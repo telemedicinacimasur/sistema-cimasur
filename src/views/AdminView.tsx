@@ -136,7 +136,7 @@ function UsersManager() {
     e.preventDefault();
     if (!editingUser) return;
     
-    await localAuth.updateUser(editingUser.email, { 
+    await localAuth.updateUser(editingUser.uid, { 
       role: editingUser.role,
       displayName: editingUser.displayName,
       ...(newPass ? { pass: newPass } : {})

@@ -25,9 +25,19 @@ export const localAuth = {
     await updateDoc(doc(db, 'users', uid), data);
   },
   createUser: async (userData: UserProfile) => {
-    // This requires enabling Admin Auth SDK in a full-stack setup, 
-    // or just creating the document for now.
-    // For now, save to users collection
+    // Add user document to 'users' collection
+    // Note: This does not create an Authentication user. The user must exist in Auth first.
+    try {
+      await addDoc(collection(db, 'users'), {
+        email: userData.email,
+        displayName: userData.displayName,
+        role: userData.role,
+        createdAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error creating user document:", error);
+      throw error;
+    }
   },
   deleteUser: async (uid: string) => {
     await deleteDoc(doc(db, 'users', uid));
