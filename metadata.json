@@ -1,0 +1,6 @@
+{
+  "name": "CIMASUR - Gestión Técnica SQL Local",
+  "description": "Sistema de gestión integral con base de datos SQLite persistente. Incluye módulos de laboratorio, CRM, gestión escolar y panel administrativo (CPANEL) para control total de usuarios y accesos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
