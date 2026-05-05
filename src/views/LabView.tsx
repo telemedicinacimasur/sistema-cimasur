@@ -2087,6 +2087,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   const [inventoryRecords, setInventoryRecords] = useState<any[]>([]);
   const [selectedArea, setSelectedArea] = useState<string>('Etiquetas salina');
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [form, setForm] = useState({
     area: 'Etiquetas salina',
@@ -2140,7 +2141,11 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     'Insumos Varios'
   ];
 
-  const filteredRecords = inventoryRecords.filter(r => r.area === selectedArea);
+  const filteredRecords = inventoryRecords.filter(r => 
+    r.area === selectedArea && 
+    (r.item.toLowerCase().includes(searchTerm.toLowerCase()) || 
+     (r.code && r.code.toLowerCase().includes(searchTerm.toLowerCase())))
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2169,51 +2174,86 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const dataArray = evt.target?.result;
+        const wb = XLSX.read(dataArray, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const rawData = XLSX.utils.sheet_to_json(ws, { defval: "" }) as any[];
+
+        if (rawData.length === 0) {
+          alert('El archivo parece estar vacío o no tiene el formato correcto.');
+          return;
+        }
 
         const existingItems = await localDB.getCollection('inventory');
         let importedCount = 0;
         let updateCount = 0;
+        let skippedCount = 0;
 
-        for (const row of data) {
-          const areaCell = row['AREA'] || row.area || row.Area || selectedArea;
-          const itemText = row['NOMBRE INSUMO'] || row.item || row.nombre || row.Insumo || '';
-          
-          if (!itemText) continue; 
-
-          const newItem = {
-            area: areaCell,
-            item: itemText,
-            code: row['CODIGO SKU'] || row.code || row.codigo || row.SKU || `IMP-${Math.floor(Math.random() * 1000)}`,
-            qty: parseInt(row.CANTIDAD || row.qty || row.cantidad || row.Stock || 0),
+        // Process sequentially
+        for (const row of rawData) {
+          // Normalize keys to support variations
+          const keys = Object.keys(row);
+          const getVal = (possibleKeys: string[]) => {
+            const key = keys.find(k => {
+              const normalizedK = k.toString().toUpperCase().trim();
+              return possibleKeys.some(pk => normalizedK === pk || normalizedK.includes(pk));
+            });
+            return key ? row[key] : null;
           };
 
-          const duplicate = existingItems.find(r => r.area === newItem.area && (r.item.toLowerCase() === newItem.item.toLowerCase() || (newItem.code && r.code?.toLowerCase() === newItem.code.toLowerCase())));
+          const areaCell = getVal(['AREA', 'ZONA', 'UBICACION']) || selectedArea || 'General';
+          const itemText = getVal(['NOMBRE INSUMO', 'ITEM', 'NOMBRE', 'PRODUCTO', 'INSUMO']);
+          const codeVal = getVal(['CODIGO SKU', 'SKU', 'CODIGO', 'CODE']);
+          const qtyVal = parseFloat(getVal(['CANTIDAD', 'STOCK', 'QTY', 'UNIDADES']) || '0');
 
-          if (duplicate) {
-            await localDB.updateInCollection('inventory', duplicate.id, { qty: duplicate.qty + newItem.qty });
+          if (!itemText || itemText.toString().trim() === "") {
+            skippedCount++;
+            continue;
+          }
+
+          const newItem = {
+            area: areaCell.toString().trim(),
+            item: itemText.toString().trim(),
+            code: codeVal ? codeVal.toString().trim() : `IMP-${Math.floor(Math.random() * 1000000)}`,
+            qty: isNaN(qtyVal) ? 0 : qtyVal,
+            updatedAt: new Date().toISOString()
+          };
+
+          // Un item es duplicado SOLO si coincide el Nombre y el Área
+          const duplicateIndex = existingItems.findIndex(r => 
+            r.area === newItem.area && 
+            r.item.toLowerCase().trim() === newItem.item.toLowerCase().trim()
+          );
+
+          if (duplicateIndex >= 0) {
+            const duplicate = existingItems[duplicateIndex];
+            const newTotalQty = (parseFloat(duplicate.qty) || 0) + newItem.qty;
+            await localDB.updateInCollection('inventory', duplicate.id, { 
+              qty: newTotalQty,
+              updatedAt: newItem.updatedAt
+            });
+            
+            existingItems[duplicateIndex].qty = newTotalQty;
             updateCount++;
-            duplicate.qty += newItem.qty;
           } else {
-            await localDB.saveToCollection('inventory', newItem);
-            existingItems.push({...newItem, id: Date.now().toString() + Math.random()}); 
+            const savedItem = await localDB.saveToCollection('inventory', newItem);
+            existingItems.push(savedItem);
             importedCount++;
           }
         }
 
-        alert(`Proceso completado.\n- Nuevos items: ${importedCount}\n- Items actualizados (cantidades sumadas): ${updateCount}`);
+        alert(`Importación Finalizada:\n- Leídas: ${rawData.length} filas\n- Nuevos items: ${importedCount}\n- Actualizados: ${updateCount}\n- Omitidos (sin nombre): ${skippedCount}`);
         const updated = await localDB.getCollection('inventory');
         setInventoryRecords(updated);
+        // Clear input
+        e.target.value = '';
       } catch (error) {
         console.error('Error parsing Excel:', error);
-        alert('Error al procesar el archivo Excel. Asegúrese de que el formato sea correcto.');
+        alert('Error al procesar el archivo Excel. Verifique el formato.');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleDeduct = async (record: any) => {
@@ -2281,41 +2321,41 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
               </select>
            </FormField>
            
-           <div className="mt-4 space-y-2">
-             <label className="block text-[10px] uppercase font-bold text-blue-100/60 mb-1">Importar Excel (.xlsx/.csv)</label>
-             <div className="flex gap-2 relative">
-               <div className="relative flex-1">
-                 <input 
-                   type="file" 
-                   accept=".xlsx, .xls, .csv" 
-                   onChange={handleFileUpload}
-                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                 />
-                 <div className="bg-white/20 hover:bg-white text-white hover:text-blue-900 h-full py-2 rounded text-[9px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-dashed border-white/30">
-                   <FileUp className="w-4 h-4" />
-                   Subir Excel
-                 </div>
-               </div>
-               <button 
-                 onClick={() => {
-                   const csvContent = "data:text/csv;charset=utf-8,AREA,NOMBRE INSUMO,CODIGO SKU,CANTIDAD\nEtiquetas salina,Etiqueta Tipo A,ET-A01,150\n";
-                   const encodedUri = encodeURI(csvContent);
-                   const link = document.createElement("a");
-                   link.setAttribute("href", encodedUri);
-                   link.setAttribute("download", "plantilla_stock.csv");
-                   document.body.appendChild(link);
-                   link.click();
-                   document.body.removeChild(link);
-                 }}
-                 className="bg-green-600/80 hover:bg-green-500 text-white p-2 rounded flex flex-col items-center justify-center"
-                 title="Descargar Plantilla Base"
-               >
-                 <Download className="w-4 h-4" />
-                 <span className="text-[8px] mt-1 font-bold">Plantilla</span>
-               </button>
-             </div>
-             <p className="text-[8px] text-blue-100/40 italic">Formato sugerido: AREA, NOMBRE INSUMO, CODIGO SKU, CANTIDAD</p>
-           </div>
+            <div className="mt-4 space-y-2">
+              <label className="block text-[10px] uppercase font-bold text-blue-100/60 mb-1">Importar Planilla Excel (.xlsx)</label>
+              <div className="flex gap-2 relative">
+                <div className="relative flex-1">
+                  <input 
+                    type="file" 
+                    accept=".xlsx, .xls" 
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="bg-white/20 hover:bg-white text-white hover:text-blue-900 h-full py-2 rounded text-[9px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-dashed border-white/30">
+                    <FileUp className="w-4 h-4" />
+                    Subir Excel
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    const data = [
+                      { 'AREA': 'Etiquetas salina', 'NOMBRE INSUMO': 'Etiqueta Tipo A', 'CODIGO SKU': 'ET-A01', 'CANTIDAD': 150 },
+                      { 'AREA': 'Etiquetas Etanol', 'NOMBRE INSUMO': 'Alcohol Isopropílico', 'CODIGO SKU': 'ALC-001', 'CANTIDAD': 10 }
+                    ];
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Plantilla Stock");
+                    XLSX.writeFile(wb, "plantilla_importacion_stock.xlsx");
+                  }}
+                  className="bg-green-600/80 hover:bg-green-500 text-white p-2 rounded flex flex-col items-center justify-center"
+                  title="Descargar Plantilla Excel"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="text-[8px] mt-1 font-bold">Plantilla</span>
+                </button>
+              </div>
+              <p className="text-[8px] text-blue-100/40 italic">Las columnas deben ser: AREA, NOMBRE INSUMO, CODIGO SKU, CANTIDAD</p>
+            </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
@@ -2365,7 +2405,13 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                 </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                  <input type="text" placeholder="Filtrar matriz..." className="text-[10px] border border-slate-200 rounded-full pl-8 pr-4 py-1.5 outline-none w-48 bg-white" />
+                  <input 
+                    type="text" 
+                    placeholder="Filtrar insumos por nombre o SKU..." 
+                    className="text-[10px] border border-slate-200 rounded-full pl-8 pr-4 py-1.5 outline-none w-64 bg-white focus:border-blue-400" 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
                 </div>
               </div>
            </div>
