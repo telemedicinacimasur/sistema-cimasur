@@ -12,7 +12,7 @@ export function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-export function formatDate(dateStr: string) {
-  if (!dateStr) return '--';
+export function formatDate(dateStr: any) {
+  if (!dateStr || typeof dateStr !== 'string') return '--';
   return dateStr.split('-').reverse().join('/');
 }

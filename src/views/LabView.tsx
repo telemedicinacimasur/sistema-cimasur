@@ -42,11 +42,16 @@ export default function LabView() {
     if (activeForm === 'default') return;
 
     const loadData = async () => {
-      let collectionName = 'lab_records';
-      if (activeForm === 'stock') collectionName = 'inventory';
-      if (activeForm === 'tracking') collectionName = 'order_tracking';
-      const data = await localDB.getCollection(collectionName);
-      setRecords(data);
+      try {
+        let collectionName = 'lab_records';
+        if (activeForm === 'stock') collectionName = 'inventory';
+        if (activeForm === 'tracking') collectionName = 'order_tracking';
+        const data = await localDB.getCollection(collectionName);
+        setRecords(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('LabView Load Error:', err);
+        setRecords([]);
+      }
     };
 
     loadData();
@@ -2106,11 +2111,17 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 
   useEffect(() => {
     const loadData = async () => {
-      const invData = await localDB.getCollection('inventory');
-      setInventoryRecords(invData);
-      
-      const folData = await localDB.getCollection('stock_followups');
-      setFollowups(folData);
+      try {
+        const invData = await localDB.getCollection('inventory');
+        setInventoryRecords(Array.isArray(invData) ? invData : []);
+        
+        const folData = await localDB.getCollection('stock_followups');
+        setFollowups(Array.isArray(folData) ? folData : []);
+      } catch (err) {
+        console.error('StockManager Load Error:', err);
+        setInventoryRecords([]);
+        setFollowups([]);
+      }
     };
     loadData();
     window.addEventListener('db-change', loadData);
@@ -2570,8 +2581,13 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
   useEffect(() => {
     const loadTrackingData = async () => {
-      const data = await localDB.getCollection('order_tracking');
-      setTrackingRecords(data);
+      try {
+        const data = await localDB.getCollection('order_tracking');
+        setTrackingRecords(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Initial Load Error:', err);
+        setTrackingRecords([]);
+      }
     };
     loadTrackingData();
     window.addEventListener('db-change', loadTrackingData);
@@ -2705,60 +2721,76 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   };
 
   const handleEdit = (r: any) => {
-    setEditingId(r.id);
-    setForm({
-      nroCotiz: r.nroCotiz || '',
-      ot: r.ot || '',
-      cliente: r.cliente || '',
-      fechaCotiz: r.fechaCotiz || '',
-      fechaEnvio: r.fechaEnvio || '',
-      fechaCierre: r.fechaCierre || '',
-      fechaRecepcion: r.fechaRecepcion || '',
-      courier: r.courier || 'Retiro en Oficina',
-      detalleSeguimiento: r.detalleSeguimiento || '',
-      situacion: r.situacion || 'PENDIENTE'
-    });
+    try {
+      if (!r) throw new Error('Registro inválido para edición');
+      setEditingId(r.id);
+      setForm({
+        nroCotiz: r.nroCotiz?.toString() || '',
+        ot: r.ot?.toString() || '',
+        cliente: r.cliente?.toString() || '',
+        fechaCotiz: r.fechaCotiz?.toString() || '',
+        fechaEnvio: r.fechaEnvio?.toString() || '',
+        fechaCierre: r.fechaCierre?.toString() || '',
+        fechaRecepcion: r.fechaRecepcion?.toString() || '',
+        courier: r.courier?.toString() || 'Retiro en Oficina',
+        detalleSeguimiento: r.detalleSeguimiento?.toString() || '',
+        situacion: r.situacion?.toString() || 'PENDIENTE'
+      });
+    } catch (err) {
+      console.error('Edit Error:', err);
+      alert('Error al intentar abrir el editor. Los datos podrían estar corruptos.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = localAuth.getCurrentUser();
-    const userName = user?.displayName || user?.email || 'Sistema';
-    const timestamp = new Date().toLocaleString('es-CL');
+    try {
+      const user = localAuth.getCurrentUser();
+      const userName = user?.displayName || user?.email || 'Sistema';
+      const timestamp = new Date().toLocaleString('es-CL');
 
-    if (editingId) {
-      const existing = trackingRecords.find(r => r.id === editingId);
-      if (!existing) return;
-      const newLogs = [...(existing.logs || [])];
-      
-      // Registrar cambios importantes
-      if (existing.situacion !== form.situacion) {
-        newLogs.push({ date: timestamp, user: userName, action: `Estado: ${existing.situacion} -> ${form.situacion}` });
-      }
-      if (existing.ot !== form.ot) {
-        newLogs.push({ date: timestamp, user: userName, action: `OT Actualizada: ${form.ot || 'QUITADA'}` });
-      }
-      if (existing.fechaEnvio !== form.fechaEnvio) {
-        newLogs.push({ date: timestamp, user: userName, action: `F. Envío: ${form.fechaEnvio || 'BORRADA'}` });
-      }
-      if (existing.detalleSeguimiento !== form.detalleSeguimiento) {
-        newLogs.push({ date: timestamp, user: userName, action: `Nota mod.: ${form.detalleSeguimiento.substring(0, 30)}...` });
-      }
+      if (editingId) {
+        const existing = trackingRecords.find(r => r.id === editingId);
+        if (!existing) {
+          alert('El registro ya no existe o fue eliminado por otro usuario.');
+          return;
+        }
+        const newLogs = [...(existing.logs || [])];
+        
+        // Registrar cambios importantes
+        if (existing.situacion !== form.situacion) {
+          newLogs.push({ date: timestamp, user: userName, action: `Estado: ${existing.situacion} -> ${form.situacion}` });
+        }
+        if (existing.ot !== form.ot) {
+          newLogs.push({ date: timestamp, user: userName, action: `OT Actualizada: ${form.ot || 'QUITADA'}` });
+        }
+        if (existing.fechaEnvio !== form.fechaEnvio) {
+          newLogs.push({ date: timestamp, user: userName, action: `F. Envío: ${form.fechaEnvio || 'BORRADA'}` });
+        }
+        
+        const safeDetalle = (form.detalleSeguimiento || '').toString();
+        const existingDetalle = (existing.detalleSeguimiento || '').toString();
+        if (existingDetalle !== safeDetalle) {
+          newLogs.push({ date: timestamp, user: userName, action: `Nota mod.: ${safeDetalle.substring(0, 30)}...` });
+        }
 
-      await localDB.updateInCollection('order_tracking', editingId, { ...form, logs: newLogs });
-      
-      // Si el cambio de situación hace que el registro ya no sea visible por el filtro actual, alertar
-      if (filterSituacion !== 'TODOS' && form.situacion !== filterSituacion) {
-        alert(`Atención: El registro ahora tiene estado "${form.situacion}" y podría no ser visible con el filtro actual ("${filterSituacion}").`);
+        await localDB.updateInCollection('order_tracking', editingId, { ...form, logs: newLogs });
+        
+        if (filterSituacion !== 'TODOS' && form.situacion !== filterSituacion) {
+          alert(`Atención: El registro ahora tiene estado "${form.situacion}" y podría no ser visible con el filtro actual ("${filterSituacion}").`);
+        }
+      } else {
+        const initialLogs = [{ date: timestamp, user: userName, action: 'Ingreso inicial a seguimiento' }];
+        await localDB.saveToCollection('order_tracking', { ...form, logs: initialLogs });
       }
-    } else {
-      const initialLogs = [{ date: timestamp, user: userName, action: 'Ingreso inicial a seguimiento' }];
-      await localDB.saveToCollection('order_tracking', { ...form, logs: initialLogs });
+      
+      const updated = await localDB.getCollection('order_tracking');
+      setTrackingRecords(updated);
+      resetForm();
+    } catch (err) {
+      console.error('Submit Error:', err);
+      alert('Error al guardar el registro. Revise su conexión o los campos ingresados.');
     }
-    
-    const updated = await localDB.getCollection('order_tracking');
-    setTrackingRecords(updated);
-    resetForm();
   };
 
   const filteredRecords = trackingRecords.filter(r => {
@@ -2769,16 +2801,15 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   });
 
   const handleDelete = async (id: string) => {
-    if (true) {
-      try {
-        await localDB.deleteFromCollection('order_tracking', id);
-        const updated = await localDB.getCollection('order_tracking');
-        setTrackingRecords(updated);
-        alert('Registro eliminado correctamente');
-      } catch (err) {
-        console.error(err);
-        alert('Error al intentar eliminar el registro');
-      }
+    try {
+      if (!id) return;
+      await localDB.deleteFromCollection('order_tracking', id);
+      const updated = await localDB.getCollection('order_tracking');
+      setTrackingRecords(updated);
+      alert('Registro eliminado correctamente');
+    } catch (err) {
+      console.error('Delete Error:', err);
+      alert('Error técnico al intentar eliminar el registro.');
     }
   };
 
