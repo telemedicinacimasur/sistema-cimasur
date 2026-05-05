@@ -2566,6 +2566,15 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   const [filterSituacion, setFilterSituacion] = useState<string>('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetail, setShowDetail] = useState<any | null>(null);
+  
+  const safe = (val: any) => {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'object') {
+      try { return JSON.stringify(val); } catch { return '[Objeto]'; }
+    }
+    return String(val);
+  };
+
   const [form, setForm] = useState({
     nroCotiz: '',
     ot: '',
@@ -2614,7 +2623,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     const logsTable = {
       title: 'Historia Unificada de Movimientos y Seguimiento',
       headers: ['Fecha', 'Usuario', 'Acción / Hito'],
-      rows: (r.logs || []).map((log: any) => [log.date, log.user, log.action])
+      rows: (Array.isArray(r.logs) ? r.logs : []).map((log: any) => [safe(log.date), safe(log.user), safe(log.action)])
     };
 
     exportExpedienteToPDF(
@@ -2632,8 +2641,8 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     const link = getTrackingLink(r.courier, r.ot);
     
     if (link) {
-      const newLogs = [...(r.logs || [])];
-      newLogs.push({ date: timestamp, user: userName, action: `Clic en enlace de seguimiento (${r.courier})` });
+      const newLogs = [...(Array.isArray(r.logs) ? r.logs : [])];
+      newLogs.push({ date: timestamp, user: userName, action: `Clic en enlace de seguimiento (${safe(r.courier)})` });
       await localDB.updateInCollection('order_tracking', r.id, { logs: newLogs });
       const updated = await localDB.getCollection('order_tracking');
       setTrackingRecords(updated);
@@ -2673,24 +2682,23 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       const quotes = await localDB.getCollection('quotes');
       const currentRecords = await localDB.getCollection('order_tracking');
       
-      // Filtramos por estado 'Aprobada' (capitalización flexible)
       const approvedQuotes = quotes.filter(q => 
-        q.estado && q.estado.trim().toLowerCase() === 'aprobada'
+        q.estado && safe(q.estado).trim().toLowerCase() === 'aprobada'
       );
       
       let addedCount = 0;
       for (const quote of approvedQuotes) {
-        // Evitar duplicados por nroCotiz (comparación limpia)
+        const quoteNro = safe(quote.nroCotiz).trim();
         const exists = currentRecords.find(r => 
-          r.nroCotiz?.toString().trim() === quote.nroCotiz?.toString().trim()
+          safe(r.nroCotiz).trim() === quoteNro
         );
         
         if (!exists) {
           await localDB.saveToCollection('order_tracking', {
-            nroCotiz: quote.nroCotiz,
+            nroCotiz: safe(quote.nroCotiz),
             ot: '',
-            cliente: quote.cliente,
-            fechaCotiz: quote.fechaElab || new Date().toISOString().split('T')[0],
+            cliente: safe(quote.cliente),
+            fechaCotiz: safe(quote.fechaElab) || new Date().toISOString().split('T')[0],
             fechaEnvio: '',
             fechaCierre: '',
             fechaRecepcion: '',
@@ -2725,16 +2733,16 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       if (!r) throw new Error('Registro inválido para edición');
       setEditingId(r.id);
       setForm({
-        nroCotiz: r.nroCotiz?.toString() || '',
-        ot: r.ot?.toString() || '',
-        cliente: r.cliente?.toString() || '',
-        fechaCotiz: r.fechaCotiz?.toString() || '',
-        fechaEnvio: r.fechaEnvio?.toString() || '',
-        fechaCierre: r.fechaCierre?.toString() || '',
-        fechaRecepcion: r.fechaRecepcion?.toString() || '',
-        courier: r.courier?.toString() || 'Retiro en Oficina',
-        detalleSeguimiento: r.detalleSeguimiento?.toString() || '',
-        situacion: r.situacion?.toString() || 'PENDIENTE'
+        nroCotiz: safe(r.nroCotiz),
+        ot: safe(r.ot),
+        cliente: safe(r.cliente),
+        fechaCotiz: safe(r.fechaCotiz),
+        fechaEnvio: safe(r.fechaEnvio),
+        fechaCierre: safe(r.fechaCierre),
+        fechaRecepcion: safe(r.fechaRecepcion),
+        courier: safe(r.courier) || 'Retiro en Oficina',
+        detalleSeguimiento: safe(r.detalleSeguimiento),
+        situacion: safe(r.situacion) || 'PENDIENTE'
       });
     } catch (err) {
       console.error('Edit Error:', err);
@@ -2755,17 +2763,17 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
           alert('El registro ya no existe o fue eliminado por otro usuario.');
           return;
         }
-        const newLogs = [...(existing.logs || [])];
+        const newLogs = [...(Array.isArray(existing.logs) ? existing.logs : [])];
         
         // Registrar cambios importantes
-        if (existing.situacion !== form.situacion) {
-          newLogs.push({ date: timestamp, user: userName, action: `Estado: ${existing.situacion} -> ${form.situacion}` });
+        if (safe(existing.situacion) !== safe(form.situacion)) {
+          newLogs.push({ date: timestamp, user: userName, action: `Estado: ${safe(existing.situacion)} -> ${safe(form.situacion)}` });
         }
-        if (existing.ot !== form.ot) {
-          newLogs.push({ date: timestamp, user: userName, action: `OT Actualizada: ${form.ot || 'QUITADA'}` });
+        if (safe(existing.ot) !== safe(form.ot)) {
+          newLogs.push({ date: timestamp, user: userName, action: `OT Actualizada: ${safe(form.ot) || 'QUITADA'}` });
         }
-        if (existing.fechaEnvio !== form.fechaEnvio) {
-          newLogs.push({ date: timestamp, user: userName, action: `F. Envío: ${form.fechaEnvio || 'BORRADA'}` });
+        if (safe(existing.fechaEnvio) !== safe(form.fechaEnvio)) {
+          newLogs.push({ date: timestamp, user: userName, action: `F. Envío: ${safe(form.fechaEnvio) || 'BORRADA'}` });
         }
         
         const safeDetalle = (form.detalleSeguimiento || '').toString();
@@ -2793,9 +2801,10 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     }
   };
 
-  const filteredRecords = trackingRecords.filter(r => {
-    const matchesSituacion = filterSituacion === 'TODOS' || r.situacion === filterSituacion;
-    const searchString = `${r.nroCotiz || ''} ${r.cliente || ''} ${r.ot || ''}`.toLowerCase();
+  const filteredRecords = (Array.isArray(trackingRecords) ? trackingRecords : []).filter(r => {
+    const situacion = safe(r.situacion);
+    const matchesSituacion = filterSituacion === 'TODOS' || situacion === filterSituacion;
+    const searchString = `${safe(r.nroCotiz)} ${safe(r.cliente)} ${safe(r.ot)}`.toLowerCase();
     const matchesSearch = searchString.includes(searchTerm.toLowerCase());
     return matchesSituacion && matchesSearch;
   });
@@ -2819,7 +2828,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full translate-y-0 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center">
-              <div className="flex items-center gap-2"><FileText className="w-5 h-5" /> Detalle Completo de Seguimiento: {showDetail.nroCotiz}</div>
+              <div className="flex items-center gap-2"><FileText className="w-5 h-5" /> Detalle Completo de Seguimiento: {safe(showDetail.nroCotiz)}</div>
               <button onClick={() => setShowDetail(null)} className="text-white hover:bg-white/10 p-1 rounded transition-colors">✕</button>
             </div>
             
@@ -2827,27 +2836,27 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
               <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-6">
                 <div>
                   <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Información Básica</h5>
-                  <p className="text-sm"><strong>Pedido:</strong> {showDetail.nroCotiz}</p>
-                  <p className="text-sm"><strong>Cliente:</strong> {showDetail.cliente}</p>
+                  <p className="text-sm"><strong>Pedido:</strong> {safe(showDetail.nroCotiz)}</p>
+                  <p className="text-sm"><strong>Cliente:</strong> {safe(showDetail.cliente)}</p>
                   <p className="text-sm"><strong>Situación:</strong> 
                     <span className={cn(
                       "ml-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase inline-block",
-                      showDetail.situacion === 'OK' ? "bg-green-100 text-green-700" :
-                      showDetail.situacion === 'PENDIENTE' ? "bg-amber-100 text-amber-700" :
-                      showDetail.situacion === 'EN TRÁNSITO' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                      safe(showDetail.situacion) === 'OK' ? "bg-green-100 text-green-700" :
+                      safe(showDetail.situacion) === 'PENDIENTE' ? "bg-amber-100 text-amber-700" :
+                      safe(showDetail.situacion) === 'EN TRÁNSITO' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
                     )}>
-                      {showDetail.situacion}
+                      {safe(showDetail.situacion)}
                     </span>
                   </p>
                 </div>
                 <div>
                   <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Logística</h5>
-                  <p className="text-sm"><strong>Courier:</strong> {showDetail.courier}</p>
-                  <p className="text-sm"><strong>OT:</strong> {showDetail.ot || 'PENDIENTE'}</p>
+                  <p className="text-sm"><strong>Courier:</strong> {safe(showDetail.courier)}</p>
+                  <p className="text-sm"><strong>OT:</strong> {safe(showDetail.ot) || 'PENDIENTE'}</p>
                 </div>
                 <div className="col-span-2 bg-slate-50 p-3 border rounded text-xs text-slate-600 italic">
                   <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 not-italic">Observaciones</h5>
-                  {showDetail.detalleSeguimiento || 'Sin observaciones adicionales registradas.'}
+                  {safe(showDetail.detalleSeguimiento) || 'Sin observaciones adicionales registradas.'}
                 </div>
               </div>
 
@@ -2882,16 +2891,16 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
                 </div>
 
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  {(showDetail.logs || []).slice().reverse().map((log: any, i: number) => (
+                  {(Array.isArray(showDetail.logs) ? showDetail.logs : []).slice().reverse().map((log: any, i: number) => (
                     <div key={i} className="text-[10px] bg-white border border-slate-100 border-l-4 border-blue-500 p-3 rounded shadow-sm hover:border-blue-200 transition-all">
                       <div className="flex justify-between font-black text-blue-900 mb-1 uppercase tracking-tighter">
-                        <span>{log.date}</span>
-                        <span className="bg-blue-50 px-1.5 py-0.5 rounded text-[8px]">{log.user}</span>
+                        <span>{safe(log.date)}</span>
+                        <span className="bg-blue-50 px-1.5 py-0.5 rounded text-[8px]">{safe(log.user)}</span>
                       </div>
-                      <p className="text-slate-600 font-medium leading-relaxed">{log.action}</p>
+                      <p className="text-slate-600 font-medium leading-relaxed">{safe(log.action)}</p>
                     </div>
                   ))}
-                  {(!showDetail.logs || showDetail.logs.length === 0) && (
+                  {(!Array.isArray(showDetail.logs) || showDetail.logs.length === 0) && (
                     <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                       <p className="text-xs text-slate-400 italic">No hay registros de movimientos aún.</p>
                     </div>
@@ -2982,27 +2991,27 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{editingId ? 'Editar Registro' : 'Registrar Nuevo Envío'}</h4>
             </div>
             
-            <FormField label="Pedido / N° Cotiz."><input required className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white" value={form.nroCotiz || ''} onChange={e => setForm({...form, nroCotiz: e.target.value})} placeholder="Ej: 2024-001" /></FormField>
-            <FormField label="Orden de Transporte (OT)"><input className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white" value={form.ot || ''} onChange={e => setForm({...form, ot: e.target.value})} placeholder="Ej: 12345678" /></FormField>
-            <FormField label="Nombre Cliente"><input required className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white uppercase" value={form.cliente || ''} onChange={e => setForm({...form, cliente: e.target.value})} placeholder="CLIENTE S.A." /></FormField>
-            <FormField label="Fecha Cotización"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={form.fechaCotiz || ''} onChange={e => setForm({...form, fechaCotiz: e.target.value})} /></FormField>
+            <FormField label="Pedido / N° Cotiz."><input required className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white" value={safe(form.nroCotiz)} onChange={e => setForm({...form, nroCotiz: e.target.value})} placeholder="Ej: 2024-001" /></FormField>
+            <FormField label="Orden de Transporte (OT)"><input className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white" value={safe(form.ot)} onChange={e => setForm({...form, ot: e.target.value})} placeholder="Ej: 12345678" /></FormField>
+            <FormField label="Nombre Cliente"><input required className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white uppercase" value={safe(form.cliente)} onChange={e => setForm({...form, cliente: e.target.value})} placeholder="CLIENTE S.A." /></FormField>
+            <FormField label="Fecha Cotización"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaCotiz)} onChange={e => setForm({...form, fechaCotiz: e.target.value})} /></FormField>
             
-            <FormField label="Fecha Envío"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={form.fechaEnvio || ''} onChange={e => setForm({...form, fechaEnvio: e.target.value})} /></FormField>
-            <FormField label="Fecha Cierre"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={form.fechaCierre || ''} onChange={e => setForm({...form, fechaCierre: e.target.value})} /></FormField>
-            <FormField label="Fecha Recepción"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={form.fechaRecepcion || ''} onChange={e => setForm({...form, fechaRecepcion: e.target.value})} /></FormField>
+            <FormField label="Fecha Envío"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaEnvio)} onChange={e => setForm({...form, fechaEnvio: e.target.value})} /></FormField>
+            <FormField label="Fecha Cierre"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaCierre)} onChange={e => setForm({...form, fechaCierre: e.target.value})} /></FormField>
+            <FormField label="Fecha Recepción"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaRecepcion)} onChange={e => setForm({...form, fechaRecepcion: e.target.value})} /></FormField>
             
             <FormField label="Courier">
-              <select className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={form.courier || 'Retiro en Oficina'} onChange={e => setForm({...form, courier: e.target.value})}>
+              <select className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.courier) || 'Retiro en Oficina'} onChange={e => setForm({...form, courier: e.target.value})}>
                 {couriers.map(c => <option key={c}>{c}</option>)}
               </select>
             </FormField>
 
             <div className="md:col-span-2">
-              <FormField label="Detalle de Seguimiento"><input className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={form.detalleSeguimiento || ''} onChange={e => setForm({...form, detalleSeguimiento: e.target.value})} placeholder="Ej: Entregado en conserjería..." /></FormField>
+              <FormField label="Detalle de Seguimiento"><input className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.detalleSeguimiento)} onChange={e => setForm({...form, detalleSeguimiento: e.target.value})} placeholder="Ej: Entregado en conserjería..." /></FormField>
             </div>
             
             <FormField label="Reclamo / Situación">
-              <select className="w-full border-b border-slate-300 p-2 text-sm font-black bg-white" value={form.situacion || 'PENDIENTE'} onChange={e => setForm({...form, situacion: e.target.value})}>
+              <select className="w-full border-b border-slate-300 p-2 text-sm font-black bg-white" value={safe(form.situacion) || 'PENDIENTE'} onChange={e => setForm({...form, situacion: e.target.value})}>
                 {situaciones.map(s => <option key={s}>{s}</option>)}
               </select>
             </FormField>
@@ -3023,7 +3032,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             <thead>
               <tr className="bg-slate-100 text-left border-b font-black text-slate-600 uppercase tracking-tighter">
                 <th className="p-2 w-20">Pedido</th>
-                <th className="p-2 w-28">OT / Enlace</th>
+                <th className="p-2 w-28 text-center">OT / Enlace</th>
                 <th className="p-2 w-32">Cliente</th>
                 <th className="p-2 w-16 text-center">Cotiz.</th>
                 <th className="p-2 w-16 text-center">Envío</th>
@@ -3035,15 +3044,15 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredRecords.map(r => (
-                <tr key={r.id} className="hover:bg-blue-50/30 transition-colors">
-                   <td className="p-2 font-bold text-blue-900 truncate">{r.nroCotiz}</td>
-                   <td className="p-2 font-mono text-slate-500 truncate flex items-center gap-1">
+                <tr key={r.id || Math.random().toString()} className="hover:bg-blue-50/30 transition-colors">
+                   <td className="p-2 font-bold text-blue-900 truncate">{safe(r.nroCotiz)}</td>
+                   <td className="p-2 font-mono text-slate-500 truncate flex items-center justify-center gap-1">
                       {r.ot ? (
                         <>
-                          {r.ot}
-                          {getTrackingLink(r.courier, r.ot) && (
+                          {safe(r.ot)}
+                          {getTrackingLink(safe(r.courier), safe(r.ot)) && (
                             <a 
-                              href={getTrackingLink(r.courier, r.ot)!} 
+                              href={getTrackingLink(safe(r.courier), safe(r.ot))!} 
                               target="_blank" 
                               rel="noreferrer" 
                               onClick={() => trackTrackingClick(r)}
@@ -3056,19 +3065,19 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
                         </>
                       ) : '---'}
                    </td>
-                   <td className="p-2 font-medium uppercase truncate" title={r.cliente}>{r.cliente}</td>
+                   <td className="p-2 font-medium uppercase truncate" title={safe(r.cliente)}>{safe(r.cliente)}</td>
                    <td className="p-2 text-center text-slate-400">{formatDate(r.fechaCotiz)}</td>
                    <td className="p-2 text-center font-bold text-emerald-600">{r.fechaEnvio ? formatDate(r.fechaEnvio) : '---'}</td>
-                   <td className="p-2 text-slate-500 italic truncate" title={r.detalleSeguimiento}>{r.detalleSeguimiento || '---'}</td>
-                   <td className="p-2 text-center font-bold">{r.courier}</td>
+                   <td className="p-2 text-slate-500 italic truncate" title={safe(r.detalleSeguimiento)}>{safe(r.detalleSeguimiento) || '---'}</td>
+                   <td className="p-2 text-center font-bold">{safe(r.courier)}</td>
                    <td className="p-2 text-center">
                     <span className={cn(
                       "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase inline-block w-full",
-                      r.situacion === 'OK' ? "bg-green-100 text-green-700" :
-                      r.situacion === 'PENDIENTE' ? "bg-amber-100 text-amber-700" :
-                      r.situacion === 'EN TRÁNSITO' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                      safe(r.situacion) === 'OK' ? "bg-green-100 text-green-700" :
+                      safe(r.situacion) === 'PENDIENTE' ? "bg-amber-100 text-amber-700" :
+                      safe(r.situacion) === 'EN TRÁNSITO' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
                     )}>
-                      {r.situacion}
+                      {safe(r.situacion)}
                     </span>
                    </td>
                    <td className="p-2 text-center">
