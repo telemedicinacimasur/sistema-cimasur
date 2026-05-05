@@ -724,9 +724,13 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
                       onDelete={async () => {
                         if (true) {
                           try {
-                            const user = localAuth.getCurrentUser();
+                            const firebaseUser = localAuth.getCurrentUser();
+                            if (firebaseUser) {
+                                const userProfile = await localAuth.getUserById(firebaseUser.uid);
+                                if (userProfile)
+                                    await addAuditLog(userProfile, `Eliminó Elaboración: ${r.producto} (N° ${r.nroCimasur})`, 'Laboratorio');
+                            }
                             await localDB.deleteFromCollection('lab_records', r.id);
-                            if (user) await addAuditLog(user, `Eliminó Elaboración: ${r.producto} (N° ${r.nroCimasur})`, 'Laboratorio');
                             const updated = await localDB.getCollection('lab_records');
                             setRecords(updated);
                             alert('Ficha Técnica eliminada correctamente');

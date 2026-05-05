@@ -409,6 +409,10 @@ function FormField({ label, children }: { label: string, children: React.ReactNo
 
 function QuoteManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Todos');
+  
   const [form, setForm] = useState({
     anio: new Date().getFullYear().toString(),
     mes: new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
@@ -420,22 +424,56 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
     fechaAprob: '',
     invUnits: 0,
     todoUnits: 0,
+    undTotal: 0,
     observaciones: ''
   });
 
   const sellers = ['CIMASUR', 'Gestión', 'Telemedicina', 'Tienda', 'Mercado Libre', 'Genérico', 'Consignación'];
   const statuses = ['Pendiente', 'Aprobada', 'Anulada'];
 
-  const undTotal = (Number(form.estado) === Number('Aprobada') || form.estado === 'Aprobada') ? (Number(form.invUnits || 0) + Number(form.todoUnits || 0)) : 0;
+  // Calculate todoUnits if undTotal and invUnits change, or vice versa
+  // If the user wants: Total 20, Inv 15 -> ToDo 5.
+  // We'll treat undTotal as the "Total Requested"
+  
+  const handleTotalChange = (val: number) => {
+    setForm(prev => ({ 
+      ...prev, 
+      undTotal: val,
+      todoUnits: Math.max(0, val - (prev.invUnits || 0))
+    }));
+  };
+
+  const handleInvChange = (val: number) => {
+    setForm(prev => ({ 
+      ...prev, 
+      invUnits: val,
+      todoUnits: Math.max(0, (prev.undTotal || 0) - val)
+    }));
+  };
+
+  const filteredRecords = records
+    .filter(r => {
+      const matchesSearch = !searchFilter || 
+        r.cliente?.toLowerCase().includes(searchFilter.toLowerCase()) || 
+        r.nroCotiz?.toString().includes(searchFilter);
+      const matchesDate = !dateFilter || r.fechaElab === dateFilter;
+      const matchesStatus = statusFilter === 'Todos' || r.estado === statusFilter;
+      return matchesSearch && matchesDate && matchesStatus;
+    })
+    .sort((a, b) => {
+      const numA = parseInt(a.nroCotiz) || 0;
+      const numB = parseInt(b.nroCotiz) || 0;
+      return numA - numB;
+    });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      await localDB.updateInCollection('quotes', editingId, { ...form, undTotal });
+      await localDB.updateInCollection('quotes', editingId, form);
       setEditingId(null);
       alert('Cotización actualizada exitosamente');
     } else {
-      await localDB.saveToCollection('quotes', { ...form, undTotal });
+      await localDB.saveToCollection('quotes', form);
       alert('Cotización guardada exitosamente');
     }
     setForm({
@@ -449,6 +487,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
       fechaAprob: '',
       invUnits: 0,
       todoUnits: 0,
+      undTotal: 0,
       observaciones: ''
     });
     const updated = await localDB.getCollection('quotes');
@@ -508,11 +547,11 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
           </FormField>
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           <FormField label="Observaciones"><input className="w-full border-b p-2 text-sm" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
-          <FormField label="Und Inventario"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits ?? 0} onChange={e => setForm({...form, invUnits: parseInt(e.target.value) || 0})} /></FormField>
-          <FormField label="Und a hacer"><input type="number" className="w-full border-b p-2 text-sm" value={form.todoUnits ?? 0} onChange={e => setForm({...form, todoUnits: parseInt(e.target.value) || 0})} /></FormField>
-          <FormField label="UND Total">
-            <div className="w-full p-2 text-sm font-black text-blue-700 bg-blue-50 rounded border-b border-blue-200">
-              {undTotal}
+          <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal ?? 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="Und Inventario"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits ?? 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="Und a hacer">
+            <div className="w-full p-2 text-sm font-bold text-amber-700 bg-amber-50 rounded border-b border-amber-200">
+              {form.todoUnits}
             </div>
           </FormField>
           <div className="flex items-end">
@@ -524,30 +563,59 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
+        <div className="p-4 bg-slate-50 border-b flex flex-wrap gap-4 items-center justify-between">
           <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Histórico de Cotizaciones</h3>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => {
-                const data = records.map(r => [
-                  `${r.anio || ''}/${r.mes || ''}`,
-                  r.nroCotiz || '',
-                  r.cliente || '',
-                  r.vendedor || '',
-                  r.estado || '',
-                  r.undTotal || 0,
-                  r.observaciones || ''
-                ]);
-                exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_cotizaciones', 'l');
-              }}
-              className="text-blue-600 hover:text-blue-800" 
-              title="PDF"
-            >
-              <Download className="w-3.5 h-3.5" />
-            </button>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Filtros:</span>
+              <input 
+                type="date" 
+                className="text-[10px] border rounded p-1 outline-none" 
+                value={dateFilter}
+                onChange={e => setDateFilter(e.target.value)}
+              />
+              <select 
+                className="text-[10px] border rounded p-1 outline-none font-bold"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+              >
+                <option value="Todos">Todos los Estados</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Aprobada">Aprobada</option>
+                <option value="Anulada">Anulada</option>
+              </select>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-              <input placeholder="Buscar por cliente o N°..." className="pl-8 pr-4 py-1 text-xs border rounded-full w-64 outline-none focus:border-blue-400" />
+              <input 
+                placeholder="Buscar por cliente o N°..." 
+                className="pl-8 pr-4 py-1 text-xs border rounded-full w-48 lg:w-64 outline-none focus:border-blue-400" 
+                value={searchFilter}
+                onChange={e => setSearchFilter(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 border-l pl-3 border-slate-200">
+              <button 
+                onClick={() => {
+                  const data = filteredRecords.map(r => [
+                    `${r.anio || ''}/${r.mes || ''}`,
+                    r.nroCotiz || '',
+                    r.cliente || '',
+                    r.vendedor || '',
+                    r.estado || '',
+                    r.undTotal || 0,
+                    r.observaciones || ''
+                  ]);
+                  exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_cotizaciones', 'l');
+                }}
+                className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition-colors hover:bg-blue-700 flex items-center gap-1" 
+                title="Descargar PDF Filtrado"
+              >
+                <Download className="w-3.5 h-3.5" /> PDF
+              </button>
             </div>
           </div>
         </div>
@@ -565,7 +633,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {records.map(r => (
+              {filteredRecords.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors italic">
                   <td className="p-4 text-center text-slate-400">{r.anio || ''} / {r.mes || ''}</td>
                   <td className="p-4 font-bold text-[#001736]">{r.nroCotiz || ''}</td>
@@ -584,8 +652,13 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                       {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
-                  <td className="p-4 text-center font-black text-blue-700">{r.undTotal || 0}</td>
-                 <td className="p-4 text-center">
+                  <td className="p-4 text-center font-black text-blue-700 italic">
+                    <div className="flex flex-col items-center">
+                      <span>{r.undTotal || 0}</span>
+                      <span className="text-[8px] text-slate-400 font-normal">Inv: {r.invUnits || 0} / Pro: {r.todoUnits || 0}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                     <RecordActions
                       onView={() => {
@@ -596,6 +669,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                           { label: 'Vendedor', value: r.vendedor || '' },
                           { label: 'Estado', value: r.estado || '' },
                           { label: 'UND Total', value: (r.undTotal || 0).toString() },
+                          { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` },
                           { label: 'Observaciones', value: r.observaciones || '' }
                         ];
                         viewExpedienteInNewTab('Ficha: Cotización', data, `cotizacion_${r.nroCotiz}`);
@@ -608,6 +682,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                           { label: 'Vendedor', value: r.vendedor || '' },
                           { label: 'Estado', value: r.estado || '' },
                           { label: 'UND Total', value: (r.undTotal || 0).toString() },
+                          { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` },
                           { label: 'Observaciones', value: r.observaciones || '' }
                         ];
                         exportExpedienteToPDF('Ficha: Cotización', data, `cotizacion_${r.nroCotiz}`);
@@ -625,6 +700,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                           fechaAprob: r.fechaAprob || '',
                           invUnits: r.invUnits || 0,
                           todoUnits: r.todoUnits || 0,
+                          undTotal: r.undTotal || 0,
                           observaciones: r.observaciones || ''
                         });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -640,7 +716,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
               <tr>
                 <td colSpan={5} className="p-4 text-right uppercase text-slate-500 text-[9px] tracking-widest">Suma Total Unidades Vendidas:</td>
                 <td className="p-4 text-center text-blue-700 text-sm">
-                  {records.reduce((sum, r) => sum + (Number(r.undTotal) || 0), 0)}
+                  {filteredRecords.reduce((sum, r) => sum + (Number(r.undTotal) || 0), 0)}
                 </td>
                 <td></td>
               </tr>
