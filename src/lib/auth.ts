@@ -80,7 +80,7 @@ export const localAuth = {
       try {
         await addDoc(collection(db, 'users'), {
           email: userData.email,
-          displayName: userData.displayName,
+          displayName: userData.displayName || 'Anónimo',
           role: userData.role,
           createdAt: new Date().toISOString()
         });
@@ -107,7 +107,7 @@ export const localAuth = {
 
 export async function addAuditLog(user: UserProfile, action: string, module: string) {
   const logData = {
-    displayName: user.displayName,
+    displayName: user.displayName || 'Anónimo',
     email: user.email,
     role: user.role,
     action,
