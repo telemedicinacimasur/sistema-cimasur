@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
-import { cn, formatDate } from '../lib/utils';
+import { cn, formatDate, safe } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Beaker, 
@@ -22,16 +22,19 @@ import {
   Edit,
   FileUp,
   PlusCircle,
+  Plus,
   History,
   ExternalLink,
   FileText,
-  Clock
+  Clock,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { RecordActions } from '../components/RecordActions';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
 
-type LabFormType = 'registro' | 'ingreso' | 'gotas-puras' | 'elaboracion' | 'nosodes' | 'tinturas' | 'preparacion' | 'insumos' | 'vademecum' | 'mantenimiento' | 'stock' | 'tracking' | 'default';
+type LabFormType = 'registro' | 'ingreso' | 'gotas-puras' | 'elaboracion' | 'nosodes' | 'tinturas' | 'preparacion' | 'insumos' | 'vademecum' | 'mantenimiento' | 'stock' | 'tracking' | 'magistrales' | 'diluciones-db' | 'default';
 
 export default function LabView() {
   const [activeForm, setActiveForm] = useState<LabFormType>('default');
@@ -46,6 +49,7 @@ export default function LabView() {
         let collectionName = 'lab_records';
         if (activeForm === 'stock') collectionName = 'inventory';
         if (activeForm === 'tracking') collectionName = 'order_tracking';
+        if (activeForm === 'magistrales') collectionName = 'lab_records';
         const data = await localDB.getCollection(collectionName);
         setRecords(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -74,25 +78,25 @@ export default function LabView() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <ModuleCard 
             title="Evaluación Gotas Puras"
-            desc="Control de calidad y pureza de extractos."
+            desc="Control de estado para elaboración."
             icon={Beaker}
             onClick={() => setActiveForm('gotas-puras')}
           />
           <ModuleCard 
             title="Elaboración Gotas y Diluciones"
-            desc="Protocolos de dinamización y mezcla."
+            desc="Registro de gotas puras y diluciones"
             icon={FlaskConical}
             onClick={() => setActiveForm('elaboracion')}
           />
           <ModuleCard 
             title="Ingreso Nosodes"
-            desc="Registro de cepas y acciones técnicas."
+            desc="Registro de muestras médicas- nosodes clientes."
             icon={Microscope}
             onClick={() => setActiveForm('nosodes')}
           />
           <ModuleCard 
-            title="Tinturas Madres"
-            desc="Maceración e ingresos de materias primas."
+            title="Ficha Tinturas Madres"
+            desc="Preparación de tintura madre"
             icon={Droplets}
             onClick={() => setActiveForm('tinturas')}
           />
@@ -103,20 +107,20 @@ export default function LabView() {
             onClick={() => setActiveForm('preparacion')}
           />
           <ModuleCard 
-            title="Insumos"
-            desc="Gestión de frascos, etiquetas y reactivos."
+            title="Registro de Insumos laboratorio T.M. y otros"
+            desc="Detalle Ingreso Productos para Tinturas"
             icon={Package}
             onClick={() => setActiveForm('insumos')}
           />
           <ModuleCard 
             title="Vademécum"
-            desc="Consulta de fórmulas y aplicaciones."
+            desc="Productos requeridos para productos de vademécum"
             icon={BookOpen}
             onClick={() => setActiveForm('vademecum')}
           />
           <ModuleCard 
             title="Mantención"
-            desc="Registro de limpieza y calibración."
+            desc="Registro de limpieza y calibración de equipos de laboratorio."
             icon={Settings}
             onClick={() => setActiveForm('mantenimiento')}
           />
@@ -132,6 +136,13 @@ export default function LabView() {
             desc="Trazabilidad, Courier y Estados de Envío."
             icon={ClipboardCheck}
             onClick={() => setActiveForm('tracking')}
+            featured
+          />
+          <ModuleCard 
+            title="Fórmulas Magistrales"
+            desc="Elaboración y composición de fórmulas magistrales."
+            icon={FileText}
+            onClick={() => setActiveForm('magistrales')}
             featured
           />
         </div>
@@ -160,6 +171,7 @@ export default function LabView() {
         {activeForm === 'mantenimiento' && <MantenimientoForm records={records} setRecords={setRecords} />}
         {activeForm === 'stock' && <StockManager records={records} setRecords={setRecords} />}
         {activeForm === 'tracking' && <OrderTrackingForm records={records} setRecords={setRecords} />}
+        {activeForm === 'magistrales' && <MagistralesForm records={records} setRecords={setRecords} />}
       </div>
     </div>
   );
@@ -416,7 +428,9 @@ function IngresoForm({ records, setRecords }: { records: any[], setRecords: (dat
 
 function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
     producto: '',
@@ -428,6 +442,60 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
     createdAt: '',
     updatedAt: ''
   });
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Fecha", "Producto", "Estado (Bajo/Medio/Alto)", "Responsable", "Observaciones"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Evaluacion");
+    XLSX.writeFile(wb, "plantilla_evaluacion_gotas_puras.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const producto = safe(row["Producto"]);
+          if (!producto) continue;
+
+          const newRecord = {
+            type: 'gotas-puras',
+            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            producto: producto,
+            estado: safe(row["Estado (Bajo/Medio/Alto)"]) || 'Medio',
+            responsable: safe(row["Responsable"]) || user.displayName || '',
+            observaciones: safe(row["Observaciones"]),
+            creadoPor: user.displayName || '',
+            createdAt: new Date().toISOString()
+          };
+
+          await localDB.saveToCollection('lab_records', newRecord);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} evaluaciones de gotas puras desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   useEffect(() => {
     if (user && !editingId) {
@@ -463,6 +531,30 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
           <h3 className="text-lg font-bold flex items-center gap-2 text-white">
             <Beaker className="w-5 h-5" /> Evaluación Gotas Puras
           </h3>
+          <div className="flex gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+          </div>
         </div>
         <form className="p-6 space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-4">
@@ -513,7 +605,19 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
       <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Evaluación</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Evaluación</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none focus:ring-1 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
           <button 
             onClick={() => {
               const data = records.filter(r => r.type === 'gotas-puras').map(r => [
@@ -546,10 +650,16 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {records.filter(r => r.type === 'gotas-puras').length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-slate-400 text-xs italic">Sin registros previos</td></tr>
+              {records.filter(r => r.type === 'gotas-puras').filter(r => {
+                const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.observaciones || ''} ${r.fecha || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).length === 0 ? (
+                <tr><td colSpan={5} className="p-8 text-center text-slate-400 text-xs italic">Sin registros previos o resultados</td></tr>
               ) : (
-                records.filter(r => r.type === 'gotas-puras').map((record) => (
+                records.filter(r => r.type === 'gotas-puras').filter(r => {
+                  const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.observaciones || ''} ${r.fecha || ''}`.toLowerCase();
+                  return searchStr.includes(searchTerm.toLowerCase());
+                }).map((record) => (
                   <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 text-xs font-medium">{formatDate(record.fecha)}</td>
                     <td className="px-6 py-4 text-xs font-bold text-[#001736]">{record.producto}</td>
@@ -591,20 +701,81 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
 function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
     tipo: 'Gota Pura',
     producto: '',
     elaborador: '',
     responsable: '',
-    solucion: 'Vehículo Estándar',
+    solucion: '',
     nroCimasur: '',
     cantidad: '',
     status: 'En Proceso',
     creadoPor: '',
     ultimaModificacionPor: ''
   });
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Fecha", "Tipo (Gota Pura/Dilución)", "Producto", "Nro Cimasur", "Solución", "Cantidad", "Status", "Responsable", "Elaborador"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Elaboracion");
+    XLSX.writeFile(wb, "plantilla_elaboracion.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const producto = safe(row["Producto"]);
+          const nroCimasur = safe(row["Nro Cimasur"]);
+          if (!producto || !nroCimasur) continue;
+
+          const newRecord = {
+            type: 'elaboracion',
+            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            tipo: safe(row["Tipo (Gota Pura/Dilución)"]) || 'Gota Pura',
+            producto: producto,
+            nroCimasur: nroCimasur,
+            solucion: safe(row["Solución"]) || '',
+            cantidad: safe(row["Cantidad"]),
+            status: safe(row["Status"]) || 'En Proceso',
+            responsable: safe(row["Responsable"]) || user.displayName || '',
+            elaborador: safe(row["Elaborador"]),
+            creadoPor: user.displayName || '',
+            createdAt: new Date().toISOString()
+          };
+
+          await localDB.saveToCollection('lab_records', newRecord);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} registros de elaboración desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   useEffect(() => {
     if (user && !editingId) {
@@ -634,7 +805,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
       producto: '',
       elaborador: '',
       responsable: user.displayName || '',
-      solucion: 'Vehículo Estándar',
+      solucion: '',
       nroCimasur: '',
       cantidad: '',
       status: 'En Proceso',
@@ -649,7 +820,31 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center">
-          <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Elaboración de Gotas y Diluciones</span>
+          <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Elaboración Gotas y Diluciones</span>
+          <div className="flex gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+          </div>
         </div>
         <form className="p-8 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4" onSubmit={handleSubmit}>
           <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
@@ -680,8 +875,45 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-          <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Kardex de Elaboración Diaria</h3>
-          <Search className="w-3 h-3 text-slate-300" />
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Kardex de Elaboración Diaria</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-48 outline-none focus:ring-1 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={() => {
+                const filtered = records.filter(r => r.type === 'elaboracion').filter(r => {
+                  const searchStr = `${r.fecha || ''} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
+                  return searchStr.includes(searchTerm.toLowerCase());
+                });
+                const data = filtered.map(r => [
+                  r.fecha,
+                  r.nroCimasur,
+                  r.producto,
+                  r.responsable,
+                  r.status
+                ]);
+                exportTableToPDF(
+                  'Kardex de Elaboración Diaria',
+                  ['Fecha', 'N° Cimasur', 'Producto', 'Responsable', 'Status'],
+                  data,
+                  'kardex_elaboracion_diaria'
+                );
+              }}
+              className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar PDF Filtrado"
+            >
+              <Download className="w-3 h-3" /> PDF
+            </button>
+          </div>
+          <FlaskConical className="w-3 h-3 text-slate-300" />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -695,7 +927,10 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {records.filter(r => r.type === 'elaboracion').map(r => (
+              {records.filter(r => r.type === 'elaboracion').filter(r => {
+                const searchStr = `${r.fecha || ''} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).map(r => (
                 <tr key={r.id} className="hover:bg-slate-50">
                   <td className="p-4">{r.fecha}</td>
                   <td className="p-4 font-mono text-blue-700">{r.nroCimasur}</td>
@@ -787,8 +1022,74 @@ const initialFormState = {
 
 function NosodesForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(initialFormState);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [form, setForm] = useState<any>(initialFormState);
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Fecha Ficha", "Nro Muestra", "Paciente", "Producto", "Médico", "Peso", "Dilución", "Maceración", "Filtrado", "Responsable"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Nosodes");
+    XLSX.writeFile(wb, "plantilla_nosodes_avanzada.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const paciente = safe(row["Paciente"]);
+          const nroMuestra = safe(row["Nro Muestra"]);
+          if (!paciente || !nroMuestra) continue;
+
+          const newRecord = {
+            ...initialFormState,
+            type: 'nosodes',
+            fechaFicha: safe(row["Fecha Ficha"]) || new Date().toISOString().split('T')[0],
+            nroMuestra: nroMuestra,
+            paciente: paciente,
+            producto: safe(row["Producto"]),
+            medico: safe(row["Médico"]),
+            acciones: {
+              ...initialFormState.acciones,
+              peso: safe(row["Peso"]),
+              dilucion: safe(row["Dilución"]),
+              maceracion: safe(row["Maceración"]),
+              filtrado: safe(row["Filtrado"]),
+            },
+            responsable: safe(row["Responsable"]) || user.displayName || '',
+            creadoPor: user.displayName || '',
+            createdAt: new Date().toISOString()
+          };
+
+          await localDB.saveToCollection('lab_records', newRecord);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} fichas de nosodes desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
 
   useEffect(() => {
@@ -826,8 +1127,32 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center">
-          <span className="flex items-center gap-2"><Microscope className="w-5 h-5" /> Ficha Técnica Avanzada de Nosodes</span>
-          <span className="text-[10px] font-normal uppercase tracking-widest">Protocolo de Bio-Seguridad</span>
+          <span className="flex items-center gap-2"><Microscope className="w-5 h-5" /> Ingreso Nosodes</span>
+          <div className="flex gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+            <span className="text-[10px] font-normal uppercase tracking-widest hidden md:inline ml-2 opacity-50">Protocolo de Bio-Seguridad</span>
+          </div>
         </div>
         <form className="p-8" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -879,7 +1204,19 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center text-[#002b5b]">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Historial de Nosodes</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Historial de Nosodes</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-48 outline-none focus:ring-1 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
           <button 
             onClick={() => {
               const data = records.filter(r => r.type === 'nosodes').map(r => [
@@ -913,7 +1250,10 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
-              {records.filter(r => r.type === 'nosodes').map(r => (
+              {records.filter(r => r.type === 'nosodes').filter(r => {
+                const searchStr = `${r.fechaFicha || ''} ${r.nroMuestra || ''} ${r.paciente || ''} ${r.producto || ''} ${r.medico || ''} ${r.refrigerador || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-medium">{formatDate(r.fechaFicha)}</td>
                   <td className="p-4 font-mono text-blue-700">{r.nroMuestra}</td>
@@ -1004,8 +1344,10 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
 
 function PreparacionForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [frascoSize, setFrascoSize] = useState<30 | 100>(30);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     producto: '',
     fecha: new Date().toISOString().split('T')[0],
@@ -1015,6 +1357,62 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     observaciones: '',
     responsable: ''
   });
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Producto", "Fecha", "Preparador", "Responsable", "Fórmula Total", "Observaciones"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Preparaciones");
+    XLSX.writeFile(wb, "plantilla_preparaciones_gotas_puras.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const producto = safe(row["Producto"]);
+          if (!producto) continue;
+
+          const newRecord = {
+            type: 'preparacion',
+            producto: producto,
+            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            preparador: safe(row["Preparador"]),
+            responsable: safe(row["Responsable"]) || user.displayName || '',
+            formulaTotal: safe(row["Fórmula Total"]),
+            observaciones: safe(row["Observaciones"]),
+            filas: Array(15).fill({ composicion: '', nroCimasur: '', dilucion: '', lambdas: '' }),
+            creadoPor: user.displayName || '',
+            createdAt: new Date().toISOString()
+          };
+
+          await localDB.saveToCollection('lab_records', newRecord);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} preparaciones desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   useEffect(() => {
     if (user && !editingId) {
@@ -1091,27 +1489,51 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
-           <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Preparación de Gotas Puras (Formato 15 Filas)</span>
-           <button 
-             onClick={() => {
-              const data = records.filter(r => r.type === 'preparacion').map(r => [
-                formatDate(r.fecha),
-                r.producto,
-                r.preparador,
-                r.totalLambdas
-              ]);
-              exportTableToPDF(
-                'Reporte: Preparación de Gotas Puras',
-                ['Fecha', 'Producto', 'Preparador', 'Total Lambdas'],
-                data,
-                'preparacion_gotas_puras'
-              );
-             }}
-             className="text-white/70 hover:text-white" 
-             title="PDF"
-           >
-             <Download className="w-4 h-4" />
-           </button>
+           <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Preparación Gotas Puras</span>
+           <div className="flex gap-2">
+             <input 
+               type="file" 
+               ref={fileInputRef} 
+               className="hidden" 
+               accept=".xlsx, .xls"
+               onChange={handleFileUpload}
+             />
+             <button 
+               type="button"
+               onClick={downloadExcelTemplate}
+               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+               title="Descargar Plantilla Excel"
+             >
+               <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+             </button>
+             <button 
+               type="button"
+               onClick={() => fileInputRef.current?.click()}
+               className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             >
+               <Upload className="w-3.5 h-3.5" /> Importar
+             </button>
+             <button 
+               onClick={() => {
+                const data = records.filter(r => r.type === 'preparacion').map(r => [
+                  formatDate(r.fecha),
+                  r.producto,
+                  r.preparador,
+                  r.totalLambdas
+                ]);
+                exportTableToPDF(
+                  'Reporte: Preparación de Gotas Puras',
+                  ['Fecha', 'Producto', 'Preparador', 'Total Lambdas'],
+                  data,
+                  'preparacion_gotas_puras'
+                );
+               }}
+               className="text-white/70 hover:text-white" 
+               title="PDF"
+             >
+               <Download className="w-4 h-4" />
+             </button>
+           </div>
         </div>
         <form className="p-8" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -1141,7 +1563,24 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                   {form.filas.map((fila, idx) => (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                       <td className="p-1 text-center font-bold text-slate-300 border-r border-slate-50">{idx + 1}</td>
-                      <td className="p-1 border-r border-slate-50"><input className="w-full p-2 outline-none bg-transparent" value={fila.composicion || ''} onChange={e => updateFila(idx, 'composicion', e.target.value)} /></td>
+                      <td className="p-1 border-r border-slate-50">
+                        <SearchableRefInput 
+                          value={fila.composicion} 
+                          onChange={(val) => updateFila(idx, 'composicion', val)}
+                          onSelect={(item) => {
+                            const newFilas = [...form.filas];
+                            newFilas[idx] = { 
+                              ...newFilas[idx], 
+                              composicion: item.composicion, 
+                              nroCimasur: item.nroCimasur, 
+                              dilucion: item.dilucion 
+                            };
+                            setForm({ ...form, filas: newFilas });
+                          }}
+                          placeholder="Buscar..."
+                          className="border-none bg-transparent"
+                        />
+                      </td>
                       <td className="p-1 border-r border-slate-50"><input className="w-full p-2 outline-none bg-transparent text-center font-mono" value={fila.nroCimasur || ''} onChange={e => updateFila(idx, 'nroCimasur', e.target.value)} /></td>
                       <td className="p-1 border-r border-slate-50"><input className="w-full p-2 outline-none bg-transparent text-center" value={fila.dilucion || ''} onChange={e => updateFila(idx, 'dilucion', e.target.value)} /></td>
                       <td className="p-1"><input className="w-full p-2 outline-none bg-transparent text-center font-bold" value={fila.lambdas || ''} onChange={e => updateFila(idx, 'lambdas', e.target.value)} /></td>
@@ -1179,7 +1618,44 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center text-[#002b5b]">
-          <h3 className="text-[10px] font-black uppercase tracking-widest">Historial de Preparaciones</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-black uppercase tracking-widest">Historial de Preparaciones</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-48 outline-none focus:ring-1 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={() => {
+                const filtered = records.filter(r => r.type === 'preparacion').filter(r => {
+                  const searchStr = `${r.fecha || ''} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
+                  return searchStr.includes(searchTerm.toLowerCase());
+                });
+                const data = filtered.map(r => [
+                  formatDate(r.fecha),
+                  r.producto,
+                  r.preparador,
+                  r.responsable,
+                  r.totalLambdas
+                ]);
+                exportTableToPDF(
+                  'Historial de Preparaciones',
+                  ['Fecha', 'Producto', 'Preparador', 'Responsable', 'Total Lambdas'],
+                  data,
+                  'historial_preparaciones'
+                );
+              }}
+              className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar PDF Filtrado"
+            >
+              <Download className="w-3 h-3" /> PDF
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -1194,7 +1670,10 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {records.filter(r => r.type === 'preparacion').map(r => (
+              {records.filter(r => r.type === 'preparacion').filter(r => {
+                const searchStr = `${r.fecha || ''} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).map(r => (
                 <tr key={r.id}>
                   <td className="p-4">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold">{r.producto}</td>
@@ -1267,7 +1746,9 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
 
 function TinturasMadresForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     insumo: '',
     fecha: new Date().toISOString().split('T')[0],
@@ -1283,6 +1764,66 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
     creadoPor: '',
     ultimaModificacionPor: ''
   });
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Insumo", "Fecha", "Nro Asignado", "Elaborador", "Estado", "Proporción", "Elaboración", "Riesgos", "Etiqueta", "Responsable"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tinturas");
+    XLSX.writeFile(wb, "plantilla_tinturas_madres.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const insumo = safe(row["Insumo"]);
+          const nroAsignado = safe(row["Nro Asignado"]);
+          if (!insumo || !nroAsignado) continue;
+
+          const newRecord = {
+            type: 'tinturas',
+            insumo: insumo,
+            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            nroAsignado: nroAsignado,
+            elaborador: safe(row["Elaborador"]),
+            estado: safe(row["Estado"]) || 'Óptimo',
+            proporcion: safe(row["Proporción"]),
+            elaboracion: safe(row["Elaboración"]),
+            riesgos: safe(row["Riesgos"]),
+            etiqueta: safe(row["Etiqueta"]),
+            responsable: safe(row["Responsable"]) || user.displayName || '',
+            creadoPor: user.displayName || '',
+            createdAt: new Date().toISOString()
+          };
+
+          await localDB.saveToCollection('lab_records', newRecord);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} registros de TM desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   useEffect(() => {
     if (user && !editingId) {
@@ -1323,28 +1864,52 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
-           <span className="flex items-center gap-2"><Droplets className="w-5 h-5" /> Ficha Tipo Tinturas Madre {editingId ? '(Editando)' : ''}</span>
-           <button 
-             onClick={() => {
-                const data = records.filter(r => r.type === 'tinturas').map(r => [
-                  formatDate(r.fecha),
-                  r.insumo,
-                  r.nroAsignado,
-                  r.elaborador,
-                  r.estado
-                ]);
-                exportTableToPDF(
-                  'Reporte: Tinturas Madre',
-                  ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado'],
-                  data,
-                  'tinturas_madre'
-                );
-             }}
-             className="text-white/70 hover:text-white" 
-             title="PDF"
-           >
-             <Download className="w-4 h-4" />
-           </button>
+           <span className="flex items-center gap-2"><Droplets className="w-5 h-5" /> Ficha Tinturas Madres {editingId ? '(Editando)' : ''}</span>
+           <div className="flex gap-2">
+             <input 
+               type="file" 
+               ref={fileInputRef} 
+               className="hidden" 
+               accept=".xlsx, .xls"
+               onChange={handleFileUpload}
+             />
+             <button 
+               type="button"
+               onClick={downloadExcelTemplate}
+               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+               title="Descargar Plantilla Excel"
+             >
+               <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+             </button>
+             <button 
+               type="button"
+               onClick={() => fileInputRef.current?.click()}
+               className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             >
+               <Upload className="w-3.5 h-3.5" /> Importar
+             </button>
+             <button 
+               onClick={() => {
+                  const data = records.filter(r => r.type === 'tinturas').map(r => [
+                    formatDate(r.fecha),
+                    r.insumo,
+                    r.nroAsignado,
+                    r.elaborador,
+                    r.estado
+                  ]);
+                  exportTableToPDF(
+                    'Reporte: Tinturas Madre',
+                    ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado'],
+                    data,
+                    'tinturas_madre'
+                  );
+               }}
+               className="text-white/70 hover:text-white" 
+               title="PDF"
+             >
+               <Download className="w-4 h-4" />
+             </button>
+           </div>
         </div>
         <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
            <FormField label="Insumo"><input className="w-full border-b p-2 text-sm font-black" value={form.insumo || ''} onChange={e => setForm({...form, insumo: e.target.value})} required /></FormField>
@@ -1369,7 +1934,44 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Tinturas Madre</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Tinturas Madre</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-48 outline-none focus:ring-1 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={() => {
+                const filtered = records.filter(r => r.type === 'tinturas').filter(r => {
+                  const searchStr = `${r.fecha || ''} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
+                  return searchStr.includes(searchTerm.toLowerCase());
+                });
+                const data = filtered.map(r => [
+                  formatDate(r.fecha),
+                  r.insumo,
+                  r.nroAsignado,
+                  r.elaborador,
+                  r.estado
+                ]);
+                exportTableToPDF(
+                  'Historial Tinturas Madre',
+                  ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado'],
+                  data,
+                  'historial_tinturas'
+                );
+              }}
+              className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar PDF Filtrado"
+            >
+              <Download className="w-3 h-3" /> PDF
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -1383,7 +1985,10 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
-              {records.filter(r => r.type === 'tinturas').map(r => (
+              {records.filter(r => r.type === 'tinturas').filter(r => {
+                const searchStr = `${r.fecha || ''} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).map(r => (
                 <tr key={r.id}>
                   <td className="px-6 py-4 font-medium">{formatDate(r.fecha)}</td>
                   <td className="px-6 py-4 font-bold">{r.insumo}</td>
@@ -1443,6 +2048,8 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
 }
 
 function InsumosForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     codigoCimasur: '',
     nombre: '',
@@ -1457,6 +2064,86 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
     observaciones: ''
   });
 
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Código CIMASUR", "Nombre Insumo", "Código Envase", "Lote", "Proveedor", "Fecha Ingreso", "Vencimiento", "Uso Específico", "Ubicación", "Cantidad", "Observaciones"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Insumos");
+    XLSX.writeFile(wb, "plantilla_importacion_insumos.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const nombre = safe(row["Nombre Insumo"]);
+          if (!nombre) continue;
+
+          const newRecord = {
+            type: 'insumos',
+            codigoCimasur: safe(row["Código CIMASUR"]),
+            nombre: nombre,
+            codigoEnvase: safe(row["Código Envase"]),
+            lote: safe(row["Lote"]),
+            proveedor: safe(row["Proveedor"]),
+            fechaIngreso: safe(row["Fecha Ingreso"]) || new Date().toISOString().split('T')[0],
+            vencimiento: safe(row["Vencimiento"]),
+            uso: safe(row["Uso Específico"]),
+            ubicacion: safe(row["Ubicación"]),
+            cantidad: safe(row["Cantidad"]),
+            observaciones: safe(row["Observaciones"])
+          };
+
+          await localDB.saveToCollection('lab_records', newRecord);
+
+          // Sincronizar con Stock
+          try {
+            const invCollection = await localDB.getCollection('inventory');
+            const duplicate = invCollection.find(r => 
+              (r.code && r.code.toLowerCase() === newRecord.codigoCimasur.toLowerCase()) || 
+              (r.item && r.item.toLowerCase() === newRecord.nombre.toLowerCase())
+            );
+            
+            if (duplicate) {
+              const newQty = duplicate.qty + (parseInt(newRecord.cantidad) || 0);
+              await localDB.updateInCollection('inventory', duplicate.id, { qty: newQty });
+            } else {
+              await localDB.saveToCollection('inventory', {
+                area: 'Insumos Varios',
+                item: newRecord.nombre,
+                code: newRecord.codigoCimasur,
+                qty: parseInt(newRecord.cantidad) || 0
+              });
+            }
+          } catch (err) { console.error("Stock sync error:", err); }
+
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} insumos desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} insumos correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1464,10 +2151,12 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
     try {
       if (editingId) {
         await localDB.updateInCollection('lab_records', editingId, form);
+        await addAuditLog(user, `Actualizó Insumo: ${form.nombre}`, 'Laboratorio');
         setEditingId(null);
         alert('Información actualizada exitosamente');
       } else {
         await localDB.saveToCollection('lab_records', { ...form, type: 'insumos' });
+        await addAuditLog(user, `Registró Insumo: ${form.nombre}`, 'Laboratorio');
         
         // Sincronizar automáticamente con el Stock (Inventario)
         try {
@@ -1533,18 +2222,40 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
-           <span className="flex items-center gap-2 text-xs uppercase tracking-tighter"><Package className="w-5 h-5" /> Registro de Insumos / Materia Prima {editingId ? '(Editando)' : ''}</span>
+           <span className="flex items-center gap-2 text-xs uppercase tracking-tighter"><Package className="w-5 h-5" /> Registro de Insumos laboratorio T.M. y otros {editingId ? '(Editando)' : ''}</span>
            <div className="flex gap-2">
-             <div className="relative">
+             <div className="relative border-r border-white/20 pr-2 mr-2 hidden md:block">
                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50" />
                <input 
                  type="text" 
                  placeholder="Filtrar historial..." 
-                 className="bg-white/10 border-none rounded pl-7 pr-2 py-1 text-[10px] text-white placeholder:text-white/30 focus:bg-white/20 outline-none w-48"
+                 className="bg-white/10 border-none rounded pl-7 pr-2 py-1 text-[10px] text-white placeholder:text-white/30 focus:bg-white/20 outline-none w-32"
                  value={searchTerm}
                  onChange={e => setSearchTerm(e.target.value)}
                />
              </div>
+             <input 
+               type="file" 
+               ref={fileInputRef} 
+               className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
              <button 
                onClick={() => {
                   const data = filteredHistory.map(r => [
@@ -1646,6 +2357,9 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
 }
 
 function VademecumForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     fechaCotiz: new Date().toISOString().split('T')[0],
     producto: '',
@@ -1661,13 +2375,73 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Fecha Cotiz", "Producto", "Nombre Alternativo", "Proveedor", "Valor", "Prioridad", "Dilución", "Observaciones"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Vademecum");
+    XLSX.writeFile(wb, "plantilla_vademecum_compras.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const producto = safe(row["Producto"]);
+          if (!producto) continue;
+
+          const newRec = {
+            type: 'vademecum',
+            fechaCotiz: safe(row["Fecha Cotiz"]) || new Date().toISOString().split('T')[0],
+            producto: producto,
+            nombreAlternativo: safe(row["Nombre Alternativo"]),
+            proveedor: safe(row["Proveedor"]),
+            valor: safe(row["Valor"]),
+            prioridad: safe(row["Prioridad"]) || 'Media',
+            dilucion: safe(row["Dilución"]),
+            observaciones: safe(row["Observaciones"]),
+            estado: 'Pendiente',
+            createdAt: new Date().toISOString()
+          };
+
+          await localDB.saveToCollection('lab_records', newRec);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} items al vademécum desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} registros.`);
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
+      } catch (err) {
+        console.error("Vademecum Import Error:", err);
+        alert("Error al importar");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     if (editingId) {
       await localDB.updateInCollection('lab_records', editingId, form);
+      await addAuditLog(user, `Actualizó Vademécum: ${form.producto}`, 'Laboratorio');
       setEditingId(null);
     } else {
       await localDB.saveToCollection('lab_records', { ...form, type: 'vademecum' });
+      await addAuditLog(user, `Agregó a Vademécum: ${form.producto}`, 'Laboratorio');
       alert('Item Vademécum guardado');
     }
     const updated = await localDB.getCollection('lab_records');
@@ -1686,28 +2460,52 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
-           <span className="flex items-center gap-2"><BookOpen className="w-5 h-5" /> Compras Vademécum {editingId ? '(Editando)' : ''}</span>
-           <button 
-             onClick={() => {
-                const data = records.filter(r => r.type === 'vademecum').map(r => [
-                  formatDate(r.fechaCotiz),
-                  r.producto,
-                  r.proveedor,
-                  r.estado,
-                  r.valor
-                ]);
-                exportTableToPDF(
-                  'Reporte: Vademécum de Compras',
-                  ['Fecha', 'Producto', 'Proveedor', 'Estado', 'Valor'],
-                  data,
-                  'vademecum_compras'
-                );
-             }}
-             className="text-white/70 hover:text-white" 
-             title="PDF"
-           >
-             <Download className="w-4 h-4" />
-           </button>
+           <span className="flex items-center gap-2"><BookOpen className="w-5 h-5" /> Vademécum {editingId ? '(Editando)' : ''}</span>
+           <div className="flex gap-2">
+             <input 
+               type="file" 
+               ref={fileInputRef} 
+               className="hidden" 
+               accept=".xlsx, .xls"
+               onChange={handleFileUpload}
+             />
+             <button 
+               type="button"
+               onClick={downloadExcelTemplate}
+               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+               title="Descargar Plantilla Excel"
+             >
+               <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+             </button>
+             <button 
+               type="button"
+               onClick={() => fileInputRef.current?.click()}
+               className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             >
+               <Upload className="w-3.5 h-3.5" /> Importar
+             </button>
+             <button 
+               onClick={() => {
+                  const data = records.filter(r => r.type === 'vademecum').map(r => [
+                    formatDate(r.fechaCotiz),
+                    r.producto,
+                    r.proveedor,
+                    r.estado,
+                    r.valor
+                  ]);
+                  exportTableToPDF(
+                    'Reporte: Vademécum de Compras',
+                    ['Fecha', 'Producto', 'Proveedor', 'Estado', 'Valor'],
+                    data,
+                    'vademecum_compras'
+                  );
+               }}
+               className="text-white/70 hover:text-white" 
+               title="PDF"
+             >
+               <Download className="w-4 h-4" />
+             </button>
+           </div>
         </div>
         <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
            <FormField label="Fecha Cotiz"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaCotiz || ''} onChange={e => setForm({...form, fechaCotiz: e.target.value})} /></FormField>
@@ -1740,7 +2538,44 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Vademécum</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Vademécum</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-48 outline-none focus:ring-1 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={() => {
+                const filtered = records.filter(r => r.type === 'vademecum').filter(r => {
+                  const searchStr = `${r.fechaCotiz || ''} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''} ${r.nombreAlternativo || ''} ${r.observaciones || ''}`.toLowerCase();
+                  return searchStr.includes(searchTerm.toLowerCase());
+                });
+                const data = filtered.map(r => [
+                  formatDate(r.fechaCotiz),
+                  r.producto,
+                  r.proveedor,
+                  r.prioridad,
+                  r.estado
+                ]);
+                exportTableToPDF(
+                  'Historial Vademécum',
+                  ['Fecha Cotiz', 'Producto', 'Proveedor', 'Prioridad', 'Estado'],
+                  data,
+                  'historial_vademecum'
+                );
+              }}
+              className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar PDF Filtrado"
+            >
+              <Download className="w-3 h-3" /> PDF
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -1754,7 +2589,10 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
-              {records.filter(r => r.type === 'vademecum').map(r => (
+              {records.filter(r => r.type === 'vademecum').filter(r => {
+                const searchStr = `${r.fechaCotiz || ''} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).map(r => (
                 <tr key={r.id}>
                   <td className="px-6 py-4 font-medium">{formatDate(r.fechaCotiz)}</td>
                   <td className="px-6 py-4 font-bold">{r.producto}</td>
@@ -1816,6 +2654,9 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 }
 
 function MantenimientoForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     codigo: '',
     producto: '',
@@ -1826,7 +2667,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
     proveedor: '',
     responsable: '',
     estado: 'Bueno',
-    area: 'L.A.B',
+    area: '(L.A.B) LABORATORIO',
     comentarios: ''
   });
 
@@ -1834,8 +2675,86 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
   const [showLogsModal, setShowLogsModal] = useState<any | null>(null);
   const [logForm, setLogForm] = useState({ fecha: new Date().toISOString().split('T')[0], tecnico: '', detalle: '', proximaMantencion: '' });
 
-  const areas = ['O.D.L', 'S.D.D', 'S.T.M', 'S.A.C', 'S.D.A', 'S.U.V', 'L.A.B', 'P.A.S'];
+  const areas = [
+    'OFICINA LABORATORIO (O.D.L)',
+    '(S.D.D) SALA DESPACHO',
+    '(S.T.M) SALA DE TINTURAS MADRES',
+    '(S.A.C) SALA AUTOCLAVE',
+    '(S.D.A) SALA DE AGUA',
+    '(S.U.V) SALA ULTRA VIOLETA',
+    '(L.A.B) LABORATORIO',
+    '(P.A.S) PASILLO DE LABORATORIO'
+  ];
   const statusOptions = ['Bueno', 'Regular', 'Eliminado', 'Dado de baja', 'Reemplazado'];
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["código equipo", "Producto / Equipo", "Área", "L.A.B", "Fecha Compra", "Marca", "Modelo", "Valor", "Proveedor", "Responsable", "Estado Actual"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Equipos");
+    XLSX.writeFile(wb, "plantilla_importacion_equipos.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        const currentRecords = await localDB.getCollection('lab_records');
+
+        for (const row of data) {
+          const codigo = safe(row["código equipo"]);
+          if (!codigo) continue;
+
+          // Check if already exists
+          if (currentRecords.some(r => r.type === 'mantenimiento' && r.codigo === codigo)) continue;
+
+          const newEquipment = {
+            type: 'mantenimiento',
+            codigo: codigo,
+            producto: safe(row["Producto / Equipo"]),
+            area: safe(row["Área"]) || safe(row["L.A.B"]) || '(L.A.B) LABORATORIO',
+            fechaCompra: safe(row["Fecha Compra"]),
+            marca: safe(row["Marca"]),
+            modelo: safe(row["Modelo"]),
+            valor: safe(row["Valor"]),
+            proveedor: safe(row["Proveedor"]),
+            responsable: safe(row["Responsable"]),
+            estado: safe(row["Estado Actual"]) || 'Bueno',
+            comentarios: 'Importado vía Excel',
+            mantenciones: [{
+              fecha: new Date().toISOString().split('T')[0],
+              tecnico: user.displayName || user.email || 'Sistema',
+              detalle: 'Registro inicial por importación Excel',
+              proximaMantencion: ''
+            }]
+          };
+
+          await localDB.saveToCollection('lab_records', newEquipment);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} equipos desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} equipos correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   const handleSubmit = async () => {
     const currentRecords = await localDB.getCollection('lab_records');
@@ -1856,6 +2775,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
       const existingRecord = currentRecords.find(r => r.id === editingId);
       const updatedMantenciones = [...(existingRecord.mantenciones || []), logEntry];
       await localDB.updateInCollection('lab_records', editingId, { ...form, mantenciones: updatedMantenciones });
+      await addAuditLog(user, `Actualizó Equipo: ${form.producto}`, 'Laboratorio');
       alert('Equipo actualizado');
       setEditingId(null);
     } else {
@@ -1864,6 +2784,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
         return;
       }
       await localDB.saveToCollection('lab_records', { ...form, mantenciones: [logEntry], type: 'mantenimiento' });
+      await addAuditLog(user, `Registró Equipo: ${form.producto}`, 'Laboratorio');
       alert('Equipo registrado');
     }
     const updated = await localDB.getCollection('lab_records');
@@ -1947,28 +2868,52 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
-          <span className="flex items-center gap-2"><Settings className="w-5 h-5" /> Mantención de Equipos</span>
-          <button 
-            onClick={() => {
-              const data = records.filter(r => r.type === 'mantenimiento').map(r => [
-                r.codigo,
-                r.producto,
-                r.area,
-                r.responsable,
-                r.estado
-              ]);
-              exportTableToPDF(
-                'Reporte: Inventario de Equipos y Mantención',
-                ['Código', 'Equipo', 'Área', 'Responsable', 'Estado'],
-                data,
-                'mantenimiento_equipos'
-              );
-            }}
-            className="text-white/70 hover:text-white" 
-            title="PDF"
-          >
-            <Download className="w-4 h-4" />
-          </button>
+          <span className="flex items-center gap-2"><Settings className="w-5 h-5" /> Mantención</span>
+          <div className="flex gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+            <button 
+              onClick={() => {
+                const data = records.filter(r => r.type === 'mantenimiento').map(r => [
+                  r.codigo,
+                  r.producto,
+                  r.area,
+                  r.responsable,
+                  r.estado
+                ]);
+                exportTableToPDF(
+                  'Reporte: Inventario de Equipos y Mantención',
+                  ['Código', 'Equipo', 'Área', 'Responsable', 'Estado'],
+                  data,
+                  'mantenimiento_equipos'
+                );
+              }}
+              className="text-white/70 hover:text-white" 
+              title="PDF"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <div className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6">
           <FormField label="Código Equipo"><input className="w-full border-b p-2 text-sm font-mono" value={form.codigo || ''} onChange={e => setForm({...form, codigo: e.target.value})} /></FormField>
@@ -2000,7 +2945,19 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center text-[#002b5b]">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Historial Mantención</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Historial Mantención</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-48 outline-none focus:ring-1 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
           <button className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Descargar PDF">
             <Download className="w-3.5 h-3.5" />
           </button>
@@ -2017,7 +2974,10 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
-              {records.filter(r => r.type === 'mantenimiento').map(r => (
+              {records.filter(r => r.type === 'mantenimiento').filter(r => {
+                const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-mono text-blue-700 text-center">{r.codigo}</td>
                   <td className="p-4 font-bold">{r.producto}</td>
@@ -2089,6 +3049,8 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 }
 
 function StockManager({ records: _, setRecords: __ }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [inventoryRecords, setInventoryRecords] = useState<any[]>([]);
   const [selectedArea, setSelectedArea] = useState<string>('Etiquetas salina');
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
@@ -2388,7 +3350,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
       <div className="lg:col-span-3 space-y-6">
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
            <div className="bg-slate-50 p-4 border-b flex justify-between items-center text-[#002b5b]">
-              <h3 className="text-[10px] font-black uppercase tracking-widest">Matriz de Inventario - {selectedArea}</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-widest">Stock de Insumo Diario - {selectedArea}</h3>
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => {
@@ -2561,18 +3523,78 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 }
 
 function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [trackingRecords, setTrackingRecords] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterSituacion, setFilterSituacion] = useState<string>('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetail, setShowDetail] = useState<any | null>(null);
   
-  const safe = (val: any) => {
-    if (val === null || val === undefined) return '';
-    if (typeof val === 'object') {
-      try { return JSON.stringify(val); } catch { return '[Objeto]'; }
-    }
-    return String(val);
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Nro Cotización", "OT", "Cliente", "Fecha Cotización", "Fecha Envio", "Fecha Cierre", "Fecha Recepcion", "Courier", "Detalle Seguimiento", "Situación"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Seguimiento");
+    XLSX.writeFile(wb, "plantilla_importacion_seguimiento.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        const currentRecords = await localDB.getCollection('order_tracking');
+
+        for (const row of data) {
+          const nroCotiz = safe(row["Nro Cotización"]);
+          if (!nroCotiz) continue;
+
+          // Check if already exists
+          if (currentRecords.some(r => safe(r.nroCotiz) === nroCotiz)) continue;
+
+          const newTracking = {
+            nroCotiz: nroCotiz,
+            ot: safe(row["OT"]),
+            cliente: safe(row["Cliente"]),
+            fechaCotiz: safe(row["Fecha Cotización"]),
+            fechaEnvio: safe(row["Fecha Envio"]),
+            fechaCierre: safe(row["Fecha Cierre"]),
+            fechaRecepcion: safe(row["Fecha Recepcion"]),
+            courier: safe(row["Courier"]) || 'Retiro en Oficina',
+            detalleSeguimiento: safe(row["Detalle Seguimiento"]),
+            situacion: safe(row["Situación"]) || 'PENDIENTE',
+            logs: [{ 
+              date: new Date().toLocaleString('es-CL'), 
+              user: user.displayName || user.email || 'Sistema (Import)', 
+              action: 'Pedido importado desde Excel' 
+            }]
+          };
+
+          await localDB.saveToCollection('order_tracking', newTracking);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} seguimientos de pedidos desde Excel`, 'Laboratorio');
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const [form, setForm] = useState({
@@ -2933,6 +3955,29 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             <ClipboardCheck className="w-5 h-5" /> Seguimiento Logístico de Pedidos
           </div>
           <div className="flex items-center gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-sm"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-[#2563eb] hover:bg-[#1d4ed8] px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-sm"
+              title="Importar desde Excel"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
             <button 
               onClick={() => exportTableToPDF(
                 `Reporte de Seguimiento Logístico - ${filterSituacion}`,
@@ -3103,11 +4148,465 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   );
 }
 
+function MagistralesForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [compositionRows, setCompositionRows] = useState([
+    { composicion: '', codigo: '', dilucion: '', lambdas: '' },
+    { composicion: '', codigo: '', dilucion: '', lambdas: '' },
+    { composicion: '', codigo: '', dilucion: '', lambdas: '' },
+    { composicion: '', codigo: '', dilucion: '', lambdas: '' }
+  ]);
+  
+  const [form, setForm] = useState({
+    nroCotizacion: '',
+    mvTratante: '',
+    nroAsignado: '',
+    fecha: new Date().toISOString().split('T')[0],
+    preparador: '',
+    observacion: '',
+    responsableRevision: ''
+  });
+
+  useEffect(() => {
+    if (user && !editingId) {
+      setForm(prev => ({ ...prev, preparador: user.displayName || '' }));
+    }
+  }, [user, editingId]);
+
+  const addRow = () => {
+    setCompositionRows([...compositionRows, { composicion: '', codigo: '', dilucion: '', lambdas: '' }]);
+  };
+
+  const removeRow = (index: number) => {
+    if (compositionRows.length > 1) {
+      setCompositionRows(compositionRows.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleRowChange = (index: number, field: string, value: string) => {
+    const updatedRows = [...compositionRows];
+    updatedRows[index] = { ...updatedRows[index], [field]: value };
+    setCompositionRows(updatedRows);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    const finalData = { 
+      ...form, 
+      composition: compositionRows,
+      type: 'magistrales',
+      creadoPor: user.displayName,
+      createdAt: new Date().toISOString()
+    };
+
+    if (editingId) {
+      await localDB.updateInCollection('lab_records', editingId, finalData);
+      if (user) await addAuditLog(user, `Actualizó Fórmula Magistral: ${form.nroCotizacion}`, 'Laboratorio');
+      setEditingId(null);
+    } else {
+      await localDB.saveToCollection('lab_records', finalData);
+      if (user) await addAuditLog(user, `Registró Fórmula Magistral: ${form.nroCotizacion}`, 'Laboratorio');
+    }
+
+    const updated = await localDB.getCollection('lab_records');
+    setRecords(updated);
+    window.dispatchEvent(new Event('db-change'));
+    
+    setForm({
+      nroCotizacion: '',
+      mvTratante: '',
+      nroAsignado: '',
+      fecha: new Date().toISOString().split('T')[0],
+      preparador: user.displayName || '',
+      observacion: '',
+      responsableRevision: ''
+    });
+    setCompositionRows([
+      { composicion: '', codigo: '', dilucion: '', lambdas: '' },
+      { composicion: '', codigo: '', dilucion: '', lambdas: '' },
+      { composicion: '', codigo: '', dilucion: '', lambdas: '' },
+      { composicion: '', codigo: '', dilucion: '', lambdas: '' }
+    ]);
+    alert('Fórmula magistral guardada exitosamente');
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-[#0b2447] p-4 text-white font-bold flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <FileText className="w-5 h-5" /> {editingId ? 'Editando Fórmula Magistral' : 'Elaboración de Fórmulas Magistrales'}
+          </span>
+        </div>
+        <form className="p-8 space-y-8" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FormField label="N° COTIZACION">
+              <input className="w-full border-b p-2 text-sm font-bold" value={form.nroCotizacion} onChange={e => setForm({...form, nroCotizacion: e.target.value})} required placeholder="COT-001" />
+            </FormField>
+            <FormField label="MV TRATANTE">
+              <input className="w-full border-b p-2 text-sm uppercase" value={form.mvTratante} onChange={e => setForm({...form, mvTratante: e.target.value})} required />
+            </FormField>
+            <FormField label="N° ASIGNADO">
+              <input className="w-full border-b p-2 text-sm font-black text-blue-800" value={form.nroAsignado} onChange={e => setForm({...form, nroAsignado: e.target.value})} required />
+            </FormField>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest">Composición Fórmula Magistral (Dilución/GP)</h3>
+              <button 
+                type="button" 
+                onClick={addRow}
+                className="bg-emerald-600 text-white p-1 rounded-full hover:bg-emerald-700 transition-colors"
+                title="Agregar Fila"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b">
+                    <th className="p-3 text-left w-1/3">COMPOSICION FORMULA MAGISTRAL</th>
+                    <th className="p-3 text-left">CODIGO CIMASUR</th>
+                    <th className="p-3 text-left">DILUCION A USAR</th>
+                    <th className="p-3 text-left">LAMBDAS</th>
+                    <th className="p-3 text-center w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {compositionRows.map((row, idx) => (
+                    <tr key={idx}>
+                      <td className="p-2">
+                        <SearchableRefInput 
+                          value={row.composicion} 
+                          onChange={(val) => handleRowChange(idx, 'composicion', val)}
+                          onSelect={(item) => {
+                            const newRows = [...compositionRows];
+                            newRows[idx] = { 
+                              ...newRows[idx], 
+                              composicion: item.composicion, 
+                              codigo: item.nroCimasur, 
+                              dilucion: item.dilucion 
+                            };
+                            setCompositionRows(newRows);
+                          }}
+                          placeholder="Buscar..."
+                          className="bg-slate-50/50 rounded border-none outline-none focus:bg-white transition-colors uppercase font-medium"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input 
+                          className="w-full p-2 bg-slate-50/50 rounded border-none outline-none focus:bg-white transition-colors" 
+                          value={row.codigo} 
+                          onChange={e => handleRowChange(idx, 'codigo', e.target.value)}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input 
+                          className="w-full p-2 bg-slate-50/50 rounded border-none outline-none focus:bg-white transition-colors" 
+                          value={row.dilucion} 
+                          onChange={e => handleRowChange(idx, 'dilucion', e.target.value)}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input 
+                          className="w-full p-2 bg-slate-50/50 rounded border-none outline-none focus:bg-white transition-colors" 
+                          value={row.lambdas} 
+                          onChange={e => handleRowChange(idx, 'lambdas', e.target.value)}
+                        />
+                      </td>
+                      <td className="p-2 text-center">
+                        <button type="button" onClick={() => removeRow(idx)} className="text-red-400 hover:text-red-600">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-6 border-t border-slate-100">
+            <FormField label="FECHA">
+              <input type="date" className="w-full border-b p-2 text-sm" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
+            </FormField>
+            <FormField label="NOMBRE PREPARADOR">
+              <input className="w-full border-b p-2 text-sm font-bold" value={form.preparador} readOnly />
+            </FormField>
+            <FormField label="NOMBRE RESPONSABLE DE REVISIÓN">
+              <input 
+                className="w-full border-b p-2 text-sm uppercase font-bold" 
+                value={form.responsableRevision} 
+                onChange={e => setForm({...form, responsableRevision: e.target.value})} 
+                placeholder="Nombre del responsable"
+              />
+            </FormField>
+            <FormField label="OBSERVACION">
+              <input className="w-full border-b p-2 text-sm" value={form.observacion} onChange={e => setForm({...form, observacion: e.target.value})} />
+            </FormField>
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <button type="submit" className="bg-[#001736] text-white px-10 py-3 rounded-lg font-black shadow-xl hover:translate-y-[-2px] transition-all">
+              {editingId ? 'ACTUALIZAR FÓRMULA' : 'GUARDAR FÓRMULA MAGISTRAL'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b flex flex-wrap justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] uppercase font-black tracking-widest text-[#001736]">Historial de Fórmulas Magistrales</h3>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                placeholder="Buscar en historial..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-48 outline-none focus:border-blue-400 transition-colors" 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={() => {
+                const filtered = records.filter(r => {
+                  if (r.type !== 'magistrales') return false;
+                  if (!searchTerm) return true;
+                  const search = searchTerm.toLowerCase();
+                  return (
+                    String(r.nroCotizacion || '').toLowerCase().includes(search) ||
+                    String(r.mvTratante || '').toLowerCase().includes(search) ||
+                    String(r.nroAsignado || '').toLowerCase().includes(search) ||
+                    String(r.fecha || '').toLowerCase().includes(search) ||
+                    String(r.preparador || '').toLowerCase().includes(search) ||
+                    String(r.observacion || '').toLowerCase().includes(search) ||
+                    String(r.responsableRevision || '').toLowerCase().includes(search) ||
+                    (r.composition && Array.isArray(r.composition) && r.composition.some((c: any) => 
+                      String(c.composicion || '').toLowerCase().includes(search) || 
+                      String(c.codigo || '').toLowerCase().includes(search) ||
+                      String(c.dilucion || '').toLowerCase().includes(search) ||
+                      String(c.lambdas || '').toLowerCase().includes(search)
+                    ))
+                  );
+                });
+                const data = filtered.map(r => [r.nroCotizacion, r.mvTratante, r.nroAsignado, formatDate(r.fecha), r.preparador]);
+                exportTableToPDF('Historial Fórmulas Magistrales', ['Cotización', 'MV Tratante', 'N° Asignado', 'Fecha', 'Preparador'], data, 'historial_magistrales');
+              }}
+              className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar PDF Filtrado"
+            >
+              <Download className="w-3 h-3" /> PDF
+            </button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
+                <th className="p-4">Cotización</th>
+                <th className="p-4">MV Tratante</th>
+                <th className="p-4">N° Asignado</th>
+                <th className="p-4">Fecha</th>
+                <th className="p-4">Preparador</th>
+                <th className="p-4 text-center">Gestión</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 italic">
+              {(() => {
+                const filtered = records.filter(r => {
+                  if (r.type !== 'magistrales') return false;
+                  if (!searchTerm) return true;
+                  const search = searchTerm.toLowerCase();
+                  return (
+                    String(r.nroCotizacion || '').toLowerCase().includes(search) ||
+                    String(r.mvTratante || '').toLowerCase().includes(search) ||
+                    String(r.nroAsignado || '').toLowerCase().includes(search) ||
+                    String(r.fecha || '').toLowerCase().includes(search) ||
+                    String(r.preparador || '').toLowerCase().includes(search) ||
+                    String(r.observacion || '').toLowerCase().includes(search) ||
+                    String(r.responsableRevision || '').toLowerCase().includes(search) ||
+                    (r.composition && Array.isArray(r.composition) && r.composition.some((c: any) => 
+                      String(c.composicion || '').toLowerCase().includes(search) || 
+                      String(c.codigo || '').toLowerCase().includes(search) ||
+                      String(c.dilucion || '').toLowerCase().includes(search) ||
+                      String(c.lambdas || '').toLowerCase().includes(search)
+                    ))
+                  );
+                }).sort((a,b) => b.fecha.localeCompare(a.fecha));
+
+                if (filtered.length === 0) {
+                  return <tr><td colSpan={6} className="p-10 text-center text-slate-400">Sin registros para "{searchTerm}"...</td></tr>;
+                }
+
+                return filtered.map(r => (
+                  <tr key={r.id}>
+                    <td className="p-4 font-bold text-blue-900">{r.nroCotizacion}</td>
+                    <td className="p-4 uppercase">{r.mvTratante}</td>
+                    <td className="p-4 font-black">{r.nroAsignado}</td>
+                    <td className="p-4">{formatDate(r.fecha)}</td>
+                    <td className="p-4">{r.preparador}</td>
+                    <td className="p-4 text-center">
+                      <RecordActions 
+                        onEdit={() => {
+                          setEditingId(r.id);
+                          setForm(r);
+                          setCompositionRows(r.composition || []);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        onDelete={async () => {
+                          try {
+                            await localDB.deleteFromCollection('lab_records', r.id);
+                            const updated = await localDB.getCollection('lab_records');
+                            setRecords(updated);
+                            window.dispatchEvent(new Event('db-change'));
+                            if (user) await addAuditLog(user, `Eliminó Fórmula Magistral: ${r.nroCotizacion}`, 'Laboratorio');
+                            alert(`Registro ${r.nroCotizacion} eliminado exitosamente`);
+                          } catch (err) {
+                            console.error('Delete Error:', err);
+                            alert('No se pudo eliminar el registro. Intente nuevamente.');
+                          }
+                        }}
+                        onView={() => {
+                          const data = [
+                            { label: 'N° Cotización', value: r.nroCotizacion },
+                            { label: 'MV Tratante', value: r.mvTratante },
+                            { label: 'N° Asignado', value: r.nroAsignado },
+                            { label: 'Fecha', value: formatDate(r.fecha) },
+                            { label: 'Preparador', value: r.preparador },
+                            { label: 'Responsable Revisión', value: r.responsableRevision || '' },
+                            { label: 'Observación', value: r.observacion || '' }
+                          ];
+                          const tables = [
+                            {
+                              title: 'Composición Fórmula Magistral',
+                              headers: ['Composición', 'Código', 'Dilución', 'Lambdas'],
+                              rows: (r.composition || []).map((c: any) => [c.composicion, c.codigo, c.dilucion, c.lambdas])
+                            }
+                          ];
+                          viewExpedienteInNewTab('Ficha: Fórmula Magistral', data, `magistral_${r.nroCotizacion}`, tables);
+                        }}
+                        onDownload={() => {
+                          const data = [
+                            { label: 'N° Cotización', value: r.nroCotizacion },
+                            { label: 'MV Tratante', value: r.mvTratante },
+                            { label: 'N° Asignado', value: r.nroAsignado },
+                            { label: 'Fecha', value: formatDate(r.fecha) },
+                            { label: 'Preparador', value: r.preparador },
+                            { label: 'Responsable Revisión', value: r.responsableRevision || '' },
+                            { label: 'Observación', value: r.observacion || '' }
+                          ];
+                          const tables = [
+                            {
+                              title: 'Composición Fórmula Magistral',
+                              headers: ['Composición', 'Código', 'Dilución', 'Lambdas'],
+                              rows: (r.composition || []).map((c: any) => [c.composicion, c.codigo, c.dilucion, c.lambdas])
+                            }
+                          ];
+                          exportExpedienteToPDF('Ficha: Fórmula Magistral', data, `magistral_${r.nroCotizacion}`, tables);
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ));
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FormField({ label, children }: { label: string, children: React.ReactNode }) {
   return (
     <div className="space-y-1">
       <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider font-label-caps">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function SearchableRefInput({ 
+  value, 
+  onChange, 
+  onSelect, 
+  placeholder, 
+  className 
+}: { 
+  value: string; 
+  onChange: (val: string) => void;
+  onSelect: (item: any) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleInputChange = async (val: string) => {
+    onChange(val);
+    if (val.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const allRef = await localDB.getCollection('lab_diluciones_ref');
+    const filtered = allRef.filter(r => 
+      String(r.composicion || '').toLowerCase().includes(val.toLowerCase()) ||
+      String(r.nroCimasur || '').toLowerCase().includes(val.toLowerCase())
+    ).slice(0, 10);
+
+    setSuggestions(filtered);
+    setShowSuggestions(filtered.length > 0);
+  };
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <input 
+        type="text"
+        className={cn("w-full border-b p-2 text-sm", className)}
+        placeholder={placeholder}
+        value={value}
+        onChange={e => handleInputChange(e.target.value)}
+        onFocus={() => { if (value.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+      />
+      {showSuggestions && (suggestions.length > 0) && (
+        <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl max-h-60 overflow-y-auto overflow-x-hidden">
+          {suggestions.map(s => (
+            <div 
+              key={s.id}
+              onClick={() => {
+                onSelect(s);
+                setShowSuggestions(false);
+              }}
+              className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 transition-colors"
+            >
+              <div className="font-bold text-sm text-slate-800">{s.composicion}</div>
+              <div className="flex justify-between items-center mt-1">
+                <div className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-mono font-black">{s.nroCimasur}</div>
+                <div className="text-[10px] text-slate-400 italic">[{s.categoria}] {s.dilucion}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

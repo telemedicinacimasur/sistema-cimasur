@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDate } from '../lib/utils';
 import { exportTableToPDF, exportExpedienteToPDF } from '../lib/pdfUtils';
+import * as XLSX from 'xlsx';
 import { 
   TrendingUp, 
   UserPlus, 
@@ -16,12 +17,14 @@ import {
   Filter,
   FileText,
   Trash2,
-  Download
+  Download,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
 
 export default function CRMView() {
-  const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
+  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities'>('register');
   const [records, setRecords] = useState<any[]>([]);
   const [filters, setFilters] = useState({
     search: '',
@@ -65,10 +68,21 @@ export default function CRMView() {
           >
             Cartera de Clientes
           </button>
+          <button 
+            onClick={() => setActiveTab('activities')}
+            className={cn(
+              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+              activeTab === 'activities' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Registro de Actividades
+          </button>
         </div>
       </div>
 
-      {activeTab === 'register' ? <CRMRegister /> : <CRMTable records={records} filters={filters} setFilters={setFilters} />}
+      {activeTab === 'register' && <CRMRegister />}
+      {activeTab === 'list' && <CRMTable records={records} filters={filters} setFilters={setFilters} />}
+      {activeTab === 'activities' && <CRMActivities />}
     </div>
   );
 }
@@ -81,8 +95,17 @@ const REGIONES = [
 
 const CATEGORIAS = ['Sin compra', 'Sin categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
 
+const safe = (val: any) => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object') {
+    try { return JSON.stringify(val); } catch { return '[Objeto]'; }
+  }
+  return String(val);
+};
+
 function CRMRegister() {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fechaIngreso: new Date().toISOString().split('T')[0],
     name: '',
@@ -111,29 +134,87 @@ function CRMRegister() {
     setForm({ ...form, name: '', rut: '', historialUnificado: '' });
   };
 
-  const handleImport = () => {
-    const csvContent = "Nombre,RUT,Email,Teléfono,Región,Tipo,Categoría\n" +
-                       "Ejemplo Cliente,12345678-9,ejemplo@correo.cl,912345678,Metropolitana,Empresa,Premium";
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "plantilla_importacion_clientes.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Región de Chile", "Tipo de Cliente", "Categoría de Cliente"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Hoja1");
+    XLSX.writeFile(wb, "plantilla_importacion_clientes.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const newContact = {
+            fechaIngreso: safe(row["Fecha Ingreso"]) || new Date().toISOString().split('T')[0],
+            name: safe(row["Nombre / Razón Social"]),
+            rut: safe(row["RUT / ID"]),
+            phone: safe(row["Teléfono"]),
+            email: safe(row["Email"]),
+            region: safe(row["Región de Chile"]) || 'Metropolitana',
+            type: safe(row["Tipo de Cliente"]) || 'Farmacia',
+            categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
+            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString()}`,
+            responsable: user.displayName || user.email || 'Sistema'
+          };
+
+          if (newContact.name && newContact.rut) {
+            await localDB.saveToCollection('contacts', newContact);
+            importedCount++;
+          }
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} clientes desde Excel`, 'CRM');
+        alert(`Éxito: Se importaron ${importedCount} clientes correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
       <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
          <span className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Ficha de Registro de Cliente</span>
-         <button 
-           onClick={handleImport}
-           className="text-[10px] bg-white/20 hover:bg-white/30 px-3 py-1 rounded transition-colors uppercase font-black"
-         >
-           Importar Clientes
-         </button>
+         <div className="flex gap-2">
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             className="hidden" 
+             accept=".xlsx, .xls"
+             onChange={handleFileUpload}
+           />
+           <button 
+             onClick={downloadExcelTemplate}
+             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             title="Descargar Plantilla Excel"
+           >
+             <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla Excel
+           </button>
+           <button 
+             onClick={() => fileInputRef.current?.click()}
+             className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+           >
+             <Upload className="w-3.5 h-3.5" /> Importar Datos
+           </button>
+         </div>
       </div>
       <form className="p-8 space-y-8" onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -189,9 +270,12 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
   const [newCategory, setNewCategory] = useState('');
 
   const filtered = records.filter(r => {
-    const matchesSearch = r.name.toLowerCase().includes(filters.search.toLowerCase()) || r.rut.toLowerCase().includes(filters.search.toLowerCase());
-    const matchesRegion = filters.region === 'Todas' || r.region === filters.region;
-    const matchesType = filters.type === 'Todos' || r.type === filters.type;
+    const name = safe(r.name).toLowerCase();
+    const rut = safe(r.rut).toLowerCase();
+    const search = filters.search.toLowerCase();
+    const matchesSearch = name.includes(search) || rut.includes(search);
+    const matchesRegion = filters.region === 'Todas' || safe(r.region) === filters.region;
+    const matchesType = filters.type === 'Todos' || safe(r.type) === filters.type;
     return matchesSearch && matchesRegion && matchesType;
   });
 
@@ -389,6 +473,230 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
                  ))}
               </tbody>
            </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CRMActivities() {
+  const { user } = useAuth();
+  const [activities, setActivities] = useState<any[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [detailView, setDetailView] = useState<any | null>(null);
+  const [form, setForm] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    campania: '',
+    tipo: 'Campaña Comercial',
+    observaciones: '',
+    responsable: ''
+  });
+
+  const loadActivities = async () => {
+    const data = await localDB.getCollection('crm_activities');
+    setActivities(data);
+  };
+
+  useEffect(() => {
+    loadActivities();
+    if (user && !editingId) setForm(prev => ({ ...prev, responsable: user.displayName || user.email || '' }));
+  }, [user, editingId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    if (editingId) {
+      await localDB.updateInCollection('crm_activities', editingId, form);
+      await addAuditLog(user, `Actualizó Actividad: ${form.campania}`, 'CRM');
+      alert('Actividad Actualizada');
+      setEditingId(null);
+    } else {
+      await localDB.saveToCollection('crm_activities', form);
+      await addAuditLog(user, `Registró Actividad: ${form.campania}`, 'CRM');
+      alert('Actividad Registrada');
+    }
+    
+    setForm({ 
+      fecha: new Date().toISOString().split('T')[0],
+      campania: '', 
+      tipo: 'Campaña Comercial',
+      observaciones: '',
+      responsable: user?.displayName || user?.email || ''
+    });
+    loadActivities();
+  };
+
+  const handleEdit = (act: any) => {
+    setEditingId(act.id);
+    setForm({
+      fecha: act.fecha,
+      campania: act.campania,
+      tipo: act.tipo,
+      observaciones: act.observaciones,
+      responsable: act.responsable
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {detailView && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-[#002b5b] p-6 text-white flex justify-between items-center">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <FileText className="w-6 h-6" /> Detalle de Actividad
+              </h3>
+              <button onClick={() => setDetailView(null)} className="text-white/70 hover:text-white transition-colors">
+                <Trash2 className="w-6 h-6 rotate-45" />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-8 border-b pb-6">
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Campaña / Actividad</span>
+                  <span className="text-lg font-bold text-[#002b5b]">{detailView.campania}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Fecha</span>
+                  <span className="text-lg font-bold text-[#002b5b]">{formatDate(detailView.fecha)}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Tipo</span>
+                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold text-xs">{detailView.tipo}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Responsable</span>
+                  <span className="text-[#002b5b] font-medium">{detailView.responsable}</span>
+                </div>
+              </div>
+              <div>
+                <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Observaciones y Resultados</span>
+                <div className="bg-slate-50 p-6 rounded-xl text-slate-700 italic leading-relaxed border border-slate-100 whitespace-pre-wrap">
+                  {detailView.observaciones || "Sin observaciones registradas."}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button 
+                  onClick={() => setDetailView(null)}
+                  className="bg-slate-100 text-slate-600 px-8 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                >
+                  CERRAR
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+           <span className="flex items-center gap-2">
+             <TrendingUp className="w-5 h-5" /> 
+             {editingId ? 'Editando Actividad / Campaña' : 'Registro de Actividades / Campañas'}
+           </span>
+           {editingId && (
+             <button 
+               onClick={() => {
+                 setEditingId(null);
+                 setForm({
+                   fecha: new Date().toISOString().split('T')[0],
+                   campania: '',
+                   tipo: 'Campaña Comercial',
+                   observaciones: '',
+                   responsable: user?.displayName || user?.email || ''
+                 });
+               }}
+               className="text-[10px] bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded uppercase font-black transition-colors"
+             >
+               Cancelar Edición
+             </button>
+           )}
+        </div>
+        <form className="p-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <CRMField label="Fecha">
+              <input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
+            </CRMField>
+            <CRMField label="Nombre de Campaña / Actividad">
+              <input 
+                className="w-full border-b p-2 font-bold" 
+                placeholder="Ej: AGENDA DE INDUCCIÓN" 
+                value={form.campania} 
+                onChange={e => setForm({...form, campania: e.target.value})} 
+                required 
+              />
+            </CRMField>
+            <CRMField label="Tipo de Actividad">
+              <select className="w-full border-b p-2" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
+                <option>Campaña Comercial</option>
+                <option>Inducción</option>
+                <option>Webinar</option>
+                <option>Email Marketing</option>
+                <option>Otros</option>
+              </select>
+            </CRMField>
+          </div>
+          <CRMField label="Observaciones y Resultados">
+            <textarea 
+              className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
+              placeholder="Detalle los objetivos y resultados de esta actividad..."
+              value={form.observaciones}
+              onChange={e => setForm({...form, observaciones: e.target.value})}
+            />
+          </CRMField>
+          <div className="flex justify-end">
+            <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
+              <Save className="w-4 h-4" /> {editingId ? 'ACTUALIZAR CAMBIOS' : 'REGISTRAR ACTIVIDAD'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b">
+          <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Historial de Actividades Recientes</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50/50 text-left border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="p-4">Fecha</th>
+                <th className="p-4">Campaña / Actividad</th>
+                <th className="p-4">Tipo</th>
+                <th className="p-4">Responsable</th>
+                <th className="p-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
+                <tr key={act.id} className="hover:bg-blue-50/30 transition-colors">
+                  <td className="p-4">{formatDate(act.fecha)}</td>
+                  <td className="p-4 font-bold text-[#001736]">{act.campania}</td>
+                  <td className="p-4"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">{act.tipo}</span></td>
+                  <td className="p-4 text-slate-500">{act.responsable}</td>
+                  <td className="p-4 text-right">
+                    <RecordActions 
+                      onView={() => setDetailView(act)}
+                      onEdit={() => handleEdit(act)}
+                      onDelete={async () => {
+                        if (confirm('¿Eliminar actividad?')) {
+                          await localDB.deleteFromCollection('crm_activities', act.id);
+                          loadActivities();
+                        }
+                      }}
+                    />
+                  </td>
+                </tr>
+              ))}
+              {activities.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-slate-400 italic">No hay actividades registradas.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

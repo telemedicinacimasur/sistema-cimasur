@@ -60,15 +60,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, pass: string) => {
-    const { localAuth } = await import('../lib/auth');
+    const { localAuth, addAuditLog } = await import('../lib/auth');
     const userData = await localAuth.login(email, pass);
     if (!isFirebaseReady) {
       setUser(userData);
     }
+    if (userData) {
+      await addAuditLog(userData, 'Inició Sesión', 'Sistema');
+    }
   };
 
   const logout = async () => {
-    const { localAuth } = await import('../lib/auth');
+    const { localAuth, addAuditLog } = await import('../lib/auth');
+    if (user) {
+      await addAuditLog(user, 'Cerró Sesión', 'Sistema');
+    }
     await localAuth.logout();
     setUser(null);
   };

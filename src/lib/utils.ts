@@ -16,3 +16,16 @@ export function formatDate(dateStr: any) {
   if (!dateStr || typeof dateStr !== 'string') return '--';
   return dateStr.split('-').reverse().join('/');
 }
+
+export function safe(val: any) {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object') {
+    try {
+      if (val instanceof Date) return val.toISOString().split('T')[0];
+      return JSON.stringify(val);
+    } catch {
+      return '[Objeto]';
+    }
+  }
+  return String(val);
+}

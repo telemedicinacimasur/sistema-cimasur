@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { localDB, localAuth } from '../lib/auth';
-import { cn, formatDate, formatCurrency } from '../lib/utils';
+import { cn, formatDate, formatCurrency, safe } from '../lib/utils';
 import { 
   exportTableToPDF, 
   exportRecordToPDF, 
@@ -23,10 +23,17 @@ import {
   Edit,
   Users,
   Shield,
-  Key
+  Key,
+  Upload,
+  PlusCircle,
+  FileUp,
+  DollarSign
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { addAuditLog } from '../lib/auth';
+import { useAuth } from '../contexts/AuthContext';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'dte' | 'users' | 'logs';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'dte' | 'pet_payments' | 'users' | 'logs';
 
 export default function AdminView() {
   const [view, setView] = useState<AdminTab>('menu');
@@ -37,6 +44,7 @@ export default function AdminView() {
       let col = 'quotes';
       if (view === 'sales') col = 'sales';
       if (view === 'dte') col = 'dte_records';
+      if (view === 'pet_payments') col = 'pet_payments';
       if (view === 'logs') col = 'audit_logs'; 
       const data = await localDB.getCollection(col);
       setRecords(data);
@@ -76,6 +84,12 @@ export default function AdminView() {
             onClick={() => setView('dte')}
           />
           <ModuleCard 
+            title="Control de Pagos Veterinarios"
+            desc="Registro de pagos tutor, mail, fono y honorarios veterinarios."
+            icon={DollarSign}
+            onClick={() => setView('pet_payments')}
+          />
+          <ModuleCard 
             title="Gestión de Usuarios"
             desc="Control de accesos, restablecimiento de contraseñas y roles."
             icon={Users}
@@ -105,6 +119,7 @@ export default function AdminView() {
       {view === 'quotes' && <QuoteManager records={records} setRecords={setRecords} />}
       {view === 'sales' && <SalesManager records={records} setRecords={setRecords} />}
       {view === 'dte' && <DTEManager records={records} setRecords={setRecords} />}
+      {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'users' && <UsersManager />}
       {view === 'logs' && <AuditLogManager records={records} />}
     </div>
@@ -383,6 +398,324 @@ function AuditLogManager({ records }: { records: any[] }) {
   );
 }
 
+function PetPaymentsManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
+  const [searchTutor, setSearchTutor] = useState('');
+  const [students, setStudents] = useState<any[]>([]);
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Fecha", "Tutor", "Mail", "Fono", "Pago Consulta", "Pago Veterinario", "Fecha Pago"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pagos Veterinarios");
+    XLSX.writeFile(wb, "plantilla_importacion_pagos_vet.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const tutor = safe(row["Tutor"]);
+          if (!tutor) continue;
+
+          const newRecord = {
+            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            tutor: tutor.toUpperCase(),
+            mail: safe(row["Mail"]) || "",
+            fono: safe(row["Fono"]) || "",
+            pagoConsulta: parseInt(safe(row["Pago Consulta"])) || 0,
+            pagoVeterinario: parseInt(safe(row["Pago Veterinario"])) || 0,
+            fechaPago: safe(row["Fecha Pago"]) || new Date().toISOString().split('T')[0]
+          };
+          
+          await localDB.saveToCollection('pet_payments', newRecord);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} pagos vet desde Excel`, 'Administración');
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const updated = await localDB.getCollection('pet_payments');
+        setRecords(updated);
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Verifique el formato.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const [form, setForm] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    tutor: '',
+    mail: '',
+    fono: '',
+    pagoConsulta: 0,
+    pagoVeterinario: 0,
+    fechaPago: new Date().toISOString().split('T')[0]
+  });
+
+  useEffect(() => {
+    const loadStudents = async () => {
+      const data = await localDB.getCollection('students');
+      const leads = await localDB.getCollection('school_leads');
+      setStudents([...data, ...leads]);
+    };
+    loadStudents();
+  }, []);
+
+  const handleTutorLookup = (name: string) => {
+    setForm(prev => ({ ...prev, tutor: name }));
+    const found = students.find(s => s.name?.toLowerCase() === name.toLowerCase() || s.nombre?.toLowerCase() === name.toLowerCase());
+    if (found) {
+      setForm(prev => ({
+        ...prev,
+        mail: found.email || found.mail || '',
+        fono: found.phone || found.fono || found.telefono || ''
+      }));
+    }
+  };
+
+  const filteredRecords = records.filter(r => {
+    const matchesSearch = !searchTutor || r.tutor?.toLowerCase().includes(searchTutor.toLowerCase());
+    const date = r.fecha;
+    const matchesStart = !dateStart || date >= dateStart;
+    const matchesEnd = !dateEnd || date <= dateEnd;
+    return matchesSearch && matchesStart && matchesEnd;
+  });
+
+  const totalVet = filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    if (editingId) {
+      await localDB.updateInCollection('pet_payments', editingId, form);
+      await addAuditLog(user, `Actualizó Pago Vet de ${form.tutor}`, 'Administración');
+      setEditingId(null);
+      alert('Registro de pago actualizado');
+    } else {
+      await localDB.saveToCollection('pet_payments', form);
+      await addAuditLog(user, `Registró Pago Vet de ${form.tutor}`, 'Administración');
+      alert('Pago registrado correctamente');
+    }
+    setForm({
+      fecha: new Date().toISOString().split('T')[0],
+      tutor: '',
+      mail: '',
+      fono: '',
+      pagoConsulta: 0,
+      pagoVeterinario: 0,
+      fechaPago: new Date().toISOString().split('T')[0]
+    });
+    const updated = await localDB.getCollection('pet_payments');
+    setRecords(updated);
+  };
+
+  const handleEdit = (r: any) => {
+    setEditingId(r.id);
+    setForm({
+      fecha: r.fecha || '',
+      tutor: r.tutor || '',
+      mail: r.mail || '',
+      fono: r.fono || '',
+      pagoConsulta: r.pagoConsulta || r.pago1 || 0,
+      pagoVeterinario: r.pagoVeterinario || r.pago2 || 0,
+      fechaPago: r.fechaPago || r.pagoVeterinario || new Date().toISOString().split('T')[0]
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('¿Eliminar este registro de pago?')) {
+      await localDB.deleteFromCollection('pet_payments', id);
+      const updated = await localDB.getCollection('pet_payments');
+      setRecords(updated);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-[#0b2447] p-4 text-white font-bold flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5" /> {editingId ? 'Editando Pago Veterinario' : 'Control de Pagos Veterinarios'}
+          </span>
+          <div className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-black uppercase tracking-widest">
+            Administración Financiera
+          </div>
+        </div>
+        <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
+          <div className="md:col-span-2 grid grid-cols-2 gap-4">
+             <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required /></FormField>
+             <FormField label="Tutor (Nombre Completo)">
+               <input 
+                className="w-full border-b p-2 text-sm font-bold uppercase" 
+                value={form.tutor} 
+                onChange={e => setForm({...form, tutor: e.target.value})} 
+                onBlur={e => handleTutorLookup(e.target.value)}
+                list="tutors-list"
+                required 
+               />
+               <datalist id="tutors-list">
+                 {students.map((s, i) => <option key={i} value={s.name || s.nombre} />)}
+               </datalist>
+             </FormField>
+          </div>
+          <div className="md:col-span-2 grid grid-cols-2 gap-4">
+             <FormField label="Mail"><input type="email" className="w-full border-b p-2 text-sm" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></FormField>
+             <FormField label="Fono"><input className="w-full border-b p-2 text-sm" value={form.fono} onChange={e => setForm({...form, fono: e.target.value})} /></FormField>
+          </div>
+          
+          <div className="md:col-span-3 grid grid-cols-3 gap-4">
+            <FormField label="Pago Consulta ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.pagoConsulta} onChange={e => setForm({...form, pagoConsulta: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Pago Veterinario ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded border-blue-200" value={form.pagoVeterinario} onChange={e => setForm({...form, pagoVeterinario: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Fecha de Pago"><input type="date" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.fechaPago} onChange={e => setForm({...form, fechaPago: e.target.value})} /></FormField>
+          </div>
+          <div className="md:col-span-1 flex flex-col justify-end gap-3">
+             <button type="submit" className={cn(
+               "w-full py-4 rounded-xl font-black shadow-xl hover:translate-y-[-2px] transition-all",
+               editingId ? "bg-amber-600 text-white" : "bg-[#001736] text-white"
+             )}>
+               {editingId ? 'ACTUALIZAR REGISTRO' : 'REGISTRAR PAGO'}
+             </button>
+             {editingId && (
+               <button type="button" onClick={() => setEditingId(null)} className="w-full text-slate-400 text-[10px] font-bold uppercase">Cancelar Edición</button>
+             )}
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b flex flex-wrap justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros de Búsqueda y Rango</span>
+            <div className="flex items-center gap-2">
+              <input type="date" className="text-[10px] border p-1 rounded" value={dateStart} onChange={e => setDateStart(e.target.value)} />
+              <span className="text-slate-300">al</span>
+              <input type="date" className="text-[10px] border p-1 rounded" value={dateEnd} onChange={e => setDateEnd(e.target.value)} />
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input 
+                placeholder="Tutor..." 
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none" 
+                value={searchTutor}
+                onChange={e => setSearchTutor(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <span className="block text-[8px] font-black text-slate-400 uppercase">Total Veterinaria</span>
+              <span className="text-sm font-black text-blue-900 tracking-tighter">{formatCurrency(totalVet)}</span>
+            </div>
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx,.xls" 
+              onChange={handleFileUpload} 
+            />
+            <div className="flex gap-1">
+              <button 
+                onClick={downloadExcelTemplate}
+                className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 shadow-sm transition-colors"
+                title="Descargar Plantilla Excel"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-amber-600 text-white p-2 rounded hover:bg-amber-700 shadow-sm transition-colors"
+                title="Importar desde Excel"
+              >
+                <Upload className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => {
+                  const data = filteredRecords.map(r => [
+                    formatDate(r.fecha), 
+                    r.tutor, 
+                    formatCurrency(r.pagoConsulta || r.pago1 || 0), 
+                    formatCurrency(r.pagoVeterinario || r.pago2 || 0), 
+                    formatDate(r.fechaPago || r.pagoVeterinario)
+                  ]);
+                  exportTableToPDF('Reporte Pagos Veterinarios', ['Fecha', 'Tutor', 'Consulta', 'Veterinario', 'Fecha Pago'], data, 'reporte_pagos_vet', 'l');
+                }}
+                className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 shadow-sm"
+                title="Descargar PDF"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50 text-left border-b font-black text-slate-500 uppercase">
+                <th className="p-4">Fecha</th>
+                <th className="p-4">Tutor</th>
+                <th className="p-4">Mail / Fono</th>
+                <th className="p-4 text-right">Consulta</th>
+                <th className="p-4 text-right text-blue-900 bg-blue-50/30">Pago Vet</th>
+                <th className="p-4 text-center">Fecha Pago</th>
+                <th className="p-4 text-center">Gestión</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredRecords.sort((a,b) => b.fecha.localeCompare(a.fecha)).map(r => (
+                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 font-mono text-slate-400">{formatDate(r.fecha)}</td>
+                  <td className="p-4 font-bold text-[#001736] uppercase">{r.tutor}</td>
+                  <td className="p-4 italic text-slate-500">
+                    <span className="block">{r.mail}</span>
+                    <span className="text-[10px]">{r.fono}</span>
+                  </td>
+                  <td className="p-4 text-right">{formatCurrency(r.pagoConsulta || r.pago1 || 0)}</td>
+                  <td className="p-4 text-right font-black bg-blue-50/10 text-blue-900 border-x border-slate-50">{formatCurrency(r.pagoVeterinario || r.pago2 || 0)}</td>
+                  <td className="p-4 text-center font-mono opacity-60 italic">{formatDate(r.fechaPago || r.pagoVeterinario)}</td>
+                  <td className="p-4 text-center">
+                    <RecordActions 
+                      onEdit={() => handleEdit(r)}
+                      onDelete={() => handleDelete(r.id)}
+                    />
+                  </td>
+                </tr>
+              ))}
+              {filteredRecords.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-10 text-center text-slate-400 italic">No hay registros para este criterio.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModuleCard({ title, desc, icon: Icon, onClick }: any) {
   return (
     <button 
@@ -408,10 +741,78 @@ function FormField({ label, children }: { label: string, children: React.ReactNo
 }
 
 function QuoteManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "UND Inventario", "UND Total", "Observaciones"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cotizaciones");
+    XLSX.writeFile(wb, "plantilla_importacion_cotizaciones.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        const currentRecords = await localDB.getCollection('quotes');
+
+        for (const row of data) {
+          const nroCotiz = safe(row["N° Cotiz"]);
+          if (!nroCotiz) continue;
+
+          // Check if already exists
+          if (currentRecords.some(r => safe(r.nroCotiz) === nroCotiz)) continue;
+
+          const invVal = parseInt(safe(row["UND Inventario"])) || 0;
+          const totalVal = parseInt(safe(row["UND Total"])) || 0;
+
+          const newQuote = {
+            anio: safe(row["Año"]) || new Date().getFullYear().toString(),
+            mes: safe(row["Mes"]) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+            nroCotiz: nroCotiz,
+            fechaElab: safe(row["Fecha Elab"]) || new Date().toISOString().split('T')[0],
+            cliente: safe(row["Cliente"]),
+            vendedor: safe(row["Vendedor"]) || 'CIMASUR',
+            estado: safe(row["Estado"]) || 'Pendiente',
+            fechaAprob: safe(row["Fecha Aprob"]),
+            invUnits: invVal,
+            undTotal: totalVal,
+            todoUnits: Math.max(0, totalVal - invVal),
+            observaciones: safe(row["Observaciones"])
+          };
+
+          await localDB.saveToCollection('quotes', newQuote);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} cotizaciones desde Excel`, 'Administración');
+        alert(`Éxito: Se importaron ${importedCount} cotizaciones correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
   
   const [form, setForm] = useState({
     anio: new Date().getFullYear().toString(),
@@ -470,10 +871,12 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
     e.preventDefault();
     if (editingId) {
       await localDB.updateInCollection('quotes', editingId, form);
+      await addAuditLog(user, `Actualizó Cotización N° ${form.nroCotiz}`, 'Administración');
       setEditingId(null);
       alert('Cotización actualizada exitosamente');
     } else {
       await localDB.saveToCollection('quotes', form);
+      await addAuditLog(user, `Registró Cotización N° ${form.nroCotiz}`, 'Administración');
       alert('Cotización guardada exitosamente');
     }
     setForm({
@@ -497,7 +900,9 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
   const handleDelete = async (id: string) => {
     if (true) {
       try {
+        const quote = records.find(r => r.id === id);
         await localDB.deleteFromCollection('quotes', id);
+        if (quote) await addAuditLog(user, `Eliminó Cotización N° ${quote.nroCotiz}`, 'Administración');
         // El db-change disparará la recarga en el useEffect padre, pero forzamos aquí para feedback inmediato
         const updated = await localDB.getCollection('quotes');
         setRecords(updated);
@@ -515,6 +920,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
       if (!record) return;
       const newTotal = newStatus === 'Aprobada' ? (Number(record.invUnits || 0) + Number(record.todoUnits || 0)) : 0;
       await localDB.updateInCollection('quotes', id, { ...record, estado: newStatus, undTotal: newTotal });
+      await addAuditLog(user, `Cambió estado Cotización N° ${record.nroCotiz} a ${newStatus}`, 'Administración');
       const updated = await localDB.getCollection('quotes');
       setRecords(updated);
     } catch (err) {
@@ -525,8 +931,34 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center gap-2">
-          <TrendingUp className="w-5 h-5" /> Seguimiento de Cotizaciones
+        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5" /> Seguimiento de Cotizaciones
+          </div>
+          <div className="flex items-center gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-sm"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-sm"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+          </div>
         </div>
         <form className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleSubmit}>
           <FormField label="Año"><input className="w-full border-b p-2 text-sm" value={form.anio || ''} onChange={e => setForm({...form, anio: e.target.value})} /></FormField>
@@ -729,6 +1161,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
 }
 
 function SalesManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     anio: new Date().getFullYear().toString(),
@@ -742,6 +1176,63 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
   const [dateFilter, setDateFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
 
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Año", "Mes", "Fecha", "Documento", "Cliente", "Frascos"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+    XLSX.writeFile(wb, "plantilla_importacion_ventas.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        const currentRecords = await localDB.getCollection('sales');
+
+        for (const row of data) {
+          const doc = safe(row["Documento"]);
+          if (!doc) continue;
+
+          // Check if already exists
+          if (currentRecords.some(r => safe(r.documento) === doc)) continue;
+
+          const newSale = {
+            anio: safe(row["Año"]) || new Date().getFullYear().toString(),
+            mes: safe(row["Mes"]) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            documento: doc,
+            cliente: safe(row["Cliente"]),
+            nroFrascos: parseInt(safe(row["Frascos"])) || 0
+          };
+
+          await localDB.saveToCollection('sales', newSale);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} ventas desde Excel`, 'Administración');
+        alert(`Éxito: Se importaron ${importedCount} ventas correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const filteredRecords = records.filter(r => 
     (dateFilter ? r.fecha === dateFilter : true) &&
     (customerFilter ? r.cliente?.toLowerCase().includes(customerFilter.toLowerCase()) : true)
@@ -753,10 +1244,12 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     e.preventDefault();
     if (editingId) {
       await localDB.updateInCollection('sales', editingId, form);
+      await addAuditLog(user, `Actualizó Venta Doc: ${form.documento}`, 'Administración');
       setEditingId(null);
       alert('Venta actualizada');
     } else {
       await localDB.saveToCollection('sales', form);
+      await addAuditLog(user, `Registró Venta Doc: ${form.documento}`, 'Administración');
       alert('Venta registrada');
     }
     setForm({
@@ -776,16 +1269,40 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
       <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas</span>
-          <button 
-            onClick={() => {
-              const data = records.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
-              exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
-            }}
-            className="text-white/70 hover:text-white"
-            title="PDF"
-          >
-            <Download className="w-4 h-4" />
-          </button>
+          <div className="flex gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+            <button 
+              onClick={() => {
+                const data = records.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
+                exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
+              }}
+              className="text-white/70 hover:text-white"
+              title="PDF"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <form className="p-6 space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-4">
@@ -896,6 +1413,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 }
 
 function DTEManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
   const [form, setForm] = useState({
@@ -922,10 +1440,12 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
     e.preventDefault();
     if (editingId) {
       await localDB.updateInCollection('dte_records', editingId, { ...form, iva, total });
+      await addAuditLog(user, `Actualizó DTE N° ${form.nroDto}`, 'Administración');
       setEditingId(null);
       alert('DTE Actualizado');
     } else {
       await localDB.saveToCollection('dte_records', { ...form, iva, total });
+      await addAuditLog(user, `Registró DTE N° ${form.nroDto}`, 'Administración');
       alert('DTE Registrado Admin');
     }
     setForm({...form, nroDto: '', nombre: '', rut: '', montoNeto: 0});

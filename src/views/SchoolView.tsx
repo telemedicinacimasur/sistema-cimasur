@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { localDB } from '../lib/auth';
+import React, { useState, useEffect, useRef } from 'react';
+import { localDB, addAuditLog } from '../lib/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDate } from '../lib/utils';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
+import * as XLSX from 'xlsx';
 import { 
   GraduationCap, 
   UserPlus, 
@@ -10,6 +12,7 @@ import {
   Search,
   Save,
   Clock,
+  History,
   BookOpen,
   DollarSign,
   ArrowRight,
@@ -18,13 +21,24 @@ import {
   Smartphone,
   Trash2,
   Download,
-  Edit
+  Edit,
+  Upload,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 
 import { RecordActions } from '../components/RecordActions';
 
+const safe = (val: any) => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object') {
+    try { return JSON.stringify(val); } catch { return '[Objeto]'; }
+  }
+  return String(val);
+};
+
 export default function SchoolView() {
-  const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking'>('register');
+  const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities'>('register');
   const [data, setData] = useState<any[]>([]);
 
   useEffect(() => {
@@ -49,6 +63,7 @@ export default function SchoolView() {
            <TabButton active={activeView === 'register'} onClick={() => setActiveView('register')} icon={UserPlus}>Captación</TabButton>
            <TabButton active={activeView === 'students'} onClick={() => setActiveView('students')} icon={GraduationCap}>Alumnos</TabButton>
            <TabButton active={activeView === 'tracking'} onClick={() => setActiveView('tracking')} icon={LineChart}>Vista 360°</TabButton>
+           <TabButton active={activeView === 'activities'} onClick={() => setActiveView('activities')} icon={History}>Actividades</TabButton>
         </div>
       </div>
 
@@ -56,6 +71,7 @@ export default function SchoolView() {
         {activeView === 'register' && <ContactRegister records={data} />}
         {activeView === 'students' && <StudentManager records={data} />}
         {activeView === 'tracking' && <TrackingView />}
+        {activeView === 'activities' && <SchoolActivities />}
       </div>
     </div>
   );
@@ -77,6 +93,8 @@ function TabButton({ active, onClick, icon: Icon, children }: any) {
 }
 
 function ContactRegister({ records }: { records: any[] }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
     name: '',
@@ -95,8 +113,65 @@ function ContactRegister({ records }: { records: any[] }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await localDB.saveToCollection('school_leads', form);
+    if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
     alert('Lead Académico Registrado');
     setForm({ ...form, name: '', rut: '', email: '', phone: '', observaciones: '' });
+  };
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Fecha Registro", "Nombre Apellido", "RUT Escrito", "Email", "Teléfono / WhatsApp", "CLASIFICACIÓN PROFESIONAL", "Programa de Interés", "Observaciones de seguimiento"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Hoja1");
+    XLSX.writeFile(wb, "plantilla_importacion_escuela.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const newLead = {
+            fecha: safe(row["Fecha Registro"]) || new Date().toISOString().split('T')[0],
+            name: safe(row["Nombre Apellido"]),
+            rut: safe(row["RUT Escrito"]),
+            email: safe(row["Email"]),
+            phone: safe(row["Teléfono / WhatsApp"]),
+            clasificacion: safe(row["CLASIFICACIÓN PROFESIONAL"]) || 'Sin información',
+            interes: safe(row["Programa de Interés"]) || 'Otro',
+            canal: 'Importación Excel',
+            estado: 'Nuevo',
+            observaciones: safe(row["Observaciones de seguimiento"]),
+            responsable: user.displayName || user.email || 'Sistema'
+          };
+
+          if (newLead.name && newLead.rut) {
+            await localDB.saveToCollection('school_leads', newLead);
+            importedCount++;
+          }
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} leads académicos desde Excel`, 'SCHOOL');
+        alert(`Éxito: Se importaron ${importedCount} leads académicos correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const moveToStudents = async (lead: any) => {
@@ -140,7 +215,30 @@ function ContactRegister({ records }: { records: any[] }) {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
           <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
              <span className="flex items-center gap-2">Registro de Potenciales Alumnos</span>
-             <span className="text-[10px] opacity-70 italic">Lead Management System</span>
+             <div className="flex gap-2">
+               <input 
+                 type="file" 
+                 ref={fileInputRef} 
+                 className="hidden" 
+                 accept=".xlsx, .xls"
+                 onChange={handleFileUpload}
+               />
+               <button 
+                 type="button"
+                 onClick={downloadExcelTemplate}
+                 className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+                 title="Descargar Plantilla Excel"
+               >
+                 <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+               </button>
+               <button 
+                 type="button"
+                 onClick={() => fileInputRef.current?.click()}
+                 className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+               >
+                 <Upload className="w-3.5 h-3.5" /> Importar
+               </button>
+             </div>
           </div>
           <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
              <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
@@ -418,10 +516,12 @@ function StudentManager({ records }: { records: any[] }) {
     );
   }
 
-  const filteredRecords = records.filter(s => {
+  const filteredRecords = (Array.isArray(records) ? records : []).filter(s => {
+    const name = safe(s.name).toLowerCase();
+    const rut = safe(s.rut).toLowerCase();
     const term = searchTerm.toLowerCase();
-    const matchSearch = s.name.toLowerCase().includes(term) || (s.rut && s.rut.toLowerCase().includes(term));
-    const matchDiplomado = filterDiplomado === 'Todos' || (s.diplomado && s.diplomado === filterDiplomado);
+    const matchSearch = name.includes(term) || rut.includes(term);
+    const matchDiplomado = filterDiplomado === 'Todos' || (safe(s.diplomado) === filterDiplomado);
     return matchSearch && matchDiplomado;
   });
 
@@ -485,15 +585,15 @@ function StudentManager({ records }: { records: any[] }) {
               {filteredRecords.map(s => (
                 <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
                    <td className="p-5">
-                      <div className="font-bold text-[#001736]">{s.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono italic">{s.clasificacion}</div>
+                      <div className="font-bold text-[#001736]">{safe(s.name)}</div>
+                      <div className="text-[10px] text-slate-400 font-mono italic">{safe(s.clasificacion)}</div>
                    </td>
-                   <td className="p-5 font-medium">{s.diplomado || 'Diplomado Homeopatía'}</td>
+                   <td className="p-5 font-medium">{safe(s.diplomado) || 'Diplomado Homeopatía'}</td>
                    <td className="p-5">
                       <span className={cn(
                         "px-3 py-1 rounded text-[9px] font-black uppercase border",
-                        s.pago === 'Al Día' ? "bg-green-50 text-green-700 border-green-100" : "bg-amber-50 text-amber-700 border-amber-100"
-                      )}>{s.pago || 'Al Día'}</span>
+                        safe(s.pago) === 'Al Día' ? "bg-green-50 text-green-700 border-green-100" : "bg-amber-50 text-amber-700 border-amber-100"
+                      )}>{safe(s.pago) || 'Al Día'}</span>
                    </td>
                    <td className="p-5">
                       <div className="flex flex-col items-center gap-1">
@@ -561,11 +661,14 @@ function TrackingView() {
   }, []);
 
   const combined = [
-    ...leads.map(l => ({ ...l, type: 'Lead' })),
-    ...students.map(s => ({ ...s, type: 'Alumno' }))
+    ...(Array.isArray(leads) ? leads : []).map(l => ({ ...l, type: 'Lead' })),
+    ...(Array.isArray(students) ? students : []).map(s => ({ ...s, type: 'Alumno' }))
   ].filter(item => {
+    const name = safe(item.name).toLowerCase();
+    const rut = safe(item.rut).toLowerCase();
+    const term = search.toLowerCase();
     const matchesFilter = filter === 'all' || (filter === 'leads' && item.type === 'Lead') || (filter === 'students' && item.type === 'Alumno');
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.rut.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = name.includes(term) || rut.includes(term);
     return matchesFilter && matchesSearch;
   });
 
@@ -635,7 +738,7 @@ function TrackingView() {
            <tbody className="divide-y divide-slate-100">
               {combined.map((item: any) => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                   <td className="p-5 font-bold text-blue-900">{item.name} <span className="block text-[9px] text-slate-400 font-mono mt-1">{item.rut}</span></td>
+                   <td className="p-5 font-bold text-blue-900">{safe(item.name)} <span className="block text-[9px] text-slate-400 font-mono mt-1">{safe(item.rut)}</span></td>
                    <td className="p-5">
                       <span className={cn(
                         "px-2 py-0.5 rounded text-[9px] font-black uppercase",
@@ -659,6 +762,230 @@ function TrackingView() {
               )}
            </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function SchoolActivities() {
+  const { user } = useAuth();
+  const [activities, setActivities] = useState<any[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [detailView, setDetailView] = useState<any | null>(null);
+  const [form, setForm] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    actividad: '',
+    tipo: 'Actividad Académica',
+    observaciones: '',
+    responsable: ''
+  });
+
+  const loadActivities = async () => {
+    const data = await localDB.getCollection('school_activities');
+    setActivities(data);
+  };
+
+  useEffect(() => {
+    loadActivities();
+    if (user && !editingId) setForm(prev => ({ ...prev, responsable: user.displayName || user.email || '' }));
+  }, [user, editingId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    if (editingId) {
+      await localDB.updateInCollection('school_activities', editingId, form);
+      await addAuditLog(user, `Actualizó Actividad Escuela: ${form.actividad}`, 'SCHOOL');
+      alert('Actividad Académica Actualizada');
+      setEditingId(null);
+    } else {
+      await localDB.saveToCollection('school_activities', form);
+      await addAuditLog(user, `Registró Actividad Escuela: ${form.actividad}`, 'SCHOOL');
+      alert('Actividad Académica Registrada');
+    }
+
+    setForm({ 
+      fecha: new Date().toISOString().split('T')[0],
+      actividad: '', 
+      tipo: 'Actividad Académica',
+      observaciones: '',
+      responsable: user.displayName || user.email || ''
+    });
+    loadActivities();
+  };
+
+  const handleEdit = (act: any) => {
+    setEditingId(act.id);
+    setForm({
+      fecha: act.fecha,
+      actividad: act.actividad,
+      tipo: act.tipo,
+      observaciones: act.observaciones,
+      responsable: act.responsable
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {detailView && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-[#002b5b] p-6 text-white flex justify-between items-center">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <FileText className="w-6 h-6" /> Detalle Actividad Académica
+              </h3>
+              <button onClick={() => setDetailView(null)} className="text-white/70 hover:text-white transition-colors">
+                <Trash2 className="w-6 h-6 rotate-45" />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-8 border-b pb-6">
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Actividad / Campaña</span>
+                  <span className="text-lg font-bold text-[#002b5b]">{detailView.actividad}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Fecha</span>
+                  <span className="text-lg font-bold text-[#002b5b]">{formatDate(detailView.fecha)}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Tipo</span>
+                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold text-xs">{detailView.tipo}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Responsable</span>
+                  <span className="text-[#002b5b] font-medium">{detailView.responsable}</span>
+                </div>
+              </div>
+              <div>
+                <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Observaciones</span>
+                <div className="bg-slate-50 p-6 rounded-xl text-slate-700 italic leading-relaxed border border-slate-100 whitespace-pre-wrap">
+                  {detailView.observaciones || "Sin observaciones registradas."}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button 
+                  onClick={() => setDetailView(null)}
+                  className="bg-slate-100 text-slate-600 px-8 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                >
+                  CERRAR
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+           <span className="flex items-center gap-2">
+             <History className="w-5 h-5" /> 
+             {editingId ? 'Editando Actividad Académica' : 'Registro de Actividades Académicas / Campañas'}
+           </span>
+           {editingId && (
+             <button 
+               onClick={() => {
+                 setEditingId(null);
+                 setForm({
+                   fecha: new Date().toISOString().split('T')[0],
+                   actividad: '',
+                   tipo: 'Actividad Académica',
+                   observaciones: '',
+                   responsable: user?.displayName || user?.email || ''
+                 });
+               }}
+               className="text-[10px] bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded uppercase font-black transition-colors"
+             >
+               Cancelar Edición
+             </button>
+           )}
+        </div>
+        <form className="p-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FormGroup label="Fecha">
+              <input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
+            </FormGroup>
+            <FormGroup label="Nombre de Actividad / Campaña">
+              <input 
+                className="w-full border-b p-2 font-bold" 
+                placeholder="Ej: AGENDA DE INDUCCIÓN" 
+                value={form.actividad} 
+                onChange={e => setForm({...form, actividad: e.target.value})} 
+                required 
+              />
+            </FormGroup>
+            <FormGroup label="Tipo">
+              <select className="w-full border-b p-2" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
+                <option>Actividad Académica</option>
+                <option>Campaña de Venta</option>
+                <option>Taller de Inducción</option>
+                <option>Webinar Educativo</option>
+                <option>Otros</option>
+              </select>
+            </FormGroup>
+          </div>
+          <FormGroup label="Observaciones">
+            <textarea 
+              className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
+              placeholder="Detalle de la actividad..."
+              value={form.observaciones}
+              onChange={e => setForm({...form, observaciones: e.target.value})}
+            />
+          </FormGroup>
+          <div className="flex justify-end">
+            <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
+              <Save className="w-4 h-4" /> {editingId ? 'ACTUALIZAR CAMBIOS' : 'GUARDAR ACTIVIDAD'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b">
+          <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-[#002b5b]">Historial Académico</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50/50 text-left border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="p-4">Fecha</th>
+                <th className="p-4">Actividad</th>
+                <th className="p-4">Tipo</th>
+                <th className="p-4">Responsable</th>
+                <th className="p-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
+                <tr key={act.id} className="hover:bg-blue-50/30 transition-colors">
+                  <td className="p-4">{formatDate(act.fecha)}</td>
+                  <td className="p-4 font-bold text-[#001736]">{act.actividad}</td>
+                  <td className="p-4"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">{act.tipo}</span></td>
+                  <td className="p-4 text-slate-500">{act.responsable}</td>
+                  <td className="p-4 text-right">
+                    <RecordActions 
+                      onView={() => setDetailView(act)}
+                      onEdit={() => handleEdit(act)}
+                      onDelete={async () => {
+                        if (confirm('¿Eliminar actividad?')) {
+                          await localDB.deleteFromCollection('school_activities', act.id);
+                          loadActivities();
+                        }
+                      }}
+                    />
+                  </td>
+                </tr>
+              ))}
+              {activities.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-slate-400 italic">No hay actividades registradas en Escuela.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
