@@ -81,7 +81,7 @@ export const localAuth = {
         await addDoc(collection(db, 'users'), {
           email: userData.email || 'anónimo@cimasur.cl',
           displayName: userData.displayName || 'Anónimo',
-          role: userData.role,
+          role: userData.role || 'viewer',
           createdAt: new Date().toISOString()
         });
       } catch (error) {
@@ -109,7 +109,7 @@ export async function addAuditLog(user: UserProfile, action: string, module: str
   const logData = {
     displayName: user.displayName || 'Anónimo',
     email: user.email || 'anónimo@cimasur.cl',
-    role: user.role,
+    role: user.role || 'viewer',
     action,
     module,
     timestamp: new Date().toISOString()
