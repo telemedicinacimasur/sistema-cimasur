@@ -131,7 +131,19 @@ function CRMRegister() {
     await localDB.saveToCollection('contacts', form);
     await addAuditLog(user, `Registró Cliente ${form.name}`, 'CRM');
     alert('Cliente Guardado en CRM');
-    setForm({ ...form, name: '', rut: '', historialUnificado: '' });
+    setForm({ 
+      fechaIngreso: new Date().toISOString().split('T')[0],
+      name: '',
+      rut: '',
+      phone: '',
+      email: '',
+      region: 'Metropolitana',
+      type: 'Farmacia',
+      categoria: 'Sin categoría',
+      historialUnificado: '',
+      responsable: user.displayName 
+    });
+    window.dispatchEvent(new Event('db-change'));
   };
 
   const downloadExcelTemplate = () => {
@@ -224,11 +236,7 @@ function CRMRegister() {
            <CRMField label="Teléfono"><input className="w-full border-b p-2 text-sm" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></CRMField>
            
            <CRMField label="Email"><input type="email" className="w-full border-b p-2 text-sm" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></CRMField>
-           <CRMField label="Región de Chile">
-              <select className="w-full border-b p-2 text-sm" value={form.region} onChange={e => setForm({...form, region: e.target.value})}>
-                {REGIONES.filter(r => r !== 'Todas').map(r => <option key={r}>{r}</option>)}
-              </select>
-           </CRMField>
+           <CRMField label="Comuna"><input className="w-full border-b p-2 text-sm" value={form.region} onChange={e => setForm({...form, region: e.target.value})} /></CRMField>
            <CRMField label="Tipo de Cliente">
               <select className="w-full border-b p-2 text-sm" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
                 <option>Farmacia</option><option>Centro Médico</option><option>Independiente</option><option>Otros</option>
@@ -284,20 +292,22 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const logHeader = `\n\n--- Actualización del ${dateStr} ---`;
-    const catLog = newCategory && newCategory !== selectedClient.categoria 
-      ? `\n[SISTEMA] Actualizado a ${newCategory} fecha ${dateStr}` 
-      : '';
     
-    const updatedHistory = selectedClient.historialUnificado + logHeader + catLog + (newHistory ? `\n${newHistory}` : '');
+    const updatedHistory = (selectedClient.historialUnificado || '') + logHeader + (newHistory ? `\n${newHistory}` : '');
     
     await localDB.updateInCollection('contacts', selectedClient.id, { 
-      historialUnificado: updatedHistory,
-      categoria: newCategory || selectedClient.categoria
+      name: selectedClient.name,
+      rut: selectedClient.rut,
+      phone: selectedClient.phone,
+      email: selectedClient.email,
+      categoria: selectedClient.categoria,
+      historialUnificado: updatedHistory
     });
     alert('Expediente actualizado');
     setSelectedClient(null);
     setNewHistory('');
     setNewCategory('');
+    window.dispatchEvent(new Event('db-change'));
   };
 
   if (selectedClient) {
@@ -457,14 +467,14 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
                                `cliente_${r.rut || r.id}`
                              );
                            }}
+                           onEdit={() => setSelectedClient(r)}
                            onDelete={async () => {
-                             if (true) {
-                               try {
-                                 await localDB.deleteFromCollection('contacts', r.id);
-                                 // Relying on db-change event listener for state update
-                               } catch (err) {
-                                 console.error(err);
-                               }
+                             try {
+                               await localDB.deleteFromCollection('contacts', r.id);
+                               window.dispatchEvent(new Event('db-change'));
+                             } catch (err) {
+                               console.error(err);
+                               alert('Error al eliminar');
                              }
                            }}
                          />
@@ -484,6 +494,7 @@ function CRMActivities() {
   const [activities, setActivities] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailView, setDetailView] = useState<any | null>(null);
+  const [filterSearch, setFilterSearch] = useState('');
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
     campania: '',
@@ -526,6 +537,8 @@ function CRMActivities() {
     });
     loadActivities();
   };
+
+  const filteredActivities = activities.filter(a => a.campania.toLowerCase().includes(filterSearch.toLowerCase()));
 
   const handleEdit = (act: any) => {
     setEditingId(act.id);
@@ -655,8 +668,17 @@ function CRMActivities() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b">
+        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
           <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Historial de Actividades Recientes</h3>
+          <div className="relative">
+            <Search className="absolute left-2 top-2 w-4 h-4 text-slate-400" />
+            <input 
+              placeholder="Buscar..." 
+              className="pl-8 pr-2 py-1 border rounded text-xs outline-none"
+              value={filterSearch}
+              onChange={e => setFilterSearch(e.target.value)}
+            />
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -670,7 +692,7 @@ function CRMActivities() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
+              {filteredActivities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
                 <tr key={act.id} className="hover:bg-blue-50/30 transition-colors">
                   <td className="p-4">{formatDate(act.fecha)}</td>
                   <td className="p-4 font-bold text-[#001736]">{act.campania}</td>
@@ -681,16 +703,19 @@ function CRMActivities() {
                       onView={() => setDetailView(act)}
                       onEdit={() => handleEdit(act)}
                       onDelete={async () => {
-                        if (confirm('¿Eliminar actividad?')) {
-                          await localDB.deleteFromCollection('crm_activities', act.id);
-                          loadActivities();
-                        }
+                         try {
+                           await localDB.deleteFromCollection('crm_activities', act.id);
+                           loadActivities();
+                         } catch (err) {
+                           console.error(err);
+                           alert('Error al eliminar');
+                         }
                       }}
                     />
                   </td>
                 </tr>
               ))}
-              {activities.length === 0 && (
+              {filteredActivities.length === 0 && (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-400 italic">No hay actividades registradas.</td>
                 </tr>
@@ -713,4 +738,3 @@ function CRMField({ label, children }: { label: string, children: React.ReactNod
     </div>
   );
 }
-
