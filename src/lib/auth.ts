@@ -79,7 +79,7 @@ export const localAuth = {
     if (isFirebaseReady && db) {
       try {
         await addDoc(collection(db, 'users'), {
-          email: userData.email,
+          email: userData.email || 'anónimo@cimasur.cl',
           displayName: userData.displayName || 'Anónimo',
           role: userData.role,
           createdAt: new Date().toISOString()
@@ -108,7 +108,7 @@ export const localAuth = {
 export async function addAuditLog(user: UserProfile, action: string, module: string) {
   const logData = {
     displayName: user.displayName || 'Anónimo',
-    email: user.email,
+    email: user.email || 'anónimo@cimasur.cl',
     role: user.role,
     action,
     module,
