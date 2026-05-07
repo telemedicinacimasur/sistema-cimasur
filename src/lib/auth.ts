@@ -107,8 +107,8 @@ export const localAuth = {
 
 export async function addAuditLog(user: UserProfile, action: string, module: string) {
   const logData = {
-    displayName: user.displayName || 'Anónimo',
-    email: user.email || 'anónimo@cimasur.cl',
+    displayName: user.displayName || 'Usuario registrado',
+    email: user.email || 'usuario@cimasur.cl',
     role: user.role || 'viewer',
     action,
     module,
@@ -146,30 +146,50 @@ export const localDB = {
       return { id: docRef.id, ...item };
     } else {
       const id = item.id || `rec_${Date.now()}`;
-      await fetch(`/api/records/${name}`, {
+      const response = await fetch(`/api/records/${name}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...item, id })
       });
+      if (!response.ok) {
+        throw new Error(`Failed to save to ${name}: ${response.statusText}`);
+      }
       return { ...item, id };
     }
   },
   updateInCollection: async (name: string, id: string, updates: any) => {
     if (isFirebaseReady && db) {
-      await updateDoc(doc(db, name, id), updates);
+      try {
+        await updateDoc(doc(db, name, id), updates);
+      } catch (error) {
+        console.error(`Firebase update error in ${name}/${id}:`, error);
+        throw error;
+      }
     } else {
-      await fetch(`/api/records/${name}/${id}`, {
+      const response = await fetch(`/api/records/${name}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API update error in ${name}/${id}:`, response.status, errorText);
+        throw new Error(`Failed to update ${id} in ${name}: Status ${response.status} - ${errorText}`);
+      }
     }
   },
   deleteFromCollection: async (name: string, id: string) => {
+    console.log(`Debug: Attempting to delete from ${name} with id: ${id}`);
     if (isFirebaseReady && db) {
       await deleteDoc(doc(db, name, id));
+      console.log(`Debug: Deleted (Firebase) from ${name} with id: ${id}`);
     } else {
-      await fetch(`/api/records/${name}/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/records/${name}/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        console.error(`Debug: Failed to delete ${id} from ${name}: ${response.statusText}`);
+        throw new Error(`Failed to delete ${id} from ${name}: ${response.statusText}`);
+      }
+      console.log(`Debug: Deleted (API) from ${name} with id: ${id}`);
     }
   }
 };

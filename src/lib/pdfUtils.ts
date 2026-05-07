@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export const exportTableToPDF = (title: string, headers: string[], data: any[][], fileName: string, orientation: 'p' | 'l' = 'p') => {
+export const exportTableToPDF = (title: string, headers: string[], data: any[][], fileName: string, orientation: 'p' | 'l' = 'l') => {
   const doc = new jsPDF({ orientation });
   
   // Update header width based on orientation
@@ -44,7 +44,8 @@ export const exportTableToPDF = (title: string, headers: string[], data: any[][]
     },
     styles: {
       fontSize: 9,
-      cellPadding: 3
+      cellPadding: 3,
+      overflow: 'linebreak'
     },
     alternateRowStyles: {
       fillColor: [245, 247, 250]

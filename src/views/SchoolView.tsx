@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
-import { cn, formatDate } from '../lib/utils';
+import { cn, formatDate, safe, parseExcelDate } from '../lib/utils';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
 import * as XLSX from 'xlsx';
 import { 
@@ -28,14 +28,6 @@ import {
 } from 'lucide-react';
 
 import { RecordActions } from '../components/RecordActions';
-
-const safe = (val: any) => {
-  if (val === null || val === undefined) return '';
-  if (typeof val === 'object') {
-    try { return JSON.stringify(val); } catch { return '[Objeto]'; }
-  }
-  return String(val);
-};
 
 export default function SchoolView() {
   const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities'>('register');
@@ -144,7 +136,7 @@ function ContactRegister({ records }: { records: any[] }) {
         let importedCount = 0;
         for (const row of data) {
           const newLead = {
-            fecha: safe(row["Fecha Registro"]) || new Date().toISOString().split('T')[0],
+            fecha: parseExcelDate(row["Fecha Registro"]),
             name: safe(row["Nombre Apellido"]),
             rut: safe(row["RUT Escrito"]),
             email: safe(row["Email"]),
@@ -350,6 +342,35 @@ function StudentManager({ records }: { records: any[] }) {
   const [academicNote, setAcademicNote] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDiplomado, setFilterDiplomado] = useState('Todos');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = (filteredRecords: any[]) => {
+    if (selectedIds.length === filteredRecords.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredRecords.map(r => r.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+      console.log('Bulk delete started for IDs:', selectedIds);
+      try {
+        for (const id of selectedIds) {
+          console.log(`Debug: Deleting student ${id}`);
+          await localDB.deleteFromCollection('students', id);
+        }
+        console.log('Bulk delete finished');
+        setSelectedIds([]);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (err) {
+        console.error('Error during bulk delete:', err);
+        alert('Error al eliminar, revise consola.');
+      }
+  };
 
   const updateStudent = async (id: string, updates: any) => {
     const student = records.find(r => r.id === id);
@@ -553,6 +574,14 @@ function StudentManager({ records }: { records: any[] }) {
               >
                 <Download className="w-4 h-4 text-blue-600" />
               </button>
+              {selectedIds.length > 0 && (
+                <button 
+                  onClick={handleBulkDelete}
+                  className="bg-red-50 text-red-700 px-4 py-2 rounded-lg border border-red-200 font-bold text-xs hover:bg-red-100 flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" /> Eliminar ({selectedIds.length})
+                </button>
+              )}
               <select 
                 className="px-4 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 text-sm font-bold text-slate-700"
                 value={filterDiplomado}
@@ -574,6 +603,14 @@ function StudentManager({ records }: { records: any[] }) {
         <table className="w-full text-sm">
            <thead>
               <tr className="bg-slate-50/50 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
+                 <th className="p-5 w-10">
+                   <input 
+                     type="checkbox"
+                     className="rounded"
+                     checked={selectedIds.length > 0 && selectedIds.length === filteredRecords.length}
+                     onChange={() => toggleSelectAll(filteredRecords)}
+                   />
+                 </th>
                  <th className="p-5">Estudiante</th>
                  <th className="p-5">Curso / Diplomado</th>
                  <th className="p-5">Estado Pago</th>
@@ -584,6 +621,14 @@ function StudentManager({ records }: { records: any[] }) {
            <tbody className="divide-y divide-slate-100">
               {filteredRecords.map(s => (
                 <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
+                   <td className="p-5">
+                     <input 
+                       type="checkbox"
+                       className="rounded"
+                       checked={selectedIds.includes(s.id)}
+                       onChange={() => toggleSelect(s.id)}
+                     />
+                   </td>
                    <td className="p-5">
                       <div className="font-bold text-[#001736]">{safe(s.name)}</div>
                       <div className="text-[10px] text-slate-400 font-mono italic">{safe(s.clasificacion)}</div>
@@ -627,7 +672,7 @@ function StudentManager({ records }: { records: any[] }) {
                           >
                              <BadgeCheck className="w-3 h-3" /> Ver Ficha
                           </button>
-                          <RecordActions onDelete={async () => { await localDB.deleteFromCollection('students', s.id); }} />
+                          <RecordActions onDelete={async () => { await localDB.deleteFromCollection('students', s.id); window.dispatchEvent(new Event('db-change')); }} />
                        </div>
                     </td>
                 </tr>

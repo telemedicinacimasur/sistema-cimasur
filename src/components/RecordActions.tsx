@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Edit, Trash2, History } from 'lucide-react';
+import { FileText, Download, Edit, Trash2, History, FileSpreadsheet } from 'lucide-react';
 
 interface RecordActionsProps {
   onView?: () => void;
@@ -7,15 +7,17 @@ interface RecordActionsProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onHistory?: () => void;
+  onExcel?: () => void;
 }
 
-export const RecordActions = ({ onView, onDownload, onEdit, onDelete, onHistory }: RecordActionsProps) => {
+export const RecordActions = ({ onView, onDownload, onEdit, onDelete, onHistory, onExcel }: RecordActionsProps) => {
   const [showConfirm, setShowConfirm] = useState(false);
 
   return (
     <div className="flex items-center justify-center gap-2 relative">
       {onView && <button type="button" onClick={onView} title="Ver Expediente" className="text-slate-600 hover:text-slate-800"><FileText className="w-4 h-4" /></button>}
       {onDownload && <button type="button" onClick={onDownload} title="Descargar PDF" className="text-blue-600 hover:text-blue-800"><Download className="w-4 h-4" /></button>}
+      {onExcel && <button type="button" onClick={onExcel} title="Descargar Excel" className="text-emerald-600 hover:text-emerald-800"><FileSpreadsheet className="w-4 h-4" /></button>}
       {onEdit && <button type="button" onClick={onEdit} title="Editar" className="text-amber-600 hover:text-amber-800"><Edit className="w-4 h-4" /></button>}
       {onHistory && <button type="button" onClick={onHistory} title="Historial" className="text-purple-600 hover:text-purple-800"><History className="w-4 h-4" /></button>}
       {onDelete && (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { localDB, localAuth } from '../lib/auth';
-import { cn, formatDate, formatCurrency, safe } from '../lib/utils';
+import { cn, formatDate, formatDateTimeChile, formatCurrency, safe, parseExcelDate, formatDateForExcel } from '../lib/utils';
 import { 
   exportTableToPDF, 
   exportRecordToPDF, 
@@ -8,6 +8,14 @@ import {
   exportExpedienteToPDF 
 } from '../lib/pdfUtils';
 import { RecordActions } from '../components/RecordActions';
+
+export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+  const wb = XLSX.utils.book_new();
+  const safeTitle = title.substring(0, 31).replace(/[\\/?*\[\]]/g, '');
+  XLSX.utils.book_append_sheet(wb, ws, safeTitle);
+  XLSX.writeFile(wb, `${fileName}.xlsx`);
+};
 import { 
   FileText, 
   ArrowLeft, 
@@ -127,6 +135,7 @@ export default function AdminView() {
 }
 
 function UsersManager() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [newPass, setNewPass] = useState('');
@@ -179,13 +188,18 @@ function UsersManager() {
     refreshUsers();
   };
 
-  const handleDelete = async (email: string) => {
-    if (email === 'admin@cimasur.cl') {
+  const handleDelete = async (uid: string) => {
+    if (uid === user?.uid) {
+      alert('No puedes eliminarte a ti mismo mientras estás en sesión');
+      return;
+    }
+    const targetUser = users.find(u => u.uid === uid);
+    if (targetUser?.email === 'admin@cimasur.cl') {
       alert('No puedes eliminar al administrador principal');
       return;
     }
     if (true) {
-      await localAuth.deleteUser(email);
+      await localAuth.deleteUser(uid);
       refreshUsers();
     }
   };
@@ -332,7 +346,7 @@ function UsersManager() {
                         setNewPass('');
                         setShowCreate(false);
                       }}
-                      onDelete={() => handleDelete(u.email)}
+                      onDelete={() => handleDelete(u.uid)}
                     />
                   </td>
                 </tr>
@@ -384,7 +398,7 @@ function AuditLogManager({ records }: { records: any[] }) {
           <tbody className="divide-y divide-slate-100">
             {records.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map(r => (
               <tr key={r.id || r.timestamp} className="hover:bg-slate-50 transition-colors italic">
-                <td className="p-4">{formatDate(r.timestamp)}</td>
+                <td className="p-4">{formatDateTimeChile(r.timestamp)}</td>
                 <td className="p-4 font-bold">{r.displayName}</td>
                 <td className="p-4 text-slate-500">{r.email}</td>
                 <td className="p-4 font-black text-[#001736]">{r.module}</td>
@@ -412,6 +426,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
       ["Fecha", "Tutor", "Mail", "Fono", "Pago Consulta", "Pago Veterinario", "Fecha Pago"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pagos Veterinarios");
     XLSX.writeFile(wb, "plantilla_importacion_pagos_vet.xlsx");
@@ -425,7 +440,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
@@ -436,13 +451,13 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
           if (!tutor) continue;
 
           const newRecord = {
-            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            fecha: parseExcelDate(row["Fecha"]),
             tutor: tutor.toUpperCase(),
             mail: safe(row["Mail"]) || "",
             fono: safe(row["Fono"]) || "",
             pagoConsulta: parseInt(safe(row["Pago Consulta"])) || 0,
             pagoVeterinario: parseInt(safe(row["Pago Veterinario"])) || 0,
-            fechaPago: safe(row["Fecha Pago"]) || new Date().toISOString().split('T')[0]
+            fechaPago: parseExcelDate(row["Fecha Pago"])
           };
           
           await localDB.saveToCollection('pet_payments', newRecord);
@@ -544,7 +559,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('¿Eliminar este registro de pago?')) {
+    if (true) {
       await localDB.deleteFromCollection('pet_payments', id);
       const updated = await localDB.getCollection('pet_payments');
       setRecords(updated);
@@ -753,6 +768,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
       ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "UND Inventario", "UND Total", "Observaciones"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Cotizaciones");
     XLSX.writeFile(wb, "plantilla_importacion_cotizaciones.xlsx");
@@ -766,20 +782,28 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
+        console.log("AdminView - Total rows imported from XLSX:", data.length);
         let importedCount = 0;
         const currentRecords = await localDB.getCollection('quotes');
 
-        for (const row of data) {
-          const nroCotiz = safe(row["N° Cotiz"]);
-          if (!nroCotiz) continue;
+        for (const [index, row] of data.entries()) {
+          console.log(`AdminView - Processing row ${index}:`, row);
+          const nroCotiz = safe(row["N° Cotiz"]).trim();
+          if (!nroCotiz) {
+            console.log(`AdminView - Skipping row ${index} because N° Cotiz is empty.`);
+            continue;
+          }
 
           // Check if already exists
-          if (currentRecords.some(r => safe(r.nroCotiz) === nroCotiz)) continue;
+          if (currentRecords.some(r => safe(r.nroCotiz).trim() === nroCotiz)) {
+             console.log(`AdminView - Skipping row ${index} because N° Cotiz ${nroCotiz} already exists.`);
+             continue;
+          }
 
           const invVal = parseInt(safe(row["UND Inventario"])) || 0;
           const totalVal = parseInt(safe(row["UND Total"])) || 0;
@@ -788,11 +812,11 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
             anio: safe(row["Año"]) || new Date().getFullYear().toString(),
             mes: safe(row["Mes"]) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
             nroCotiz: nroCotiz,
-            fechaElab: safe(row["Fecha Elab"]) || new Date().toISOString().split('T')[0],
+            fechaElab: parseExcelDate(row["Fecha Elab"]),
             cliente: safe(row["Cliente"]),
             vendedor: safe(row["Vendedor"]) || 'CIMASUR',
             estado: safe(row["Estado"]) || 'Pendiente',
-            fechaAprob: safe(row["Fecha Aprob"]),
+            fechaAprob: parseExcelDate(row["Fecha Aprob"]) || "",
             invUnits: invVal,
             undTotal: totalVal,
             todoUnits: Math.max(0, totalVal - invVal),
@@ -1173,14 +1197,16 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     nroFrascos: 0
   });
 
-  const [dateFilter, setDateFilter] = useState('');
-  const [customerFilter, setCustomerFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const downloadExcelTemplate = () => {
     const headers = [
       ["Año", "Mes", "Fecha", "Documento", "Cliente", "Frascos"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ventas");
     XLSX.writeFile(wb, "plantilla_importacion_ventas.xlsx");
@@ -1194,7 +1220,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
@@ -1212,7 +1238,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
           const newSale = {
             anio: safe(row["Año"]) || new Date().getFullYear().toString(),
             mes: safe(row["Mes"]) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
-            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            fecha: parseExcelDate(row["Fecha"]),
             documento: doc,
             cliente: safe(row["Cliente"]),
             nroFrascos: parseInt(safe(row["Frascos"])) || 0
@@ -1229,14 +1255,24 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
       }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     };
     reader.readAsBinaryString(file);
   };
 
-  const filteredRecords = records.filter(r => 
-    (dateFilter ? r.fecha === dateFilter : true) &&
-    (customerFilter ? r.cliente?.toLowerCase().includes(customerFilter.toLowerCase()) : true)
-  );
+  const filteredRecords = records.filter(r => {
+    let match = true;
+    if (dateFrom && r.fecha < dateFrom) match = false;
+    if (dateTo && r.fecha > dateTo) match = false;
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      const text = `${r.documento || ''} ${r.cliente || ''} ${r.nroFrascos || ''}`.toLowerCase();
+      if (!text.includes(s)) match = false;
+    }
+    return match;
+  });
 
   const totalFrascos = filteredRecords.reduce((sum, r) => sum + (Number(r.nroFrascos) || 0), 0);
 
@@ -1292,16 +1328,6 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
             >
               <Upload className="w-3.5 h-3.5" /> Importar
             </button>
-            <button 
-              onClick={() => {
-                const data = records.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
-                exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
-              }}
-              className="text-white/70 hover:text-white"
-              title="PDF"
-            >
-              <Download className="w-4 h-4" />
-            </button>
           </div>
         </div>
         <form className="p-6 space-y-4" onSubmit={handleSubmit}>
@@ -1321,36 +1347,55 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
             <h3 className="font-black text-[10px] uppercase text-slate-400 tracking-widest">Detalle de Ventas Registradas</h3>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Filtro:</span>
-              <input 
-                type="date" 
-                className="text-xs border rounded p-1" 
-                value={dateFilter}
-                onChange={e => setDateFilter(e.target.value)}
-              />
-              <input 
-                placeholder="Cliente..."
-                className="text-xs border rounded p-1 w-24" 
-                onChange={e => setCustomerFilter(e.target.value)}
-              />
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
+                <input 
+                  type="date" 
+                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Hasta:</span>
+                <input 
+                  type="date" 
+                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Search className="w-3.5 h-3.5 text-slate-400" />
+                <input 
+                  placeholder="Buscar..."
+                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
             <button 
               onClick={() => {
                 const data = filteredRecords.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
+                data.push(['', '', 'TOTAL', totalFrascos]);
                 exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
               }}
-              className="text-white bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-blue-700" 
+              className="text-white bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-blue-700 flex items-center gap-1" 
+              title="Descargar PDF"
             >
-              PDF (Filtrado)
+              <Download className="w-3.5 h-3.5" /> PDF
             </button>
             <button 
               onClick={() => {
-                const data = records.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
-                exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas_todo');
+                const data = filteredRecords.map(r => [formatDateForExcel(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
+                data.push(['', '', 'TOTAL', totalFrascos]);
+                exportTableToExcel('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
               }}
-              className="text-slate-600 bg-slate-200 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-slate-300" 
+              className="text-white bg-emerald-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-emerald-700 flex flex-row items-center gap-1" 
+              title="Descargar Excel"
             >
-               PDF (Todo)
+              <FileSpreadsheet className="w-3.5 h-3.5"/> Excel
             </button>
             </div>
           </div>
@@ -1415,7 +1460,10 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 function DTEManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [form, setForm] = useState({
     anio: new Date().getFullYear().toString(),
     mes: new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
@@ -1429,12 +1477,22 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
     montoNeto: 0
   });
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const iva = (Number(form.montoNeto) || 0) * 0.19;
   const total = (Number(form.montoNeto) || 0) + iva;
 
-  const filteredRecords = dateFilter
-    ? records.filter(r => r.fecha === dateFilter)
-    : records;
+  const filteredRecords = records.filter(r => {
+    let match = true;
+    if (dateFrom && r.fecha < dateFrom) match = false;
+    if (dateTo && r.fecha > dateTo) match = false;
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      const text = String(r.nroDto || '') + ' ' + String(r.nombre || '') + ' ' + String(r.rut || '');
+      if (!text.toLowerCase().includes(s)) match = false;
+    }
+    return match;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1449,6 +1507,8 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       alert('DTE Registrado Admin');
     }
     setForm({...form, nroDto: '', nombre: '', rut: '', montoNeto: 0});
+    const updated = await localDB.getCollection('dte_records');
+    setRecords(updated);
   };
 
   const handleEdit = (r: any) => {
@@ -1468,18 +1528,142 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const downloadExcelTemplate = () => {
+    const headers = ['Año', 'Mes', 'Fecha', 'N° Dcto', 'Razón Social', 'RUT', 'Dirección', 'Ciudad', 'Email', 'Neto'];
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `DTE`);
+    XLSX.writeFile(wb, 'plantilla_importacion_dte.xlsx');
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        const currentRecords = await localDB.getCollection('dte_records');
+
+        for (const row of data) {
+          const doc = safe(row['N° Dcto'] || row['nroDto'] || row['N° Documento']);
+          if (!doc) continue;
+          if (currentRecords.some(r => safe(r.nroDto) === doc)) continue;
+
+          const neto = parseFloat(safe(row['Neto'] || row['montoNeto']).replace(/[^0-9.-]+/g, '')) || 0;
+          const rIva = neto * 0.19;
+          const rTotal = neto + rIva;
+
+          const newDte = {
+            anio: safe(row['Año']) || new Date().getFullYear().toString(),
+            mes: safe(row['Mes']) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+            fecha: parseExcelDate(row['Fecha']),
+            nroDto: doc,
+            nombre: safe(row['Razón Social'] || row['Nombre']),
+            rut: safe(row['RUT']),
+            direccion: safe(row['Dirección']),
+            ciudad: safe(row['Ciudad']),
+            email: safe(row['Email']),
+            montoNeto: neto,
+            iva: rIva,
+            total: rTotal
+          };
+
+          await localDB.saveToCollection('dte_records', newDte);
+          importedCount++;
+        }
+
+        if (importedCount > 0) {
+          const updated = await localDB.getCollection('dte_records');
+          setRecords(updated);
+          await addAuditLog(user, `Importó ${importedCount} registros DTE`, 'Administración');
+          alert(`Importación completada. ${importedCount} registros nuevos añadidos.`);
+        } else {
+          alert('No se encontraron registros nuevos para importar (o faltaba el N° de Documento).');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error al procesar el archivo Excel.');
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const getExportData = () => {
+    return filteredRecords.map(r => [
+      r.anio || '',
+      r.mes || '',
+      formatDate(r.fecha) || '',
+      r.nroDto || '',
+      r.nombre || '',
+      r.rut || '',
+      r.direccion || '',
+      r.ciudad || '',
+      r.email || '',
+      formatCurrency(r.montoNeto || 0),
+      formatCurrency((r.montoNeto || 0) * 0.19),
+      formatCurrency((r.montoNeto || 0) * 1.19)
+    ]);
+  };
+  
+  const getExcelExportData = () => {
+    return filteredRecords.map(r => [
+      r.anio || '',
+      r.mes || '',
+      formatDateForExcel(r.fecha) || '',
+      r.nroDto || '',
+      r.nombre || '',
+      r.rut || '',
+      r.direccion || '',
+      r.ciudad || '',
+      r.email || '',
+      r.montoNeto || 0,
+      (r.montoNeto || 0) * 0.19,
+      (r.montoNeto || 0) * 1.19
+    ]);
+  };
+
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#0b2447] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#0b2447] p-4 text-white font-bold flex flex-wrap gap-4 items-center justify-between">
           <span className="flex items-center gap-2">
             <Receipt className="w-5 h-5" /> {editingId ? 'Editando Registro DTE' : 'Registro Administrativo de DTE'}
           </span>
-          <div className="flex items-center gap-2">
-            <button className="text-white/70 hover:text-white p-1" title="Descargar PDF">
-              <Download className="w-4 h-4" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
             </button>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded">Uso Interno - No SII</span>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded ml-2">Uso Interno - No SII</span>
           </div>
         </div>
         <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
@@ -1512,7 +1696,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
           </div>
           <div className="md:col-span-1 space-y-6">
              <FormField label="Monto Neto ($)">
-               <input type="number" className="w-full border-b border-blue-200 p-4 text-xl font-black bg-blue-50/50 rounded-t outline-none focus:bg-blue-50" value={form.montoNeto ?? 0} onChange={e => setForm({...form, montoNeto: parseInt(e.target.value) || 0})} />
+               <input type="number" className="w-full border-b border-blue-200 p-4 text-xl font-black bg-blue-50/50 rounded-t outline-none focus:bg-blue-50" value={form.montoNeto || ''} onChange={e => setForm({...form, montoNeto: parseInt(e.target.value) || 0})} />
              </FormField>
              <div className="space-y-2 border-t border-slate-100 pt-4">
                 <div className="flex justify-between text-xs font-bold text-slate-400 uppercase">
@@ -1538,33 +1722,53 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex justify-between items-center font-black text-[10px] text-slate-400 uppercase tracking-widest">
+        <div className="p-4 bg-slate-50 border-b flex flex-wrap justify-between items-center font-black text-[10px] text-slate-400 uppercase tracking-widest gap-4">
           <span>Consulta de Registros DTE</span>
-          <div className="flex items-center gap-2">
-            <input 
-              type="date" 
-              className="text-[10px] border rounded p-1" 
-              value={dateFilter}
-              onChange={e => setDateFilter(e.target.value)}
-            />
-            <button className="text-[#001736] flex items-center gap-1"><Search className="w-3 h-3" /> BUSCAR DETALLE</button>
+          <div className="flex items-center gap-2 flex-wrap text-normal normal-case">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
+                <input 
+                  type="date" 
+                  className="text-xs border rounded p-1 text-slate-600" 
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Hasta:</span>
+                <input 
+                  type="date" 
+                  className="text-xs border rounded p-1 text-slate-600" 
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Search className="w-3.5 h-3.5 text-slate-400" />
+                <input 
+                  placeholder="Buscar..."
+                  className="text-xs border rounded p-1 w-28 text-slate-600 font-normal" 
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
             <button 
                onClick={() => {
-                 const data = filteredRecords.map(r => [r.nroDto, r.nombre, r.rut, formatCurrency(r.montoNeto), formatCurrency(r.total)]);
-                 exportTableToPDF('Reporte: DTE', ['N° Dcto', 'Nombre', 'RUT', 'Neto', 'Total'], data, 'reporte_dte', 'l');
+                 exportTableToPDF('Reporte: DTE', ['Año', 'Mes', 'Fecha', 'N° Dcto', 'Razón Social', 'RUT', 'Dirección', 'Ciudad', 'Email', 'Neto', 'IVA', 'Total'], getExportData(), 'reporte_dte', 'l');
                }}
-               className="text-blue-600 flex items-center gap-1"
+               className="text-white bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-blue-700 flex items-center gap-1"
+               title="Descargar PDF"
             >
-              <Download className="w-3 h-3" /> PDF (Filtrado)
+              <Download className="w-3 h-3" /> PDF
             </button>
             <button 
                onClick={() => {
-                 const data = records.map(r => [r.nroDto, r.nombre, r.rut, formatCurrency(r.montoNeto), formatCurrency(r.total)]);
-                 exportTableToPDF('Reporte: DTE', ['N° Dcto', 'Nombre', 'RUT', 'Neto', 'Total'], data, 'reporte_dte_todo', 'l');
+                 exportTableToExcel('Reporte: DTE', ['Año', 'Mes', 'Fecha', 'N° Dcto', 'Razón Social', 'RUT', 'Dirección', 'Ciudad', 'Email', 'Neto', 'IVA', 'Total'], getExcelExportData(), 'reporte_dte');
                }}
-               className="text-slate-600 flex items-center gap-1 ml-2"
+               className="text-white bg-emerald-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-emerald-700 flex flex-row items-center gap-1"
+               title="Descargar Excel"
             >
-              <Download className="w-3 h-3" /> PDF (Todo)
+              <FileSpreadsheet className="w-3 h-3" /> Excel
             </button>
           </div>
         </div>
@@ -1572,6 +1776,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
+                <th className="p-4">Fecha</th>
                 <th className="p-4">N° Dcto</th>
                 <th className="p-4">Razón Social</th>
                 <th className="p-4">RUT</th>
@@ -1583,6 +1788,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
             <tbody className="divide-y divide-slate-100">
               {filteredRecords.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 text-slate-500">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold text-[#001736]">{r.nroDto}</td>
                   <td className="p-4">{r.nombre}</td>
                   <td className="p-4 font-mono text-slate-400">{r.rut}</td>

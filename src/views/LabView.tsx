@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
-import { cn, formatDate, safe } from '../lib/utils';
+import { cn, formatDate, safe, parseExcelDate, formatDateForExcel } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Beaker, 
@@ -33,6 +33,14 @@ import {
 import * as XLSX from 'xlsx';
 import { RecordActions } from '../components/RecordActions';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
+
+export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+  const wb = XLSX.utils.book_new();
+  const safeTitle = title.substring(0, 31).replace(/[\\/?*\[\]]/g, '');
+  XLSX.utils.book_append_sheet(wb, ws, safeTitle);
+  XLSX.writeFile(wb, `${fileName}.xlsx`);
+};
 
 type LabFormType = 'registro' | 'ingreso' | 'gotas-puras' | 'elaboracion' | 'nosodes' | 'tinturas' | 'preparacion' | 'insumos' | 'vademecum' | 'mantenimiento' | 'stock' | 'tracking' | 'magistrales' | 'diluciones-db' | 'default';
 
@@ -139,10 +147,18 @@ export default function LabView() {
             featured
           />
           <ModuleCard 
-            title="Fórmulas Magistrales"
+            title="Formulación Magistral"
             desc="Elaboración y composición de fórmulas magistrales."
             icon={FileText}
             onClick={() => setActiveForm('magistrales')}
+            featured
+          />
+
+          <ModuleCard 
+            title="Recepción / Ingreso"
+            desc="Registro de entrada de productos"
+            icon={FilePlus}
+            onClick={() => setActiveForm('ingreso')}
             featured
           />
         </div>
@@ -161,6 +177,7 @@ export default function LabView() {
       </button>
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {activeForm === 'ingreso' && <IngresoForm records={records} setRecords={setRecords} />}
         {activeForm === 'gotas-puras' && <GotasPurasForm records={records} setRecords={setRecords} />}
         {activeForm === 'elaboracion' && <ElaboracionForm records={records} setRecords={setRecords} />}
         {activeForm === 'nosodes' && <NosodesForm records={records} setRecords={setRecords} />}
@@ -198,114 +215,9 @@ function ModuleCard({ title, desc, icon: Icon, onClick, featured }: any) {
   );
 }
 
-function RegistroForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
-  const { user } = useAuth();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    fecha: new Date().toISOString().split('T')[0],
-    nroRegistro: '',
-    tipo: 'Control',
-    responsable: '',
-    observaciones: ''
-  });
-
-  useEffect(() => {
-    if (user && !editingId) {
-      setForm(prev => ({ ...prev, responsable: user.displayName }));
-    }
-  }, [user, editingId]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    let finalData = { ...form };
-    if (editingId) {
-      finalData = { ...finalData, ultimaModificacionPor: user.displayName };
-      await localDB.updateInCollection('lab_records', editingId, finalData);
-      setEditingId(null);
-    } else {
-      finalData = { ...finalData, creadoPor: user.displayName, createdAt: new Date().toISOString() };
-      await localDB.saveToCollection('lab_records', { ...finalData, type: 'registro' });
-    }
-    const updated = await localDB.getCollection('lab_records');
-    setRecords(updated);
-    setForm({ fecha: new Date().toISOString().split('T')[0], nroRegistro: '', tipo: 'Control', responsable: user.displayName, observaciones: '' });
-    alert('Actividad registrada');
-  };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-[#002b5b] text-white px-6 py-4 flex justify-between items-center font-bold">
-          <ClipboardCheck className="w-5 h-5" /> Ficha de Registro
-        </div>
-        <form className="p-6 space-y-4" onSubmit={handleSubmit}>
-          <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
-          <FormField label="N° Registro"><input className="w-full border-b p-2 text-sm" placeholder="REG-001" value={form.nroRegistro || ''} onChange={e => setForm({...form, nroRegistro: e.target.value})} required /></FormField>
-          <FormField label="Tipo">
-            <select className="w-full border-b p-2 text-sm" value={form.tipo || 'Control'} onChange={e => setForm({...form, tipo: e.target.value})}>
-              <option>Control</option><option>Proceso</option><option>Limpieza</option><option>Otros</option>
-            </select>
-          </FormField>
-          <FormField label="Responsable">
-            <input className="w-full border-b p-2 text-sm bg-slate-50" value={form.responsable || ''} readOnly />
-          </FormField>
-          <FormField label="Observaciones"><textarea className="w-full border p-2 text-sm h-20" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
-          <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold shadow-lg hover:opacity-90">GUARDAR REGISTRO</button>
-        </form>
-      </div>
-      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-          <h3 className="text-[10px] uppercase font-black tracking-widest text-[#001736]">Historial de Registros</h3>
-          <button className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Descargar PDF">
-            <Download className="w-3 h-3" />
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-slate-50/50 text-left border-b">
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">N°</th>
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">Tipo</th>
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">Responsable</th>
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">Fecha</th>
-                <th className="p-4 text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 italic">
-              {records.filter(r => r.type === 'registro').map(r => (
-                <tr key={r.id}>
-                  <td className="p-4 font-bold">{r.nroRegistro}</td>
-                  <td className="p-4">{r.tipo}</td>
-                  <td className="p-4">
-                      {r.creadoPor || r.responsable}
-                      {r.ultimaModificacionPor && <span className="block text-[9px] text-slate-400">Editado: {r.ultimaModificacionPor}</span>}
-                  </td>
-                  <td className="p-4">{formatDate(r.fecha)}</td>
-                  <td className="p-4 text-center">
-                    <button onClick={async () => { 
-                        setEditingId(r.id); 
-                        setForm(r);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }} className="text-blue-400 hover:text-blue-600 mr-2">
-                        <Edit className="w-3 h-3" />
-                    </button>
-                    <button onClick={async () => { if (true) { await localDB.deleteFromCollection('lab_records', r.id); const updated = await localDB.getCollection('lab_records'); setRecords(updated); } }} className="text-red-400 hover:text-red-600">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function IngresoForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -315,6 +227,77 @@ function IngresoForm({ records, setRecords }: { records: any[], setRecords: (dat
     observaciones: '',
     responsable: ''
   });
+
+  const downloadExcelTemplate = () => {
+    const headers = [["Fecha", "N° Ingreso", "Procedencia", "Detalle", "Observaciones"]];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ingresos");
+    XLSX.writeFile(wb, "plantilla_ingresos_laboratorio.xlsx");
+  };
+
+  const exportRecordToExcel = (record: any) => {
+    const data = [
+      ["Campo", "Valor"],
+      ["Fecha", formatDateForExcel(record.fecha)],
+      ["N° Ingreso", record.nroIngreso || ""],
+      ["Procedencia", record.procedencia || ""],
+      ["Detalle", record.detalle || ""],
+      ["Observaciones", record.observaciones || ""],
+      ["Responsable", record.creadoPor || record.responsable || ""]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 30 }, { wch: 50 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ficha de Ingreso");
+    XLSX.writeFile(wb, `ingreso_${record.nroIngreso || record.id}.xlsx`);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const nroIngreso = safe(row["N° Ingreso"]) || safe(row["N°"]);
+          if (!nroIngreso) continue;
+
+          const newRecord = {
+            type: 'ingreso',
+            fecha: parseExcelDate(row["Fecha"]),
+            nroIngreso: nroIngreso,
+            procedencia: safe(row["Procedencia"]),
+            detalle: safe(row["Detalle"]),
+            observaciones: safe(row["Observaciones"]),
+            responsable: user.displayName,
+            creadoPor: user.displayName,
+            createdAt: new Date().toISOString()
+          };
+
+          await localDB.saveToCollection('lab_records', newRecord);
+          importedCount++;
+          if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
+        }
+
+        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
+      } catch (err) {
+        console.error(err);
+        alert('Error al procesar el archivo');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   useEffect(() => {
     if (user && !editingId) {
@@ -344,7 +327,33 @@ function IngresoForm({ records, setRecords }: { records: any[], setRecords: (dat
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-[#002b5b] text-white px-6 py-4 flex justify-between items-center font-bold">
-          <FilePlus className="w-5 h-5" /> Ficha de Ingreso
+          <div className="flex items-center gap-2">
+            <FilePlus className="w-5 h-5" /> Ficha de Ingreso
+          </div>
+          <div className="flex gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black shadow-sm"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black shadow-sm"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+          </div>
         </div>
         <form className="p-6 space-y-4" onSubmit={handleSubmit}>
           <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
@@ -361,8 +370,21 @@ function IngresoForm({ records, setRecords }: { records: any[], setRecords: (dat
       <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
           <h3 className="text-[10px] uppercase font-black tracking-widest text-[#001736]">Historial de Ingresos</h3>
-          <button className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Descargar PDF">
-            <Download className="w-3 h-3" />
+          <button 
+            onClick={() => {
+              const data = records.filter(r => r.type === 'ingreso').map(r => [
+                r.nroIngreso || '',
+                r.procedencia || '',
+                r.detalle || '',
+                r.observaciones || '',
+                r.creadoPor || r.responsable || 'Administrador Cimasur',
+                formatDate(r.fecha)
+              ]);
+              exportTableToPDF('Historial de Ingresos Lab', ['N°', 'Procedencia', 'Detalle', 'Observaciones', 'Responsable', 'Fecha'], data, 'historial_ingresos_lab', 'l');
+            }}
+            className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+          >
+            <Download className="w-3 h-3" /> PDF
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -408,12 +430,18 @@ function IngresoForm({ records, setRecords }: { records: any[], setRecords: (dat
                         ];
                         exportExpedienteToPDF('Ficha: Ingreso de Insumos', data, `ingreso_${r.nroIngreso}`);
                       }}
+                      onExcel={() => exportRecordToExcel(r)}
                       onEdit={() => {
                         setEditingId(r.id);
                         setForm(r);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      onDelete={async () => { if (true) { await localDB.deleteFromCollection('lab_records', r.id); const updated = await localDB.getCollection('lab_records'); setRecords(updated); } }}
+                      onDelete={async () => { 
+                        await localDB.deleteFromCollection('lab_records', r.id); 
+                        const updated = await localDB.getCollection('lab_records'); 
+                        setRecords(updated); 
+                        alert('Ingreso eliminado');
+                      }}
                     />
                   </td>
                 </tr>
@@ -443,13 +471,27 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
     updatedAt: ''
   });
 
-  const downloadExcelTemplate = () => {
-    const headers = [
-      ["Fecha", "Producto", "Estado (Bajo/Medio/Alto)", "Responsable", "Observaciones"]
+  const exportRecordToExcel = (record: any) => {
+    const data = [
+      ["Producto", record.producto || "---"],
+      ["Fecha", formatDateForExcel(record.fecha)],
+      ["Estado", record.estado || "---"],
+      ["Responsable", record.creadoPor || record.responsable || "Administrador Cimasur"],
+      ["Observaciones", record.observaciones || "---"]
     ];
-    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 25 }, { wch: 25 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Evaluacion");
+    XLSX.writeFile(wb, `evaluacion_${record.id}.xlsx`);
+  };
+
+  const downloadExcelTemplate = () => {
+    const headers = [["Fecha", "Producto", "Estado", "Responsable", "Observaciones"]];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Evaluación");
     XLSX.writeFile(wb, "plantilla_evaluacion_gotas_puras.xlsx");
   };
 
@@ -472,9 +514,9 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
           const newRecord = {
             type: 'gotas-puras',
-            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            fecha: parseExcelDate(row["Fecha"]),
             producto: producto,
-            estado: safe(row["Estado (Bajo/Medio/Alto)"]) || 'Medio',
+            estado: safe(row["Estado"]) || 'Medio',
             responsable: safe(row["Responsable"]) || user.displayName || '',
             observaciones: safe(row["Observaciones"]),
             creadoPor: user.displayName || '',
@@ -483,9 +525,10 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
           await localDB.saveToCollection('lab_records', newRecord);
           importedCount++;
+          if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
         }
 
-        await addAuditLog(user, `Importó ${importedCount} evaluaciones de gotas puras desde Excel`, 'Laboratorio');
+        await addAuditLog(user, `Importó ${importedCount} Evaluaciones Gotas Puras`, 'Laboratorio');
         alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
         const updated = await localDB.getCollection('lab_records');
         setRecords(updated);
@@ -630,12 +673,28 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 'Reporte: Evaluación Gotas Puras',
                 ['Fecha', 'Producto', 'Estado', 'Observaciones'],
                 data,
-                'evaluacion_gotas_puras'
+                'evaluacion_gotas_puras',
+                'l'
               );
             }}
             className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded text-[10px] font-bold uppercase hover:bg-white transition-colors"
           >
             <Download className="w-4 h-4" /> Exportar
+          </button>
+          <button 
+            onClick={() => {
+              const data = records.filter(r => r.type === 'gotas-puras').map(r => [
+                formatDateForExcel(r.fecha),
+                r.producto || '',
+                r.estado || '',
+                r.observaciones || '',
+                r.creadoPor || r.responsable || 'Administrador Cimasur'
+              ]);
+              exportTableToExcel('Evaluación Gotas Puras', ['Fecha', 'Producto', 'Estado', 'Observaciones', 'Responsable'], data, 'evaluacion_gotas_puras');
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded text-[10px] font-bold uppercase hover:bg-white transition-colors text-emerald-600"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Excel
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -651,46 +710,62 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
             </thead>
             <tbody className="divide-y divide-slate-100">
               {records.filter(r => r.type === 'gotas-puras').filter(r => {
-                const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.observaciones || ''} ${r.fecha || ''}`.toLowerCase();
+                const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.observaciones || ''} ${formatDate(r.fecha)}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-slate-400 text-xs italic">Sin registros previos o resultados</td></tr>
-              ) : (
-                records.filter(r => r.type === 'gotas-puras').filter(r => {
-                  const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.observaciones || ''} ${r.fecha || ''}`.toLowerCase();
-                  return searchStr.includes(searchTerm.toLowerCase());
-                }).map((record) => (
-                  <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-xs font-medium">{formatDate(record.fecha)}</td>
-                    <td className="px-6 py-4 text-xs font-bold text-[#001736]">{record.producto}</td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "text-[10px] font-black px-2 py-0.5 rounded uppercase",
-                        record.estado === 'Óptimo' ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                      )}>
-                        {record.estado}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-500 italic max-w-xs truncate">{record.observaciones}</td>
-                    <td className="px-6 py-4">
-                      {record.creadoPor || record.responsable}
-                      {record.ultimaModificacionPor && <span className="block text-[9px] text-slate-400">Editado: {record.ultimaModificacionPor}</span>}
+              }).map((record) => (
+                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 text-xs font-medium">{formatDate(record.fecha)}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-[#001736]">{record.producto}</td>
+                  <td className="px-6 py-4">
+                    <span className={cn(
+                      "text-[10px] font-black px-2 py-0.5 rounded uppercase",
+                      record.estado === 'Óptimo' ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                    )}>
+                      {record.estado}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-xs text-slate-500 italic max-w-xs truncate">{record.observaciones}</td>
+                  <td className="px-6 py-4 text-[11px]">
+                    {record.creadoPor || record.responsable || 'Administrador Cimasur'}
+                    {record.ultimaModificacionPor && <span className="block text-[9px] text-slate-400">Editado: {record.ultimaModificacionPor}</span>}
                   </td>
                   <td className="px-6 py-4 text-center">
-                       <button onClick={async () => { 
-                          setEditingId(record.id); 
-                          setForm(record);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }} className="text-blue-400 hover:text-blue-600 mr-2">
-                          <Edit className="w-3 h-3" />
-                      </button>
-                       <button onClick={async () => { if (true) { await localDB.deleteFromCollection('lab_records', record.id); const updated = await localDB.getCollection('lab_records'); setRecords(updated); } }} className="text-red-400 hover:text-red-600">
-                         <Trash2 className="w-3 h-3" />
-                       </button>
-                    </td>
-                  </tr>
-                ))
-              )}
+                    <RecordActions
+                      onView={() => {
+                        const recordData = [
+                          { label: 'Fecha', value: formatDate(record.fecha) },
+                          { label: 'Producto', value: record.producto },
+                          { label: 'Estado', value: record.estado },
+                          { label: 'Responsable', value: record.creadoPor || record.responsable || 'Administrador Cimasur' },
+                          { label: 'Observaciones', value: record.observaciones || '' }
+                        ];
+                        viewExpedienteInNewTab('Ficha Técnica: Evaluación Gotas Puras', recordData, `evaluacion_${record.id}`);
+                      }}
+                      onDownload={() => {
+                        const recordData = [
+                          { label: 'Fecha', value: formatDate(record.fecha) },
+                          { label: 'Producto', value: record.producto },
+                          { label: 'Estado', value: record.estado },
+                          { label: 'Responsable', value: record.creadoPor || record.responsable || 'Administrador Cimasur' },
+                          { label: 'Observaciones', value: record.observaciones || '' }
+                        ];
+                        exportExpedienteToPDF('Ficha Técnica: Evaluación Gotas Puras', recordData, `evaluacion_${record.id}`);
+                      }}
+                      onExcel={() => exportRecordToExcel(record)}
+                      onEdit={() => {
+                        setEditingId(record.id);
+                        setForm(record);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      onDelete={async () => {
+                        await localDB.deleteFromCollection('lab_records', record.id);
+                        const updated = await localDB.getCollection('lab_records');
+                        setRecords(updated);
+                      }}
+                    />
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -723,6 +798,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
       ["Fecha", "Tipo (Gota Pura/Dilución)", "Producto", "Nro Cimasur", "Solución", "Cantidad", "Status", "Responsable", "Elaborador"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Elaboracion");
     XLSX.writeFile(wb, "plantilla_elaboracion.xlsx");
@@ -736,7 +812,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
@@ -746,9 +822,11 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
           const nroCimasur = safe(row["Nro Cimasur"]);
           if (!producto || !nroCimasur) continue;
 
+          const fecha = parseExcelDate(row["Fecha"]);
+
           const newRecord = {
             type: 'elaboracion',
-            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            fecha: fecha,
             tipo: safe(row["Tipo (Gota Pura/Dilución)"]) || 'Gota Pura',
             producto: producto,
             nroCimasur: nroCimasur,
@@ -763,6 +841,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
 
           await localDB.saveToCollection('lab_records', newRecord);
           importedCount++;
+          if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
         }
 
         await addAuditLog(user, `Importó ${importedCount} registros de elaboración desde Excel`, 'Laboratorio');
@@ -890,27 +969,53 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
             <button 
               onClick={() => {
                 const filtered = records.filter(r => r.type === 'elaboracion').filter(r => {
-                  const searchStr = `${r.fecha || ''} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
+                  const searchStr = `${formatDate(r.fecha)} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
                   return searchStr.includes(searchTerm.toLowerCase());
                 });
                 const data = filtered.map(r => [
-                  r.fecha,
-                  r.nroCimasur,
-                  r.producto,
-                  r.responsable,
-                  r.status
+                  formatDate(r.fecha),
+                  r.tipo || '---',
+                  r.producto || '---',
+                  r.elaborador || '---',
+                  r.creadoPor || r.responsable || 'Administrador Cimasur',
+                  r.solucion || '---',
+                  r.nroCimasur || '---',
+                  r.cantidad || '---',
+                  r.status || '---'
                 ]);
                 exportTableToPDF(
-                  'Kardex de Elaboración Diaria',
-                  ['Fecha', 'N° Cimasur', 'Producto', 'Responsable', 'Status'],
+                  'Kardex de Elaboración de Gotas y Diluciones',
+                  ['Fecha', 'Tipo', 'Producto / Fórmula', 'Elaborador', 'Responsable', 'Solución / Base', 'No. Cimasur', 'Cantidad (ml/un)', 'Estado'],
                   data,
-                  'kardex_elaboracion_diaria'
+                  'kardex_elaboracion_gotas',
+                  'l'
                 );
               }}
               className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
               title="Descargar PDF Filtrado"
             >
               <Download className="w-3 h-3" /> PDF
+            </button>
+            <button 
+              onClick={() => {
+                const data = records.filter(r => r.type === 'elaboracion').map(r => [
+                  formatDateForExcel(r.fecha),
+                  r.tipo || '',
+                  r.producto || '',
+                  r.elaborador || '',
+                  r.responsable || 'Administrador Cimasur',
+                  r.solucion || '',
+                  r.nroCimasur || '',
+                  r.cantidad || '',
+                  r.status || '',
+                  r.observaciones || ''
+                ]);
+                exportTableToExcel('Elaboración Gotas', ['Fecha', 'Tipo', 'Producto / Fórmula', 'Elaborador', 'Responsable', 'Solución / Base', 'No. Cimasur', 'Cantidad (ml/un)', 'Estado', 'Observaciones'], data, 'kardex_elaboracion_gotas');
+              }}
+              className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar Excel"
+            >
+              <FileSpreadsheet className="w-3 h-3" /> Excel
             </button>
           </div>
           <FlaskConical className="w-3 h-3 text-slate-300" />
@@ -928,11 +1033,11 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
             </thead>
             <tbody className="divide-y divide-slate-100">
               {records.filter(r => r.type === 'elaboracion').filter(r => {
-                const searchStr = `${r.fecha || ''} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
+                const searchStr = `${formatDate(r.fecha)} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
               }).map(r => (
                 <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="p-4">{r.fecha}</td>
+                  <td className="p-4">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-mono text-blue-700">{r.nroCimasur}</td>
                   <td className="p-4 font-bold">{r.producto}</td>
                   <td className="p-4 italic">
@@ -944,13 +1049,31 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
                   </td>
                   <td className="p-4 text-center">
                     <RecordActions
+                      onView={() => {
+                        const recordData = [
+                          { label: 'Fecha', value: formatDate(r.fecha) },
+                          { label: 'Tipo', value: r.tipo },
+                          { label: 'Producto / Fórmula', value: r.producto },
+                          { label: 'Elaborador', value: r.elaborador },
+                          { label: 'Responsable', value: r.creadoPor || r.responsable || 'Administrador Cimasur' },
+                          { label: 'Solución / Base', value: r.solucion || '' },
+                          { label: 'N° Cimasur', value: r.nroCimasur },
+                          { label: 'Cantidad (ml/un)', value: r.cantidad || '' },
+                          { label: 'Status', value: r.status },
+                          { label: 'Observaciones', value: r.observaciones || '' }
+                        ];
+                        viewExpedienteInNewTab('Expediente: Elaboración de Gotas', recordData, `expediente_${r.nroCimasur}`);
+                      }}
                       onDownload={() => {
                         const recordData = [
-                          { label: 'N° Cimasur', value: r.nroCimasur },
-                          { label: 'Fecha', value: r.fecha },
-                          { label: 'Producto', value: r.producto },
+                          { label: 'Fecha', value: formatDate(r.fecha) },
+                          { label: 'Tipo', value: r.tipo },
+                          { label: 'Producto / Fórmula', value: r.producto },
                           { label: 'Elaborador', value: r.elaborador },
-                          { label: 'Responsable', value: r.creadoPor || r.responsable },
+                          { label: 'Responsable', value: r.creadoPor || r.responsable || 'Administrador Cimasur' },
+                          { label: 'Solución / Base', value: r.solucion || '' },
+                          { label: 'N° Cimasur', value: r.nroCimasur },
+                          { label: 'Cantidad (ml/un)', value: r.cantidad || '' },
                           { label: 'Status', value: r.status },
                           { label: 'Observaciones', value: r.observaciones || '' }
                         ];
@@ -962,21 +1085,13 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       onDelete={async () => {
-                        if (true) {
-                          try {
-                            const firebaseUser = localAuth.getCurrentUser();
-                            if (firebaseUser) {
-                                const userProfile = await localAuth.getUserById(firebaseUser.uid);
-                                if (userProfile)
-                                    await addAuditLog(userProfile, `Eliminó Elaboración: ${r.producto} (N° ${r.nroCimasur})`, 'Laboratorio');
-                            }
-                            await localDB.deleteFromCollection('lab_records', r.id);
-                            const updated = await localDB.getCollection('lab_records');
-                            setRecords(updated);
-                            alert('Ficha Técnica eliminada correctamente');
-                          } catch (err) {
-                            alert('Error al intentar eliminar la ficha');
-                          }
+                        try {
+                          await localDB.deleteFromCollection('lab_records', r.id);
+                          const updated = await localDB.getCollection('lab_records');
+                          setRecords(updated);
+                          alert('Ficha Técnica eliminada correctamente');
+                        } catch (err) {
+                          alert('Error al intentar eliminar la ficha');
                         }
                       }}
                     />
@@ -1029,12 +1144,51 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Ficha", "Nro Muestra", "Paciente", "Producto", "Médico", "Peso", "Dilución", "Maceración", "Filtrado", "Responsable"]
+      [
+        "Fecha Ficha", "Ingreso Lab", "Nro Muestra", "Refrigerador", "Tipo Muestra", 
+        "Médico", "Paciente", "Estado Muestra", "Peso gr", "Dilución realizada", 
+        "Nº maceración-congelado", "Tiempo Filtrado", "Tº Termoregulado", "Tiempo Luz UV", 
+        "Dilución Final", "Otros", "Producto Solicitado", "Inicio Proceso", 
+        "Salida Proceso", "Nº Clasificación", "Responsable"
+      ]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Nosodes");
-    XLSX.writeFile(wb, "plantilla_nosodes_avanzada.xlsx");
+    XLSX.writeFile(wb, "plantilla_nosodes_completa.xlsx");
+  };
+
+  const exportRecordToExcel = (record: any) => {
+    const data = [
+      ["Campo", "Valor"],
+      ["Fecha Ficha", formatDateForExcel(record.fechaFicha)],
+      ["Ingreso Lab", formatDateForExcel(record.ingresoLab)],
+      ["Nro Muestra", record.nroMuestra || ""],
+      ["Refrigerador", record.refrigerador || ""],
+      ["Tipo Muestra", record.tipoMuestra || ""],
+      ["Médico", record.medico || ""],
+      ["Paciente", record.paciente || ""],
+      ["Estado Muestra", record.estadoMuestra || ""],
+      ["Peso gr", record.pesoGr || ""],
+      ["Dilución realizada", record.dilucionRealizada || ""],
+      ["Nº maceración-congelado", record.nroMaceracion || ""],
+      ["Tiempo Filtrado", record.tiempoFiltrado || ""],
+      ["Tº Termoregulado", record.tTermoregulado || ""],
+      ["Tiempo Luz UV", record.tiempoLuz || ""],
+      ["Dilución Final", record.datosTecnicos?.dilucionFinal || ""],
+      ["Otros", record.datosTecnicos?.otros || ""],
+      ["Producto Solicitado", record.producto || ""],
+      ["Inicio Proceso", formatDateForExcel(record.inicioProceso)],
+      ["Salida Proceso", formatDateForExcel(record.salidaProceso)],
+      ["Nº Clasificación", record.nroClasificacion || ""],
+      ["Responsable", record.responsable || ""]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 30 }, { wch: 50 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ficha Nosode");
+    XLSX.writeFile(wb, `nosode_${record.nroMuestra || record.id}.xlsx`);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1058,17 +1212,27 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
           const newRecord = {
             ...initialFormState,
             type: 'nosodes',
-            fechaFicha: safe(row["Fecha Ficha"]) || new Date().toISOString().split('T')[0],
+            fechaFicha: parseExcelDate(row["Fecha Ficha"]),
+            fechaIngresoLab: parseExcelDate(row["Ingreso Lab"]),
             nroMuestra: nroMuestra,
-            paciente: paciente,
-            producto: safe(row["Producto"]),
+            refrigerador: safe(row["Refrigerador"]),
+            tipoMuestra: safe(row["Tipo Muestra"]),
             medico: safe(row["Médico"]),
+            paciente: paciente,
+            estadoMuestra: safe(row["Estado Muestra"]) || 'Óptimo',
+            producto: safe(row["Producto Solicitado"]),
+            fechaInicio: parseExcelDate(row["Inicio Proceso"]),
+            fechaSalida: parseExcelDate(row["Salida Proceso"]),
+            nroClasificacion: safe(row["Nº Clasificación"]),
             acciones: {
-              ...initialFormState.acciones,
-              peso: safe(row["Peso"]),
-              dilucion: safe(row["Dilución"]),
-              maceracion: safe(row["Maceración"]),
-              filtrado: safe(row["Filtrado"]),
+              peso: safe(row["Peso gr"]),
+              dilucion: safe(row["Dilución realizada"]),
+              maceracion: safe(row["Nº maceración-congelado"]),
+              filtrado: safe(row["Tiempo Filtrado"]),
+              termoregulado: safe(row["Tº Termoregulado"]),
+              luzUV: safe(row["Tiempo Luz UV"]),
+              dilucionFinal: safe(row["Dilución Final"]),
+              otros: safe(row["Otros"]),
             },
             responsable: safe(row["Responsable"]) || user.displayName || '',
             creadoPor: user.displayName || '',
@@ -1077,6 +1241,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
 
           await localDB.saveToCollection('lab_records', newRecord);
           importedCount++;
+          if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
         }
 
         await addAuditLog(user, `Importó ${importedCount} fichas de nosodes desde Excel`, 'Laboratorio');
@@ -1223,19 +1388,44 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
                 formatDate(r.fechaFicha),
                 r.nroMuestra,
                 r.paciente,
-                r.producto
+                r.producto,
+                r.medico || '---',
+                r.estadoMuestra || '---',
+                r.responsable || '---'
               ]);
-              exportTableToPDF(
-                'Reporte: Historial de Nosodes',
-                ['Fecha', 'N° Muestra', 'Paciente', 'Producto'],
-                data,
-                'historial_nosodes'
-              );
+            exportTableToPDF(
+              `Reporte: Historial de Nosodes`,
+              ['Fecha', 'N° Muestra', 'Paciente', 'Producto', 'Médico', 'Estado', 'Responsable'],
+              data,
+              'historial_nosodes',
+              'l'
+            );
             }}
             className="text-blue-600 hover:bg-blue-50 p-1 rounded" 
             title="Descargar PDF"
           >
             <Download className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onClick={() => {
+              const data = records.filter(r => r.type === 'nosodes').map(r => [
+                formatDateForExcel(r.fechaFicha),
+                formatDateForExcel(r.fechaIngresoLab),
+                r.nroMuestra || '',
+                r.refrigerador || '',
+                r.paciente || '',
+                r.producto || '',
+                r.medico || '',
+                r.estadoMuestra || '',
+                r.nroClasificacion || '',
+                r.responsable || 'Administrador Cimasur'
+              ]);
+              exportTableToExcel('Ingreso Nosodes', ['Fecha Ficha', 'Ingreso Lab', 'N° Muestra', 'Refrigerador', 'Paciente', 'Producto', 'Médico', 'Estado', 'N° Clasificación', 'Responsable'], data, 'historial_nosodes');
+            }}
+            className="text-emerald-600 hover:bg-emerald-50 p-1 rounded" 
+            title="Descargar Excel"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -1251,7 +1441,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
               {records.filter(r => r.type === 'nosodes').filter(r => {
-                const searchStr = `${r.fechaFicha || ''} ${r.nroMuestra || ''} ${r.paciente || ''} ${r.producto || ''} ${r.medico || ''} ${r.refrigerador || ''}`.toLowerCase();
+                const searchStr = `${formatDate(r.fechaFicha)} ${r.nroMuestra || ''} ${r.paciente || ''} ${r.producto || ''} ${r.medico || ''} ${r.refrigerador || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
               }).map(r => (
                 <tr key={r.id}>
@@ -1263,8 +1453,8 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
                     <RecordActions
                       onView={() => {
                         const nosodeData = [
-                          { label: 'Fecha Ficha', value: r.fechaFicha },
-                          { label: 'Ingreso Lab', value: r.fechaIngresoLab },
+                          { label: 'Fecha Ficha', value: formatDate(r.fechaFicha) },
+                          { label: 'Ingreso Lab', value: formatDate(r.fechaIngresoLab) },
                           { label: 'N° Muestra', value: r.nroMuestra },
                           { label: 'Refrigerador', value: r.refrigerador },
                           { label: 'Tipo Muestra', value: r.tipoMuestra },
@@ -1280,17 +1470,17 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
                           { label: 'Dilución Final', value: r.acciones?.dilucionFinal },
                           { label: 'Otros', value: r.acciones?.otros },
                           { label: 'Producto', value: r.producto },
-                          { label: 'Inicio Proceso', value: r.fechaInicio },
-                          { label: 'Salida Proceso', value: r.fechaSalida },
+                          { label: 'Inicio Proceso', value: formatDate(r.fechaInicio) },
+                          { label: 'Salida Proceso', value: formatDate(r.fechaSalida) },
                           { label: 'N° Clasificación', value: r.nroClasificacion },
-                          { label: 'Responsable', value: r.responsable }
+                          { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' }
                         ];
                         viewExpedienteInNewTab('Ficha Técnica de Nosode', nosodeData, `ficha_nosode_${r.nroMuestra}`);
                       }}
                       onDownload={() => {
                         const nosodeData = [
-                          { label: 'Fecha Ficha', value: r.fechaFicha },
-                          { label: 'Ingreso Lab', value: r.fechaIngresoLab },
+                          { label: 'Fecha Ficha', value: formatDate(r.fechaFicha) },
+                          { label: 'Ingreso Lab', value: formatDate(r.fechaIngresoLab) },
                           { label: 'N° Muestra', value: r.nroMuestra },
                           { label: 'Refrigerador', value: r.refrigerador },
                           { label: 'Tipo Muestra', value: r.tipoMuestra },
@@ -1306,28 +1496,27 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
                           { label: 'Dilución Final', value: r.acciones?.dilucionFinal },
                           { label: 'Otros', value: r.acciones?.otros },
                           { label: 'Producto', value: r.producto },
-                          { label: 'Inicio Proceso', value: r.fechaInicio },
-                          { label: 'Salida Proceso', value: r.fechaSalida },
+                          { label: 'Inicio Proceso', value: formatDate(r.fechaInicio) },
+                          { label: 'Salida Proceso', value: formatDate(r.fechaSalida) },
                           { label: 'N° Clasificación', value: r.nroClasificacion },
-                          { label: 'Responsable', value: r.responsable }
+                          { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' }
                         ];
                         exportExpedienteToPDF('Ficha Técnica de Nosode', nosodeData, `ficha_nosode_${r.nroMuestra}`);
                       }}
+                      onExcel={() => exportRecordToExcel(r)}
                       onEdit={() => {
                         setEditingId(r.id);
                         setForm(r);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       onDelete={async () => {
-                        if (true) {
-                          try {
-                            await localDB.deleteFromCollection('lab_records', r.id);
-                            const updated = await localDB.getCollection('lab_records');
-                            setRecords(updated);
-                            alert('Ficha Técnica de Nosode eliminada exitosamente');
-                          } catch (err) {
-                            alert('Error al intentar eliminar la ficha');
-                          }
+                        try {
+                          await localDB.deleteFromCollection('lab_records', r.id);
+                          const updated = await localDB.getCollection('lab_records');
+                          setRecords(updated);
+                          alert('Ficha Técnica de Nosode eliminada exitosamente');
+                        } catch (err) {
+                          alert('Error al intentar eliminar la ficha');
                         }
                       }}
                     />
@@ -1358,13 +1547,50 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     responsable: ''
   });
 
+  const exportRecordToExcel = (record: any) => {
+    const data = [
+      ["Producto", record.producto || "---"],
+      ["Fecha", formatDate(record.fecha)],
+      ["Preparador", record.preparador || "---"],
+      ["Responsable", record.responsable || "Administrador Cimasur"],
+      ["Total Lambdas", String(record.totalLambdas || "0")],
+      ["Fórmula Total", record.formulaTotal || "---"],
+      ["Observaciones", record.observaciones || "---"],
+      [],
+      ["Detalle de Preparación (Composición)"],
+      ["#", "Composición / Terapia", "N° Cimasur", "Dilución", "Lambdas"]
+    ];
+
+    const filas = (record.filas || []).filter((f: any) => f.composicion).map((f: any, i: number) => [
+      i + 1,
+      f.composicion,
+      f.nroCimasur,
+      f.dilucion,
+      f.lambdas
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([...data, ...filas]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Preparación");
+    XLSX.writeFile(wb, `preparacion_${record.id}.xlsx`);
+  };
+
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Producto", "Fecha", "Preparador", "Responsable", "Fórmula Total", "Observaciones"]
+      ["Producto", "arnica cs"],
+      ["Fecha", "18-07-1905"],
+      ["Preparador", "fernanda"],
+      ["Responsable", "Administrador Cimasur"],
+      ["Total Lambdas", "0"],
+      ["Fórmula Total", ""],
+      ["Observaciones", ""],
+      [],
+      ["Detalle de Preparación (Composición)"],
+      ["#", "Composición / Terapia", "N° Cimasur", "Dilución", "Lambdas"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Preparaciones");
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
     XLSX.writeFile(wb, "plantilla_preparaciones_gotas_puras.xlsx");
   };
 
@@ -1378,37 +1604,58 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
-        let importedCount = 0;
-        for (const row of data) {
-          const producto = safe(row["Producto"]);
-          if (!producto) continue;
+        const findVal = (label: string) => {
+          const row = rows.find(r => r[0] && String(r[0]).trim().toLowerCase().includes(label.toLowerCase()));
+          return row ? row[1] : null;
+        };
 
-          const newRecord = {
-            type: 'preparacion',
-            producto: producto,
-            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
-            preparador: safe(row["Preparador"]),
-            responsable: safe(row["Responsable"]) || user.displayName || '',
-            formulaTotal: safe(row["Fórmula Total"]),
-            observaciones: safe(row["Observaciones"]),
-            filas: Array(15).fill({ composicion: '', nroCimasur: '', dilucion: '', lambdas: '' }),
-            creadoPor: user.displayName || '',
-            createdAt: new Date().toISOString()
-          };
-
-          await localDB.saveToCollection('lab_records', newRecord);
-          importedCount++;
+        const producto = safe(findVal("Producto"));
+        if (!producto) {
+          alert("Error: No se encontró el campo 'Producto' en la columna A. Asegúrese de usar la plantilla correcta.");
+          return;
         }
 
-        await addAuditLog(user, `Importó ${importedCount} preparaciones desde Excel`, 'Laboratorio');
-        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
+        const headerIdx = rows.findIndex(r => r[1] === "Composición / Terapia");
+        let extractedFilas = [];
+        if (headerIdx !== -1) {
+          extractedFilas = rows.slice(headerIdx + 1)
+            .filter(r => r[1] && String(r[1]).trim() !== "")
+            .map(r => ({
+              composicion: safe(r[1]),
+              nroCimasur: safe(r[2]),
+              dilucion: safe(r[3]),
+              lambdas: safe(r[4])
+            }));
+        }
+
+        const finalFilas = [...extractedFilas];
+        while (finalFilas.length < 15) finalFilas.push({ composicion: '', nroCimasur: '', dilucion: '', lambdas: '' });
+
+        const newRecord = {
+          type: 'preparacion',
+          producto: producto,
+          fecha: parseExcelDate(findVal("Fecha")),
+          preparador: safe(findVal("Preparador")),
+          responsable: safe(findVal("Responsable")) || user.displayName || '',
+          formulaTotal: safe(findVal("Fórmula Total")),
+          observaciones: safe(findVal("Observaciones")),
+          totalLambdas: String(findVal("Total Lambdas") || "0"),
+          filas: finalFilas,
+          creadoPor: user.displayName || '',
+          createdAt: new Date().toISOString()
+        };
+
+        await localDB.saveToCollection('lab_records', newRecord);
+        await addAuditLog(user, `Importó Preparación Individual: ${producto}`, 'Laboratorio');
+        alert(`Éxito: Se importó el registro de "${producto}" correctamente.`);
+        
         const updated = await localDB.getCollection('lab_records');
         setRecords(updated);
       } catch (error) {
         console.error("Import Error:", error);
-        alert("Error al procesar el archivo.");
+        alert("Error al procesar el archivo. Asegúrese de que sea un archivo Excel (.xlsx) estructurado por producto.");
       }
     };
     reader.readAsBinaryString(file);
@@ -1447,7 +1694,7 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     if (sumaML > 0) {
       part1 += ` + ${sumaML.toFixed(2)} ML`;
     }
-    return `${part1} = ${totalML.toFixed(2)} ML - ${frascoSize} ML = ${diferencia.toFixed(2)} ML (Vehículo OL 48)`;
+    return `${part1} = ${totalML.toFixed(2)} ML - ${frascoSize} ML = ${diferencia.toFixed(2)} ML (OL 48)`;
   }, [sumaUL, sumaML, totalML, frascoSize, diferencia]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1633,27 +1880,51 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
             <button 
               onClick={() => {
                 const filtered = records.filter(r => r.type === 'preparacion').filter(r => {
-                  const searchStr = `${r.fecha || ''} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
+                  const searchStr = `${formatDate(r.fecha)} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
                   return searchStr.includes(searchTerm.toLowerCase());
                 });
                 const data = filtered.map(r => [
                   formatDate(r.fecha),
                   r.producto,
                   r.preparador,
-                  r.responsable,
-                  r.totalLambdas
+                  r.responsable || '---',
+                  r.formulaTotal || '---',
+                  r.totalLambdas || '---'
                 ]);
                 exportTableToPDF(
-                  'Historial de Preparaciones',
-                  ['Fecha', 'Producto', 'Preparador', 'Responsable', 'Total Lambdas'],
+                  'Historial de Preparaciones Gotas Puras',
+                  ['Fecha', 'Producto', 'Preparador', 'Responsable', 'Fórmula', 'Total L.'],
                   data,
-                  'historial_preparaciones'
+                  'historial_preparaciones',
+                  'l'
                 );
               }}
               className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
               title="Descargar PDF Filtrado"
             >
               <Download className="w-3 h-3" /> PDF
+            </button>
+            <button 
+              onClick={() => {
+                const search = searchTerm.toLowerCase();
+                const filtered = records.filter(r => r.type === 'preparacion').filter(r => {
+                  const str = (r.producto || '') + ' ' + (r.preparador || '') + ' ' + (r.responsable || '');
+                  return str.toLowerCase().includes(search);
+                });
+                const data = filtered.map(r => [
+                  formatDateForExcel(r.fecha),
+                  r.producto || '',
+                  r.preparador || '',
+                  r.responsable || 'Administrador Cimasur',
+                  r.formulaTotal || '',
+                  r.totalLambdas || ''
+                ]);
+                exportTableToExcel('Preparación Gotas Puras', ['Fecha', 'Producto', 'Preparador', 'Responsable', 'Fórmula', 'Total L.'], data, 'historial_preparaciones');
+              }}
+              className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar Excel Filtrado"
+            >
+              <FileSpreadsheet className="w-3 h-3" /> Excel
             </button>
           </div>
         </div>
@@ -1671,7 +1942,7 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
             </thead>
             <tbody className="divide-y divide-slate-100">
               {records.filter(r => r.type === 'preparacion').filter(r => {
-                const searchStr = `${r.fecha || ''} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
+                const searchStr = `${formatDate(r.fecha)} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
               }).map(r => (
                 <tr key={r.id}>
@@ -1690,13 +1961,15 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                              { label: 'Producto', value: r.producto },
                              { label: 'Fecha', value: formatDate(r.fecha) },
                              { label: 'Preparador', value: r.preparador },
-                             { label: 'Responsable', value: r.responsable },
-                             { label: 'Total Lambdas', value: r.totalLambdas?.toString() }
+                             { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' },
+                             { label: 'Total Lambdas', value: String(r.totalLambdas || '0') },
+                             { label: 'Fórmula Total', value: r.formulaTotal || '' },
+                             { label: 'Observaciones', value: r.observaciones || '' }
                            ];
                            const tables = [{
-                             title: 'Detalle de Preparación',
+                             title: 'Detalle de Preparación (Composición)',
                              headers: ['#', 'Composición / Terapia', 'N° Cimasur', 'Dilución', 'Lambdas'],
-                             rows: r.filas?.map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
+                             rows: (r.filas || []).filter((f:any) => f.composicion).map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
                            }];
                            viewExpedienteInNewTab('Expediente: Preparación Gotas Puras', prepData, `expediente_preparacion_${r.id}`, tables);
                         }}
@@ -1705,31 +1978,32 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                              { label: 'Producto', value: r.producto },
                              { label: 'Fecha', value: formatDate(r.fecha) },
                              { label: 'Preparador', value: r.preparador },
-                             { label: 'Responsable', value: r.responsable },
-                             { label: 'Total Lambdas', value: r.totalLambdas?.toString() }
+                             { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' },
+                             { label: 'Total Lambdas', value: String(r.totalLambdas || '0') },
+                             { label: 'Fórmula Total', value: r.formulaTotal || '' },
+                             { label: 'Observaciones', value: r.observaciones || '' }
                            ];
                            const tables = [{
-                             title: 'Detalle de Preparación',
+                             title: 'Detalle de Preparación (Composición)',
                              headers: ['#', 'Composición / Terapia', 'N° Cimasur', 'Dilución', 'Lambdas'],
-                             rows: r.filas?.map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
+                             rows: (r.filas || []).filter((f:any) => f.composicion).map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
                            }];
                            exportExpedienteToPDF('Expediente: Preparación Gotas Puras', prepData, `expediente_preparacion_${r.id}`, tables);
                         }}
+                        onExcel={() => exportRecordToExcel(r)}
                         onEdit={() => {
                           setEditingId(r.id);
                           setForm(r);
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         onDelete={async () => {
-                          if (true) {
-                            try {
-                              await localDB.deleteFromCollection('lab_records', r.id);
-                              const updated = await localDB.getCollection('lab_records');
-                              setRecords(updated);
-                              alert('Ficha Técnica eliminada correctamente');
-                            } catch (err) {
-                              alert('Error al intentar eliminar la ficha');
-                            }
+                          try {
+                            await localDB.deleteFromCollection('lab_records', r.id);
+                            const updated = await localDB.getCollection('lab_records');
+                            setRecords(updated);
+                            alert('Ficha Técnica eliminada correctamente');
+                          } catch (err) {
+                            alert('Error al intentar eliminar la ficha');
                           }
                         }}
                       />
@@ -1770,9 +2044,30 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
       ["Insumo", "Fecha", "Nro Asignado", "Elaborador", "Estado", "Proporción", "Elaboración", "Riesgos", "Etiqueta", "Responsable"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Tinturas");
     XLSX.writeFile(wb, "plantilla_tinturas_madres.xlsx");
+  };
+
+  const exportRecordToExcel = (record: any) => {
+    const data = [
+      ["Insumo", record.insumo || "---"],
+      ["Fecha", formatDateForExcel(record.fecha)],
+      ["Nro Asignado", record.nroAsignado || "---"],
+      ["Elaborador", record.elaborador || "---"],
+      ["Estado", record.estado || "---"],
+      ["Proporción", record.proporcion || "---"],
+      ["Elaboración", record.elaboracion || "---"],
+      ["Riesgos", record.riesgos || "---"],
+      ["Etiqueta", record.etiqueta || "---"],
+      ["Responsable", record.responsable || "Administrador Cimasur"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 25 }, { wch: 25 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tintura");
+    XLSX.writeFile(wb, `tintura_${record.nroAsignado || record.id}.xlsx`);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1790,18 +2085,18 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
         let importedCount = 0;
         for (const row of data) {
           const insumo = safe(row["Insumo"]);
-          const nroAsignado = safe(row["Nro Asignado"]);
+          const nroAsignado = safe(row["Nro Asignado"]) || safe(row["Nº Asignado"]) || safe(row["N° Asignado"]);
           if (!insumo || !nroAsignado) continue;
 
           const newRecord = {
             type: 'tinturas',
             insumo: insumo,
-            fecha: safe(row["Fecha"]) || new Date().toISOString().split('T')[0],
+            fecha: parseExcelDate(row["Fecha"]),
             nroAsignado: nroAsignado,
             elaborador: safe(row["Elaborador"]),
             estado: safe(row["Estado"]) || 'Óptimo',
-            proporcion: safe(row["Proporción"]),
-            elaboracion: safe(row["Elaboración"]),
+            proporcion: safe(row["Proporción"]) || safe(row["Proporcion"]),
+            elaboracion: safe(row["Elaboración"]) || safe(row["Elaboracion"]),
             riesgos: safe(row["Riesgos"]),
             etiqueta: safe(row["Etiqueta"]),
             responsable: safe(row["Responsable"]) || user.displayName || '',
@@ -1811,6 +2106,8 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
 
           await localDB.saveToCollection('lab_records', newRecord);
           importedCount++;
+          // Pausa para evitar saturación en importaciones grandes
+          if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
         }
 
         await addAuditLog(user, `Importó ${importedCount} registros de TM desde Excel`, 'Laboratorio');
@@ -1895,13 +2192,20 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
                     r.insumo,
                     r.nroAsignado,
                     r.elaborador,
-                    r.estado
+                    r.estado,
+                    r.proporcion || '---',
+                    r.elaboracion || '---',
+                    r.riesgos || '---',
+                    r.etiqueta || '---',
+                    r.firma || '---',
+                    r.responsable || '---'
                   ]);
                   exportTableToPDF(
-                    'Reporte: Tinturas Madre',
-                    ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado'],
+                    'Reporte: Tinturas Madre - Detalle Completo',
+                    ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado', 'Prop.', 'Elab.', 'Riesgos', 'Etiqueta', 'Firma', 'Resp.'],
                     data,
-                    'tinturas_madre'
+                    'tinturas_madre_completo',
+                    'l'
                   );
                }}
                className="text-white/70 hover:text-white" 
@@ -1949,7 +2253,7 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
             <button 
               onClick={() => {
                 const filtered = records.filter(r => r.type === 'tinturas').filter(r => {
-                  const searchStr = `${r.fecha || ''} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
+                  const searchStr = `${formatDate(r.fecha)} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
                   return searchStr.includes(searchTerm.toLowerCase());
                 });
                 const data = filtered.map(r => [
@@ -1957,19 +2261,53 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
                   r.insumo,
                   r.nroAsignado,
                   r.elaborador,
-                  r.estado
+                  r.estado,
+                  r.proporcion || '---',
+                  r.elaboracion || '---',
+                  r.riesgos || '---',
+                  r.etiqueta || '---',
+                  r.firma || '---',
+                  r.responsable || '---'
                 ]);
                 exportTableToPDF(
-                  'Historial Tinturas Madre',
-                  ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado'],
+                  'Historial Tinturas Madre - Detalle Completo',
+                  ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado', 'Prop.', 'Elab.', 'Riesgos', 'Etiqueta', 'Firma', 'Resp.'],
                   data,
-                  'historial_tinturas'
+                  'historial_tinturas_completo',
+                  'l'
                 );
               }}
               className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
               title="Descargar PDF Filtrado"
             >
               <Download className="w-3 h-3" /> PDF
+            </button>
+            <button 
+              onClick={() => {
+                const search = searchTerm.toLowerCase();
+                const filtered = records.filter(r => r.type === 'tinturas-madres').filter(r => {
+                  const str = (r.insumo || '') + ' ' + (r.nroAsignado || '') + ' ' + (r.elaborador || '');
+                  return str.toLowerCase().includes(search);
+                });
+                const data = filtered.map(r => [
+                  formatDateForExcel(r.fecha),
+                  r.insumo || '',
+                  r.nroAsignado || '',
+                  r.elaborador || '',
+                  r.estadoMuestra || '',
+                  r.proporciones || '',
+                  r.elaboracion || '',
+                  r.riesgos || '',
+                  r.etiqueta || '',
+                  r.firma || '',
+                  r.responsable || ''
+                ]);
+                exportTableToExcel('Ficha Tinturas Madres', ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado', 'Proporciones', 'Elaboración', 'Riesgos', 'Etiqueta', 'Firma', 'Responsable'], data, 'historial_tinturas_madres');
+              }}
+              className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar Excel Filtrado"
+            >
+              <FileSpreadsheet className="w-3 h-3" /> Excel
             </button>
           </div>
         </div>
@@ -1981,12 +2319,13 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Insumo</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">N° Asignado</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Elaborador</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Responsable</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
               {records.filter(r => r.type === 'tinturas').filter(r => {
-                const searchStr = `${r.fecha || ''} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
+                const searchStr = `${formatDate(r.fecha)} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
               }).map(r => (
                 <tr key={r.id}>
@@ -1994,11 +2333,11 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
                   <td className="px-6 py-4 font-bold">{r.insumo}</td>
                   <td className="px-6 py-4 font-mono text-blue-700">{r.nroAsignado}</td>
                   <td className="px-6 py-4">{r.elaborador}</td>
-                  <td className="px-6 py-4">
-                     {r.creadoPor || r.elaborador}
+                  <td className="px-6 py-4 text-[11px]">
+                     {r.creadoPor || r.responsable || 'Administrador Cimasur'}
                      {r.ultimaModificacionPor && <span className="block text-[9px] text-slate-400">Editado: {r.ultimaModificacionPor}</span>}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-center">
                     <RecordActions
                       onView={() => {
                           const tinturaData = [
@@ -2007,9 +2346,14 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
                              { label: 'N° Asignado', value: r.nroAsignado },
                              { label: 'Elaborador', value: r.elaborador },
                              { label: 'Proporción', value: r.proporcion },
-                             { label: 'Estado', value: r.estado }
+                             { label: 'Estado', value: r.estado },
+                             { label: 'Detalle Elaboración', value: r.elaboracion },
+                             { label: 'Riesgos/Precauciones', value: r.riesgos },
+                             { label: 'Información Etiqueta', value: r.etiqueta },
+                             { label: 'Firma Responsable', value: r.firma || '---' },
+                             { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' }
                           ];
-                          viewExpedienteInNewTab('Ficha: Tintura Madre', tinturaData, `ficha_tintura_${r.nroAsignado}`);
+                          viewExpedienteInNewTab('Ficha Técnica: Tintura Madre', tinturaData, `ficha_tintura_${r.nroAsignado}`);
                       }}
                       onDownload={() => {
                           const tinturaData = [
@@ -2018,21 +2362,25 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
                               { label: 'N° Asignado', value: r.nroAsignado },
                               { label: 'Elaborador', value: r.elaborador },
                               { label: 'Proporción', value: r.proporcion },
-                              { label: 'Estado', value: r.estado }
+                              { label: 'Estado', value: r.estado },
+                              { label: 'Detalle Elaboración', value: r.elaboracion },
+                              { label: 'Riesgos/Precauciones', value: r.riesgos },
+                              { label: 'Información Etiqueta', value: r.etiqueta },
+                              { label: 'Firma Responsable', value: r.firma || '---' },
+                              { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' }
                           ];
-                          exportExpedienteToPDF('Ficha: Tintura Madre', tinturaData, `ficha_tintura_${r.nroAsignado}`);
+                          exportExpedienteToPDF('Ficha Técnica: Tintura Madre', tinturaData, `ficha_tintura_${r.nroAsignado}`);
                       }}
+                      onExcel={() => exportRecordToExcel(r)}
                       onEdit={() => handleEdit(r)}
                       onDelete={async () => {
-                        if (true) {
-                          try {
-                            await localDB.deleteFromCollection('lab_records', r.id);
-                            const updated = await localDB.getCollection('lab_records');
-                            setRecords(updated);
-                            alert('Tintura Madre eliminada correctamente');
-                          } catch (err) {
-                            alert('Error al intentar eliminar la ficha');
-                          }
+                        try {
+                          await localDB.deleteFromCollection('lab_records', r.id);
+                          const updated = await localDB.getCollection('lab_records');
+                          setRecords(updated);
+                          alert('Tintura Madre eliminada correctamente');
+                        } catch (err) {
+                          alert('Error al intentar eliminar la ficha');
                         }
                       }}
                     />
@@ -2069,9 +2417,31 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
       ["Código CIMASUR", "Nombre Insumo", "Código Envase", "Lote", "Proveedor", "Fecha Ingreso", "Vencimiento", "Uso Específico", "Ubicación", "Cantidad", "Observaciones"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Insumos");
     XLSX.writeFile(wb, "plantilla_importacion_insumos.xlsx");
+  };
+
+  const exportRecordToExcel = (record: any) => {
+    const data = [
+      ["Código CIMASUR", record.codigoCimasur || "---"],
+      ["Nombre Insumo", record.nombre || "---"],
+      ["Código Envase", record.codigoEnvase || "---"],
+      ["Lote", record.lote || "---"],
+      ["Proveedor", record.proveedor || "---"],
+      ["Fecha Ingreso", formatDateForExcel(record.fechaIngreso)],
+      ["Vencimiento", formatDateForExcel(record.vencimiento)],
+      ["Uso Específico", record.uso || "---"],
+      ["Ubicación", record.ubicacion || "---"],
+      ["Cantidad", record.cantidad || "0"],
+      ["Observaciones", record.observaciones || "---"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 25 }, { wch: 25 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Insumo");
+    XLSX.writeFile(wb, `insumo_${record.id}.xlsx`);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2099,8 +2469,8 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
             codigoEnvase: safe(row["Código Envase"]),
             lote: safe(row["Lote"]),
             proveedor: safe(row["Proveedor"]),
-            fechaIngreso: safe(row["Fecha Ingreso"]) || new Date().toISOString().split('T')[0],
-            vencimiento: safe(row["Vencimiento"]),
+            fechaIngreso: parseExcelDate(row["Fecha Ingreso"]),
+            vencimiento: parseExcelDate(row["Vencimiento"]),
             uso: safe(row["Uso Específico"]),
             ubicacion: safe(row["Ubicación"]),
             cantidad: safe(row["Cantidad"]),
@@ -2109,33 +2479,27 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
 
           await localDB.saveToCollection('lab_records', newRecord);
 
-          // Sincronizar con Stock
+          // Sincronizar con Stock - SIEMPRE crea nuevo para permitir "duplicados" (lotes distintos/asientos separados)
           try {
-            const invCollection = await localDB.getCollection('inventory');
-            const duplicate = invCollection.find(r => 
-              (r.code && r.code.toLowerCase() === newRecord.codigoCimasur.toLowerCase()) || 
-              (r.item && r.item.toLowerCase() === newRecord.nombre.toLowerCase())
-            );
-            
-            if (duplicate) {
-              const newQty = duplicate.qty + (parseInt(newRecord.cantidad) || 0);
-              await localDB.updateInCollection('inventory', duplicate.id, { qty: newQty });
-            } else {
-              await localDB.saveToCollection('inventory', {
-                area: 'Insumos Varios',
-                item: newRecord.nombre,
-                code: newRecord.codigoCimasur,
-                qty: parseInt(newRecord.cantidad) || 0
-              });
-            }
+            await localDB.saveToCollection('inventory', {
+              area: 'Insumos Varios',
+              item: newRecord.nombre,
+              code: newRecord.codigoCimasur,
+              qty: parseInt(newRecord.cantidad) || 0,
+              lote: newRecord.lote,
+              vencimiento: newRecord.vencimiento
+            });
           } catch (err) { console.error("Stock sync error:", err); }
 
           importedCount++;
+          if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
         }
 
         await addAuditLog(user, `Importó ${importedCount} insumos desde Excel`, 'Laboratorio');
         alert(`Éxito: Se importaron ${importedCount} insumos correctamente.`);
         window.dispatchEvent(new Event('db-change'));
+        const updated = await localDB.getCollection('lab_records');
+        setRecords(updated);
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
@@ -2159,24 +2523,16 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
         await addAuditLog(user, `Registró Insumo: ${form.nombre}`, 'Laboratorio');
         
         // Sincronizar automáticamente con el Stock (Inventario)
+        // Permitir duplicados en inventario (asientos distintos por registro de insumo)
         try {
-          const invCollection = await localDB.getCollection('inventory');
-          const duplicate = invCollection.find(r => 
-            (r.code && r.code.toLowerCase() === form.codigoCimasur.toLowerCase()) || 
-            (r.item && r.item.toLowerCase() === form.nombre.toLowerCase())
-          );
-          
-          if (duplicate) {
-            const newQty = duplicate.qty + (parseInt(form.cantidad) || 0);
-            await localDB.updateInCollection('inventory', duplicate.id, { qty: newQty });
-          } else {
-            await localDB.saveToCollection('inventory', {
-              area: 'Insumos Varios',
-              item: form.nombre,
-              code: form.codigoCimasur,
-              qty: parseInt(form.cantidad) || 0
-            });
-          }
+          await localDB.saveToCollection('inventory', {
+            area: 'Insumos Varios',
+            item: form.nombre,
+            code: form.codigoCimasur,
+            qty: parseInt(form.cantidad) || 0,
+            lote: form.lote,
+            vencimiento: form.vencimiento
+          });
         } catch (err) {
           console.error("Error syncing to stock:", err);
         }
@@ -2262,20 +2618,49 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
                     formatDate(r.fechaIngreso),
                     r.nombre,
                     r.codigoCimasur,
+                    r.codigoEnvase || '---',
                     r.lote,
-                    r.proveedor
+                    r.proveedor,
+                    formatDate(r.vencimiento),
+                    r.uso || '---',
+                    r.ubicacion || '---',
+                    r.cantidad || '0',
+                    r.observaciones || '---'
                   ]);
                   exportTableToPDF(
-                    'Kardex: Insumos y Materia Prima',
-                    ['Fecha Ingreso', 'Insumo', 'Código', 'Lote', 'Proveedor'],
+                    'Kardex: Insumos y Materia Prima - Detalle Completo',
+                    ['F. Ingreso', 'Insumo', 'Código', 'Envase', 'Lote', 'Proveedor', 'Vencimiento', 'Uso', 'Ubicación', 'Cantidad', 'Observaciones'],
                     data,
-                    'kardex_insumos'
+                    'kardex_insumos_completo',
+                    'l'
                   );
                }}
                className="text-white/70 hover:text-white" 
                title="PDF"
              >
                <Download className="w-4 h-4" />
+             </button>
+             <button 
+               onClick={() => {
+                  const data = records.filter(r => r.type === 'insumos').map(r => [
+                    formatDateForExcel(r.fechaIngreso),
+                    r.nombre || '',
+                    r.codigoCimasur || '',
+                    r.codigoEnvase || '',
+                    r.lote || '',
+                    r.proveedor || '',
+                    formatDateForExcel(r.vencimiento) || '',
+                    r.uso || '',
+                    r.ubicacion || '',
+                    r.cantidad || '0',
+                    r.observaciones || ''
+                  ]);
+                  exportTableToExcel('Registro de Insumos T.M.', ['Fecha Ingreso', 'Insumo', 'Código CIMASUR', 'Código Envase', 'Lote', 'Proveedor', 'Vencimiento', 'Uso', 'Ubicación', 'Cantidad', 'Observaciones'], data, 'kardex_insumos_completo');
+               }}
+               className="text-white/70 hover:text-white ml-2" 
+               title="Excel"
+             >
+               <FileSpreadsheet className="w-4 h-4" />
              </button>
            </div>
         </div>
@@ -2324,20 +2709,51 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
                   <td className="px-6 py-4 font-mono text-blue-700">{r.codigoCimasur}</td>
                   <td className="px-6 py-4">{r.lote}</td>
                   <td className="px-6 py-4 font-black">{r.cantidad || '0'}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-center">
                     <RecordActions
+                      onView={() => {
+                        const recordData = [
+                          { label: 'Nombre Insumo', value: r.nombre },
+                          { label: 'Código CIMASUR', value: r.codigoCimasur },
+                          { label: 'Código Envase', value: r.codigoEnvase },
+                          { label: 'Lote', value: r.lote },
+                          { label: 'Proveedor', value: r.proveedor },
+                          { label: 'Fecha Ingreso', value: formatDate(r.fechaIngreso) },
+                          { label: 'Vencimiento', value: formatDate(r.vencimiento) },
+                          { label: 'Uso Específico', value: r.uso },
+                          { label: 'Ubicación', value: r.ubicacion },
+                          { label: 'Cantidad', value: String(r.cantidad || '0') },
+                          { label: 'Observaciones', value: r.observaciones }
+                        ];
+                        viewExpedienteInNewTab('Ficha de Insumo / Materia Prima', recordData, `insumo_${r.id}`);
+                      }}
+                      onDownload={() => {
+                        const recordData = [
+                          { label: 'Nombre Insumo', value: r.nombre },
+                          { label: 'Código CIMASUR', value: r.codigoCimasur },
+                          { label: 'Código Envase', value: r.codigoEnvase },
+                          { label: 'Lote', value: r.lote },
+                          { label: 'Proveedor', value: r.proveedor },
+                          { label: 'Fecha Ingreso', value: formatDate(r.fechaIngreso) },
+                          { label: 'Vencimiento', value: formatDate(r.vencimiento) },
+                          { label: 'Uso Específico', value: r.uso },
+                          { label: 'Ubicación', value: r.ubicacion },
+                          { label: 'Cantidad', value: String(r.cantidad || '0') },
+                          { label: 'Observaciones', value: r.observaciones }
+                        ];
+                        exportExpedienteToPDF('Ficha de Insumo / Materia Prima', recordData, `insumo_${r.id}`);
+                      }}
+                      onExcel={() => exportRecordToExcel(r)}
                       onEdit={() => handleEdit(r)}
                       onDelete={async () => { 
-                        if (true) { 
-                          try {
-                            await localDB.deleteFromCollection('lab_records', r.id); 
-                            const updated = await localDB.getCollection('lab_records'); 
-                            setRecords(updated); 
-                            alert('Eliminado');
-                          } catch (err) {
-                            alert('No se pudo eliminar');
-                          }
-                        } 
+                        try {
+                          await localDB.deleteFromCollection('lab_records', r.id); 
+                          const updated = await localDB.getCollection('lab_records'); 
+                          setRecords(updated); 
+                          alert('Registro eliminado correctamente');
+                        } catch (err) {
+                          alert('No se pudo eliminar');
+                        }
                       }}
                     />
                   </td>
@@ -2377,7 +2793,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Cotiz", "Producto", "Nombre Alternativo", "Proveedor", "Valor", "Prioridad", "Dilución", "Observaciones"]
+      ["Fecha Cotiz", "Producto", "Nombre Alternativo", "Proveedor", "Valor", "Prioridad", "Fecha Compra", "Estado", "Dilución", "Observaciones"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     const wb = XLSX.utils.book_new();
@@ -2404,15 +2820,16 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 
           const newRec = {
             type: 'vademecum',
-            fechaCotiz: safe(row["Fecha Cotiz"]) || new Date().toISOString().split('T')[0],
+            fechaCotiz: parseExcelDate(row["Fecha Cotiz"]),
             producto: producto,
             nombreAlternativo: safe(row["Nombre Alternativo"]),
             proveedor: safe(row["Proveedor"]),
             valor: safe(row["Valor"]),
             prioridad: safe(row["Prioridad"]) || 'Media',
+            fechaCompra: parseExcelDate(row["Fecha Compra"]) || '',
+            estado: safe(row["Estado"]) || 'Pendiente',
             dilucion: safe(row["Dilución"]),
             observaciones: safe(row["Observaciones"]),
-            estado: 'Pendiente',
             createdAt: new Date().toISOString()
           };
 
@@ -2486,24 +2903,51 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
              </button>
              <button 
                onClick={() => {
-                  const data = records.filter(r => r.type === 'vademecum').map(r => [
-                    formatDate(r.fechaCotiz),
-                    r.producto,
-                    r.proveedor,
-                    r.estado,
-                    r.valor
-                  ]);
-                  exportTableToPDF(
-                    'Reporte: Vademécum de Compras',
-                    ['Fecha', 'Producto', 'Proveedor', 'Estado', 'Valor'],
-                    data,
-                    'vademecum_compras'
-                  );
+                 const data = records.filter(r => r.type === 'vademecum').map(r => [
+                   formatDate(r.fechaCotiz),
+                   r.producto || '',
+                   r.nombreAlternativo || '',
+                   r.proveedor || '',
+                   r.valor || '',
+                   r.prioridad || '',
+                   formatDate(r.fechaCompra),
+                   r.estado || '',
+                   r.dilucion || '',
+                   r.observaciones || ''
+                 ]);
+                 exportTableToPDF(
+                   'Reporte: Vademécum de Compras',
+                   ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'],
+                   data,
+                   'vademecum_compras',
+                   'l'
+                 );
                }}
                className="text-white/70 hover:text-white" 
                title="PDF"
              >
                <Download className="w-4 h-4" />
+             </button>
+             <button 
+               onClick={() => {
+                 const data = records.filter(r => r.type === 'vademecum').map(r => [
+                   formatDateForExcel(r.fechaCotiz) || '',
+                   r.producto || '',
+                   r.nombreAlternativo || '',
+                   r.proveedor || '',
+                   r.valor || '',
+                   r.prioridad || '',
+                   formatDateForExcel(r.fechaCompra) || '',
+                   r.estado || '',
+                   r.dilucion || '',
+                   r.observaciones || ''
+                 ]);
+                 exportTableToExcel('Vademécum de Compras', ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'], data, 'vademecum_compras');
+               }}
+               className="text-white/70 hover:text-white ml-2" 
+               title="Excel"
+             >
+               <FileSpreadsheet className="w-4 h-4" />
              </button>
            </div>
         </div>
@@ -2553,27 +2997,59 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
             <button 
               onClick={() => {
                 const filtered = records.filter(r => r.type === 'vademecum').filter(r => {
-                  const searchStr = `${r.fechaCotiz || ''} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''} ${r.nombreAlternativo || ''} ${r.observaciones || ''}`.toLowerCase();
+                  const searchStr = `${formatDate(r.fechaCotiz)} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''} ${r.nombreAlternativo || ''} ${r.observaciones || ''}`.toLowerCase();
                   return searchStr.includes(searchTerm.toLowerCase());
                 });
                 const data = filtered.map(r => [
                   formatDate(r.fechaCotiz),
-                  r.producto,
-                  r.proveedor,
-                  r.prioridad,
-                  r.estado
+                  r.producto || '',
+                  r.nombreAlternativo || '',
+                  r.proveedor || '',
+                  r.valor || '',
+                  r.prioridad || '',
+                  formatDate(r.fechaCompra),
+                  r.estado || '',
+                  r.dilucion || '',
+                  r.observaciones || ''
                 ]);
                 exportTableToPDF(
-                  'Historial Vademécum',
-                  ['Fecha Cotiz', 'Producto', 'Proveedor', 'Prioridad', 'Estado'],
+                  'Historial Vademécum de Insumos',
+                  ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'],
                   data,
-                  'historial_vademecum'
+                  'historial_vademecum',
+                  'l'
                 );
               }}
               className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
               title="Descargar PDF Filtrado"
             >
               <Download className="w-3 h-3" /> PDF
+            </button>
+            <button 
+              onClick={() => {
+                const search = searchTerm.toLowerCase();
+                const filtered = records.filter(r => r.type === 'vademecum').filter(r => {
+                  const str = (r.producto || '') + ' ' + (r.proveedor || '') + ' ' + (r.estado || '');
+                  return str.toLowerCase().includes(search);
+                });
+                const data = filtered.map(r => [
+                   formatDateForExcel(r.fechaCotiz) || '',
+                   r.producto || '',
+                   r.nombreAlternativo || '',
+                   r.proveedor || '',
+                   r.valor || '',
+                   r.prioridad || '',
+                   formatDateForExcel(r.fechaCompra) || '',
+                   r.estado || '',
+                   r.dilucion || '',
+                   r.observaciones || ''
+                ]);
+                exportTableToExcel('Vademécum', ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'], data, 'historial_vademecum');
+              }}
+              className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar Excel Filtrado"
+            >
+              <FileSpreadsheet className="w-3 h-3" /> Excel
             </button>
           </div>
         </div>
@@ -2590,7 +3066,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
               {records.filter(r => r.type === 'vademecum').filter(r => {
-                const searchStr = `${r.fechaCotiz || ''} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''}`.toLowerCase();
+                const searchStr = `${formatDate(r.fechaCotiz)} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
               }).map(r => (
                 <tr key={r.id}>
@@ -2610,35 +3086,43 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
                     <RecordActions
                       onView={() => {
                         const data = [
-                          { label: 'Producto', value: r.producto },
-                          { label: 'Proveedor', value: r.proveedor },
-                          { label: 'Valor', value: r.valor },
-                          { label: 'Fecha Cotiz', value: formatDate(r.fechaCotiz) },
-                          { label: 'Estado', value: r.estado }
+                          { label: 'Producto', value: r.producto || '' },
+                          { label: 'Nombre Alternativo', value: r.nombreAlternativo || '' },
+                          { label: 'Proveedor', value: r.proveedor || '' },
+                          { label: 'Valor', value: r.valor || '' },
+                          { label: 'Prioridad', value: r.prioridad || '' },
+                          { label: 'Fecha Compra', value: formatDate(r.fechaCompra) || '' },
+                          { label: 'Estado', value: r.estado || '' },
+                          { label: 'Dilución', value: r.dilucion || '' },
+                          { label: 'Observaciones', value: r.observaciones || '' },
+                          { label: 'Fecha Cotiz', value: formatDate(r.fechaCotiz) }
                         ];
                         viewExpedienteInNewTab('Ficha: Vademécum', data, `vademecum_${r.id}`);
                       }}
                       onDownload={() => {
                          const data = [
-                          { label: 'Producto', value: r.producto },
-                          { label: 'Proveedor', value: r.proveedor },
-                          { label: 'Valor', value: r.valor },
-                          { label: 'Fecha Cotiz', value: formatDate(r.fechaCotiz) },
-                          { label: 'Estado', value: r.estado }
+                          { label: 'Producto', value: r.producto || '' },
+                          { label: 'Nombre Alternativo', value: r.nombreAlternativo || '' },
+                          { label: 'Proveedor', value: r.proveedor || '' },
+                          { label: 'Valor', value: r.valor || '' },
+                          { label: 'Prioridad', value: r.prioridad || '' },
+                          { label: 'Fecha Compra', value: formatDate(r.fechaCompra) || '' },
+                          { label: 'Estado', value: r.estado || '' },
+                          { label: 'Dilución', value: r.dilucion || '' },
+                          { label: 'Observaciones', value: r.observaciones || '' },
+                          { label: 'Fecha Cotiz', value: formatDate(r.fechaCotiz) }
                         ];
                         exportExpedienteToPDF('Ficha: Vademécum', data, `vademecum_${r.id}`);
                       }}
                       onEdit={() => handleEdit(r)}
                       onDelete={async () => {
-                        if (true) {
-                          try {
-                            await localDB.deleteFromCollection('lab_records', r.id);
-                            const updated = await localDB.getCollection('lab_records');
-                            setRecords(updated);
-                            alert('Vademécum eliminado correctamente');
-                          } catch (err) {
-                            alert('Error al eliminar');
-                          }
+                        try {
+                          await localDB.deleteFromCollection('lab_records', r.id);
+                          const updated = await localDB.getCollection('lab_records');
+                          setRecords(updated);
+                          alert('Vademécum eliminado correctamente');
+                        } catch (err) {
+                          alert('Error al eliminar');
                         }
                       }}
                     />
@@ -2689,7 +3173,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["código equipo", "Producto / Equipo", "Área", "L.A.B", "Fecha Compra", "Marca", "Modelo", "Valor", "Proveedor", "Responsable", "Estado Actual"]
+      ["Código", "Equipo", "Fecha Compra", "Marca", "Modelo", "Valor", "Proveedor", "Responsable", "Estado", "Área", "Comentarios"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     const wb = XLSX.utils.book_new();
@@ -2714,7 +3198,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
         const currentRecords = await localDB.getCollection('lab_records');
 
         for (const row of data) {
-          const codigo = safe(row["código equipo"]);
+          const codigo = safe(row["Código"]) || safe(row["código equipo"]);
           if (!codigo) continue;
 
           // Check if already exists
@@ -2723,16 +3207,16 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
           const newEquipment = {
             type: 'mantenimiento',
             codigo: codigo,
-            producto: safe(row["Producto / Equipo"]),
+            producto: safe(row["Equipo"]) || safe(row["Producto / Equipo"]),
             area: safe(row["Área"]) || safe(row["L.A.B"]) || '(L.A.B) LABORATORIO',
-            fechaCompra: safe(row["Fecha Compra"]),
+            fechaCompra: parseExcelDate(row["Fecha Compra"]),
             marca: safe(row["Marca"]),
             modelo: safe(row["Modelo"]),
             valor: safe(row["Valor"]),
             proveedor: safe(row["Proveedor"]),
             responsable: safe(row["Responsable"]),
-            estado: safe(row["Estado Actual"]) || 'Bueno',
-            comentarios: 'Importado vía Excel',
+            estado: safe(row["Estado"]) || safe(row["Estado Actual"]) || 'Bueno',
+            comentarios: safe(row["Comentarios"]) || 'Importado vía Excel',
             mantenciones: [{
               fecha: new Date().toISOString().split('T')[0],
               tecnico: user.displayName || user.email || 'Sistema',
@@ -2895,17 +3379,24 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
             <button 
               onClick={() => {
                 const data = records.filter(r => r.type === 'mantenimiento').map(r => [
-                  r.codigo,
-                  r.producto,
-                  r.area,
-                  r.responsable,
-                  r.estado
+                  r.codigo || '',
+                  r.producto || '',
+                  formatDate(r.fechaCompra),
+                  r.marca || '',
+                  r.modelo || '',
+                  r.valor || '',
+                  r.proveedor || '',
+                  r.responsable || '',
+                  r.estado || '',
+                  r.area || '',
+                  r.comentarios || ''
                 ]);
                 exportTableToPDF(
                   'Reporte: Inventario de Equipos y Mantención',
-                  ['Código', 'Equipo', 'Área', 'Responsable', 'Estado'],
+                  ['Código', 'Equipo', 'F. Compra', 'Marca', 'Modelo', 'Valor', 'Proveedor', 'Responsable', 'Estado', 'Área', 'Comentarios'],
                   data,
-                  'mantenimiento_equipos'
+                  'mantenimiento_equipos',
+                  'l'
                 );
               }}
               className="text-white/70 hover:text-white" 
@@ -2958,8 +3449,62 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
               />
             </div>
           </div>
-          <button className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Descargar PDF">
+          <button 
+            onClick={() => {
+              const data = records.filter(r => r.type === 'mantenimiento').filter(r => {
+                const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''} ${formatDate(r.fechaCompra)}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).map(r => [
+                r.codigo || '',
+                r.producto || '',
+                formatDate(r.fechaCompra),
+                r.marca || '',
+                r.modelo || '',
+                r.valor || '',
+                r.proveedor || '',
+                r.responsable || '',
+                r.estado || '',
+                r.area || '',
+                r.comentarios || ''
+              ]);
+              exportTableToPDF(
+                'Reporte: Inventario de Equipos y Mantención',
+                ['Código', 'Equipo', 'F. Compra', 'Marca', 'Modelo', 'Valor', 'Proveedor', 'Responsable', 'Estado', 'Área', 'Comentarios'],
+                data,
+                'mantenimiento_equipos_filtrado',
+                'l'
+              );
+            }}
+            className="text-blue-600 hover:bg-blue-50 p-1 rounded" 
+            title="Descargar PDF"
+          >
             <Download className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onClick={() => {
+              const currentFiltered = records.filter(r => r.type === 'mantenimiento').filter(r => {
+                const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''} ${formatDate(r.fechaCompra)}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              });
+              const data = currentFiltered.map(r => [
+                r.codigo || '',
+                r.producto || '',
+                formatDateForExcel(r.fechaCompra) || '',
+                r.marca || '',
+                r.modelo || '',
+                r.valor || '',
+                r.proveedor || '',
+                r.responsable || '',
+                r.estado || '',
+                r.area || '',
+                r.comentarios || ''
+              ]);
+              exportTableToExcel('Equipos y Mantención', ['Código', 'Equipo', 'F. Compra', 'Marca', 'Modelo', 'Valor', 'Proveedor', 'Responsable', 'Estado', 'Área', 'Comentarios'], data, 'mantenimiento_equipos');
+            }}
+            className="text-emerald-600 hover:bg-emerald-50 p-1 rounded" 
+            title="Descargar Excel"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -2975,7 +3520,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
               {records.filter(r => r.type === 'mantenimiento').filter(r => {
-                const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''}`.toLowerCase();
+                const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''} ${formatDate(r.fechaCompra)}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
               }).map(r => (
                 <tr key={r.id}>
@@ -2994,30 +3539,45 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
                       <RecordActions
                         onView={() => {
                           const data = [
-                            { label: 'Código', value: r.codigo },
-                            { label: 'Equipo', value: r.producto },
-                            { label: 'Área', value: r.area },
-                            { label: 'Estado', value: r.estado },
-                            { label: 'Responsable', value: r.responsable },
-                            { label: 'Comentarios', value: r.comentarios || '' }
-                          ];
-                          viewExpedienteInNewTab('Ficha: Equipo', data, `equipo_${r.codigo}`);
-                        }}
-                        onDownload={() => {
-                          const data = [
-                            { label: 'Código', value: r.codigo },
-                            { label: 'Equipo', value: r.producto },
-                            { label: 'Área', value: r.area },
-                            { label: 'Estado', value: r.estado },
-                            { label: 'Responsable', value: r.responsable },
+                            { label: 'Código', value: r.codigo || '' },
+                            { label: 'Equipo', value: r.producto || '' },
+                            { label: 'Fecha Compra', value: formatDate(r.fechaCompra) || '' },
+                            { label: 'Marca', value: r.marca || '' },
+                            { label: 'Modelo', value: r.modelo || '' },
+                            { label: 'Valor', value: r.valor || '' },
+                            { label: 'Proveedor', value: r.proveedor || '' },
+                            { label: 'Responsable', value: r.responsable || '' },
+                            { label: 'Estado', value: r.estado || '' },
+                            { label: 'Área', value: r.area || '' },
                             { label: 'Comentarios', value: r.comentarios || '' }
                           ];
                           const logsTable = {
                             title: 'Historial de Mantenciones',
-                            headers: ['Fecha', 'Técnico', 'Detalle', 'Próxima'],
+                            headers: ['Fecha', 'Técnico', 'Detalle', 'Próxima Mantención'],
                             rows: (r.mantenciones || []).map((m: any) => [formatDate(m.fecha), m.tecnico, m.detalle, formatDate(m.proximaMantencion)])
                           };
-                          exportExpedienteToPDF('Ficha: Equipo', data, `equipo_${r.codigo}`, [logsTable]);
+                          viewExpedienteInNewTab('Ficha: Equipo y Mantenciones', data, `equipo_${r.codigo}`, [logsTable]);
+                        }}
+                        onDownload={() => {
+                          const data = [
+                            { label: 'Código', value: r.codigo || '' },
+                            { label: 'Equipo', value: r.producto || '' },
+                            { label: 'Fecha Compra', value: formatDate(r.fechaCompra) || '' },
+                            { label: 'Marca', value: r.marca || '' },
+                            { label: 'Modelo', value: r.modelo || '' },
+                            { label: 'Valor', value: r.valor || '' },
+                            { label: 'Proveedor', value: r.proveedor || '' },
+                            { label: 'Responsable', value: r.responsable || '' },
+                            { label: 'Estado', value: r.estado || '' },
+                            { label: 'Área', value: r.area || '' },
+                            { label: 'Comentarios', value: r.comentarios || '' }
+                          ];
+                          const logsTable = {
+                            title: 'Historial de Mantenciones',
+                            headers: ['Fecha', 'Técnico', 'Detalle', 'Próxima Mantención'],
+                            rows: (r.mantenciones || []).map((m: any) => [formatDate(m.fecha), m.tecnico, m.detalle, formatDate(m.proximaMantencion)])
+                          };
+                          exportExpedienteToPDF('Ficha: Equipo y Mantenciones', data, `equipo_${r.codigo}`, [logsTable]);
                         }}
                         onEdit={() => {
                           setForm(r);
@@ -3025,15 +3585,13 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         onDelete={async () => {
-                          if (true) {
-                            try {
-                              await localDB.deleteFromCollection('lab_records', r.id);
-                              const updated = await localDB.getCollection('lab_records');
-                              setRecords(updated);
-                              alert('Equipo eliminado correctamente');
-                            } catch(err) {
-                              alert('No se pudo eliminar el equipo');
-                            }
+                          try {
+                            await localDB.deleteFromCollection('lab_records', r.id);
+                            const updated = await localDB.getCollection('lab_records');
+                            setRecords(updated);
+                            alert('Equipo eliminado correctamente');
+                          } catch(err) {
+                            alert('No se pudo eliminar el equipo');
                           }
                         }}
                       />
@@ -3091,11 +3649,10 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   }, []);
 
   const handleDeleteItem = async (id: string) => {
-    if (true) {
-      await localDB.deleteFromCollection('inventory', id);
-      const updated = await localDB.getCollection('inventory');
-      setInventoryRecords(updated);
-    }
+    await localDB.deleteFromCollection('inventory', id);
+    const updated = await localDB.getCollection('inventory');
+    setInventoryRecords(updated);
+    alert('Item eliminado del inventario');
   };
 
   const handleEditItemSave = async (id: string) => {
@@ -3364,13 +3921,29 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                       `Inventario: ${selectedArea}`,
                       ['Insumo', 'Código', 'Stock', 'Área'],
                       data,
-                      `inventario_${selectedArea.toLowerCase().replace(/\s+/g, '_')}`
+                      `inventario_${selectedArea.toLowerCase().replace(/\s+/g, '_')}`,
+                      'l'
                     );
                   }}
                   className="p-1.5 hover:bg-slate-200 rounded text-blue-600"
                   title="Exportar Matrix PDF"
                 >
                   <Download className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => {
+                    const data = filteredRecords.map(r => [
+                      r.item || '',
+                      r.code || '',
+                      r.qty || '0',
+                      r.area || ''
+                    ]);
+                    exportTableToExcel('Inventario: ' + selectedArea, ['Insumo', 'Código', 'Stock', 'Área'], data, 'inventario_' + selectedArea.toLowerCase().replace(/s+/g, '_'));
+                  }}
+                  className="p-1.5 hover:bg-slate-200 rounded text-emerald-600"
+                  title="Exportar Excel"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
                 </button>
                 <div className="flex items-center gap-2 text-[9px] font-black text-slate-400">
                   <div className="w-3 h-3 bg-red-100 rounded"></div> Crítico
@@ -3463,9 +4036,45 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
            <div className="bg-slate-50 p-4 border-b flex justify-between items-center text-[#002b5b]">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Seguimiento de Movimientos (Salidas)</h3>
-              <button className="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="PDF">
+              <button 
+                onClick={() => {
+                  const data = followups.slice().reverse().map(f => [
+                    formatDate(f.fecha),
+                    f.item,
+                    `-${f.cantidadDescontada}`,
+                    f.stockFinal,
+                    f.motivo || '---'
+                  ]);
+                  exportTableToPDF(
+                    'Historial de Movimientos de Stock (Salidas)',
+                    ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'],
+                    data,
+                    'historial_movimientos_stock',
+                    'l'
+                  );
+                }}
+                className="text-blue-600 hover:text-blue-800 flex items-center gap-1" 
+                title="Descargar PDF"
+              >
                 <Download className="w-3 h-3" />
                 <span className="text-[9px] font-black uppercase tracking-tighter">Descargar Historial</span>
+              </button>
+              <button 
+                onClick={() => {
+                  const data = followups.slice().reverse().map(f => [
+                    formatDateForExcel(f.fecha),
+                    f.item || '',
+                    '-' + String(f.cantidadDescontada),
+                    f.stockFinal || '0',
+                    f.motivo || '---'
+                  ]);
+                  exportTableToExcel('Historial de Movimientos de Stock', ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'], data, 'historial_movimientos_stock');
+                }}
+                className="text-emerald-600 hover:text-emerald-800 flex items-center gap-1 ml-2" 
+                title="Descargar Excel"
+              >
+                <FileSpreadsheet className="w-3 h-3" />
+                <span className="text-[9px] font-black uppercase tracking-tighter">Excel</span>
               </button>
            </div>
            <div className="overflow-x-auto max-h-64 scrollbar-thin">
@@ -3568,10 +4177,10 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             nroCotiz: nroCotiz,
             ot: safe(row["OT"]),
             cliente: safe(row["Cliente"]),
-            fechaCotiz: safe(row["Fecha Cotización"]),
-            fechaEnvio: safe(row["Fecha Envio"]),
-            fechaCierre: safe(row["Fecha Cierre"]),
-            fechaRecepcion: safe(row["Fecha Recepcion"]),
+            fechaCotiz: parseExcelDate(row["Fecha Cotización"]),
+            fechaEnvio: parseExcelDate(row["Fecha Envio"]),
+            fechaCierre: parseExcelDate(row["Fecha Cierre"]),
+            fechaRecepcion: parseExcelDate(row["Fecha Recepcion"]),
             courier: safe(row["Courier"]) || 'Retiro en Oficina',
             detalleSeguimiento: safe(row["Detalle Seguimiento"]),
             situacion: safe(row["Situación"]) || 'PENDIENTE',
@@ -3826,7 +4435,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   const filteredRecords = (Array.isArray(trackingRecords) ? trackingRecords : []).filter(r => {
     const situacion = safe(r.situacion);
     const matchesSituacion = filterSituacion === 'TODOS' || situacion === filterSituacion;
-    const searchString = `${safe(r.nroCotiz)} ${safe(r.cliente)} ${safe(r.ot)}`.toLowerCase();
+    const searchString = `${safe(r.nroCotiz)} ${safe(r.cliente)} ${safe(r.ot)} ${formatDate(r.fechaCotiz)} ${formatDate(r.fechaEnvio)}`.toLowerCase();
     const matchesSearch = searchString.includes(searchTerm.toLowerCase());
     return matchesSituacion && matchesSearch;
   });
@@ -3983,7 +4592,8 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
                 `Reporte de Seguimiento Logístico - ${filterSituacion}`,
                 ['Pedido', 'OT', 'Cliente', 'F. Cotiz', 'F. Envío', 'Courier', 'Situación'],
                 filteredRecords.map(r => [r.nroCotiz, r.ot || '---', r.cliente, formatDate(r.fechaCotiz), formatDate(r.fechaEnvio), r.courier, r.situacion]),
-                `seguimiento_general_${filterSituacion.toLowerCase()}`
+                `seguimiento_general_${filterSituacion.toLowerCase()}`,
+                'l'
               )}
               className="text-[10px] bg-blue-500 hover:bg-blue-600 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors"
               title="Exportar registros visibles a PDF"
@@ -4383,7 +4993,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                     String(r.nroCotizacion || '').toLowerCase().includes(search) ||
                     String(r.mvTratante || '').toLowerCase().includes(search) ||
                     String(r.nroAsignado || '').toLowerCase().includes(search) ||
-                    String(r.fecha || '').toLowerCase().includes(search) ||
+                    formatDate(r.fecha).toLowerCase().includes(search) ||
                     String(r.preparador || '').toLowerCase().includes(search) ||
                     String(r.observacion || '').toLowerCase().includes(search) ||
                     String(r.responsableRevision || '').toLowerCase().includes(search) ||
@@ -4396,12 +5006,35 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                   );
                 });
                 const data = filtered.map(r => [r.nroCotizacion, r.mvTratante, r.nroAsignado, formatDate(r.fecha), r.preparador]);
-                exportTableToPDF('Historial Fórmulas Magistrales', ['Cotización', 'MV Tratante', 'N° Asignado', 'Fecha', 'Preparador'], data, 'historial_magistrales');
+                exportTableToPDF('Historial Fórmulas Magistrales', ['Cotización', 'MV Tratante', 'N° Asignado', 'Fecha', 'Preparador'], data, 'historial_magistrales', 'l');
               }}
               className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
               title="Descargar PDF Filtrado"
             >
               <Download className="w-3 h-3" /> PDF
+            </button>
+            <button 
+              onClick={() => {
+                const search = searchTerm.toLowerCase();
+                const filtered = records.filter(r => r.type === 'magistrales').filter(r => {
+                  const str = (r.nroCotizacion || '') + ' ' + (r.mvTratante || '') + ' ' + (r.nroAsignado || '') + ' ' + (r.preparador || '');
+                  return str.toLowerCase().includes(search);
+                });
+                const data = filtered.map(r => [
+                  r.nroCotizacion || '',
+                  r.mvTratante || '',
+                  r.nroAsignado || '',
+                  formatDateForExcel(r.fecha) || '',
+                  r.preparador || '',
+                  r.responsableRevision || '',
+                  r.observacion || ''
+                ]);
+                exportTableToExcel('Fórmulas Magistrales', ['Cotización', 'MV Tratante', 'N° Asignado', 'Fecha', 'Preparador', 'Revisor', 'Observación'], data, 'historial_magistrales');
+              }}
+              className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
+              title="Descargar Excel Filtrado"
+            >
+              <FileSpreadsheet className="w-3 h-3" /> Excel
             </button>
           </div>
         </div>
@@ -4427,7 +5060,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                     String(r.nroCotizacion || '').toLowerCase().includes(search) ||
                     String(r.mvTratante || '').toLowerCase().includes(search) ||
                     String(r.nroAsignado || '').toLowerCase().includes(search) ||
-                    String(r.fecha || '').toLowerCase().includes(search) ||
+                    formatDate(r.fecha).toLowerCase().includes(search) ||
                     String(r.preparador || '').toLowerCase().includes(search) ||
                     String(r.observacion || '').toLowerCase().includes(search) ||
                     String(r.responsableRevision || '').toLowerCase().includes(search) ||

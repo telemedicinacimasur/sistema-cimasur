@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
-import { cn, formatDate } from '../lib/utils';
+import { cn, formatDate, parseExcelDate, safe, formatDateForExcel } from '../lib/utils';
 import { exportTableToPDF, exportExpedienteToPDF } from '../lib/pdfUtils';
 import * as XLSX from 'xlsx';
 import { 
@@ -95,14 +95,6 @@ const REGIONES = [
 
 const CATEGORIAS = ['Sin compra', 'Sin categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
 
-const safe = (val: any) => {
-  if (val === null || val === undefined) return '';
-  if (typeof val === 'object') {
-    try { return JSON.stringify(val); } catch { return '[Objeto]'; }
-  }
-  return String(val);
-};
-
 function CRMRegister() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,9 +140,10 @@ function CRMRegister() {
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Región de Chile", "Tipo de Cliente", "Categoría de Cliente"]
+      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Hoja1");
     XLSX.writeFile(wb, "plantilla_importacion_clientes.xlsx");
@@ -164,23 +157,25 @@ function CRMRegister() {
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         let importedCount = 0;
         for (const row of data) {
+          const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
+
           const newContact = {
-            fechaIngreso: safe(row["Fecha Ingreso"]) || new Date().toISOString().split('T')[0],
+            fechaIngreso: fechaIngreso,
             name: safe(row["Nombre / Razón Social"]),
             rut: safe(row["RUT / ID"]),
             phone: safe(row["Teléfono"]),
             email: safe(row["Email"]),
-            region: safe(row["Región de Chile"]) || 'Metropolitana',
+            region: safe(row["Comuna"]) || 'Metropolitana',
             type: safe(row["Tipo de Cliente"]) || 'Farmacia',
             categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
-            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString()}`,
+            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')}`,
             responsable: user.displayName || user.email || 'Sistema'
           };
 
@@ -239,7 +234,7 @@ function CRMRegister() {
            <CRMField label="Comuna"><input className="w-full border-b p-2 text-sm" value={form.region} onChange={e => setForm({...form, region: e.target.value})} /></CRMField>
            <CRMField label="Tipo de Cliente">
               <select className="w-full border-b p-2 text-sm" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
-                <option>Farmacia</option><option>Centro Médico</option><option>Independiente</option><option>Otros</option>
+                <option>Farmacia</option><option>Centro Médico</option><option>Empresa</option><option>Independiente</option><option>Otros</option>
               </select>
            </CRMField>
            <CRMField label="Categoría de Cliente">
@@ -273,6 +268,7 @@ function CRMRegister() {
 }
 
 function CRMTable({ records, filters, setFilters }: { records: any[], filters: any, setFilters: any }) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [newHistory, setNewHistory] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -286,6 +282,34 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
     const matchesType = filters.type === 'Todos' || safe(r.type) === filters.type;
     return matchesSearch && matchesRegion && matchesType;
   });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filtered.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map(r => r.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+      console.log('Bulk delete started for IDs:', selectedIds);
+      try {
+        for (const id of selectedIds) {
+          console.log(`Debug: Deleting client ${id}`);
+          await localDB.deleteFromCollection('contacts', id);
+        }
+        console.log('Bulk delete finished');
+        setSelectedIds([]);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (err) {
+        console.error('Error during bulk delete:', err);
+        alert('Error al eliminar, revise consola.');
+      }
+  };
 
   const handleUpdate = async () => {
     if (!selectedClient) return;
@@ -310,6 +334,25 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
     window.dispatchEvent(new Event('db-change'));
   };
 
+  const exportRecordToExcel = (record: any) => {
+    const data = [
+      ["Nombre / Razón Social", record.name || "---"],
+      ["RUT / ID", record.rut || "---"],
+      ["Email", record.email || "---"],
+      ["Teléfono", record.phone || "---"],
+      ["Comuna", record.region || "---"],
+      ["Tipo", record.type || "---"],
+      ["Categoría", record.categoria || "---"],
+      ["Fecha Ingreso", formatDateForExcel(record.fechaIngreso)],
+      ["Historial", record.historialUnificado || "---"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 25 }, { wch: 40 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Expediente");
+    XLSX.writeFile(wb, `expediente_${record.rut || record.id}.xlsx`);
+  };
+
   if (selectedClient) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden animate-in slide-in-from-right-4 duration-500">
@@ -321,9 +364,9 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
            <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 text-xs">
                  <div><span className="font-black text-slate-400 block uppercase">RUT</span> {selectedClient.rut}</div>
-                 <div><span className="font-black text-slate-400 block uppercase">Región</span> {selectedClient.region}</div>
+                 <div><span className="font-black text-slate-400 block uppercase">Comuna</span> {selectedClient.region}</div>
                  <div><span className="font-black text-slate-400 block uppercase">Tipo</span> {selectedClient.type}</div>
-                 <div><span className="font-black text-slate-400 block uppercase">Ingreso</span> {selectedClient.fechaIngreso || 'N/A'}</div>
+                 <div><span className="font-black text-slate-400 block uppercase">Ingreso</span> {formatDate(selectedClient.fechaIngreso) || 'N/A'}</div>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg">
                  <h4 className="text-[10px] font-black text-blue-900 mb-2 uppercase">Historial Acumulado</h4>
@@ -364,7 +407,7 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
@@ -390,31 +433,41 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
            onChange={e => setFilters({...filters, type: e.target.value})}
          >
             <option value="Todos">Todos los tipos</option>
-            <option>Farmacia</option><option>Centro Médico</option><option>Independiente</option><option>Otros</option>
+            <option>Farmacia</option><option>Centro Médico</option><option>Empresa</option><option>Independiente</option><option>Otros</option>
          </select>
-         <button 
-           onClick={() => {
-             const data = filtered.map(r => [
-               r.name,
-               r.rut,
-               r.region,
-               r.categoria,
-               r.type,
-               r.phone || '---',
-               r.email || '---'
-             ]);
-             exportTableToPDF(
-               'Reporte: Cartera de Clientes (CRM Comercial)',
-               ['Nombre/Razón Social', 'RUT', 'Región', 'Categoría', 'Tipo', 'Teléfono', 'Email'],
-               data,
-               'cartera_clientes_crm'
-             );
-           }}
-           className="w-full bg-blue-50 border border-blue-200 text-blue-700 py-2 rounded-full font-bold text-xs hover:bg-blue-100 flex items-center justify-center gap-2"
-           title="Exportar a PDF"
-         >
-           <Download className="w-4 h-4" /> Exportar Filtrados
-         </button>
+         <div className="flex flex-col gap-2">
+            <button 
+              onClick={() => {
+                const data = filtered.map(r => [
+                  r.name,
+                  r.rut,
+                  r.region,
+                  r.categoria,
+                  r.type,
+                  r.phone || '---',
+                  r.email || '---'
+                ]);
+                exportTableToPDF(
+                  'Reporte: Cartera de Clientes (CRM Comercial)',
+                  ['Nombre/Razón Social', 'RUT', 'Región', 'Categoría', 'Tipo', 'Teléfono', 'Email'],
+                  data,
+                  'cartera_clientes_crm'
+                );
+              }}
+              className="w-full bg-blue-50 border border-blue-200 text-blue-700 py-2 rounded-full font-bold text-xs hover:bg-blue-100 flex items-center justify-center gap-2"
+              title="Exportar a PDF"
+            >
+              <Download className="w-4 h-4" /> Exportar Filtrados
+            </button>
+            {selectedIds.length > 0 && (
+              <button 
+                onClick={handleBulkDelete}
+                className="w-full bg-red-50 border border-red-200 text-red-700 py-2 rounded-full font-bold text-xs hover:bg-red-100 flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" /> Eliminar ({selectedIds.length})
+              </button>
+            )}
+         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -422,8 +475,18 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
            <table className="w-full text-xs">
               <thead>
                  <tr className="bg-slate-50 border-b text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <th className="p-5">
+                       <input 
+                         type="checkbox" 
+                         className="rounded"
+                         checked={selectedIds.length > 0 && selectedIds.length === filtered.length}
+                         onChange={toggleSelectAll}
+                       />
+                     </th>
                     <th className="p-5">Razón Social / Cliente</th>
-                    <th className="p-5">Región</th>
+                    <th className="p-5">Comuna</th>
+                    <th className="p-5">Email</th>
+                    <th className="p-5">Fecha Ingreso</th>
                     <th className="p-5">Categoría</th>
                     <th className="p-5">Tipo</th>
                     <th className="p-5 text-right px-8">Acciones</th>
@@ -433,10 +496,20 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
                  {filtered.map(r => (
                    <tr key={r.id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="p-5">
+                        <input 
+                          type="checkbox" 
+                          className="rounded"
+                          checked={selectedIds.includes(r.id)}
+                          onChange={() => toggleSelect(r.id)}
+                        />
+                      </td>
+                      <td className="p-5">
                          <div className="font-bold text-[#001736]">{r.name}</div>
                          <div className="text-[10px] text-slate-400 font-mono">{r.rut}</div>
                       </td>
                       <td className="p-5 text-slate-500 italic">{r.region}</td>
+                      <td className="p-5 text-slate-600">{r.email || '---'}</td>
+                      <td className="p-5 text-slate-600">{formatDate(r.fechaIngreso) || '---'}</td>
                       <td className="p-5">
                          <span className={cn(
                            "px-3 py-1 rounded-full font-black text-[9px] uppercase",
@@ -455,10 +528,10 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
                                { label: 'RUT / ID', value: r.rut },
                                { label: 'Email', value: r.email },
                                { label: 'Teléfono', value: r.phone },
-                               { label: 'Región de Chile', value: r.region },
+                               { label: 'Región / Comuna', value: r.region },
                                { label: 'Tipo', value: r.type },
                                { label: 'Categoría CRM', value: r.categoria },
-                               { label: 'Fecha de Ingreso', value: r.fechaIngreso || 'N/A' },
+                               { label: 'Fecha de Ingreso', value: formatDate(r.fechaIngreso) || 'N/A' },
                                { label: 'Historial Unificado', value: r.historialUnificado || 'Sin registros preexistentes.' }
                              ];
                              exportExpedienteToPDF(
@@ -467,6 +540,7 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
                                `cliente_${r.rut || r.id}`
                              );
                            }}
+                           onExcel={() => exportRecordToExcel(r)}
                            onEdit={() => setSelectedClient(r)}
                            onDelete={async () => {
                              try {
