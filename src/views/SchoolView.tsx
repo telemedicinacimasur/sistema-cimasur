@@ -4,6 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDate, safe, parseExcelDate } from '../lib/utils';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
 import * as XLSX from 'xlsx';
+
+const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+  const wb = XLSX.utils.book_new();
+  const safeTitle = title.substring(0, 31).replace(/[\\/?*\[\]]/g, '');
+  XLSX.utils.book_append_sheet(wb, ws, safeTitle);
+  XLSX.writeFile(wb, `${fileName}.xlsx`);
+};
+
 import { 
   GraduationCap, 
   UserPlus, 
@@ -558,6 +567,27 @@ function StudentManager({ records }: { records: any[] }) {
                 onClick={() => {
                   const data = filteredRecords.map(s => [
                     s.name,
+                    s.rut || '---',
+                    s.diplomado || 'Diplomado Homeopatía',
+                    s.pago || 'Al Día',
+                    `${s.avance || 0}%`
+                  ]);
+                  exportTableToExcel(
+                    'Reporte: Alumnos',
+                    ['Estudiante', 'RUT', 'Curso / Diplomado', 'Estado Pago', 'Avance'],
+                    data,
+                    'lista_alumnos'
+                  );
+                }}
+                className="bg-white border p-2 rounded-lg hover:bg-slate-100 transition-colors" 
+                title="Exportar Excel"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              </button>
+              <button 
+                onClick={() => {
+                  const data = filteredRecords.map(s => [
+                    s.name,
                     s.diplomado || 'Diplomado Homeopatía',
                     s.pago || 'Al Día',
                     `${s.avance || 0}%`
@@ -657,6 +687,23 @@ function StudentManager({ records }: { records: any[] }) {
                                  { label: 'RUT', value: s.rut },
                                  { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
                                  { label: 'Estado Pago', value: s.pago || 'Al Día' },
+                                 { label: 'Avance', value: (s.avance || 0).toString() + '%' },
+                                 { label: 'Ficha Académica', value: s.observacionesAcademicas || '' }
+                               ];
+                               viewExpedienteInNewTab('Expediente Académico: Alumno', studentData, `expediente_${s.name.replace(/\s+/g, '_')}`);
+                             }}
+                             className="text-amber-600 hover:text-amber-800" 
+                             title="Expediente (Ver en nueva pestaña)"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                         <button 
+                             onClick={() => {
+                               const studentData = [
+                                 { label: 'Nombre', value: s.name },
+                                 { label: 'RUT', value: s.rut },
+                                 { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
+                                 { label: 'Estado Pago', value: s.pago || 'Al Día' },
                                  { label: 'Avance', value: (s.avance || 0).toString() + '%' }
                                ];
                                exportExpedienteToPDF('Ficha: Alumno', studentData, `alumno_${s.name.replace(/\s+/g, '_')}`);
@@ -735,6 +782,29 @@ function TrackingView() {
             >Alumnos</button>
          </div>
          <div className="flex items-center gap-4 w-full md:w-auto">
+           <button 
+             onClick={() => {
+               const tableData = combined.map(item => [
+                 item.name,
+                 item.rut || '---',
+                 item.type,
+                 item.clasificacion || 'Sin clasif.',
+                 item.interes || item.diplomado || '---',
+                 item.email || '---',
+                 item.phone || '---'
+               ]);
+               exportTableToExcel(
+                 `Reporte 360`,
+                 ['Nombre', 'RUT', 'Tipo', 'Clasificación', 'Programa', 'Email', 'Teléfono'],
+                 tableData,
+                 `reporte_360`
+               );
+             }}
+             className="bg-white border p-2 rounded-lg hover:bg-slate-100 transition-colors"
+             title="Exportar Reporte 360 a Excel"
+           >
+             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+           </button>
            <button 
              onClick={() => {
                const tableData = combined.map(item => [
@@ -988,8 +1058,40 @@ function SchoolActivities() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b">
+        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
           <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-[#002b5b]">Historial Académico</h3>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => {
+                const data = activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => [
+                  formatDate(act.fecha),
+                  act.actividad,
+                  act.tipo,
+                  act.responsable
+                ]);
+                exportTableToPDF('Historial Académico Escuela', ['Fecha', 'Actividad', 'Tipo', 'Responsable'], data, 'historial_escuela', 'l');
+              }}
+              className="p-2 hover:bg-slate-200 rounded transition-colors text-blue-600"
+              title="Exportar PDF"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => {
+                const data = activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => [
+                  formatDate(act.fecha),
+                  act.actividad,
+                  act.tipo,
+                  act.responsable
+                ]);
+                exportTableToExcel('Historial Académico Escuela', ['Fecha', 'Actividad', 'Tipo', 'Responsable'], data, 'historial_escuela');
+              }}
+              className="p-2 hover:bg-slate-200 rounded transition-colors text-emerald-600"
+              title="Exportar Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">

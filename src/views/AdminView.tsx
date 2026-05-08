@@ -423,7 +423,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha", "Tutor", "Mail", "Fono", "Pago Consulta", "Pago Veterinario", "Fecha Pago"]
+      ["Fecha", "Tutor", "Mail", "Fono", "Nombre MV", "Pago Consulta", "Pago Veterinario", "Fecha Pago"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -455,6 +455,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
             tutor: tutor.toUpperCase(),
             mail: safe(row["Mail"]) || "",
             fono: safe(row["Fono"]) || "",
+            nombreMV: safe(row["Nombre MV"]) || "",
             pagoConsulta: parseInt(safe(row["Pago Consulta"])) || 0,
             pagoVeterinario: parseInt(safe(row["Pago Veterinario"])) || 0,
             fechaPago: parseExcelDate(row["Fecha Pago"])
@@ -481,6 +482,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
     tutor: '',
     mail: '',
     fono: '',
+    nombreMV: '',
     pagoConsulta: 0,
     pagoVeterinario: 0,
     fechaPago: new Date().toISOString().split('T')[0]
@@ -536,6 +538,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
       tutor: '',
       mail: '',
       fono: '',
+      nombreMV: '',
       pagoConsulta: 0,
       pagoVeterinario: 0,
       fechaPago: new Date().toISOString().split('T')[0]
@@ -551,6 +554,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
       tutor: r.tutor || '',
       mail: r.mail || '',
       fono: r.fono || '',
+      nombreMV: r.nombreMV || '',
       pagoConsulta: r.pagoConsulta || r.pago1 || 0,
       pagoVeterinario: r.pagoVeterinario || r.pago2 || 0,
       fechaPago: r.fechaPago || r.pagoVeterinario || new Date().toISOString().split('T')[0]
@@ -594,9 +598,10 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                </datalist>
              </FormField>
           </div>
-          <div className="md:col-span-2 grid grid-cols-2 gap-4">
+          <div className="md:col-span-2 grid grid-cols-3 gap-4">
              <FormField label="Mail"><input type="email" className="w-full border-b p-2 text-sm" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></FormField>
              <FormField label="Fono"><input className="w-full border-b p-2 text-sm" value={form.fono} onChange={e => setForm({...form, fono: e.target.value})} /></FormField>
+             <FormField label="Nombre MV"><input className="w-full border-b p-2 text-sm uppercase" value={form.nombreMV} onChange={e => setForm({...form, nombreMV: e.target.value})} /></FormField>
           </div>
           
           <div className="md:col-span-3 grid grid-cols-3 gap-4">
@@ -682,6 +687,26 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
               >
                 <Download className="w-4 h-4" />
               </button>
+              <button 
+                onClick={() => {
+                  const headers = ['Fecha', 'Tutor', 'Mail', 'Fono', 'Nombre MV', 'Consulta', 'Veterinario', 'Fecha Pago'];
+                  const data = filteredRecords.map(r => [
+                    formatDate(r.fecha), 
+                    r.tutor, 
+                    r.mail || '',
+                    r.fono || '',
+                    r.nombreMV || '',
+                    r.pagoConsulta || r.pago1 || 0, 
+                    r.pagoVeterinario || r.pago2 || 0, 
+                    formatDate(r.fechaPago || r.pagoVeterinario)
+                  ]);
+                  exportTableToExcel('Reporte Pagos Veterinarios', headers, data, 'reporte_pagos_vet');
+                }}
+                className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 shadow-sm"
+                title="Exportar a Excel"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -691,6 +716,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
               <tr className="bg-slate-50 text-left border-b font-black text-slate-500 uppercase">
                 <th className="p-4">Fecha</th>
                 <th className="p-4">Tutor</th>
+                <th className="p-4">Nombre MV</th>
                 <th className="p-4">Mail / Fono</th>
                 <th className="p-4 text-right">Consulta</th>
                 <th className="p-4 text-right text-blue-900 bg-blue-50/30">Pago Vet</th>
@@ -703,6 +729,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-4 font-mono text-slate-400">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold text-[#001736] uppercase">{r.tutor}</td>
+                  <td className="p-4 text-slate-500 uppercase">{r.nombreMV}</td>
                   <td className="p-4 italic text-slate-500">
                     <span className="block">{r.mail}</span>
                     <span className="text-[10px]">{r.fono}</span>
@@ -720,7 +747,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
               ))}
               {filteredRecords.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-slate-400 italic">No hay registros para este criterio.</td>
+                  <td colSpan={8} className="p-10 text-center text-slate-400 italic">No hay registros para este criterio.</td>
                 </tr>
               )}
             </tbody>
@@ -1670,7 +1697,22 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
           <div className="md:col-span-1 space-y-4">
              <FormField label="Año"><input className="w-full border-b p-2 text-sm" value={form.anio || ''} onChange={e => setForm({...form, anio: e.target.value})} /></FormField>
              <FormField label="Mes"><input className="w-full border-b p-2 text-sm" value={form.mes || ''} onChange={e => setForm({...form, mes: e.target.value})} /></FormField>
-             <FormField label="N° Documento"><input className="w-full border-b p-2 text-sm font-bold" value={form.nroDto || ''} onChange={e => setForm({...form, nroDto: e.target.value})} required /></FormField>
+             <FormField label="N° Documento"><input className="w-full border-b p-2 text-sm font-bold" value={form.nroDto || ''} onChange={e => {
+               const val = e.target.value;
+               if (val.toUpperCase() === 'BOLETA') {
+                 setForm({
+                   ...form,
+                   nroDto: val,
+                   nombre: 'GENERICO',
+                   rut: '76.087.016-1',
+                   direccion: 'GENERICO',
+                   ciudad: 'GENERICO',
+                   email: 'ADMIN@CIMASUR.CL'
+                 });
+               } else {
+                 setForm({...form, nroDto: val});
+               }
+             }} required /></FormField>
              <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
           </div>
           <div className="md:col-span-2 space-y-4">
