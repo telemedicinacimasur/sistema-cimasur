@@ -3383,8 +3383,13 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     item: '',
     code: '',
     qty: 0,
-    motivo: 'Ingreso Inicial / Compra'
+    motivo: 'Compra / Ingreso Nuevo'
   });
+
+  // Sync form area with selected area browser tab is showing
+  useEffect(() => {
+    setForm(f => ({ ...f, area: selectedArea }));
+  }, [selectedArea]);
 
   const [followups, setFollowups] = useState<any[]>([]);
   const [editingFollowupId, setEditingFollowupId] = useState<string | null>(null);
@@ -3447,14 +3452,19 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.item.trim() || form.qty < 0) {
+      alert('Por favor ingrese un nombre de insumo válido y cantidad mayor o igual a 0');
+      return;
+    }
+
     try {
       const existingItems = await localDB.getCollection('inventory');
       const normalizedItem = form.item.trim().toLowerCase();
-      const normalizedCode = (form.code || '').trim().toLowerCase();
+      const normalizedArea = form.area.trim();
       
-      // Match primarily by name in the same area to avoid collisions with generic codes like "otros"
+      // Match primarily by name in the same area (case-insensitive and trimmed)
       const duplicate = existingItems.find(r => 
-        r.area === form.area && 
+        r.area?.trim() === normalizedArea && 
         (r.item || '').toLowerCase().trim() === normalizedItem
       );
 
@@ -3470,20 +3480,20 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 
         await localDB.saveToCollection('stock_followups', {
           fecha: new Date().toISOString(),
-          area: form.area,
+          area: normalizedArea,
           item: duplicate.item,
-          code: duplicate.code,
+          code: duplicate.code || form.code.trim(),
           cantidadSumada: addQty,
           stockFinal: newQty,
-          motivo: form.motivo || 'Ingreso Manual (Formulario)'
+          motivo: form.motivo || 'Ingreso Manual (Actualización)'
         });
 
-        alert(`Insumo actualizado. Se ha sumado la cantidad.\n(Stock Anterior: ${currentQty} -> Nuevo Stock: ${newQty})`);
+        alert(`Insumo existente en [${normalizedArea}] actualizado.\nStock Anterior: ${currentQty} -> Nuevo Stock: ${newQty}`);
       } else {
         const itemData = { 
-          area: form.area,
+          area: normalizedArea,
           item: form.item.trim(),
-          code: form.code.trim(),
+          code: form.code.trim() || `MAN-${Math.floor(Math.random() * 10000)}`,
           qty: Number(form.qty) || 0,
           updatedAt: new Date().toISOString()
         };
@@ -3492,12 +3502,12 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 
         await localDB.saveToCollection('stock_followups', {
           fecha: new Date().toISOString(),
-          area: form.area,
+          area: normalizedArea,
           item: itemData.item,
           code: itemData.code,
           cantidadSumada: itemData.qty,
           stockFinal: itemData.qty,
-          motivo: form.motivo || 'Registro Inicial / Compra'
+          motivo: form.motivo || 'Registro Inicial'
         });
 
         alert('Nuevo insumo registrado con éxito');
@@ -3509,7 +3519,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
       window.dispatchEvent(new Event('db-change'));
     } catch (err) {
       console.error(err);
-      alert('Error al procesar el ingreso de stock');
+      alert('Error crítico al procesar el ingreso de stock. Revise consola.');
     }
   };
 

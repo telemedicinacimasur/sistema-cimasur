@@ -134,11 +134,11 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  app.put('/api/users/:email', async (req, res) => {
-    console.log('API call: PUT /api/users/:email');
-    const { email } = req.params;
+  app.put('/api/users/:id', async (req, res) => {
+    console.log('API call: PUT /api/users/:id');
+    const { id } = req.params;
     let users = await readRecords('users');
-    const idx = users.findIndex(u => u.email === email);
+    const idx = users.findIndex(u => u.uid === id || u.email === id);
     if (idx !== -1) {
       users[idx] = { ...users[idx], ...req.body };
       await writeRecords('users', users);
@@ -148,11 +148,11 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/users/:email', async (req, res) => {
-    console.log('API call: DELETE /api/users/:email');
-    const { email } = req.params;
+  app.delete('/api/users/:id', async (req, res) => {
+    console.log('API call: DELETE /api/users/:id');
+    const { id } = req.params;
     let users = await readRecords('users');
-    users = users.filter(u => u.email !== email);
+    users = users.filter(u => u.uid !== id && u.email !== id);
     await writeRecords('users', users);
     res.json({ success: true });
   });

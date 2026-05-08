@@ -108,7 +108,8 @@ function CRMRegister() {
     type: 'Farmacia',
     categoria: 'Sin categoría',
     historialUnificado: '',
-    responsable: ''
+    responsable: '',
+    intranet: 'No'
   });
 
   useEffect(() => {
@@ -133,14 +134,15 @@ function CRMRegister() {
       type: 'Farmacia',
       categoria: 'Sin categoría',
       historialUnificado: '',
-      responsable: user.displayName 
+      responsable: user.displayName,
+      intranet: 'No'
     });
     window.dispatchEvent(new Event('db-change'));
   };
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente"]
+      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente", "Inscrito en Intranet"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -175,6 +177,7 @@ function CRMRegister() {
             region: safe(row["Comuna"]) || 'Metropolitana',
             type: safe(row["Tipo de Cliente"]) || 'Farmacia',
             categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
+            intranet: safe(row["Inscrito en Intranet"]) || 'No',
             historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')}`,
             responsable: user.displayName || user.email || 'Sistema'
           };
@@ -242,6 +245,12 @@ function CRMRegister() {
                 {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
               </select>
            </CRMField>
+           <CRMField label="Inscrito en Intranet">
+              <select className="w-full border-b p-2 text-sm font-bold text-slate-700" value={form.intranet} onChange={e => setForm({...form, intranet: e.target.value})}>
+                <option value="No">No</option>
+                <option value="Si">Si</option>
+              </select>
+           </CRMField>
         </div>
 
         <div className="space-y-2">
@@ -272,6 +281,9 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [newHistory, setNewHistory] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [newIntranet, setNewIntranet] = useState('');
+  const [activityType, setActivityType] = useState('Nota de Seguimiento');
+  const [currentStatus, setCurrentStatus] = useState('En proceso');
 
   const filtered = records.filter(r => {
     const name = safe(r.name).toLowerCase();
@@ -296,41 +308,48 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
   };
 
   const handleBulkDelete = async () => {
-      console.log('Bulk delete started for IDs:', selectedIds);
-      try {
-        for (const id of selectedIds) {
-          console.log(`Debug: Deleting client ${id}`);
-          await localDB.deleteFromCollection('contacts', id);
-        }
-        console.log('Bulk delete finished');
-        setSelectedIds([]);
-        window.dispatchEvent(new Event('db-change'));
-      } catch (err) {
-        console.error('Error during bulk delete:', err);
-        alert('Error al eliminar, revise consola.');
+    if (selectedIds.length === 0) return;
+    
+    if (!window.confirm(`¿Está seguro que desea eliminar masivamente ${selectedIds.length} registros? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      for (const id of selectedIds) {
+        console.log(`Debug: Deleting record ${id}`);
+        await localDB.deleteFromCollection('contacts', id);
       }
+      setSelectedIds([]);
+      window.dispatchEvent(new Event('db-change'));
+      alert(`Se han eliminado ${selectedIds.length} registros correctamente.`);
+    } catch (err) {
+      console.error('Error during bulk delete:', err);
+      alert('Hubo un problema al eliminar algunos registros.');
+    }
   };
 
   const handleUpdate = async () => {
     if (!selectedClient) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const logHeader = `\n\n--- Actualización del ${dateStr} ---`;
+    const logHeader = `\n\n--- ${activityType} (${dateStr}) ---`;
     
-    const updatedHistory = (selectedClient.historialUnificado || '') + logHeader + (newHistory ? `\n${newHistory}` : '');
+    const updatedHistory = (selectedClient.historialUnificado || '') + logHeader + (newHistory ? `\n[Estado: ${currentStatus}] - ${newHistory}` : `\n[Actualización de datos: ${currentStatus}]`);
     
     await localDB.updateInCollection('contacts', selectedClient.id, { 
       name: selectedClient.name,
       rut: selectedClient.rut,
       phone: selectedClient.phone,
       email: selectedClient.email,
-      categoria: selectedClient.categoria,
+      categoria: newCategory || selectedClient.categoria,
+      intranet: newIntranet || selectedClient.intranet || 'No',
       historialUnificado: updatedHistory
     });
-    alert('Expediente actualizado');
+    alert('Expediente actualizado correctamente');
     setSelectedClient(null);
     setNewHistory('');
     setNewCategory('');
+    setNewIntranet('');
     window.dispatchEvent(new Event('db-change'));
   };
 
@@ -343,6 +362,7 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
       ["Comuna", record.region || "---"],
       ["Tipo", record.type || "---"],
       ["Categoría", record.categoria || "---"],
+      ["Intranet", record.intranet || "No"],
       ["Fecha Ingreso", formatDateForExcel(record.fechaIngreso)],
       ["Historial", record.historialUnificado || "---"]
     ];
@@ -355,50 +375,149 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
 
   if (selectedClient) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden animate-in slide-in-from-right-4 duration-500">
-        <div className="bg-[#001736] p-4 text-white flex justify-between items-center">
-           <h3 className="font-bold flex items-center gap-2"><FileText className="w-5 h-5" /> Expediente: {selectedClient.name}</h3>
-           <button onClick={() => setSelectedClient(null)} className="text-xs uppercase font-black opacity-70 hover:opacity-100">Cerrar</button>
+      <div className="bg-slate-50 min-h-[600px] rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-right-4 duration-500 border border-slate-200">
+        <div className="bg-[#001736] p-6 text-white flex justify-between items-center">
+           <div className="flex items-center gap-3">
+             <div className="p-2 bg-white/10 rounded-lg">
+                <FileText className="w-6 h-6 text-blue-400" />
+             </div>
+             <div>
+               <h3 className="text-xl font-bold leading-tight">Expediente de Cliente</h3>
+               <p className="text-xs uppercase tracking-widest font-black text-blue-300 opacity-80">{selectedClient.name}</p>
+             </div>
+           </div>
+           <button onClick={() => setSelectedClient(null)} className="bg-red-900/40 border border-red-500/30 text-red-200 px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-800 transition-all active:scale-95">Cerrar Expediente</button>
         </div>
-        <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-           <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                 <div><span className="font-black text-slate-400 block uppercase">RUT</span> {selectedClient.rut}</div>
-                 <div><span className="font-black text-slate-400 block uppercase">Comuna</span> {selectedClient.region}</div>
-                 <div><span className="font-black text-slate-400 block uppercase">Tipo</span> {selectedClient.type}</div>
-                 <div><span className="font-black text-slate-400 block uppercase">Ingreso</span> {formatDate(selectedClient.fechaIngreso) || 'N/A'}</div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12">
+           <div className="lg:col-span-8 p-6 lg:p-8 space-y-8">
+              {/* Top Info Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">RUT</span>
+                    <span className="text-sm font-bold text-[#001736]">{selectedClient.rut}</span>
+                 </div>
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Comuna</span>
+                    <span className="text-sm font-bold text-[#001736]">{selectedClient.region}</span>
+                 </div>
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Tipo Empresa</span>
+                    <span className="text-sm font-bold text-[#001736]">{selectedClient.type}</span>
+                 </div>
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Fecha Ingreso</span>
+                    <span className="text-sm font-bold text-[#001736]">{formatDate(selectedClient.fechaIngreso)}</span>
+                 </div>
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100">
+                    <span className="block text-[9px] font-black uppercase text-blue-400 tracking-widest mb-1">Inscrito Intranet</span>
+                    <span className={cn(
+                      "text-sm font-black italic",
+                      (newIntranet || selectedClient.intranet) === 'Si' ? "text-emerald-600" : "text-red-500"
+                    )}>{newIntranet || selectedClient.intranet || 'No'}</span>
+                 </div>
               </div>
-              <div className="bg-slate-50 p-4 rounded-lg">
-                 <h4 className="text-[10px] font-black text-blue-900 mb-2 uppercase">Historial Acumulado</h4>
-                 <div className="text-sm whitespace-pre-wrap max-h-48 overflow-y-auto text-slate-600 bg-white p-4 border rounded italic">
-                    {selectedClient.historialUnificado || 'Sin registros previos.'}
+
+              <div className="space-y-4">
+                 <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black uppercase text-blue-900 tracking-tighter flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" />
+                       Historial detallado de actividades
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      {(selectedClient.historialUnificado || '').split('---').length - 1} registros encontrados
+                    </span>
+                 </div>
+                 <div className="bg-white border rounded-2xl p-8 shadow-inner min-h-[300px] flex flex-col items-center justify-center relative bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5">
+                    {selectedClient.historialUnificado ? (
+                      <div className="w-full text-sm leading-relaxed text-slate-600 italic whitespace-pre-wrap font-medium">
+                         {selectedClient.historialUnificado}
+                      </div>
+                    ) : (
+                      <div className="text-center opacity-40">
+                         <History className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                         <p className="text-sm font-medium">No se han registrado actividades para este expediente aún.</p>
+                      </div>
+                    )}
                  </div>
               </div>
            </div>
-           <div className="space-y-4">
-              <CRMField label="Nueva Gestión / Nota de Seguimiento">
-                 <textarea 
-                   className="w-full h-32 p-3 border rounded text-sm bg-slate-50 focus:bg-white" 
-                   value={newHistory}
-                   onChange={e => setNewHistory(e.target.value)}
-                   placeholder="Escriba aquí los nuevos avances..."
-                 />
-              </CRMField>
-              <CRMField label="Actualizar Categoría">
-                 <select 
-                   className="w-full border p-2 text-sm font-black" 
-                   value={newCategory || selectedClient.categoria}
-                   onChange={e => setNewCategory(e.target.value)}
-                 >
-                   {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
-                 </select>
-              </CRMField>
-              <button 
-                onClick={handleUpdate}
-                className="w-full bg-[#001736] text-white py-3 rounded-xl font-bold mt-4 shadow-lg"
-              >
-                 ACTUALIZAR EXPEDIENTE
-              </button>
+
+           {/* Sidebar: Management */}
+           <div className="lg:col-span-4 bg-white border-l border-slate-200 p-8 space-y-8">
+              <div className="space-y-6">
+                <div>
+                   <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Save className="w-4 h-4" /> Nueva Gestión / Seguimiento
+                   </h4>
+                   <div className="h-px bg-slate-200 mb-8" />
+                </div>
+
+                <CRMField label="Tipo de Actividad">
+                  <select 
+                    className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm focus:bg-white transition-all outline-none" 
+                    value={activityType}
+                    onChange={e => setActivityType(e.target.value)}
+                  >
+                    <option>Nota de Seguimiento</option>
+                    <option>Llamada Telefónica</option>
+                    <option>Reunión Presencial</option>
+                    <option>Campaña Email</option>
+                    <option>Otro</option>
+                  </select>
+                </CRMField>
+
+                <CRMField label="Detalle de la Actividad">
+                  <textarea 
+                    className="w-full h-40 p-4 border rounded-xl bg-slate-50 focus:bg-white text-sm transition-all outline-none resize-none" 
+                    value={newHistory}
+                    onChange={e => setNewHistory(e.target.value)}
+                    placeholder="Escriba los pormenores de la gestión realizada..."
+                  />
+                </CRMField>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <CRMField label="Categoría">
+                    <select 
+                      className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-bold text-blue-600 outline-none" 
+                      value={newCategory || selectedClient.categoria}
+                      onChange={e => setNewCategory(e.target.value)}
+                    >
+                      {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </CRMField>
+                  <CRMField label="Estado Actual">
+                     <select 
+                       className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-bold text-slate-700 outline-none"
+                       value={currentStatus}
+                       onChange={e => setCurrentStatus(e.target.value)}
+                     >
+                       <option>En proceso</option>
+                       <option>Completado</option>
+                       <option>Pendiente</option>
+                       <option>Cancelado</option>
+                     </select>
+                  </CRMField>
+                </div>
+
+                <CRMField label="Inscrito en Intranet">
+                    <select 
+                      className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-black text-blue-800 outline-none" 
+                      value={newIntranet || selectedClient.intranet || 'No'}
+                      onChange={e => setNewIntranet(e.target.value)}
+                    >
+                      <option value="No">No</option>
+                      <option value="Si">Si</option>
+                    </select>
+                </CRMField>
+
+                <button 
+                  onClick={handleUpdate}
+                  className="w-full bg-[#001736] text-white py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)] hover:-translate-y-1 transition-all active:scale-95 text-xs ring-4 ring-white"
+                >
+                   <Save className="w-5 h-5" /> Registrar en Expediente
+                </button>
+              </div>
            </div>
         </div>
       </div>
@@ -531,6 +650,7 @@ function CRMTable({ records, filters, setFilters }: { records: any[], filters: a
                                { label: 'Región / Comuna', value: r.region },
                                { label: 'Tipo', value: r.type },
                                { label: 'Categoría CRM', value: r.categoria },
+                               { label: 'Inscrito en Intranet', value: r.intranet || 'No' },
                                { label: 'Fecha de Ingreso', value: formatDate(r.fechaIngreso) || 'N/A' },
                                { label: 'Historial Unificado', value: r.historialUnificado || 'Sin registros preexistentes.' }
                              ];
@@ -574,7 +694,8 @@ function CRMActivities() {
     campania: '',
     tipo: 'Campaña Comercial',
     observaciones: '',
-    responsable: ''
+    responsable: '',
+    targetCategories: [] as string[]
   });
 
   const loadActivities = async () => {
@@ -584,7 +705,11 @@ function CRMActivities() {
 
   useEffect(() => {
     loadActivities();
-    if (user && !editingId) setForm(prev => ({ ...prev, responsable: user.displayName || user.email || '' }));
+    if (user && !editingId) setForm(prev => ({ 
+      ...prev, 
+      responsable: user.displayName || user.email || '',
+      targetCategories: []
+    }));
   }, [user, editingId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -599,7 +724,23 @@ function CRMActivities() {
     } else {
       await localDB.saveToCollection('crm_activities', form);
       await addAuditLog(user, `Registró Actividad: ${form.campania}`, 'CRM');
-      alert('Actividad Registrada');
+      
+      // Automatic update in customer records
+      if (form.targetCategories.length > 0) {
+        const contacts = await localDB.getCollection('contacts');
+        const targetedContacts = contacts.filter(c => form.targetCategories.includes(c.categoria));
+        
+        for (const contact of targetedContacts) {
+          const logHeader = `\n\n--- Automatización: ${form.campania} ---`;
+          const updatedHistory = (contact.historialUnificado || '') + logHeader + `\n[${form.tipo}] - ${form.observaciones}`;
+          await localDB.updateInCollection('contacts', contact.id, {
+            historialUnificado: updatedHistory
+          });
+        }
+        alert(`Actividad registrada y aplicada automáticamente a ${targetedContacts.length} clientes.`);
+      } else {
+        alert('Actividad Registrada');
+      }
     }
     
     setForm({ 
@@ -607,9 +748,11 @@ function CRMActivities() {
       campania: '', 
       tipo: 'Campaña Comercial',
       observaciones: '',
-      responsable: user?.displayName || user?.email || ''
+      responsable: user?.displayName || user?.email || '',
+      targetCategories: []
     });
     loadActivities();
+    window.dispatchEvent(new Event('db-change'));
   };
 
   const filteredActivities = activities.filter(a => a.campania.toLowerCase().includes(filterSearch.toLowerCase()));
@@ -717,14 +860,31 @@ function CRMActivities() {
             </CRMField>
             <CRMField label="Tipo de Actividad">
               <select className="w-full border-b p-2" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
-                <option>Campaña Comercial</option>
+                <option>Campaña comercial/wsp</option>
                 <option>Inducción</option>
-                <option>Webinar</option>
                 <option>Email Marketing</option>
-                <option>Otros</option>
+                <option>Instagram y whatsapp</option>
+                <option>otros (detallar cuál)</option>
               </select>
             </CRMField>
           </div>
+          <CRMField label="Categorías Objetivo (Opcional)">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 bg-slate-50 p-3 rounded">
+               {CATEGORIAS.map(cat => (
+                 <label key={cat} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                   <input 
+                     type="checkbox"
+                     checked={form.targetCategories.includes(cat)}
+                     onChange={(e) => {
+                       if (e.target.checked) setForm({...form, targetCategories: [...form.targetCategories, cat]});
+                       else setForm({...form, targetCategories: form.targetCategories.filter(c => c !== cat)});
+                     }}
+                   />
+                   {cat}
+                 </label>
+               ))}
+            </div>
+          </CRMField>
           <CRMField label="Observaciones y Resultados">
             <textarea 
               className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"

@@ -228,9 +228,10 @@ function UsersManager() {
       alert('No puedes eliminar al administrador principal');
       return;
     }
-    if (true) {
+    if (window.confirm(`¿Está seguro que desea eliminar definitivamente al usuario ${targetUser?.displayName || targetUser?.email}?`)) {
       await localAuth.deleteUser(uid);
       refreshUsers();
+      alert('Usuario eliminado');
     }
   };
 
@@ -326,7 +327,16 @@ function UsersManager() {
               </div>
             </FormField>
             <div className="md:col-span-2">
-               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Modificar Accesos</label>
+               <div className="flex justify-between items-center mb-2">
+                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Modificar Accesos</label>
+                 <button 
+                   type="button" 
+                   onClick={() => setEditingUser({...editingUser, roles: availableRoles.filter(ar => ar.id !== 'viewer').map(ar => ar.id)})}
+                   className="text-[9px] font-black text-blue-600 hover:underline"
+                 >
+                   Marcar Todos (Full Access)
+                 </button>
+               </div>
                <div className="grid grid-cols-3 gap-2">
                   {availableRoles.map(r => (
                     <label key={r.id} className="flex items-center gap-2 cursor-pointer group">

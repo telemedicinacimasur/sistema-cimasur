@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 
 import { RecordActions } from '../components/RecordActions';
+import { Expediente } from '../components/Expediente';
 
 export default function SchoolView() {
   const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities'>('register');
@@ -191,6 +192,7 @@ function ContactRegister({ records }: { records: any[] }) {
       await localDB.saveToCollection('students', studentData);
       await localDB.deleteFromCollection('school_leads', lead.id);
       setSelectedLead(null);
+      window.dispatchEvent(new Event('db-change'));
       alert(`${lead.name} ahora es ALUMNO VIGENTE`);
     } catch(err) {
       alert('Error en la transferencia de alumno');
@@ -273,21 +275,36 @@ function ContactRegister({ records }: { records: any[] }) {
         </div>
 
         {selectedLead && (
-          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 animate-in slide-in-from-top-4">
-             <div className="flex justify-between items-center mb-4">
-                <h4 className="font-black text-amber-900 text-sm flex items-center gap-2 uppercase">
-                   <ArrowRight className="w-4 h-4" /> Transferir a Alumnos: {selectedLead.name}
-                </h4>
-                <button onClick={() => setSelectedLead(null)} className="text-[10px] font-bold text-amber-700">CANCELAR</button>
-             </div>
-             <p className="text-xs text-amber-800 mb-6 font-medium">Al confirmar, el registro se moverá permanentemente a la base de Alumnos Vigentes para control académico y pagos.</p>
-             <button 
-               onClick={() => moveToStudents(selectedLead)}
-               className="w-full bg-amber-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-amber-700 transition-colors"
-             >
-                CONFIRMAR MATRÍCULA E INGRESO
-             </button>
-          </div>
+          <Expediente
+            selectedClient={{
+              ...selectedLead,
+              name: selectedLead.name,
+              rut: selectedLead.rut,
+              region: selectedLead.clasificacion,
+              type: selectedLead.interes,
+              fechaIngreso: selectedLead.fecha || new Date().toISOString(),
+              historialUnificado: selectedLead.observaciones || '[SISTEMA] Sin registros de captación.'
+            }}
+            showIntranet={false}
+            showComuna={false}
+            onClose={() => setSelectedLead(null)}
+            onUpdate={async(data) => {
+               // Update logic for lead
+               await localDB.updateInCollection('school_leads', selectedLead.id, { observaciones: data.newHistory });
+               alert('Gestión de captación guardada');
+            }}
+            newHistory={selectedLead.observaciones || ''}
+            setNewHistory={() => {}} // Simplified for now
+            newCategory={selectedLead.clasificacion}
+            setNewCategory={(val) => {}}
+            newIntranet={'No'}
+            setNewIntranet={() => {}}
+            activityType={'Nota de Seguimiento'}
+            setActivityType={() => {}}
+            currentStatus={selectedLead.estado}
+            setCurrentStatus={() => {}}
+            categories={['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro']}
+          />
         )}
       </div>
 
@@ -349,6 +366,8 @@ function ContactRegister({ records }: { records: any[] }) {
 function StudentManager({ records }: { records: any[] }) {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [academicNote, setAcademicNote] = useState('');
+  const [activityType, setActivityType] = useState('Nota de Seguimiento');
+  const [currentStatus, setCurrentStatus] = useState('En proceso');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDiplomado, setFilterDiplomado] = useState('Todos');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -366,19 +385,24 @@ function StudentManager({ records }: { records: any[] }) {
   };
 
   const handleBulkDelete = async () => {
-      console.log('Bulk delete started for IDs:', selectedIds);
-      try {
-        for (const id of selectedIds) {
-          console.log(`Debug: Deleting student ${id}`);
-          await localDB.deleteFromCollection('students', id);
-        }
-        console.log('Bulk delete finished');
-        setSelectedIds([]);
-        window.dispatchEvent(new Event('db-change'));
-      } catch (err) {
-        console.error('Error during bulk delete:', err);
-        alert('Error al eliminar, revise consola.');
+    if (selectedIds.length === 0) return;
+    
+    if (!window.confirm(`¿Está seguro que desea eliminar masivamente ${selectedIds.length} alumnos? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      for (const id of selectedIds) {
+        console.log(`Debug: Deleting student ${id}`);
+        await localDB.deleteFromCollection('students', id);
       }
+      setSelectedIds([]);
+      window.dispatchEvent(new Event('db-change'));
+      alert(`Se han eliminado ${selectedIds.length} registros correctamente.`);
+    } catch (err) {
+      console.error('Error during bulk delete:', err);
+      alert('Error parcial al eliminar.');
+    }
   };
 
   const updateStudent = async (id: string, updates: any) => {
@@ -453,96 +477,32 @@ function StudentManager({ records }: { records: any[] }) {
 
   if (selectedStudent) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-         <div className="bg-[#001736] p-4 text-white flex justify-between items-center">
-            <h3 className="font-bold flex items-center gap-2"><GraduationCap className="w-5 h-5" /> Ficha Académica: {selectedStudent.name}</h3>
-            <div className="flex items-center gap-4">
-              <button onClick={handleDownloadFicha} className="text-white/70 hover:text-white" title="Descargar PDF"><Download className="w-4 h-4" /></button>
-              <button onClick={() => setSelectedStudent(null)} className="text-xs uppercase font-black opacity-70">Cerrar</button>
-            </div>
-         </div>
-         <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-               <div className="grid grid-cols-2 gap-4 text-[10px] font-bold uppercase text-slate-400">
-                  <div className="bg-slate-50 p-3 rounded">RUT: <span className="text-slate-900 block mt-1">{selectedStudent.rut}</span></div>
-                  <div className="bg-slate-50 p-3 rounded">Email: <span className="text-slate-900 block mt-1 lowercase font-normal">{selectedStudent.email}</span></div>
-                  <div className="bg-slate-50 p-3 rounded">
-                    Clasif: 
-                    <select 
-                      className="text-slate-900 block mt-1 bg-transparent border-none outline-none font-bold w-full"
-                      value={selectedStudent.clasificacion || ''}
-                      onChange={e => handleFieldLocalChange('clasificacion', e.target.value)}
-                    >
-                      {['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'].map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="bg-slate-100 p-3 rounded ring-1 ring-blue-100 flex flex-col">
-                    DIPLOMADO / CURSO: 
-                    <input 
-                      className="text-slate-900 block mt-1 bg-transparent border-none outline-none font-bold placeholder:text-slate-300" 
-                      value={selectedStudent.diplomado || ''}
-                      placeholder="Ingrese nombre manual..."
-                      onChange={e => handleFieldLocalChange('diplomado', e.target.value)}
-                    />
-                  </div>
-               </div>
-               <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-                  <h4 className="text-[10px] font-black text-blue-900 uppercase mb-4 tracking-widest">Control Académico y Pagos</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                     <FormGroup label="Estado de Pago">
-                        <select 
-                          className="w-full border-b p-2 bg-transparent font-bold text-sm" 
-                          value={selectedStudent.pago} 
-                          onChange={e => handleFieldLocalChange('pago', e.target.value)}
-                        >
-                           <option>Al Día</option><option>Pendiente</option><option>Vencido</option><option>Becado</option>
-                        </select>
-                     </FormGroup>
-                     <FormGroup label="ValorMatricula / Arancel">
-                        <input 
-                          type="text"
-                          className="w-full border-b p-2 bg-transparent font-bold text-sm" 
-                          placeholder="$ 0.000"
-                          value={selectedStudent.valor || ''}
-                          onChange={e => handleFieldLocalChange('valor', e.target.value)}
-                        />
-                     </FormGroup>
-                     <FormGroup label="Avance (%)">
-                        <input 
-                           type="number" 
-                           className="w-full border-b p-2 bg-transparent font-bold text-sm underline decoration-blue-300" 
-                           value={selectedStudent.avance || ''} 
-                           onChange={e => handleFieldLocalChange('avance', e.target.value)}
-                        />
-                     </FormGroup>
-                  </div>
-               </div>
-            </div>
-            <div className="space-y-4">
-               <FormGroup label="Historial Académico / Observaciones">
-                  <div className="text-xs font-mono p-4 bg-slate-900 text-green-400 rounded-xl h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed shadow-inner">
-                     {selectedStudent.observacionesAcademicas || '[SISTEMA] Sin registros académicos.'}
-                  </div>
-               </FormGroup>
-               <div className="pt-2">
-                  <textarea 
-                    className="w-full border rounded-xl p-3 text-xs bg-slate-50 h-20" 
-                    placeholder="Agregar nueva acción académica o comentario de progreso..." 
-                    value={academicNote}
-                    onChange={e => setAcademicNote(e.target.value)}
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <button 
-                      onClick={handleSaveAndAddNote}
-                      className="w-full bg-[#001736] text-white py-2 rounded-lg font-black text-[10px] uppercase hover:bg-blue-950 transition-colors"
-                    >
-                       REGISTRAR ACCIÓN
-                    </button>
-                  </div>
-               </div>
-            </div>
-         </div>
-      </div>
+        <Expediente
+        selectedClient={{
+          ...selectedStudent,
+          name: selectedStudent.name,
+          rut: selectedStudent.rut,
+          region: selectedStudent.clasificacion,
+          type: selectedStudent.diplomado,
+          fechaIngreso: selectedStudent.fechaIngreso || new Date().toISOString(),
+          historialUnificado: selectedStudent.observacionesAcademicas || '[SISTEMA] Sin registros académicos.'
+        }}
+        showIntranet={false}
+        showComuna={false}
+        onClose={() => setSelectedStudent(null)}
+        onUpdate={handleSaveAndAddNote}
+        newHistory={academicNote}
+        setNewHistory={setAcademicNote}
+        newCategory={selectedStudent.clasificacion}
+        setNewCategory={(val) => handleFieldLocalChange('clasificacion', val)}
+        newIntranet={selectedStudent.intranet || 'No'}
+        setNewIntranet={(val) => handleFieldLocalChange('intranet', val)}
+        activityType={activityType}
+        setActivityType={setActivityType}
+        currentStatus={currentStatus}
+        setCurrentStatus={setCurrentStatus}
+        categories={['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro']}
+      />
     );
   }
 
@@ -891,6 +851,7 @@ function SchoolActivities() {
     fecha: new Date().toISOString().split('T')[0],
     actividad: '',
     tipo: 'Actividad Académica',
+    categoriaObjetivo: 'Todos',
     observaciones: '',
     responsable: ''
   });
@@ -898,6 +859,23 @@ function SchoolActivities() {
   const loadActivities = async () => {
     const data = await localDB.getCollection('school_activities');
     setActivities(data);
+  };
+  
+  const autoRegisterInExpedientes = async (activity: string, tipo: string, categoria: string, observaciones: string) => {
+    const allStudents = await localDB.getCollection('students');
+    const allLeads = await localDB.getCollection('school_leads');
+    const allRecords = [...allStudents, ...allLeads.map(l => ({...l, isLead: true}))];
+    
+    const matchingRecords = allRecords.filter(r => categoria === 'Todos' || r.clasificacion === categoria);
+    
+    for (const record of matchingRecords) {
+        const newEntry = `\n[${new Date().toLocaleString('es-CL')}] Actividad: ${activity} (${tipo}). Obs: ${observaciones}`;
+        if (record.isLead) {
+            await localDB.updateInCollection('school_leads', record.id, { observaciones: (record.observaciones || '') + newEntry });
+        } else {
+            await localDB.updateInCollection('students', record.id, { observacionesAcademicas: (record.observacionesAcademicas || '') + newEntry });
+        }
+    }
   };
 
   useEffect(() => {
@@ -916,14 +894,16 @@ function SchoolActivities() {
       setEditingId(null);
     } else {
       await localDB.saveToCollection('school_activities', form);
+      await autoRegisterInExpedientes(form.actividad, form.tipo, form.categoriaObjetivo, form.observaciones);
       await addAuditLog(user, `Registró Actividad Escuela: ${form.actividad}`, 'SCHOOL');
-      alert('Actividad Académica Registrada');
+      alert('Actividad Académica Registrada y Expedientes Actualizados');
     }
 
     setForm({ 
       fecha: new Date().toISOString().split('T')[0],
       actividad: '', 
       tipo: 'Actividad Académica',
+      categoriaObjetivo: 'Todos',
       observaciones: '',
       responsable: user.displayName || user.email || ''
     });
@@ -1038,6 +1018,12 @@ function SchoolActivities() {
                 <option>Taller de Inducción</option>
                 <option>Webinar Educativo</option>
                 <option>Otros</option>
+              </select>
+            </FormGroup>
+            <FormGroup label="Categoría Objetivo">
+              <select className="w-full border-b p-2" value={form.categoriaObjetivo} onChange={e => setForm({...form, categoriaObjetivo: e.target.value})}>
+                <option>Todos</option>
+                {['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'].map(c => <option key={c}>{c}</option>)}
               </select>
             </FormGroup>
           </div>
