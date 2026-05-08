@@ -3417,6 +3417,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     await localDB.deleteFromCollection('inventory', id);
     const updated = await localDB.getCollection('inventory');
     setInventoryRecords(updated);
+    window.dispatchEvent(new Event('db-change'));
     alert('Item eliminado del inventario');
   };
 
@@ -3430,6 +3431,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
       setEditingStockId(null);
       const updated = await localDB.getCollection('inventory');
       setInventoryRecords(updated);
+      window.dispatchEvent(new Event('db-change'));
       alert('Cambios guardados');
     } catch (err) {
       console.error(err);
@@ -3448,12 +3450,12 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     try {
       const existingItems = await localDB.getCollection('inventory');
       const normalizedItem = form.item.trim().toLowerCase();
-      const normalizedCode = form.code?.trim().toLowerCase();
+      const normalizedCode = (form.code || '').trim().toLowerCase();
       
+      // Match primarily by name in the same area to avoid collisions with generic codes like "otros"
       const duplicate = existingItems.find(r => 
         r.area === form.area && 
-        ((r.item || '').toLowerCase().trim() === normalizedItem || 
-         (normalizedCode && (r.code || '').toLowerCase().trim() === normalizedCode))
+        (r.item || '').toLowerCase().trim() === normalizedItem
       );
 
       if (duplicate) {
@@ -3631,6 +3633,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     setInventoryRecords(updatedInv);
     const updatedFollow = await localDB.getCollection('stock_followups');
     setFollowups(updatedFollow);
+    window.dispatchEvent(new Event('db-change'));
   };
 
   const handleDeleteFollowup = async (id: string) => {
