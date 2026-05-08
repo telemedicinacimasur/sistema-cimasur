@@ -7,7 +7,8 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL: string;
-  role: 'admin' | 'lab' | 'crm' | 'school' | 'viewer';
+  role: string;
+  roles?: string[];
 }
 
 export const localAuth = {
@@ -75,13 +76,14 @@ export const localAuth = {
       });
     }
   },
-  createUser: async (userData: UserProfile) => {
+  createUser: async (userData: any) => {
     if (isFirebaseReady && db) {
       try {
         await addDoc(collection(db, 'users'), {
           email: userData.email || 'anónimo@cimasur.cl',
           displayName: userData.displayName || 'Anónimo',
           role: userData.role || 'viewer',
+          roles: userData.roles || [userData.role || 'viewer'],
           createdAt: new Date().toISOString()
         });
       } catch (error) {

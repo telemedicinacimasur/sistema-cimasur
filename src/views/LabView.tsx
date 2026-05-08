@@ -12,7 +12,6 @@ import {
   Search,
   ClipboardList,
   ClipboardCheck,
-  FilePlus,
   Table,
   Package,
   BookOpen,
@@ -42,7 +41,7 @@ export const exportTableToExcel = (title: string, headers: string[], data: any[]
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 };
 
-type LabFormType = 'registro' | 'ingreso' | 'gotas-puras' | 'elaboracion' | 'nosodes' | 'tinturas' | 'preparacion' | 'insumos' | 'vademecum' | 'mantenimiento' | 'stock' | 'tracking' | 'magistrales' | 'diluciones-db' | 'default';
+type LabFormType = 'registro' | 'gotas-puras' | 'elaboracion' | 'nosodes' | 'tinturas' | 'preparacion' | 'insumos' | 'vademecum' | 'mantenimiento' | 'stock' | 'tracking' | 'magistrales' | 'diluciones-db' | 'default';
 
 export default function LabView() {
   const [activeForm, setActiveForm] = useState<LabFormType>('default');
@@ -153,14 +152,6 @@ export default function LabView() {
             onClick={() => setActiveForm('magistrales')}
             featured
           />
-
-          <ModuleCard 
-            title="Recepción / Ingreso"
-            desc="Registro de entrada de productos"
-            icon={FilePlus}
-            onClick={() => setActiveForm('ingreso')}
-            featured
-          />
         </div>
       </div>
     );
@@ -177,7 +168,6 @@ export default function LabView() {
       </button>
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {activeForm === 'ingreso' && <IngresoForm records={records} setRecords={setRecords} />}
         {activeForm === 'gotas-puras' && <GotasPurasForm records={records} setRecords={setRecords} />}
         {activeForm === 'elaboracion' && <ElaboracionForm records={records} setRecords={setRecords} />}
         {activeForm === 'nosodes' && <NosodesForm records={records} setRecords={setRecords} />}
@@ -211,245 +201,6 @@ function ModuleCard({ title, desc, icon: Icon, onClick, featured }: any) {
       </div>
       <h3 className="text-lg font-bold">{title}</h3>
       <p className="text-sm text-slate-500 mt-1">{desc}</p>
-    </div>
-  );
-}
-
-function IngresoForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
-  const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    fecha: new Date().toISOString().split('T')[0],
-    nroIngreso: '',
-    procedencia: '',
-    detalle: '',
-    observaciones: '',
-    responsable: ''
-  });
-
-  const downloadExcelTemplate = () => {
-    const headers = [["Fecha", "N° Ingreso", "Procedencia", "Detalle", "Observaciones"]];
-    const ws = XLSX.utils.aoa_to_sheet(headers);
-    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ingresos");
-    XLSX.writeFile(wb, "plantilla_ingresos_laboratorio.xlsx");
-  };
-
-  const exportRecordToExcel = (record: any) => {
-    const data = [
-      ["Campo", "Valor"],
-      ["Fecha", formatDateForExcel(record.fecha)],
-      ["N° Ingreso", record.nroIngreso || ""],
-      ["Procedencia", record.procedencia || ""],
-      ["Detalle", record.detalle || ""],
-      ["Observaciones", record.observaciones || ""],
-      ["Responsable", record.creadoPor || record.responsable || ""]
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 30 }, { wch: 50 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ficha de Ingreso");
-    XLSX.writeFile(wb, `ingreso_${record.nroIngreso || record.id}.xlsx`);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
-
-        let importedCount = 0;
-        for (const row of data) {
-          const nroIngreso = safe(row["N° Ingreso"]) || safe(row["N°"]);
-          if (!nroIngreso) continue;
-
-          const newRecord = {
-            type: 'ingreso',
-            fecha: parseExcelDate(row["Fecha"]),
-            nroIngreso: nroIngreso,
-            procedencia: safe(row["Procedencia"]),
-            detalle: safe(row["Detalle"]),
-            observaciones: safe(row["Observaciones"]),
-            responsable: user.displayName,
-            creadoPor: user.displayName,
-            createdAt: new Date().toISOString()
-          };
-
-          await localDB.saveToCollection('lab_records', newRecord);
-          importedCount++;
-          if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
-        }
-
-        alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
-        const updated = await localDB.getCollection('lab_records');
-        setRecords(updated);
-      } catch (err) {
-        console.error(err);
-        alert('Error al procesar el archivo');
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  useEffect(() => {
-    if (user && !editingId) {
-      setForm(prev => ({ ...prev, responsable: user.displayName }));
-    }
-  }, [user, editingId]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    let finalData = { ...form };
-    if (editingId) {
-        finalData = { ...finalData, ultimaModificacionPor: user.displayName };
-        await localDB.updateInCollection('lab_records', editingId, finalData);
-        setEditingId(null);
-    } else {
-        finalData = { ...finalData, creadoPor: user.displayName, createdAt: new Date().toISOString() };
-        await localDB.saveToCollection('lab_records', { ...finalData, type: 'ingreso' });
-    }
-    const updated = await localDB.getCollection('lab_records');
-    setRecords(updated);
-    setForm({ fecha: new Date().toISOString().split('T')[0], nroIngreso: '', procedencia: '', detalle: '', observaciones: '', responsable: user.displayName });
-    alert('Ingreso registrado');
-  };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-[#002b5b] text-white px-6 py-4 flex justify-between items-center font-bold">
-          <div className="flex items-center gap-2">
-            <FilePlus className="w-5 h-5" /> Ficha de Ingreso
-          </div>
-          <div className="flex gap-2">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-            />
-            <button 
-              type="button"
-              onClick={downloadExcelTemplate}
-              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black shadow-sm"
-              title="Descargar Plantilla Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
-            </button>
-            <button 
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black shadow-sm"
-            >
-              <Upload className="w-3.5 h-3.5" /> Importar
-            </button>
-          </div>
-        </div>
-        <form className="p-6 space-y-4" onSubmit={handleSubmit}>
-          <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
-          <FormField label="N° Ingreso"><input className="w-full border-b p-2 text-sm" placeholder="ING-001" value={form.nroIngreso || ''} onChange={e => setForm({...form, nroIngreso: e.target.value})} required /></FormField>
-          <FormField label="Procedencia / Cliente"><input className="w-full border-b p-2 text-sm" value={form.procedencia || ''} onChange={e => setForm({...form, procedencia: e.target.value})} required /></FormField>
-          <FormField label="Detalle"><input className="w-full border-b p-2 text-sm" value={form.detalle || ''} onChange={e => setForm({...form, detalle: e.target.value})} required /></FormField>
-          <FormField label="Responsable">
-            <input className="w-full border-b p-2 text-sm bg-slate-50" value={form.responsable || ''} readOnly />
-          </FormField>
-          <FormField label="Observaciones"><textarea className="w-full border p-2 text-sm h-20" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
-          <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold shadow-lg hover:opacity-90">REGISTRAR INGRESO</button>
-        </form>
-      </div>
-      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-          <h3 className="text-[10px] uppercase font-black tracking-widest text-[#001736]">Historial de Ingresos</h3>
-          <button 
-            onClick={() => {
-              const data = records.filter(r => r.type === 'ingreso').map(r => [
-                r.nroIngreso || '',
-                r.procedencia || '',
-                r.detalle || '',
-                r.observaciones || '',
-                r.creadoPor || r.responsable || 'Administrador Cimasur',
-                formatDate(r.fecha)
-              ]);
-              exportTableToPDF('Historial de Ingresos Lab', ['N°', 'Procedencia', 'Detalle', 'Observaciones', 'Responsable', 'Fecha'], data, 'historial_ingresos_lab', 'l');
-            }}
-            className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 text-[10px] font-black uppercase"
-          >
-            <Download className="w-3 h-3" /> PDF
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-slate-50/50 text-left border-b">
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">N°</th>
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">Procedencia</th>
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">Responsable</th>
-                <th className="p-4 uppercase font-black text-slate-500 text-[10px]">Fecha</th>
-                <th className="p-4 text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 italic">
-              {records.filter(r => r.type === 'ingreso').map(r => (
-                <tr key={r.id}>
-                  <td className="p-4 font-bold">{r.nroIngreso}</td>
-                  <td className="p-4 text-[#001736] font-medium">{r.procedencia}</td>
-                  <td className="p-4">
-                      {r.creadoPor || r.responsable}
-                      {r.ultimaModificacionPor && <span className="block text-[9px] text-slate-400">Editado: {r.ultimaModificacionPor}</span>}
-                  </td>
-                  <td className="p-4">{formatDate(r.fecha)}</td>
-                  <td className="p-4 text-center">
-                    <RecordActions
-                      onView={() => {
-                        const data = [
-                          { label: 'N° Ingreso', value: r.nroIngreso },
-                          { label: 'Procedencia', value: r.procedencia },
-                          { label: 'Detalle', value: r.detalle },
-                          { label: 'Fecha', value: formatDate(r.fecha) },
-                          { label: 'Observaciones', value: r.observaciones || '' }
-                        ];
-                        viewExpedienteInNewTab('Ficha: Ingreso de Insumos', data, `ingreso_${r.nroIngreso}`);
-                      }}
-                      onDownload={() => {
-                        const data = [
-                          { label: 'N° Ingreso', value: r.nroIngreso },
-                          { label: 'Procedencia', value: r.procedencia },
-                          { label: 'Detalle', value: r.detalle },
-                          { label: 'Fecha', value: formatDate(r.fecha) },
-                          { label: 'Observaciones', value: r.observaciones || '' }
-                        ];
-                        exportExpedienteToPDF('Ficha: Ingreso de Insumos', data, `ingreso_${r.nroIngreso}`);
-                      }}
-                      onExcel={() => exportRecordToExcel(r)}
-                      onEdit={() => {
-                        setEditingId(r.id);
-                        setForm(r);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      onDelete={async () => { 
-                        await localDB.deleteFromCollection('lab_records', r.id); 
-                        const updated = await localDB.getCollection('lab_records'); 
-                        setRecords(updated); 
-                        alert('Ingreso eliminado');
-                      }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }
@@ -3613,12 +3364,26 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   const [selectedArea, setSelectedArea] = useState<string>('Etiquetas salina');
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
   const [searchTerm, setSearchTerm] = useState('');
+
+  const areas = useMemo(() => {
+    const defaults = [
+      'Etiquetas salina', 
+      'Etiquetas Etanol', 
+      'Estuches', 
+      'Frascos', 
+      'Plantillas para descontar', 
+      'Insumos Varios'
+    ];
+    const fromRecords = inventoryRecords.map(r => r.area).filter(a => a && !defaults.includes(a));
+    return [...defaults, ...Array.from(new Set(fromRecords))];
+  }, [inventoryRecords]);
   
   const [form, setForm] = useState({
     area: 'Etiquetas salina',
     item: '',
     code: '',
     qty: 0,
+    motivo: 'Ingreso Inicial / Compra'
   });
 
   const [followups, setFollowups] = useState<any[]>([]);
@@ -3656,45 +3421,94 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   };
 
   const handleEditItemSave = async (id: string) => {
-    await localDB.updateInCollection('inventory', id, { item: editingStockItem, qty: editingStockQty });
-    setEditingStockId(null);
-    const updated = await localDB.getCollection('inventory');
-    setInventoryRecords(updated);
+    try {
+      await localDB.updateInCollection('inventory', id, { 
+        item: editingStockItem, 
+        qty: Number(editingStockQty) || 0,
+        updatedAt: new Date().toISOString()
+      });
+      setEditingStockId(null);
+      const updated = await localDB.getCollection('inventory');
+      setInventoryRecords(updated);
+      alert('Cambios guardados');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar cambios');
+    }
   };
-
-  const areas = [
-    'Etiquetas salina', 
-    'Etiquetas Etanol', 
-    'Estuches', 
-    'Frascos', 
-    'Plantillas para descontar', 
-    'Insumos Varios'
-  ];
 
   const filteredRecords = inventoryRecords.filter(r => 
     r.area === selectedArea && 
-    (r.item.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    ((r.item || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
      (r.code && r.code.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const existingItems = await localDB.getCollection('inventory');
-    const duplicate = existingItems.find(r => r.area === form.area && (r.item.toLowerCase() === form.item.toLowerCase() || (form.code && r.code?.toLowerCase() === form.code.toLowerCase())));
+    try {
+      const existingItems = await localDB.getCollection('inventory');
+      const normalizedItem = form.item.trim().toLowerCase();
+      const normalizedCode = form.code?.trim().toLowerCase();
+      
+      const duplicate = existingItems.find(r => 
+        r.area === form.area && 
+        ((r.item || '').toLowerCase().trim() === normalizedItem || 
+         (normalizedCode && (r.code || '').toLowerCase().trim() === normalizedCode))
+      );
 
-    if (duplicate) {
-      const newQty = duplicate.qty + form.qty;
-      await localDB.updateInCollection('inventory', duplicate.id, { qty: newQty });
-      alert(`Producto ya ingresado. Se ha sumado la cantidad.\n(Stock Anterior: ${duplicate.qty} -> Nuevo Stock: ${newQty})`);
-    } else {
-      await localDB.saveToCollection('inventory', { ...form });
-      alert('Stock registrado en Kardex (Nuevo Insumo)');
+      if (duplicate) {
+        const currentQty = Number(duplicate.qty) || 0;
+        const addQty = Number(form.qty) || 0;
+        const newQty = currentQty + addQty;
+        
+        await localDB.updateInCollection('inventory', duplicate.id, { 
+          qty: newQty,
+          updatedAt: new Date().toISOString()
+        });
+
+        await localDB.saveToCollection('stock_followups', {
+          fecha: new Date().toISOString(),
+          area: form.area,
+          item: duplicate.item,
+          code: duplicate.code,
+          cantidadSumada: addQty,
+          stockFinal: newQty,
+          motivo: form.motivo || 'Ingreso Manual (Formulario)'
+        });
+
+        alert(`Insumo actualizado. Se ha sumado la cantidad.\n(Stock Anterior: ${currentQty} -> Nuevo Stock: ${newQty})`);
+      } else {
+        const itemData = { 
+          area: form.area,
+          item: form.item.trim(),
+          code: form.code.trim(),
+          qty: Number(form.qty) || 0,
+          updatedAt: new Date().toISOString()
+        };
+
+        const savedItem = await localDB.saveToCollection('inventory', itemData);
+
+        await localDB.saveToCollection('stock_followups', {
+          fecha: new Date().toISOString(),
+          area: form.area,
+          item: itemData.item,
+          code: itemData.code,
+          cantidadSumada: itemData.qty,
+          stockFinal: itemData.qty,
+          motivo: form.motivo || 'Registro Inicial / Compra'
+        });
+
+        alert('Nuevo insumo registrado con éxito');
+      }
+      
+      setForm({ ...form, item: '', code: '', qty: 0, motivo: 'Compra / Ingreso Nuevo' });
+      const updated = await localDB.getCollection('inventory');
+      setInventoryRecords(updated);
+      window.dispatchEvent(new Event('db-change'));
+    } catch (err) {
+      console.error(err);
+      alert('Error al procesar el ingreso de stock');
     }
-    
-    setForm({ ...form, item: '', code: '', qty: 0 });
-    const updated = await localDB.getCollection('inventory');
-    setInventoryRecords(updated);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3776,6 +3590,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
         alert(`Importación Finalizada:\n- Leídas: ${rawData.length} filas\n- Nuevos items: ${importedCount}\n- Actualizados: ${updateCount}\n- Omitidos (sin nombre): ${skippedCount}`);
         const updated = await localDB.getCollection('inventory');
         setInventoryRecords(updated);
+        window.dispatchEvent(new Event('db-change'));
         // Clear input
         e.target.value = '';
       } catch (error) {
@@ -3899,6 +3714,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
             <FormField label="Nombre Insumo"><input className="w-full border-b p-2 text-xs" value={form.item || ''} onChange={e => setForm({...form, item: e.target.value})} required /></FormField>
             <FormField label="Código SKU"><input className="w-full border-b p-2 text-xs font-mono" value={form.code || ''} onChange={e => setForm({...form, code: e.target.value})} required /></FormField>
             <FormField label="Cant."><input type="number" className="w-full border-b p-2 text-xs font-bold" value={form.qty || 0} onChange={e => setForm({...form, qty: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Detalle de compra (Kardex)"><input className="w-full border-b p-2 text-xs" value={form.motivo || ''} onChange={e => setForm({...form, motivo: e.target.value})} placeholder="Ej: Compra Mayo, Donación, etc." /></FormField>
             <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-black text-[10px] uppercase shadow-lg">Registrar Entrada</button>
           </form>
         </div>
@@ -3997,7 +3813,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                        <td className="p-4 text-center">
                           <input 
                             type="number" 
-                            className="w-16 border rounded text-center py-1 font-bold text-blue-600"
+                            className="w-16 border rounded text-center py-1 font-bold text-[#001736]"
                             placeholder="0"
                             value={consumptionQty[record.id] || ''}
                             onChange={e => setConsumptionQty({...consumptionQty, [record.id]: parseInt(e.target.value) || 0})}
@@ -4005,13 +3821,15 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                        </td>
                        <td className="p-4 text-center">
                           <div className="flex flex-col gap-2 items-center">
-                            <button 
-                              onClick={() => handleDeduct(record)}
-                              className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all shadow-sm w-full"
-                            >
-                              Descontar
-                            </button>
-                            <div className="flex gap-2">
+                            <div className="flex gap-1 w-full">
+                              <button 
+                                onClick={() => handleDeduct(record)}
+                                className="bg-red-50 text-red-600 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all shadow-sm flex-1"
+                              >
+                                (-) Descontar
+                              </button>
+                            </div>
+                            <div className="flex gap-2 w-full">
                               {editingStockId === record.id ? (
                                 <button onClick={() => handleEditItemSave(record.id)} className="text-green-500 hover:text-green-700 bg-green-50 px-2 py-1 rounded w-full flex justify-center"><Download className="w-3.5 h-3.5" /></button>
                               ) : (
@@ -4022,31 +3840,31 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                           </div>
                        </td>
                      </tr>
-                   ))}
+                    ))}
                    {filteredRecords.length === 0 && (
-                     <tr>
+                                           <tr>
                         <td colSpan={4} className="p-10 text-center text-slate-400 italic">No hay insumos registrados para esta área...</td>
-                     </tr>
-                   )}
-                </tbody>
-             </table>
+                      </tr>
+                    )}
+                 </tbody>
+              </table>
            </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
            <div className="bg-slate-50 p-4 border-b flex justify-between items-center text-[#002b5b]">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Seguimiento de Movimientos (Salidas)</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Seguimiento de Movimientos (Kardex)</h3>
               <button 
                 onClick={() => {
                   const data = followups.slice().reverse().map(f => [
                     formatDate(f.fecha),
                     f.item,
-                    `-${f.cantidadDescontada}`,
+                    f.cantidadDescontada ? `-${f.cantidadDescontada}` : `+${f.cantidadSumada}`,
                     f.stockFinal,
                     f.motivo || '---'
                   ]);
                   exportTableToPDF(
-                    'Historial de Movimientos de Stock (Salidas)',
+                    'Historial de Movimientos de Stock (Kardex)',
                     ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'],
                     data,
                     'historial_movimientos_stock',
@@ -4059,23 +3877,25 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                 <Download className="w-3 h-3" />
                 <span className="text-[9px] font-black uppercase tracking-tighter">Descargar Historial</span>
               </button>
-              <button 
-                onClick={() => {
-                  const data = followups.slice().reverse().map(f => [
-                    formatDateForExcel(f.fecha),
-                    f.item || '',
-                    '-' + String(f.cantidadDescontada),
-                    f.stockFinal || '0',
-                    f.motivo || '---'
-                  ]);
-                  exportTableToExcel('Historial de Movimientos de Stock', ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'], data, 'historial_movimientos_stock');
-                }}
-                className="text-emerald-600 hover:text-emerald-800 flex items-center gap-1 ml-2" 
-                title="Descargar Excel"
-              >
-                <FileSpreadsheet className="w-3 h-3" />
-                <span className="text-[9px] font-black uppercase tracking-tighter">Excel</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    const data = followups.slice().reverse().map(f => [
+                      formatDateForExcel(f.fecha),
+                      f.item || '',
+                      f.cantidadDescontada ? '-' + String(f.cantidadDescontada) : '+' + String(f.cantidadSumada),
+                      f.stockFinal || '0',
+                      f.motivo || '---'
+                    ]);
+                    exportTableToExcel('Historial de Movimientos de Stock', ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'], data, 'historial_movimientos_stock');
+                  }}
+                  className="text-emerald-600 hover:text-emerald-800 flex items-center gap-1 ml-2" 
+                  title="Descargar Excel"
+                >
+                  <FileSpreadsheet className="w-3 h-3" />
+                  <span className="text-[9px] font-black uppercase tracking-tighter">Excel</span>
+                </button>
+              </div>
            </div>
            <div className="overflow-x-auto max-h-64 scrollbar-thin">
               <table className="w-full text-[10px]">
@@ -4094,7 +3914,13 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                       <tr key={i} className="hover:bg-slate-50 italic">
                         <td className="p-3">{formatDate(f.fecha)}</td>
                         <td className="p-3 font-bold text-[#002b5b]">{f.item}</td>
-                        <td className="p-3 text-center text-red-600 font-bold">-{f.cantidadDescontada}</td>
+                        <td className="p-3 text-center font-bold">
+                          {f.cantidadDescontada ? (
+                            <span className="text-red-600">-{f.cantidadDescontada}</span>
+                          ) : (
+                            <span className="text-emerald-600">+{f.cantidadSumada}</span>
+                          )}
+                        </td>
                         <td className="p-3 text-center font-black">{f.stockFinal}</td>
                         <td className="p-3 text-slate-400">
                           {editingFollowupId === f.id ? (

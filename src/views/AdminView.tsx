@@ -22,6 +22,8 @@ import {
   Save, 
   Download, 
   Search,
+  ListChecks,
+  ClipboardList,
   ShoppingCart,
   Receipt,
   FileSpreadsheet,
@@ -41,7 +43,7 @@ import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'dte' | 'pet_payments' | 'users' | 'logs';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'users' | 'logs';
 
 export default function AdminView() {
   const [view, setView] = useState<AdminTab>('menu');
@@ -51,6 +53,7 @@ export default function AdminView() {
     const loadData = async () => {
       let col = 'quotes';
       if (view === 'sales') col = 'sales';
+      if (view === 'sales_gestion') col = 'sales_gestion';
       if (view === 'dte') col = 'dte_records';
       if (view === 'pet_payments') col = 'pet_payments';
       if (view === 'logs') col = 'audit_logs'; 
@@ -84,6 +87,12 @@ export default function AdminView() {
             desc="Registro diario de facturas y boletas emitidas por cliente."
             icon={ShoppingCart}
             onClick={() => setView('sales')}
+          />
+          <ModuleCard 
+            title="Detalle de Ventas GESTIÓN"
+            desc="Registro diario de ventas con detalle de productos y cotización."
+            icon={ShoppingCart}
+            onClick={() => setView('sales_gestion')}
           />
           <ModuleCard 
             title="Detalle de DTE"
@@ -126,6 +135,7 @@ export default function AdminView() {
 
       {view === 'quotes' && <QuoteManager records={records} setRecords={setRecords} />}
       {view === 'sales' && <SalesManager records={records} setRecords={setRecords} />}
+      {view === 'sales_gestion' && <SalesGestionManager records={records} setRecords={setRecords} />}
       {view === 'dte' && <DTEManager records={records} setRecords={setRecords} />}
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'users' && <UsersManager />}
@@ -144,8 +154,18 @@ function UsersManager() {
     email: '',
     displayName: '',
     role: 'viewer',
+    roles: ['viewer'] as string[],
     pass: ''
   });
+
+  const availableRoles = [
+    { id: 'admin', label: 'Administrador' },
+    { id: 'lab', label: 'Laboratorio' },
+    { id: 'crm', label: 'CRM' },
+    { id: 'school', label: 'Escuela' },
+    { id: 'gestion', label: 'Gestión' },
+    { id: 'viewer', label: 'Solo Lectura' }
+  ];
 
   const refreshUsers = async () => {
     const data = await localAuth.getAllUsers();
@@ -161,7 +181,8 @@ function UsersManager() {
     if (!editingUser) return;
     
     await localAuth.updateUser(editingUser.uid, { 
-      role: editingUser.role,
+      role: editingUser.roles && editingUser.roles.length > 0 ? editingUser.roles[0] : 'viewer',
+      roles: editingUser.roles,
       displayName: editingUser.displayName,
       ...(newPass ? { pass: newPass } : {})
     });
@@ -178,14 +199,23 @@ function UsersManager() {
     
     await localAuth.createUser({
       ...newUser,
+      role: newUser.roles.length > 0 ? newUser.roles[0] : 'viewer',
       uid: `user-${Date.now()}`,
       photoURL: ''
     });
     
     alert('Usuario creado correctamente');
-    setNewUser({ email: '', displayName: '', role: 'viewer', pass: '' });
+    setNewUser({ email: '', displayName: '', role: 'viewer', roles: ['viewer'], pass: '' });
     setShowCreate(false);
     refreshUsers();
+  };
+
+  const toggleRole = (currentRoles: string[], roleId: string) => {
+    if (currentRoles.includes(roleId)) {
+      return currentRoles.filter(r => r !== roleId);
+    } else {
+      return [...currentRoles, roleId];
+    }
   };
 
   const handleDelete = async (uid: string) => {
@@ -240,19 +270,6 @@ function UsersManager() {
                 onChange={e => setNewUser({...newUser, displayName: e.target.value})} 
               />
             </FormField>
-            <FormField label="Rol de Sistema">
-              <select 
-                className="w-full border-b border-blue-200 bg-transparent p-2 text-sm" 
-                value={newUser.role} 
-                onChange={e => setNewUser({...newUser, role: e.target.value})}
-              >
-                <option value="admin">Administrador</option>
-                <option value="lab">Laboratorio</option>
-                <option value="crm">CRM</option>
-                <option value="school">Escuela</option>
-                <option value="viewer">Solo Lectura</option>
-              </select>
-            </FormField>
             <FormField label="Contraseña Inicial">
               <input 
                 type="text"
@@ -262,7 +279,23 @@ function UsersManager() {
                 onChange={e => setNewUser({...newUser, pass: e.target.value})} 
               />
             </FormField>
-            <div className="md:col-span-4 flex justify-end">
+            <div className="md:col-span-1">
+               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Accesos / Roles</label>
+               <div className="grid grid-cols-2 gap-2">
+                  {availableRoles.map(r => (
+                    <label key={r.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        className="w-3 h-3 rounded border-blue-200 text-blue-600 focus:ring-blue-500"
+                        checked={newUser.roles.includes(r.id)}
+                        onChange={() => setNewUser({...newUser, roles: toggleRole(newUser.roles, r.id)})}
+                      />
+                      <span className="text-[10px] font-bold text-blue-900 group-hover:text-blue-600 transition-colors uppercase">{r.label}</span>
+                    </label>
+                  ))}
+               </div>
+            </div>
+            <div className="md:col-span-4 flex justify-end mt-4">
               <button type="submit" className="bg-blue-600 text-white px-8 py-2 rounded font-bold hover:bg-blue-700 uppercase text-xs tracking-widest">CREAR ACCESO</button>
             </div>
           </form>
@@ -280,19 +313,6 @@ function UsersManager() {
                 onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} 
               />
             </FormField>
-            <FormField label="Rol de Sistema">
-              <select 
-                className="w-full border-b p-2 text-sm" 
-                value={editingUser.role} 
-                onChange={e => setEditingUser({...editingUser, role: e.target.value})}
-              >
-                <option value="admin">Administrador</option>
-                <option value="lab">Laboratorio</option>
-                <option value="crm">CRM</option>
-                <option value="school">Escuela</option>
-                <option value="viewer">Solo Lectura</option>
-              </select>
-            </FormField>
             <FormField label="Modificar Contraseña">
               <div className="relative">
                 <input 
@@ -305,9 +325,28 @@ function UsersManager() {
                 <Key className="absolute right-2 top-2 w-4 h-4 text-slate-300" />
               </div>
             </FormField>
-            <div className="flex items-end gap-2 text-xs">
-              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 uppercase tracking-tighter">GUARDAR</button>
-              <button type="button" onClick={() => setEditingUser(null)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold uppercase tracking-tighter">CERRAR</button>
+            <div className="md:col-span-2">
+               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Modificar Accesos</label>
+               <div className="grid grid-cols-3 gap-2">
+                  {availableRoles.map(r => (
+                    <label key={r.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        checked={(editingUser.roles || [editingUser.role]).includes(r.id)}
+                        onChange={() => {
+                          const current = editingUser.roles || [editingUser.role];
+                          setEditingUser({...editingUser, roles: toggleRole(current, r.id)});
+                        }}
+                      />
+                      <span className="text-[10px] font-bold text-slate-700 group-hover:text-blue-600 transition-colors uppercase">{r.label}</span>
+                    </label>
+                  ))}
+               </div>
+            </div>
+            <div className="md:col-span-4 flex items-center justify-end gap-2 text-xs mt-4">
+              <button type="button" onClick={() => setEditingUser(null)} className="px-6 bg-slate-200 text-slate-700 py-2 rounded font-bold uppercase tracking-tighter hover:bg-slate-300">CERRAR</button>
+              <button type="submit" className="px-10 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 uppercase tracking-tighter shadow-lg">GUARDAR CAMBIOS</button>
             </div>
           </form>
         )}
@@ -318,7 +357,7 @@ function UsersManager() {
               <tr className="bg-slate-50 text-left border-b font-black text-slate-500 uppercase">
                 <th className="p-4">Usuario / Email</th>
                 <th className="p-4">Nombre</th>
-                <th className="p-4 text-center">Rol</th>
+                <th className="p-4 text-center">Permisos (Roles)</th>
                 <th className="p-4 text-center">Clave Actual</th>
                 <th className="p-4 text-center">Gestión</th>
               </tr>
@@ -329,12 +368,16 @@ function UsersManager() {
                   <td className="p-4 font-bold text-blue-900 italic">{u.email}</td>
                   <td className="p-4 font-medium">{u.displayName}</td>
                   <td className="p-4 text-center">
-                    <span className={cn(
-                      "px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                      u.role === 'admin' ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
-                    )}>
-                      {u.role}
-                    </span>
+                    <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mx-auto">
+                      {(u.roles || [u.role]).map((r: string) => (
+                        <span key={r} className={cn(
+                          "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tight",
+                          r === 'admin' ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-blue-50 text-blue-700 border border-blue-100"
+                        )}>
+                          {r}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="p-4 text-center font-mono text-slate-400">
                     {u.pass}
@@ -342,7 +385,10 @@ function UsersManager() {
                   <td className="p-4 text-center">
                     <RecordActions 
                       onEdit={() => {
-                        setEditingUser(u);
+                        setEditingUser({
+                          ...u,
+                          roles: u.roles || [u.role]
+                        });
                         setNewPass('');
                         setShowCreate(false);
                       }}
@@ -1205,6 +1251,420 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SalesGestionManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    anio: new Date().getFullYear().toString(),
+    mes: new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+    fecha: new Date().toISOString().split('T')[0],
+    documento: '',
+    cliente: '',
+    nroFrascos: 0,
+    detalleProductos: '',
+    valorCotizacion: 0
+  });
+
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterMonth, setFilterMonth] = useState('Todos');
+  const [showProductSummary, setShowProductSummary] = useState(false);
+
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Año", "Mes", "Fecha", "Documento", "Cliente", "Frascos", "Detalle Productos", "Valor Cotización"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ventas Gestión");
+    XLSX.writeFile(wb, "plantilla_importacion_ventas_gestion.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        const currentRecords = await localDB.getCollection('sales_gestion');
+
+        for (const row of data) {
+          const doc = safe(row["Documento"]);
+          if (!doc) continue;
+
+          // Check if already exists
+          if (currentRecords.some(r => safe(r.documento) === doc)) continue;
+
+          const newSale = {
+            anio: safe(row["Año"]) || new Date().getFullYear().toString(),
+            mes: safe(row["Mes"]) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+            fecha: parseExcelDate(row["Fecha"]),
+            documento: doc,
+            cliente: safe(row["Cliente"]),
+            nroFrascos: parseInt(safe(row["Frascos"])) || 0,
+            detalleProductos: safe(row["Detalle Productos"]) || '',
+            valorCotizacion: parseInt(safe(row["Valor Cotización"])) || 0
+          };
+
+          await localDB.saveToCollection('sales_gestion', newSale);
+          importedCount++;
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} ventas gestión desde Excel`, 'Administración');
+        alert(`Éxito: Se importaron ${importedCount} ventas gestión correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const filteredRecords = records.filter(r => {
+    let match = true;
+    if (dateFrom && r.fecha < dateFrom) match = false;
+    if (dateTo && r.fecha > dateTo) match = false;
+    if (filterMonth !== 'Todos' && r.mes !== filterMonth) match = false;
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      const text = `${r.documento || ''} ${r.cliente || ''} ${r.nroFrascos || ''} ${r.detalleProductos || ''}`.toLowerCase();
+      if (!text.includes(s)) match = false;
+    }
+    return match;
+  });
+
+  const getConsolidatedProducts = () => {
+    const counts: Record<string, number> = {};
+    
+    filteredRecords.forEach(r => {
+      if (!r.detalleProductos) return;
+      
+      // Split by commas or newlines
+      const items = r.detalleProductos.split(/[,\n]/);
+      
+      items.forEach((item: string) => {
+        const trimmed = item.trim();
+        if (!trimmed) return;
+        
+        // Try to match patterns like "2x Omega 3" or "2 Omega 3"
+        const match = trimmed.match(/^(\d+)\s*[xX*]?\s*(.+)$/);
+        
+        let qty = 1;
+        let name = trimmed;
+        
+        if (match) {
+          qty = parseInt(match[1]) || 1;
+          name = match[2].trim();
+        }
+        
+        const lowerName = name.toUpperCase();
+        counts[lowerName] = (counts[lowerName] || 0) + qty;
+      });
+    });
+    
+    return Object.entries(counts)
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  const consolidated = getConsolidatedProducts();
+
+  const totalFrascos = filteredRecords.reduce((sum, r) => sum + (Number(r.nroFrascos) || 0), 0);
+  const totalCotizacion = filteredRecords.reduce((sum, r) => sum + (Number(r.valorCotizacion) || 0), 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingId) {
+      await localDB.updateInCollection('sales_gestion', editingId, form);
+      await addAuditLog(user, `Actualizó Venta Gestión Doc: ${form.documento}`, 'Administración');
+      setEditingId(null);
+      alert('Venta Gestión actualizada');
+    } else {
+      await localDB.saveToCollection('sales_gestion', form);
+      await addAuditLog(user, `Registró Venta Gestión Doc: ${form.documento}`, 'Administración');
+      alert('Venta Gestión registrada');
+    }
+    setForm({
+      anio: new Date().getFullYear().toString(),
+      mes: new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+      fecha: new Date().toISOString().split('T')[0],
+      documento: '',
+      cliente: '',
+      nroFrascos: 0,
+      detalleProductos: '',
+      valorCotizacion: 0
+    });
+    const updated = await localDB.getCollection('sales_gestion');
+    setRecords(updated);
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
+      <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit">
+        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+          <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas GESTIÓN</span>
+          <div className="flex gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+            />
+            <button 
+              type="button"
+              onClick={downloadExcelTemplate}
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              title="Descargar Plantilla Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+            </button>
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
+          </div>
+        </div>
+        <form className="p-6 space-y-4" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Año"><input className="w-full border-b p-2 text-sm" value={form.anio || ''} onChange={e => setForm({...form, anio: e.target.value})} /></FormField>
+            <FormField label="Mes"><input className="w-full border-b p-2 text-sm" value={form.mes || ''} onChange={e => setForm({...form, mes: e.target.value})} /></FormField>
+          </div>
+          <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
+          <FormField label="Fact / Boleta"><input className="w-full border-b p-2 text-sm" value={form.documento || ''} onChange={e => setForm({...form, documento: e.target.value})} required /></FormField>
+          <FormField label="Cliente"><input className="w-full border-b p-2 text-sm" value={form.cliente || ''} onChange={e => setForm({...form, cliente: e.target.value})} required /></FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="N° Frascos"><input type="number" className="w-full border-b p-2 text-sm" value={form.nroFrascos ?? 0} onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Valor Cotización ($)"><input type="number" className="w-full border-b p-2 text-sm" value={form.valorCotizacion ?? 0} onChange={e => setForm({...form, valorCotizacion: parseInt(e.target.value) || 0})} /></FormField>
+          </div>
+          <FormField label="Detalle de Productos Solicitados">
+            <textarea 
+              className="w-full border p-2 text-xs rounded h-24 outline-none focus:ring-1 focus:ring-blue-200" 
+              value={form.detalleProductos} 
+              onChange={e => setForm({...form, detalleProductos: e.target.value})}
+              placeholder="Ej: 2x Omega 3, 1x Multivitamínico..."
+            />
+          </FormField>
+          <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold mt-2 hover:bg-opacity-90">GUARDAR VENTA GESTIÓN</button>
+        </form>
+      </div>
+
+      <div className="lg:col-span-8 space-y-4">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
+            <h3 className="font-black text-[10px] uppercase text-slate-400 tracking-widest">Detalle de Ventas GESTIÓN Registradas</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Mes:</span>
+                <select 
+                  className="text-xs border rounded p-1 w-28 text-slate-600"
+                  value={filterMonth}
+                  onChange={e => setFilterMonth(e.target.value)}
+                >
+                  <option value="Todos">Todos</option>
+                  {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
+                <input 
+                  type="date" 
+                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Hasta:</span>
+                <input 
+                  type="date" 
+                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Search className="w-3.5 h-3.5 text-slate-400" />
+                <input 
+                  placeholder="Buscar..."
+                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <button 
+                onClick={() => {
+                  const data = filteredRecords.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0, formatCurrency(r.valorCotizacion || 0)]);
+                  data.push(['', '', 'TOTAL', totalFrascos, formatCurrency(totalCotizacion)]);
+                  exportTableToPDF('Reporte: Ventas Gestión', ['Fecha', 'Documento', 'Cliente', 'Frascos', 'Valor Cotiz'], data, 'reporte_ventas_gestion');
+                }}
+                className="text-white bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-blue-700 flex items-center gap-1" 
+                title="Descargar PDF"
+              >
+                <Download className="w-3.5 h-3.5" /> PDF
+              </button>
+              <button 
+                onClick={() => setShowProductSummary(!showProductSummary)}
+                className={cn(
+                  "px-3 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1 transition-all",
+                  showProductSummary ? "bg-amber-500 text-white" : "bg-slate-700 text-white hover:bg-slate-800"
+                )}
+                title="Ver resumen de productos"
+              >
+                <ClipboardList className="w-3.5 h-3.5" /> {showProductSummary ? 'OCULTAR RESUMEN' : 'RESUMEN PRODUCTOS'}
+              </button>
+            </div>
+          </div>
+
+          {showProductSummary && (
+            <div className="p-4 bg-amber-50 border-b border-amber-100 animate-in slide-in-from-top duration-300">
+               <h4 className="text-[10px] font-black text-amber-800 uppercase mb-3 flex items-center gap-2">
+                 <ListChecks className="w-4 h-4" /> Resumen Consolidado de Productos ({filterMonth})
+               </h4>
+               <div className="bg-white p-0 rounded-lg border border-amber-200 shadow-inner max-h-80 overflow-y-auto">
+                 {consolidated.length > 0 ? (
+                   <table className="w-full text-xs">
+                     <thead className="bg-amber-100/50 sticky top-0">
+                       <tr className="text-[9px] font-black text-amber-900 uppercase text-left border-b border-amber-200">
+                         <th className="p-2">Producto</th>
+                         <th className="p-2 text-center w-20">Total</th>
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-amber-100">
+                       {consolidated.map((item, i) => (
+                         <tr key={i} className="hover:bg-amber-50/50 transition-colors">
+                           <td className="p-2 font-bold text-slate-700">{item.name}</td>
+                           <td className="p-2 text-center">
+                             <span className="bg-amber-600 text-white px-2 py-0.5 rounded-full font-black text-[10px]">
+                               {item.qty}
+                             </span>
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 ) : (
+                   <p className="text-xs text-slate-400 italic text-center py-8">No hay detalles de productos para consolidar en esta selección.</p>
+                 )}
+               </div>
+               <div className="mt-3 text-[9px] text-amber-700 flex justify-between font-bold uppercase">
+                  <span>Mostrando {consolidated.length} productos únicos</span>
+                  <button 
+                    onClick={() => {
+                      const text = consolidated.map(item => `${item.qty}x ${item.name}`).join('\n');
+                      navigator.clipboard.writeText(text);
+                      alert('Resumen consolidado copiado');
+                    }}
+                    className="flex items-center gap-1 hover:text-amber-900"
+                  >
+                    <ClipboardList className="w-3 h-3" /> Copiar Resumen
+                  </button>
+               </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
+                  <th className="p-4">Fecha</th>
+                  <th className="p-4">Documento</th>
+                  <th className="p-4">Cliente</th>
+                  <th className="p-4 text-center">Fcos</th>
+                  <th className="p-4 text-right">Valor Cotiz</th>
+                  <th className="p-4 text-center">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 italic">
+                {filteredRecords.map(r => (
+                  <tr key={r.id}>
+                    <td className="p-4">{formatDate(r.fecha)}</td>
+                    <td className="p-4 font-bold text-[#001736]">{r.documento}</td>
+                    <td className="p-4">{r.cliente}</td>
+                    <td className="p-4 text-center font-black">{r.nroFrascos}</td>
+                    <td className="p-4 text-right font-black text-blue-700">{formatCurrency(r.valorCotizacion || 0)}</td>
+                    <td className="p-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <RecordActions
+                          onView={() => {
+                            const data = [
+                              { label: 'Documento', value: r.documento || '' },
+                              { label: 'Fecha', value: formatDate(r.fecha) },
+                              { label: 'Cliente', value: r.cliente || '' },
+                              { label: 'N° Frascos', value: (r.nroFrascos || 0).toString() },
+                              { label: 'Valor Cotización', value: formatCurrency(r.valorCotizacion || 0) },
+                              { label: 'Detalle Productos', value: r.detalleProductos || 'Sin detalles.' }
+                            ];
+                            viewExpedienteInNewTab(`Expediente Venta GESTIÓN: ${r.cliente}`, data, `venta_gestion_${r.documento}`);
+                          }}
+                          onDownload={() => {
+                            const data = [
+                              { label: 'Documento', value: r.documento || '' },
+                              { label: 'Fecha', value: formatDate(r.fecha) },
+                              { label: 'Cliente', value: r.cliente || '' },
+                              { label: 'N° Frascos', value: (r.nroFrascos || 0).toString() },
+                              { label: 'Valor Cotización', value: formatCurrency(r.valorCotizacion || 0) },
+                              { label: 'Detalle Productos', value: r.detalleProductos || 'Sin detalles.' }
+                            ];
+                            exportExpedienteToPDF(`Expediente Venta GESTIÓN: ${r.cliente}`, data, `venta_gestion_${r.documento}`);
+                          }}
+                          onEdit={() => {
+                            setEditingId(r.id);
+                            setForm(r);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          onDelete={async () => {
+                            try {
+                              await localDB.deleteFromCollection('sales_gestion', r.id);
+                              const updated = await localDB.getCollection('sales_gestion');
+                              setRecords(updated);
+                              alert('Venta Gestión eliminada');
+                            } catch (err) {
+                              alert('Error al eliminar');
+                            }
+                          }}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-blue-50/50 font-black">
+                <tr>
+                  <td colSpan={3} className="p-4 text-right uppercase text-slate-500 text-[9px] tracking-widest">Totales en Selección:</td>
+                  <td className="p-4 text-center text-blue-700 text-sm">{totalFrascos}</td>
+                  <td className="p-4 text-right text-blue-700 text-sm">{formatCurrency(totalCotizacion)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       </div>
     </div>

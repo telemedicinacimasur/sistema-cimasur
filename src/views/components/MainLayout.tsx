@@ -56,12 +56,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab'] },
     { name: 'Administración', icon: ShieldCheck, path: '/administracion', roles: ['admin'] },
     { name: 'CRM Comercial', icon: TrendingUp, path: '/crm', roles: ['admin', 'crm'] },
+    { name: 'Gestión', icon: Activity, path: '/gestion', roles: ['admin', 'crm', 'gestion'] },
     { name: 'Escuela CIMASUR', icon: GraduationCap, path: '/escuela', roles: ['admin', 'school'] },
   ];
 
-  const filteredMenuItems = menuItems.filter(item => 
-    user?.role && item.roles.includes(user.role)
-  );
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!user) return false;
+    const userRoles = user.roles || [user.role];
+    return item.roles.some(r => userRoles.includes(r));
+  });
 
   const handleLogout = () => {
     logout();
@@ -163,9 +166,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </button>
               
               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-                <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-[#001736] leading-tight">{user?.displayName}</p>
-                  <p className="text-[10px] text-slate-500 leading-tight uppercase font-medium">{user?.role}</p>
+                <div className="text-right hidden sm:block overflow-hidden max-w-[150px]">
+                  <p className="text-xs font-bold text-[#001736] leading-tight truncate">{user?.displayName}</p>
+                  <p className="text-[10px] text-slate-500 leading-tight uppercase font-medium truncate" title={(user?.roles || [user?.role]).join(' / ')}>
+                    {(user?.roles || [user?.role]).join(' / ')}
+                  </p>
                 </div>
                 <div className="h-9 w-9 rounded-full bg-blue-100 border border-blue-200 overflow-hidden shadow-sm">
                   {user?.photoURL ? (

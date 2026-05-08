@@ -10,6 +10,7 @@ const SchoolView = React.lazy(() => import('./views/SchoolView'));
 const LabView = React.lazy(() => import('./views/LabView'));
 const AdminView = React.lazy(() => import('./views/AdminView'));
 const CRMView = React.lazy(() => import('./views/CRMView'));
+const GestionView = React.lazy(() => import('./views/GestionView'));
 
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -21,7 +22,14 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function RoleRoute({ children, roles }: { children: React.ReactNode, roles: string[] }) {
   const { user } = useAuth();
-  if (!user || !roles.includes(user.role)) {
+  
+  if (!user) return <Navigate to="/login" />;
+
+  // Support both single role and roles array
+  const userRoles = user.roles || [user.role];
+  const hasAccess = roles.some(r => userRoles.includes(r));
+
+  if (!hasAccess) {
     return <Navigate to="/" />;
   }
   return <>{children}</>;
@@ -57,6 +65,10 @@ export default function App() {
                         <Route 
                           path="/escuela" 
                           element={<RoleRoute roles={['admin', 'school']}><SchoolView /></RoleRoute>} 
+                        />
+                        <Route 
+                          path="/gestion" 
+                          element={<RoleRoute roles={['admin', 'crm', 'gestion']}><GestionView /></RoleRoute>} 
                         />
                       </Routes>
                     </Suspense>

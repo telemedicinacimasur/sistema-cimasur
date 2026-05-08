@@ -8,7 +8,8 @@ export interface UserProfile {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
-  role: 'admin' | 'lab' | 'crm' | 'school' | 'viewer';
+  role: string;
+  roles?: string[];
 }
 
 interface AuthContextType {
@@ -46,7 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            role: userData.role || 'viewer'
+            role: userData.role || 'viewer',
+            roles: userData.roles || [userData.role || 'viewer']
           });
         } catch (error) {
           console.error("Error fetching user data from Firebase:", error);

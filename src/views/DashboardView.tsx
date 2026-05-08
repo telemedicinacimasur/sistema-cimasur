@@ -12,7 +12,7 @@ export default function DashboardView() {
   const modules = [
     {
       name: 'Laboratorio',
-      description: 'Fichas de registro e ingreso laboratorio.',
+      description: 'Gestión técnica, registros de elaboración y protocolos.',
       icon: FlaskConical,
       path: '/laboratorio',
       color: 'bg-[#a9c7ff]/10 text-[#001736]'
