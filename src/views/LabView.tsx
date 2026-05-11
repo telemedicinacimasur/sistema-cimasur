@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
+import { checkStockAlerts, checkPendingOrderAlerts } from '../lib/stockAlerts';
 import { cn, formatDate, safe, parseExcelDate, formatDateForExcel } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -3385,6 +3386,11 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     qty: 0,
     motivo: 'Compra / Ingreso Nuevo'
   });
+
+  useEffect(() => {
+    checkStockAlerts(inventoryRecords);
+    checkPendingOrderAlerts();
+  }, [inventoryRecords]);
 
   // Sync form area with selected area browser tab is showing
   useEffect(() => {

@@ -19,6 +19,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn, formatDate } from '../../lib/utils';
 import { exportTableToPDF } from '../../lib/pdfUtils';
 import { localDB } from '../../lib/auth';
+import { UserSettingsDialog } from '../../components/UserSettingsDialog';
+
+import { NotificationsDialog } from '../../components/NotificationsDialog';
 
 import { DataBackup } from '../../components/DataBackup';
 
@@ -27,6 +30,8 @@ interface MainLayoutProps {
 }
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -110,10 +115,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </nav>
 
         <div className="mt-auto pt-6 border-t border-[#1e40af]/30 flex flex-col gap-1">
-          <button className="flex items-center gap-3 text-blue-100/70 hover:text-white px-4 py-2 hover:bg-[#1e40af]/50 transition-all rounded-lg text-left text-sm font-medium">
+          <a href="mailto:formacion@cimasur.cl" className="flex items-center gap-3 text-blue-100/70 hover:text-white px-4 py-2 hover:bg-[#1e40af]/50 transition-all rounded-lg text-left text-sm font-medium">
             <HelpCircle className="w-5 h-5" />
             <span>Soporte</span>
-          </button>
+          </a>
           <button 
             onClick={handleLogout}
             className="flex items-center gap-3 text-blue-100/70 hover:text-white px-4 py-2 hover:bg-[#1e40af]/50 transition-all rounded-lg text-left text-sm font-medium"
@@ -141,15 +146,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="relative">
-              <input 
-                className="bg-slate-100 border-none text-slate-700 text-xs py-2 px-4 pr-10 rounded-full w-64 focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-500" 
-                placeholder="Búsqueda global..." 
-                type="text"
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            </div>
-            
             <div className="flex items-center gap-3">
               <button 
                 onClick={handleGlobalExport}
@@ -158,16 +154,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               >
                 <FileText className="w-5 h-5" />
               </button>
-              <button className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
+              <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
                 <Bell className="w-5 h-5" />
               </button>
-              <button className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
+              <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
                 <Settings className="w-5 h-5" />
               </button>
               
               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
                 <div className="text-right hidden sm:block overflow-hidden max-w-[150px]">
-                  <p className="text-xs font-bold text-[#001736] leading-tight truncate">{user?.displayName}</p>
+                  <p className="text-xs font-bold text-[#001736] leading-tight truncate">{user?.displayName || user?.email}</p>
                   <p className="text-[10px] text-slate-500 leading-tight uppercase font-medium truncate" title={(user?.roles || [user?.role]).join(' / ')}>
                     {(user?.roles || [user?.role]).join(' / ')}
                   </p>
@@ -192,6 +188,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
       </main>
       <DataBackup />
+      <UserSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} user={user} onUpdate={() => window.location.reload()} />
+      <NotificationsDialog isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>
   );
 }

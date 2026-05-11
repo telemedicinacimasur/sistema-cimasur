@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Edit, Trash2, History, FileSpreadsheet } from 'lucide-react';
+import { FileText, Download, Edit, Trash2, History, FileSpreadsheet, MessageCircle } from 'lucide-react';
 
 interface RecordActionsProps {
   onView?: () => void;
@@ -8,14 +8,16 @@ interface RecordActionsProps {
   onDelete?: () => void;
   onHistory?: () => void;
   onExcel?: () => void;
+  onComment?: () => void;
 }
 
-export const RecordActions = ({ onView, onDownload, onEdit, onDelete, onHistory, onExcel }: RecordActionsProps) => {
+export const RecordActions = ({ onView, onDownload, onEdit, onDelete, onHistory, onExcel, onComment }: RecordActionsProps) => {
   const [showConfirm, setShowConfirm] = useState(false);
 
   return (
     <div className="flex items-center justify-center gap-2 relative">
       {onView && <button type="button" onClick={onView} title="Ver Expediente" className="text-slate-600 hover:text-slate-800"><FileText className="w-4 h-4" /></button>}
+      {onComment && <button type="button" onClick={onComment} title="Comentar" className="text-blue-500 hover:text-blue-700"><MessageCircle className="w-4 h-4" /></button>}
       {onDownload && <button type="button" onClick={onDownload} title="Descargar PDF" className="text-blue-600 hover:text-blue-800"><Download className="w-4 h-4" /></button>}
       {onExcel && <button type="button" onClick={onExcel} title="Descargar Excel" className="text-emerald-600 hover:text-emerald-800"><FileSpreadsheet className="w-4 h-4" /></button>}
       {onEdit && <button type="button" onClick={onEdit} title="Editar" className="text-amber-600 hover:text-amber-800"><Edit className="w-4 h-4" /></button>}

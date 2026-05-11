@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Save, History } from 'lucide-react';
+import { FileText, Save, History, ArrowRight } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 
 export function CRMField({ label, children }: { label: string, children: React.ReactNode }) {
@@ -17,6 +17,7 @@ export interface ExpedienteProps {
   selectedClient: any;
   onClose: () => void;
   onUpdate: (data: any) => Promise<void>;
+  onTransfer?: () => Promise<void>;
   newHistory: string;
   setNewHistory: (val: string) => void;
   newCategory: string;
@@ -38,6 +39,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
   selectedClient,
   onClose,
   onUpdate,
+  onTransfer,
   newHistory,
   setNewHistory,
   newCategory,
@@ -197,6 +199,14 @@ export const Expediente: React.FC<ExpedienteProps> = ({
               >
                  <Save className="w-5 h-5" /> Registrar en Expediente
               </button>
+              {onTransfer && (
+                <button 
+                  onClick={onTransfer}
+                  className="w-full mt-4 bg-amber-600 text-white py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)] hover:-translate-y-1 transition-all active:scale-95 text-xs ring-4 ring-amber-50"
+                >
+                   <ArrowRight className="w-5 h-5" /> Transferir a Alumno
+                </button>
+              )}
             </div>
          </div>
       </div>

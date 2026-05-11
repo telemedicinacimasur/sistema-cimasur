@@ -22,10 +22,12 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
+import { CommentDialog } from '../components/CommentDialog';
 
 export default function CRMView() {
   const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities'>('register');
   const [records, setRecords] = useState<any[]>([]);
+  const [commentTarget, setCommentTarget] = useState<any | null>(null);
   const [filters, setFilters] = useState({
     search: '',
     region: 'Todas',
@@ -81,8 +83,24 @@ export default function CRMView() {
       </div>
 
       {activeTab === 'register' && <CRMRegister />}
-      {activeTab === 'list' && <CRMTable records={records} filters={filters} setFilters={setFilters} />}
+      {activeTab === 'list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
       {activeTab === 'activities' && <CRMActivities />}
+      {commentTarget && (
+        <CommentDialog 
+           isOpen={!!commentTarget} 
+           onClose={() => setCommentTarget(null)}
+           recordId={commentTarget.id}
+           recordTitle={commentTarget.name}
+           module="CRM"
+           recipientRoles={['Administrador']}
+           onSubmit={async (comment) => {
+             const updatedHistory = (commentTarget.historialUnificado || '') + `\n\n--- Comentario (${new Date().toLocaleDateString('es-CL')}) ---\n${comment}`;
+             await localDB.updateInCollection('contacts', commentTarget.id, { historialUnificado: updatedHistory });
+             window.dispatchEvent(new Event('db-change'));
+             alert('Comentario registrado y notificación enviada.');
+           }}
+        />
+      )}
     </div>
   );
 }
@@ -276,7 +294,7 @@ function CRMRegister() {
   );
 }
 
-function CRMTable({ records, filters, setFilters }: { records: any[], filters: any, setFilters: any }) {
+function CRMTable({ records, filters, setFilters, onComment }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [newHistory, setNewHistory] = useState('');

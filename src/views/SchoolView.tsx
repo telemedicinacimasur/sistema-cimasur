@@ -293,6 +293,9 @@ function ContactRegister({ records }: { records: any[] }) {
                await localDB.updateInCollection('school_leads', selectedLead.id, { observaciones: data.newHistory });
                alert('Gestión de captación guardada');
             }}
+            onTransfer={async() => {
+              await moveToStudents(selectedLead);
+            }}
             newHistory={selectedLead.observaciones || ''}
             setNewHistory={() => {}} // Simplified for now
             newCategory={selectedLead.clasificacion}
