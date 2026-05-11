@@ -184,11 +184,15 @@ function UsersManager() {
     if (!editingUser) return;
     
     try {
-        const validRoles = editingUser.roles && Array.isArray(editingUser.roles) && editingUser.roles.length > 0 
-            ? editingUser.roles 
+        const validRoles = editingUser.roles && Array.isArray(editingUser.roles) && editingUser.roles.length > 0
+            ? editingUser.roles.filter(r => r !== undefined && r !== null)
             : ['viewer'];
+            
+        if (validRoles.length === 0) validRoles.push('viewer');
 
-        await localAuth.updateUser(editingUser.uid, { 
+        console.log("Saving user:", editingUser.uid, "roles:", validRoles);
+
+        await localAuth.updateUser(editingUser.uid, {
           role: validRoles[0],
           roles: validRoles,
           displayName: editingUser.displayName,

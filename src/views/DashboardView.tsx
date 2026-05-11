@@ -12,6 +12,10 @@ import { useAuth } from '../contexts/AuthContext';
 export default function DashboardView() {
   const { user } = useAuth();
   
+  React.useEffect(() => {
+    console.log("DashboardView - Current User:", user);
+  }, [user]);
+
   const allModules = [
     {
       name: 'Laboratorio',
