@@ -145,7 +145,7 @@ export default function AdminView() {
 }
 
 function UsersManager() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [newPass, setNewPass] = useState('');
@@ -198,6 +198,11 @@ function UsersManager() {
           displayName: editingUser.displayName,
           ...(newPass ? { pass: newPass } : {})
         });
+        
+        // If the user editing is the currently logged in user, refresh the state
+        if (user?.uid === editingUser.uid) {
+            await refreshUser();
+        }
         
         alert('Usuario actualizado correctamente');
         setEditingUser(null);

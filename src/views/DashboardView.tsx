@@ -53,6 +53,22 @@ export default function DashboardView() {
 
   const modules = allModules.filter(m => {
     if (user?.role === 'admin' || user?.roles?.includes('admin')) return true;
+    
+    if (m.name === 'Laboratorio') {
+        console.log("Checking Laboratorio access.");
+        console.log("User roles:", user?.roles);
+        console.log("Module roles:", m.roles);
+        
+        const hasAccess = m.roles.some(r => {
+            const includes = user?.roles?.includes(r);
+            const matchesRole = user?.role === r;
+            console.log(`Checking role [${r}]: includes=${includes}, matchesRole=${matchesRole}`);
+            return includes || matchesRole;
+        });
+        console.log("Laboratorio Has Access:", hasAccess);
+        return hasAccess;
+    }
+    
     return m.roles.some(r => user?.roles?.includes(r) || user?.role === r);
   });
 

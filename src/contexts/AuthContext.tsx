@@ -18,6 +18,7 @@ interface AuthContextType {
   isAdmin: boolean;
   login: (email: string, pass: string) => Promise<void>; 
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +26,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = async () => {
+    if (auth.currentUser && db) {
+        try {
+            const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+            const userData = userDoc.exists() ? userDoc.data() : { role: 'viewer' };
+            console.log("AuthProvider - Fetched user data (refreshed):", userData);
+            setUser({
+                uid: auth.currentUser.uid,
+                email: auth.currentUser.email,
+                displayName: auth.currentUser.displayName,
+                photoURL: auth.currentUser.photoURL,
+                role: userData.role || 'viewer',
+                roles: Array.isArray(userData.roles) 
+                    ? userData.roles 
+                    : (userData.roles && typeof userData.roles === 'object' ? Object.values(userData.roles) : [userData.role || 'viewer'])
+            });
+        } catch (error) {
+            console.error("Error refreshing user data:", error);
+        }
+    }
+  };
 
   useEffect(() => {
     if (!isFirebaseReady || !auth) {
@@ -98,7 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     isAdmin: user?.role === 'admin',
     login,
-    logout
+    logout,
+    refreshUser
   };
 
   return (
