@@ -183,17 +183,22 @@ function UsersManager() {
     e.preventDefault();
     if (!editingUser) return;
     
-    await localAuth.updateUser(editingUser.uid, { 
-      role: editingUser.roles && editingUser.roles.length > 0 ? editingUser.roles[0] : 'viewer',
-      roles: editingUser.roles,
-      displayName: editingUser.displayName,
-      ...(newPass ? { pass: newPass } : {})
-    });
-    
-    alert('Usuario actualizado correctamente');
-    setEditingUser(null);
-    setNewPass('');
-    refreshUsers();
+    try {
+        await localAuth.updateUser(editingUser.uid, { 
+          role: editingUser.roles && editingUser.roles.length > 0 ? editingUser.roles[0] : 'viewer',
+          roles: editingUser.roles,
+          displayName: editingUser.displayName,
+          ...(newPass ? { pass: newPass } : {})
+        });
+        
+        alert('Usuario actualizado correctamente');
+        setEditingUser(null);
+        setNewPass('');
+        refreshUsers();
+    } catch (error) {
+        console.error("Error updating user:", error);
+        alert('Error al guardar cambios: ' + error);
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
