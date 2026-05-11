@@ -184,9 +184,13 @@ function UsersManager() {
     if (!editingUser) return;
     
     try {
+        const validRoles = editingUser.roles && Array.isArray(editingUser.roles) && editingUser.roles.length > 0 
+            ? editingUser.roles 
+            : ['viewer'];
+
         await localAuth.updateUser(editingUser.uid, { 
-          role: editingUser.roles && editingUser.roles.length > 0 ? editingUser.roles[0] : 'viewer',
-          roles: editingUser.roles,
+          role: validRoles[0],
+          roles: validRoles,
           displayName: editingUser.displayName,
           ...(newPass ? { pass: newPass } : {})
         });
@@ -405,7 +409,7 @@ function UsersManager() {
                       onEdit={() => {
                         setEditingUser({
                           ...u,
-                          roles: u.roles || [u.role]
+                          roles: u.roles && u.roles.length > 0 ? u.roles : (u.role ? [u.role] : ['viewer'])
                         });
                         setNewPass('');
                         setShowCreate(false);
