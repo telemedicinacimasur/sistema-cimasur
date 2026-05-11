@@ -10,11 +10,11 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 export default function DashboardView() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   
-  React.useEffect(() => {
-    console.log("DashboardView - Current User:", user);
-  }, [user]);
+  if (loading) {
+     return <div>Cargando...</div>;
+  }
 
   const allModules = [
     {
@@ -53,9 +53,8 @@ export default function DashboardView() {
 
   const modules = allModules.filter(m => {
     if (user?.role === 'admin' || user?.roles?.includes('admin')) return true;
-    console.log("Checking module:", m.name, "roles required:", m.roles, "user roles:", user?.roles);
     const hasAccess = m.roles.some(r => user?.roles?.includes(r) || user?.role === r);
-    console.log("Module:", m.name, "Has Access:", hasAccess);
+    console.log("Module:", m.name, "Access:", hasAccess);
     return hasAccess;
   });
 
