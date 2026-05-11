@@ -413,7 +413,9 @@ function UsersManager() {
                       onEdit={() => {
                         setEditingUser({
                           ...u,
-                          roles: u.roles && u.roles.length > 0 ? u.roles : (u.role ? [u.role] : ['viewer'])
+                          roles: Array.isArray(u.roles) 
+                            ? u.roles 
+                            : (u.roles && typeof u.roles === 'object' ? Object.values(u.roles) : (u.role ? [u.role] : ['viewer']))
                         });
                         setNewPass('');
                         setShowCreate(false);

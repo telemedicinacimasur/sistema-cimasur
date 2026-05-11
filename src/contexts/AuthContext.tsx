@@ -50,7 +50,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
             role: userData.role || 'viewer',
-            roles: userData.roles || [userData.role || 'viewer']
+            roles: Array.isArray(userData.roles) 
+              ? userData.roles 
+              : (userData.roles && typeof userData.roles === 'object' ? Object.values(userData.roles) : [userData.role || 'viewer'])
           });
         } catch (error) {
           console.error("Error fetching user data from Firebase:", error);
