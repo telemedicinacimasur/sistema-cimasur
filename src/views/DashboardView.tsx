@@ -7,38 +7,50 @@ import {
   ShieldCheck, 
   ArrowRight
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function DashboardView() {
-  const modules = [
+  const { user } = useAuth();
+  
+  const allModules = [
     {
       name: 'Laboratorio',
       description: 'Gestión técnica, registros de elaboración y protocolos.',
       icon: FlaskConical,
       path: '/laboratorio',
-      color: 'bg-[#a9c7ff]/10 text-[#001736]'
+      color: 'bg-[#a9c7ff]/10 text-[#001736]',
+      roles: ['admin', 'lab', 'viewer_lab']
     },
     {
       name: 'Administración',
       description: 'Seguimiento de cotizaciones, ingreso de documentos y registro de unidades.',
       icon: ShieldCheck,
       path: '/administracion',
-      color: 'bg-[#002b5b]/10 text-[#001736]'
+      color: 'bg-[#002b5b]/10 text-[#001736]',
+      roles: ['admin']
     },
     {
       name: 'Comercial CRM',
       description: 'Gestión de clientes, registros de interacción y seguimiento.',
       icon: TrendingUp,
       path: '/crm',
-      color: 'bg-[#91cef1]/10 text-[#001736]'
+      color: 'bg-[#91cef1]/10 text-[#001736]',
+      roles: ['admin', 'crm', 'viewer_crm']
     },
     {
       name: 'Escuela CIMASUR',
       description: 'Gestión Integral del Alumno (Matrícula, Seguimiento y Control Académico).',
       icon: GraduationCap,
       path: '/escuela',
-      color: 'bg-primary/10 text-primary'
+      color: 'bg-primary/10 text-primary',
+      roles: ['admin', 'school', 'viewer_school']
     }
   ];
+
+  const modules = allModules.filter(m => {
+    if (user?.role === 'admin') return true;
+    return m.roles.some(r => user?.roles?.includes(r));
+  });
 
   return (
     <div className="space-y-10 py-6">
