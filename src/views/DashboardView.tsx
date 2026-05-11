@@ -42,6 +42,14 @@ export default function DashboardView() {
       roles: ['admin', 'crm', 'viewer_crm']
     },
     {
+      name: 'Gestión',
+      description: 'Módulo de gestión y seguimiento de clientes estratégicos.',
+      icon: TrendingUp,
+      path: '/gestion',
+      color: 'bg-green-50 text-green-700',
+      roles: ['admin', 'gestion', 'viewer_gestion']
+    },
+    {
       name: 'Escuela CIMASUR',
       description: 'Gestión Integral del Alumno (Matrícula, Seguimiento y Control Académico).',
       icon: GraduationCap,
@@ -53,23 +61,8 @@ export default function DashboardView() {
 
   const modules = allModules.filter(m => {
     if (user?.role === 'admin' || user?.roles?.includes('admin')) return true;
-    
-    if (m.name === 'Laboratorio') {
-        console.log("Checking Laboratorio access.");
-        console.log("User roles:", user?.roles);
-        console.log("Module roles:", m.roles);
-        
-        const hasAccess = m.roles.some(r => {
-            const includes = user?.roles?.includes(r);
-            const matchesRole = user?.role === r;
-            console.log(`Checking role [${r}]: includes=${includes}, matchesRole=${matchesRole}`);
-            return includes || matchesRole;
-        });
-        console.log("Laboratorio Has Access:", hasAccess);
-        return hasAccess;
-    }
-    
-    return m.roles.some(r => user?.roles?.includes(r) || user?.role === r);
+    const userRoles = user?.roles || [user?.role];
+    return m.roles.some(r => userRoles.includes(r));
   });
 
   return (

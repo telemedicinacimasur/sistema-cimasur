@@ -61,7 +61,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab', 'viewer_lab'] },
     { name: 'Administración', icon: ShieldCheck, path: '/administracion', roles: ['admin'] },
     { name: 'CRM Comercial', icon: TrendingUp, path: '/crm', roles: ['admin', 'crm', 'viewer_crm'] },
-    { name: 'Gestión', icon: Activity, path: '/gestion', roles: ['admin', 'crm', 'gestion', 'viewer_gestion'] },
+    { name: 'Gestión', icon: Activity, path: '/gestion', roles: ['admin', 'gestion', 'viewer_gestion'] },
     { name: 'Escuela CIMASUR', icon: GraduationCap, path: '/escuela', roles: ['admin', 'school', 'viewer_school'] },
   ];
 

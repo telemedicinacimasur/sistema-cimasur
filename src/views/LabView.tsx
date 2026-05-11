@@ -34,6 +34,8 @@ import * as XLSX from 'xlsx';
 import { RecordActions } from '../components/RecordActions';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
 
+import { addNotification } from '../lib/notifications';
+
 export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
   const wb = XLSX.utils.book_new();
@@ -310,6 +312,13 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
     } else {
       finalData = { ...finalData, creadoPor: user.displayName, createdAt: new Date().toISOString() };
       await localDB.saveToCollection('lab_records', { ...finalData, type: 'gotas-puras' });
+      
+      await addNotification({
+        title: 'Nueva Evaluación Gota Pura',
+        message: `${user.displayName || user.email} registró evaluación para ${finalData.producto}`,
+        recipientRoles: ['admin', 'lab'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Guardó Evaluación Gota Pura: ${finalData.producto}`, 'Laboratorio');
     }
     const updated = await localDB.getCollection('lab_records');
@@ -626,6 +635,13 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
     } else {
       finalData = { ...finalData, creadoPor: user.displayName, createdAt: new Date().toISOString() };
       await localDB.saveToCollection('lab_records', { ...finalData, type: 'elaboracion' });
+      
+      await addNotification({
+        title: 'Nuevo Registro Elaboración',
+        message: `${user.displayName || user.email} registró elaboración de ${finalData.producto} (No. ${finalData.nroCimasur})`,
+        recipientRoles: ['admin', 'lab'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Guardó Elaboración: ${finalData.producto}`, 'Laboratorio');
     }
     const updated = await localDB.getCollection('lab_records');
@@ -1027,6 +1043,13 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
     } else {
       finalData = { ...finalData, creadoPor: user.displayName, createdAt: new Date().toISOString() };
       await localDB.saveToCollection('lab_records', { ...finalData, type: 'nosodes' });
+      
+      await addNotification({
+        title: 'Nueva Ficha Técnica Nosode',
+        message: `${user.displayName || user.email} registró nosode para el paciente ${finalData.paciente}`,
+        recipientRoles: ['admin', 'lab'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Guardó Nosode: ${finalData.paciente}`, 'Laboratorio');
     }
     const updated = await localDB.getCollection('lab_records');
@@ -1472,6 +1495,13 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
         createdAt: new Date().toISOString() 
       };
       await localDB.saveToCollection('lab_records', finalData);
+      
+      await addNotification({
+        title: 'Nueva Preparación Gotas Puras',
+        message: `${user.displayName || user.email} registró preparación de ${finalData.producto}`,
+        recipientRoles: ['admin', 'lab'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Guardó Preparación ${frascoSize}ml`, 'Laboratorio');
       alert('Ficha de Preparación guardada');
     }
@@ -4664,6 +4694,13 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
       setEditingId(null);
     } else {
       await localDB.saveToCollection('lab_records', finalData);
+      
+      await addNotification({
+        title: 'Nueva Fórmula Magistral',
+        message: `${user.displayName || user.email} registró fórmula magistral: ${form.nroCotizacion}`,
+        recipientRoles: ['admin', 'lab'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       if (user) await addAuditLog(user, `Registró Fórmula Magistral: ${form.nroCotizacion}`, 'Laboratorio');
     }
 

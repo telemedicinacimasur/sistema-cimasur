@@ -16,7 +16,8 @@ export const checkStockAlerts = async (inventory: any[]) => {
         await addNotification({
             title: 'Alerta de Stock Bajo',
             message: `El insumo ${item.item} tiene un stock crítico de ${item.stock}. Mínimo requerido: ${alert.min}.`,
-            recipientRoles: ['Administrador', 'Laboratorio']
+            recipientRoles: ['admin', 'lab'],
+            sender: 'Sistema de Inventario'
         });
     }
   }
@@ -27,7 +28,8 @@ export const checkStockAlerts = async (inventory: any[]) => {
       await addNotification({
           title: 'Alerta de Stock Bajo',
           message: `Los frascos de 30ml tienen un stock crítico de ${frascos.stock}. Mínimo requerido: 2500.`,
-          recipientRoles: ['Administrador', 'Laboratorio']
+          recipientRoles: ['admin', 'lab'],
+          sender: 'Sistema de Inventario'
       });
   }
 };
@@ -42,7 +44,8 @@ export const checkPendingOrderAlerts = async () => {
             await addNotification({
                 title: 'Alerta de Revisión Logística',
                 message: `El pedido de ${order.cliente} lleva más de 6 días en estado ${order.estado}.`,
-                recipientRoles: ['Administrador', 'Laboratorio']
+                recipientRoles: ['admin', 'lab'],
+                sender: 'Sistema de Logística'
             });
         }
     }

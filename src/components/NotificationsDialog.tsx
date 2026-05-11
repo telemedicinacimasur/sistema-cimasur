@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Bell, Check } from 'lucide-react';
 import { localDB } from '../lib/auth';
 import { formatDate } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
+import { cn } from '../lib/utils';
 
 interface NotificationsDialogProps {
   isOpen: boolean;
@@ -10,17 +12,26 @@ interface NotificationsDialogProps {
 
 export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen, onClose }) => {
   const [notifications, setNotifications] = useState<any[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && user) {
       const loadNotifications = async () => {
         const data = await localDB.getCollection('notifications');
+        const userRoles = user.roles || [];
+        
+        // Filter by role
+        const filtered = data.filter((n: any) => {
+          if (!n.recipientRoles || n.recipientRoles.length === 0) return true;
+          return n.recipientRoles.some((role: string) => userRoles.includes(role));
+        });
+
         // Sort by date desc
-        setNotifications(data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        setNotifications(filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       };
       loadNotifications();
     }
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   const markAsRead = async (id: string) => {
     await localDB.updateInCollection('notifications', id, { read: true });
@@ -60,4 +71,3 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
     </div>
   );
 };
-import { cn } from '../lib/utils';

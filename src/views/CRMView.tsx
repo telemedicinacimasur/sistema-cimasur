@@ -24,6 +24,8 @@ import {
 import { RecordActions } from '../components/RecordActions';
 import { CommentDialog } from '../components/CommentDialog';
 
+import { addNotification } from '../lib/notifications';
+
 export default function CRMView() {
   const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities'>('register');
   const [records, setRecords] = useState<any[]>([]);
@@ -140,6 +142,13 @@ function CRMRegister() {
     e.preventDefault();
     if (!user) return;
     await localDB.saveToCollection('contacts', form);
+    
+    await addNotification({
+      title: 'Nuevo Cliente CRM',
+      message: `${user.displayName || user.email} registró a ${form.name}`,
+      recipientRoles: ['admin', 'crm', 'viewer_crm'],
+      sender: user.displayName || user.email || 'Sistema'
+    });
     await addAuditLog(user, `Registró Cliente ${form.name}`, 'CRM');
     alert('Cliente Guardado en CRM');
     setForm({ 
@@ -741,6 +750,13 @@ function CRMActivities() {
       setEditingId(null);
     } else {
       await localDB.saveToCollection('crm_activities', form);
+      
+      await addNotification({
+        title: 'Nueva Actividad Comercial',
+        message: `${user.displayName || user.email} registró: ${form.campania} (${form.tipo})`,
+        recipientRoles: ['admin', 'crm', 'viewer_crm'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Registró Actividad: ${form.campania}`, 'CRM');
       
       // Automatic update in customer records

@@ -39,6 +39,8 @@ import {
 import { RecordActions } from '../components/RecordActions';
 import { Expediente } from '../components/Expediente';
 
+import { addNotification } from '../lib/notifications';
+
 export default function SchoolView() {
   const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities'>('register');
   const [data, setData] = useState<any[]>([]);
@@ -115,6 +117,13 @@ function ContactRegister({ records }: { records: any[] }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await localDB.saveToCollection('school_leads', form);
+    
+    await addNotification({
+      title: 'Nuevo Lead Académico',
+      message: `${user?.displayName || user?.email} registró a ${form.name}`,
+      recipientRoles: ['admin', 'school', 'viewer_school'],
+      sender: user?.displayName || user?.email || 'Sistema'
+    });
     if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
     alert('Lead Académico Registrado');
     setForm({ ...form, name: '', rut: '', email: '', phone: '', observaciones: '' });
@@ -190,6 +199,13 @@ function ContactRegister({ records }: { records: any[] }) {
         observacionesAcademicas: 'Inscrito desde Captación'
       };
       await localDB.saveToCollection('students', studentData);
+      
+      await addNotification({
+        title: 'Nuevo Alumno Matriculado',
+        message: `${user?.displayName || user?.email} matriculó a ${lead.name}`,
+        recipientRoles: ['admin', 'school', 'viewer_school'],
+        sender: user?.displayName || user?.email || 'Sistema'
+      });
       await localDB.deleteFromCollection('school_leads', lead.id);
       setSelectedLead(null);
       window.dispatchEvent(new Event('db-change'));

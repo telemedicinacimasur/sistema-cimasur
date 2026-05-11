@@ -38,6 +38,8 @@ const exportTableToExcel = (title: string, headers: string[], data: any[][], fil
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 };
 
+import { addNotification } from '../lib/notifications';
+
 function parseExcelDate(serial: any) {
   if (!serial) return null;
   if (typeof serial === 'string') return serial;
@@ -171,6 +173,13 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
       };
 
       await localDB.saveToCollection('gestion_activities', newActivity);
+      
+      await addNotification({
+        title: 'Nueva Actividad en Gestión',
+        message: `${user.displayName || user.email} registró: ${newActivityType} para ${client.nombre || client.cliente}`,
+        recipientRoles: ['admin', 'gestion', 'viewer_gestion'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       
       // Update client category and state
       await localDB.updateInCollection('gestion_records', client.id, {
@@ -449,6 +458,13 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
       if (onCancel) onCancel();
     } else {
       await localDB.saveToCollection('gestion_records', recordToSave);
+      
+      await addNotification({
+        title: 'Nuevo Cliente en Gestión',
+        message: `${user.displayName || user.email} añadió a ${form.nombre} (${form.rut})`,
+        recipientRoles: ['admin', 'gestion', 'viewer_gestion'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Añadió Cliente a Gestión: ${form.nombre}`, 'Gestión');
       alert('Cliente Guardado Correctamente');
       setForm({
