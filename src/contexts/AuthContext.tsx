@@ -42,6 +42,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           const userData = userDoc.exists() ? userDoc.data() : { role: 'viewer' };
           
+          console.log("AuthProvider - Fetched user data:", userData);
+
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
