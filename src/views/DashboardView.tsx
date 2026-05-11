@@ -53,9 +53,7 @@ export default function DashboardView() {
 
   const modules = allModules.filter(m => {
     if (user?.role === 'admin' || user?.roles?.includes('admin')) return true;
-    const hasAccess = m.roles.some(r => user?.roles?.includes(r) || user?.role === r);
-    console.log("Module:", m.name, "Access:", hasAccess);
-    return hasAccess;
+    return m.roles.some(r => user?.roles?.includes(r) || user?.role === r);
   });
 
   return (
