@@ -57,12 +57,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   };
 
   const menuItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'lab', 'crm', 'school', 'viewer'] },
-    { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab'] },
+    { name: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'lab', 'crm', 'school', 'viewer_lab', 'viewer_crm', 'viewer_school', 'viewer_gestion'] },
+    { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab', 'viewer_lab'] },
     { name: 'Administración', icon: ShieldCheck, path: '/administracion', roles: ['admin'] },
-    { name: 'CRM Comercial', icon: TrendingUp, path: '/crm', roles: ['admin', 'crm'] },
-    { name: 'Gestión', icon: Activity, path: '/gestion', roles: ['admin', 'crm', 'gestion'] },
-    { name: 'Escuela CIMASUR', icon: GraduationCap, path: '/escuela', roles: ['admin', 'school'] },
+    { name: 'CRM Comercial', icon: TrendingUp, path: '/crm', roles: ['admin', 'crm', 'viewer_crm'] },
+    { name: 'Gestión', icon: Activity, path: '/gestion', roles: ['admin', 'crm', 'gestion', 'viewer_gestion'] },
+    { name: 'Escuela CIMASUR', icon: GraduationCap, path: '/escuela', roles: ['admin', 'school', 'viewer_school'] },
   ];
 
   const filteredMenuItems = menuItems.filter(item => {

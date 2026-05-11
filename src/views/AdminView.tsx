@@ -164,7 +164,10 @@ function UsersManager() {
     { id: 'crm', label: 'CRM' },
     { id: 'school', label: 'Escuela' },
     { id: 'gestion', label: 'Gestión' },
-    { id: 'viewer', label: 'Solo Lectura' }
+    { id: 'viewer_lab', label: 'Lector Laboratorio' },
+    { id: 'viewer_crm', label: 'Lector CRM' },
+    { id: 'viewer_school', label: 'Lector Escuela' },
+    { id: 'viewer_gestion', label: 'Lector Gestión' }
   ];
 
   const refreshUsers = async () => {
