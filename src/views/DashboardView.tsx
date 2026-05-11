@@ -52,8 +52,8 @@ export default function DashboardView() {
   ];
 
   const modules = allModules.filter(m => {
-    if (user?.role === 'admin') return true;
-    return m.roles.some(r => user?.roles?.includes(r));
+    if (user?.role === 'admin' || user?.roles?.includes('admin')) return true;
+    return m.roles.some(r => user?.roles?.includes(r) || user?.role === r);
   });
 
   return (
