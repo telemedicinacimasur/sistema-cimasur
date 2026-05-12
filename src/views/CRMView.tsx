@@ -30,8 +30,9 @@ export default function CRMView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
 
-  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities'>('register');
+  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'imports'>('register');
   const [records, setRecords] = useState<any[]>([]);
+  const [imports, setImports] = useState<any[]>([]);
   const [commentTarget, setCommentTarget] = useState<any | null>(null);
   const [filters, setFilters] = useState({
     search: '',
@@ -45,6 +46,8 @@ export default function CRMView() {
     const loadData = async () => {
       const data = await localDB.getCollection('contacts');
       setRecords(data);
+      const importData = await localDB.getCollection('intranet_imports');
+      setImports(importData);
     };
     loadData();
     window.addEventListener('db-change', loadData);
@@ -86,12 +89,22 @@ export default function CRMView() {
           >
             Registro de Actividades
           </button>
+          <button 
+            onClick={() => setActiveTab('imports')}
+            className={cn(
+              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+              activeTab === 'imports' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Historial de Importaciones
+          </button>
         </div>
       </div>
 
       {activeTab === 'register' && <CRMRegister />}
       {activeTab === 'list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
       {activeTab === 'activities' && <CRMActivities />}
+      {activeTab === 'imports' && <CRMImportsTable imports={imports} />}
       {commentTarget && (
         <CommentDialog 
            isOpen={!!commentTarget} 
@@ -131,6 +144,7 @@ const CATEGORIAS = ['Sin compra', 'Sin categoría', 'Bronce', 'Plata', 'Oro', 'P
 function CRMRegister() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const intranetFileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fechaIngreso: new Date().toISOString().split('T')[0],
     name: '',
@@ -239,6 +253,63 @@ function CRMRegister() {
     reader.readAsBinaryString(file);
   };
 
+  const handleIntranetFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+        for (const row of data) {
+          const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
+
+          const newContact = {
+            fechaIngreso: fechaIngreso,
+            name: safe(row["Nombre / Razón Social"]),
+            rut: safe(row["RUT / ID"]),
+            phone: safe(row["Teléfono"]),
+            email: safe(row["Email"]),
+            region: safe(row["Comuna"]) || 'Metropolitana',
+            type: safe(row["Tipo de Cliente"]) || 'Farmacia',
+            categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
+            intranet: 'Si',
+            historialUnificado: `Importado desde Intranet el ${new Date().toLocaleDateString('es-CL')}`,
+            responsable: user.displayName || user.email || 'Sistema'
+          };
+
+          if (newContact.name && newContact.rut) {
+            await localDB.saveToCollection('contacts', newContact);
+            importedCount++;
+          }
+        }
+
+        if (importedCount > 0) {
+          await localDB.saveToCollection('intranet_imports', {
+            fechaImportacion: new Date().toISOString(),
+            responsable: user.displayName || user.email || 'Sistema',
+            cantidadImportada: importedCount,
+            archivoNombre: file.name
+          });
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} clientes desde Intranet`, 'CRM');
+        alert(`Éxito: Se importaron ${importedCount} clientes desde Intranet correctamente.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Import Intranet Error:", error);
+        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
       <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
@@ -250,6 +321,13 @@ function CRMRegister() {
              className="hidden" 
              accept=".xlsx, .xls"
              onChange={handleFileUpload}
+           />
+           <input 
+             type="file" 
+             ref={intranetFileInputRef} 
+             className="hidden" 
+             accept=".xlsx, .xls"
+             onChange={handleIntranetFileUpload}
            />
            <button 
              onClick={downloadExcelTemplate}
@@ -263,6 +341,12 @@ function CRMRegister() {
              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
            >
              <Upload className="w-3.5 h-3.5" /> Importar Datos
+           </button>
+           <button 
+             onClick={() => intranetFileInputRef.current?.click()}
+             className="text-[10px] bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+           >
+             <Upload className="w-3.5 h-3.5" /> Importar Intranet
            </button>
          </div>
       </div>
@@ -668,8 +752,18 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
             <button 
                 onClick={async () => {
                    const { getCRMAIRecommendations } = await import('../services/crmAIService');
-                   const contacts = await localDB.getCollection('contacts');
-                   const activities = await localDB.getCollection('crm_activities');
+                   let contacts = [];
+                   try {
+                     contacts = await localDB.getCollection('contacts');
+                   } catch (e) {
+                     console.warn('Could not fetch contacts (may not exist yet)', e);
+                   }
+                   let activities = [];
+                   try {
+                     activities = await localDB.getCollection('crm_activities');
+                   } catch (e) {
+                     console.warn('Could not fetch crm_activities (may not exist yet)', e);
+                   }
                    const recs = await getCRMAIRecommendations(contacts, activities);
                    alert("Recomendaciones de IA:\n\n" + JSON.stringify(recs, null, 2));
                    console.log(recs);
@@ -773,6 +867,45 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
               </tbody>
            </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CRMImportsTable({ imports }: { imports: any[] }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
+      <div className="bg-[#002b5b] p-4 text-white font-bold">
+         <span className="flex items-center gap-2">
+           <FileSpreadsheet className="w-5 h-5" /> Historial de Importaciones de Intranet
+         </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-slate-50 border-b text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              <th className="p-5">Fecha Importación</th>
+              <th className="p-5">Archivo</th>
+              <th className="p-5">Cantidad</th>
+              <th className="p-5">Responsable</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {imports.sort((a, b) => b.fechaImportacion.localeCompare(a.fechaImportacion)).map(imp => (
+              <tr key={imp.fechaImportacion + imp.archivoNombre} className="hover:bg-blue-50/30 transition-colors">
+                <td className="p-5">{ formatDate(imp.fechaImportacion) }</td>
+                <td className="p-5 font-medium">{ imp.archivoNombre }</td>
+                <td className="p-5 font-bold text-emerald-600">{ imp.cantidadImportada }</td>
+                <td className="p-5">{ imp.responsable }</td>
+              </tr>
+            ))}
+            {imports.length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-slate-400 italic">No hay importaciones registradas.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
