@@ -32,8 +32,8 @@ export interface ExpedienteProps {
   showIntranet?: boolean;
   comunaLabel?: string;
   showComuna?: boolean;
+  extraTransferFields?: React.ReactNode;
 }
-//... rest of the file ...
 
 export const Expediente: React.FC<ExpedienteProps> = ({
   selectedClient,
@@ -53,7 +53,8 @@ export const Expediente: React.FC<ExpedienteProps> = ({
   categories,
   showIntranet = true,
   comunaLabel = 'Comuna',
-  showComuna = true
+  showComuna = true,
+  extraTransferFields
 }) => {
   return (
     <div className="bg-slate-50 min-h-[600px] rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-right-4 duration-500 border border-slate-200">
@@ -199,6 +200,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
               >
                  <Save className="w-5 h-5" /> Registrar en Expediente
               </button>
+              {extraTransferFields}
               {onTransfer && (
                 <button 
                   onClick={onTransfer}

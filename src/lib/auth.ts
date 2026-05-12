@@ -147,7 +147,7 @@ export const localDB = {
       });
       return { id: docRef.id, ...item };
     } else {
-      const id = item.id || `rec_${Date.now()}`;
+      const id = item.id || `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const response = await fetch(`/api/records/${name}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

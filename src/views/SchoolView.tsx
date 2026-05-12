@@ -114,24 +114,52 @@ function ContactRegister({ records }: { records: any[] }) {
     interes: 'Diplomado Homeopatía',
     canal: 'Instagram',
     estado: 'Nuevo',
-    observaciones: ''
+    observaciones: '',
+    montoTotalPagado: 0,
+    montoTotalRecibido: 0,
+    nroFactura: '',
+    fechaFactura: '',
+    observacionesPago: ''
   });
 
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [newHistory, setNewHistory] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [activityType, setActivityType] = useState('Nota de Seguimiento');
+  const [currentStatus, setCurrentStatus] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await localDB.saveToCollection('school_leads', form);
-    
-    await addNotification({
-      title: 'Nuevo Lead Académico',
-      message: `${user?.displayName || user?.email} registró a ${form.name}`,
-      recipientRoles: ['admin'],
-      sender: user?.displayName || user?.email || 'Sistema'
+    if (editingId) {
+       await localDB.updateInCollection('school_leads', editingId, form);
+       if (user) await addAuditLog(user, `Actualizó lead académico: ${form.name}`, 'SCHOOL');
+       alert('Lead Académico Actualizado');
+       setEditingId(null);
+    } else {
+       await localDB.saveToCollection('school_leads', form);
+       await addNotification({
+         title: 'Nuevo Lead Académico',
+         message: `${user?.displayName || user?.email} registró a ${form.name}`,
+         recipientRoles: ['admin'],
+         sender: user?.displayName || user?.email || 'Sistema'
+       });
+       if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
+       alert('Lead Académico Registrado');
+    }
+    setForm({ 
+      ...form, 
+      name: '', 
+      rut: '', 
+      email: '', 
+      phone: '', 
+      observaciones: '',
+      montoTotalPagado: 0,
+      montoTotalRecibido: 0,
+      nroFactura: '',
+      fechaFactura: '',
+      observacionesPago: ''
     });
-    if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
-    alert('Lead Académico Registrado');
-    setForm({ ...form, name: '', rut: '', email: '', phone: '', observaciones: '' });
   };
 
   const downloadExcelTemplate = () => {
@@ -190,7 +218,20 @@ function ContactRegister({ records }: { records: any[] }) {
     reader.readAsBinaryString(file);
   };
 
-  const moveToStudents = async (lead: any) => {
+  const [transferringLead, setTransferringLead] = useState<any | null>(null);
+  const [transferPaymentForm, setTransferPaymentForm] = useState({
+    montoTotalPagado: 0,
+    montoTotalRecibido: 0,
+    fechaPago: new Date().toISOString().split('T')[0],
+    nroFactura: '',
+    fechaFactura: '',
+    observaciones: ''
+  });
+
+  const confirmTransfer = async (e: React.FormEvent, lead: any) => {
+    e.preventDefault();
+    if (!lead) return;
+
     try {
       const studentData = {
         name: lead.name,
@@ -199,15 +240,36 @@ function ContactRegister({ records }: { records: any[] }) {
         phone: lead.phone,
         clasificacion: lead.clasificacion,
         diplomado: lead.interes,
-        pago: 'Pendiente',
+        pago: transferPaymentForm.montoTotalRecibido > 0 ? 'Pagado' : 'Pendiente',
         avance: 0,
-        observacionesAcademicas: 'Inscrito desde Captación'
+        observacionesAcademicas: 'Inscrito desde Captación',
+        montoTotalPagado: transferPaymentForm.montoTotalPagado,
+        montoTotalRecibido: transferPaymentForm.montoTotalRecibido,
+        nroFactura: transferPaymentForm.nroFactura,
+        fechaFactura: transferPaymentForm.fechaFactura
       };
       await localDB.saveToCollection('students', studentData);
       
+      // Sincronizar automáticamente con el módulo administrativo de Escuela
+      const schoolPayment = {
+        tipo: 'Ingreso Alumno',
+        nombreAlumno: lead.name,
+        rut: lead.rut,
+        direccion: lead.direccion || '',
+        email: lead.email,
+        telefono: lead.phone,
+        fechaPago: transferPaymentForm.fechaPago || new Date().toISOString().split('T')[0],
+        montoTotalPagado: transferPaymentForm.montoTotalPagado,
+        montoTotalRecibido: transferPaymentForm.montoTotalRecibido,
+        nroFactura: transferPaymentForm.nroFactura,
+        fechaFactura: transferPaymentForm.fechaFactura,
+        observaciones: transferPaymentForm.observaciones || `Matrícula desde Captación: ${lead.interes}`
+      };
+      await localDB.saveToCollection('school_payments', schoolPayment);
+      
       await addNotification({
         title: 'Nuevo Alumno Matriculado',
-        message: `${user?.displayName || user?.email} matriculó a ${lead.name}`,
+        message: `${user?.displayName || user?.email} matriculó a ${lead.name}. Se ha creado el registro en Administración.`,
         recipientRoles: ['admin'],
         sender: user?.displayName || user?.email || 'Sistema'
       });
@@ -265,33 +327,56 @@ function ContactRegister({ records }: { records: any[] }) {
                </div>
             </div>
             <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
-               <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
-               <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required /></FormGroup>
-               <FormGroup label="RUT Escrito"><input className="w-full border-b p-2" value={form.rut} onChange={e => setForm({...form, rut: e.target.value})} required /></FormGroup>
-               <FormGroup label="Email"><input type="email" className="w-full border-b p-2" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></FormGroup>
-               <FormGroup label="Teléfono / WhatsApp"><input className="w-full border-b p-2" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></FormGroup>
+               <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
+               <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} required /></FormGroup>
+               <FormGroup label="RUT Escrito"><input className="w-full border-b p-2" value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} required /></FormGroup>
+               <FormGroup label="Email"><input type="email" className="w-full border-b p-2" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></FormGroup>
+               <FormGroup label="Teléfono / WhatsApp"><input className="w-full border-b p-2" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} /></FormGroup>
                
                <FormGroup label="CLASIFICACIÓN PROFESIONAL">
-                  <select className="w-full border-b p-2 text-sm font-bold text-blue-700" value={form.clasificacion} onChange={e => setForm({...form, clasificacion: e.target.value})}>
+                  <select className="w-full border-b p-2 text-sm font-bold text-blue-700" value={form.clasificacion || ''} onChange={e => setForm({...form, clasificacion: e.target.value})}>
                     {CLASIFICACIONES.map(c => <option key={c}>{c}</option>)}
                   </select>
                </FormGroup>
 
                <FormGroup label="Programa de Interés">
-                  <select className="w-full border-b p-2 text-sm" value={form.interes} onChange={e => setForm({...form, interes: e.target.value})}>
+                  <select className="w-full border-b p-2 text-sm" value={form.interes || ''} onChange={e => setForm({...form, interes: e.target.value})}>
                     {PROGRAMAS.map(p => <option key={p}>{p}</option>)}
                   </select>
                </FormGroup>
 
                <div className="col-span-full">
                   <FormGroup label="Observaciones de seguimiento">
-                    <textarea className="w-full border rounded-xl p-4 h-24 bg-slate-50 outline-none focus:bg-white" value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} />
+                    <textarea className="w-full border rounded-xl p-4 h-24 bg-slate-50 outline-none focus:bg-white" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} />
                   </FormGroup>
                </div>
                
-               <button type="submit" className="col-span-full bg-[#001736] text-white py-4 rounded-xl font-bold shadow-xl flex items-center justify-center gap-3">
-                  <Save className="w-5 h-5" /> GUARDAR LEAD ACADÉMICO
-               </button>
+               <div className="col-span-full border-t border-slate-200 mt-4 pt-6">
+                  <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Datos de Matrícula / Pago</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                     <FormGroup label="Total de Venta (Opcional)"><input type="number" className="w-full border-b p-2" value={form.montoTotalPagado ?? 0} onChange={e => setForm({...form, montoTotalPagado: Number(e.target.value)})} /></FormGroup>
+                     <FormGroup label="Monto Recibido"><input type="number" className="w-full border-b p-2 font-black text-emerald-600 bg-emerald-50 rounded" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} /></FormGroup>
+                     <FormGroup label="N° Factura"><input className="w-full border-b p-2" value={form.nroFactura || ''} onChange={e => setForm({...form, nroFactura: e.target.value})} /></FormGroup>
+                     <FormGroup label="Fecha Factura"><input type="date" className="w-full border-b p-2" value={form.fechaFactura || ''} onChange={e => setForm({...form, fechaFactura: e.target.value})} /></FormGroup>
+                     <div className="col-span-1 md:col-span-4">
+                        <FormGroup label="Observación Pago"><input className="w-full border-b p-2 italic" value={form.observacionesPago || ''} onChange={e => setForm({...form, observacionesPago: e.target.value})} placeholder="Ej: Pago total del diplomado..." /></FormGroup>
+                     </div>
+                  </div>
+               </div>
+               
+               <div className="col-span-full flex gap-3">
+                 <button type="submit" className="flex-1 bg-[#001736] text-white py-4 rounded-xl font-bold shadow-xl flex items-center justify-center gap-3">
+                    <Save className="w-5 h-5" /> {editingId ? 'ACTUALIZAR LEAD ACADÉMICO' : 'GUARDAR LEAD ACADÉMICO'}
+                 </button>
+                 {editingId && (
+                   <button type="button" onClick={() => {
+                     setEditingId(null);
+                     setForm({ ...form, name: '', rut: '', email: '', phone: '', observaciones: '', montoTotalPagado: 0, montoTotalRecibido: 0, nroFactura: '', fechaFactura: '', observacionesPago: '' });
+                   }} className="px-6 bg-slate-200 text-slate-700 py-4 rounded-xl font-bold shadow-xl flex items-center justify-center">
+                      CANCELAR
+                   </button>
+                 )}
+               </div>
             </form>
           </div>
 
@@ -310,23 +395,73 @@ function ContactRegister({ records }: { records: any[] }) {
             showComuna={false}
             onClose={() => setSelectedLead(null)}
             onUpdate={async(data) => {
-               // Update logic for lead
-               await localDB.updateInCollection('school_leads', selectedLead.id, { observaciones: data.newHistory });
+               const currentDate = new Date().toLocaleString();
+               const userStamp = user?.displayName || user?.email || 'Admin';
+               const header = `[${currentDate}] - ${userStamp}\n\u25b6 Actividad: ${data.activityType || activityType}\n\u25b6 Estado: ${data.currentStatus || currentStatus}`;
+               const addedNote = data.newHistory ? `\nResumen: ${data.newHistory}` : '';
+               const fullHistoryEntry = header + addedNote;
+
+               const mergedHistory = selectedLead.observaciones 
+                  ? selectedLead.observaciones + '\n\n' + fullHistoryEntry 
+                  : fullHistoryEntry;
+
+               await localDB.updateInCollection('school_leads', selectedLead.id, { 
+                  observaciones: mergedHistory,
+                  estado: data.currentStatus || currentStatus,
+                  clasificacion: data.newCategory || newCategory || selectedLead.clasificacion
+               });
+
+               setSelectedLead({
+                  ...selectedLead,
+                  observaciones: mergedHistory,
+                  estado: data.currentStatus || currentStatus,
+                  clasificacion: data.newCategory || newCategory || selectedLead.clasificacion
+               });
+
+               if (user) await addAuditLog(user, `Actualizó gestión de lead: ${selectedLead.name}`, 'SCHOOL');
                alert('Gestión de captación guardada');
+               setNewHistory('');
             }}
             onTransfer={async() => {
-              await moveToStudents(selectedLead);
+              await confirmTransfer(new Event('submit') as any, selectedLead);
             }}
-            newHistory={selectedLead.observaciones || ''}
-            setNewHistory={() => {}} // Simplified for now
-            newCategory={selectedLead.clasificacion}
-            setNewCategory={(val) => {}}
+            extraTransferFields={(
+              <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 mt-4 space-y-4">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-2">Datos de Matrícula (Opcional)</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Monto Total de Venta</label>
+                    <input type="number" className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.montoTotalPagado ?? 0} onChange={e => setTransferPaymentForm({...transferPaymentForm, montoTotalPagado: Number(e.target.value)})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-emerald-600 tracking-wider">Monto Recibido</label>
+                    <input type="number" className="w-full border-b bg-emerald-50 border-emerald-300 p-2 text-sm font-bold text-emerald-700 outline-none" value={transferPaymentForm.montoTotalRecibido ?? 0} onChange={e => setTransferPaymentForm({...transferPaymentForm, montoTotalRecibido: Number(e.target.value)})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">N° Factura</label>
+                    <input className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.nroFactura || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, nroFactura: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Fecha Factura</label>
+                    <input type="date" className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.fechaFactura || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, fechaFactura: e.target.value})} />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Observación Pago</label>
+                    <input className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none italic" value={transferPaymentForm.observaciones || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, observaciones: e.target.value})} placeholder={`Matrícula: ${selectedLead.interes}`} />
+                  </div>
+                </div>
+              </div>
+            )}
+            newHistory={newHistory}
+            setNewHistory={setNewHistory}
+            newCategory={newCategory || selectedLead.clasificacion}
+            setNewCategory={setNewCategory}
             newIntranet={'No'}
             setNewIntranet={() => {}}
-            activityType={'Nota de Seguimiento'}
-            setActivityType={() => {}}
-            currentStatus={selectedLead.estado}
-            setCurrentStatus={() => {}}
+            activityType={activityType}
+            setActivityType={setActivityType}
+            currentStatus={currentStatus || selectedLead.estado}
+            setCurrentStatus={setCurrentStatus}
             categories={['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro']}
           />
         )}
@@ -361,13 +496,31 @@ function ContactRegister({ records }: { records: any[] }) {
                        </div>
                        <div className="flex gap-2">
                         <button 
-                          onClick={() => setSelectedLead(r)}
+                          onClick={() => {
+                            setSelectedLead(r);
+                            setTransferPaymentForm({
+                              montoTotalPagado: r.montoTotalPagado || 0,
+                              montoTotalRecibido: r.montoTotalRecibido || 0,
+                              nroFactura: r.nroFactura || '',
+                              fechaFactura: r.fechaFactura || '',
+                              observaciones: r.observacionesPago || '',
+                              fechaPago: new Date().toISOString().split('T')[0]
+                            });
+                          }}
                           className="bg-slate-100 p-1.5 rounded hover:bg-amber-100 hover:text-amber-700 transition-colors"
                           title="Mover a Estudiante"
                         >
                           <ArrowRight className="w-3 h-3" />
                         </button>
                         <RecordActions 
+                          onEdit={() => {
+                            setForm({
+                              ...form,
+                              ...r
+                            });
+                            setEditingId(r.id);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
                           onDelete={async () => {
                             await localDB.deleteFromCollection('school_leads', r.id);
                           }}
@@ -1026,19 +1179,19 @@ function SchoolActivities() {
           <form className="p-8 space-y-6" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FormGroup label="Fecha">
-                <input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
+                <input type="date" className="w-full border-b p-2" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} required />
               </FormGroup>
               <FormGroup label="Nombre de Actividad / Campaña">
                 <input 
                   className="w-full border-b p-2 font-bold" 
                   placeholder="Ej: AGENDA DE INDUCCIÓN" 
-                  value={form.actividad} 
+                  value={form.actividad || ''} 
                   onChange={e => setForm({...form, actividad: e.target.value})} 
                   required 
                 />
               </FormGroup>
               <FormGroup label="Tipo">
-                <select className="w-full border-b p-2" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
+                <select className="w-full border-b p-2" value={form.tipo || ''} onChange={e => setForm({...form, tipo: e.target.value})}>
                   <option>Actividad Académica</option>
                   <option>Campaña de Venta</option>
                   <option>Taller de Inducción</option>
@@ -1047,7 +1200,7 @@ function SchoolActivities() {
                 </select>
               </FormGroup>
               <FormGroup label="Categoría Objetivo">
-                <select className="w-full border-b p-2" value={form.categoriaObjetivo} onChange={e => setForm({...form, categoriaObjetivo: e.target.value})}>
+                <select className="w-full border-b p-2" value={form.categoriaObjetivo || ''} onChange={e => setForm({...form, categoriaObjetivo: e.target.value})}>
                   <option>Todos</option>
                   {['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'].map(c => <option key={c}>{c}</option>)}
                 </select>
@@ -1057,7 +1210,7 @@ function SchoolActivities() {
               <textarea 
                 className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
                 placeholder="Detalle de la actividad..."
-                value={form.observaciones}
+                value={form.observaciones || ''}
                 onChange={e => setForm({...form, observaciones: e.target.value})}
               />
             </FormGroup>
@@ -1128,10 +1281,8 @@ function SchoolActivities() {
                       onView={() => setDetailView(act)}
                       onEdit={() => handleEdit(act)}
                       onDelete={async () => {
-                        if (confirm('¿Eliminar actividad?')) {
-                          await localDB.deleteFromCollection('school_activities', act.id);
-                          loadActivities();
-                        }
+                        await localDB.deleteFromCollection('school_activities', act.id);
+                        loadActivities();
                       }}
                     />
                   </td>

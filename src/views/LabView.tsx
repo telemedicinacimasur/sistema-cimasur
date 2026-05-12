@@ -475,7 +475,9 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
               {records.filter(r => r.type === 'gotas-puras').filter(r => {
                 const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.observaciones || ''} ${formatDate(r.fecha)}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).map((record) => (
+              })
+              .sort((a,b) => (b.fecha || '').localeCompare(a.fecha || ''))
+              .map((record) => (
                 <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 text-xs font-medium">{formatDate(record.fecha)}</td>
                   <td className="px-6 py-4 text-xs font-bold text-[#001736]">{record.producto}</td>
@@ -807,7 +809,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
               {records.filter(r => r.type === 'elaboracion').filter(r => {
                 const searchStr = `${formatDate(r.fecha)} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).map(r => (
+              }).sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).map(r => (
                 <tr key={r.id} className="hover:bg-slate-50">
                   <td className="p-4">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-mono text-blue-700">{r.nroCimasur}</td>
@@ -1224,7 +1226,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
               {records.filter(r => r.type === 'nosodes').filter(r => {
                 const searchStr = `${formatDate(r.fechaFicha)} ${r.nroMuestra || ''} ${r.paciente || ''} ${r.producto || ''} ${r.medico || ''} ${r.refrigerador || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).map(r => (
+              }).sort((a,b) => (b.fechaFicha || '').localeCompare(a.fechaFicha || '')).map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-medium">{formatDate(r.fechaFicha)}</td>
                   <td className="p-4 font-mono text-blue-700">{r.nroMuestra}</td>
@@ -1734,7 +1736,7 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
               {records.filter(r => r.type === 'preparacion').filter(r => {
                 const searchStr = `${formatDate(r.fecha)} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).map(r => (
+              }).sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).map(r => (
                 <tr key={r.id}>
                   <td className="p-4">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold">{r.producto}</td>
@@ -2119,7 +2121,7 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
               {records.filter(r => r.type === 'tinturas').filter(r => {
                 const searchStr = `${formatDate(r.fecha)} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).map(r => (
+              }).sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).map(r => (
                 <tr key={r.id}>
                   <td className="px-6 py-4 font-medium">{formatDate(r.fecha)}</td>
                   <td className="px-6 py-4 font-bold">{r.insumo}</td>
@@ -2366,7 +2368,8 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
     .filter(r => {
       const searchStr = `${r.nombre || ''} ${r.codigoCimasur || ''} ${r.lote || ''} ${r.proveedor || ''}`.toLowerCase();
       return searchStr.includes(searchTerm.toLowerCase());
-    });
+    })
+    .sort((a,b) => (b.fechaIngreso || "").localeCompare(a.fechaIngreso || ""));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -2865,7 +2868,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
               {records.filter(r => r.type === 'vademecum').filter(r => {
                 const searchStr = `${formatDate(r.fechaCotiz)} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).map(r => (
+              }).sort((a,b) => (b.fechaCotiz || '').localeCompare(a.fechaCotiz || '')).map(r => (
                 <tr key={r.id}>
                   <td className="px-6 py-4 font-medium">{formatDate(r.fechaCotiz)}</td>
                   <td className="px-6 py-4 font-bold">{r.producto}</td>
@@ -3321,7 +3324,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
               {records.filter(r => r.type === 'mantenimiento').filter(r => {
                 const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''} ${formatDate(r.fechaCompra)}`.toLowerCase();
                 return searchStr.includes(searchTerm.toLowerCase());
-              }).map(r => (
+              }).sort((a,b) => (b.fechaCompra || '').localeCompare(a.fechaCompra || '')).map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-mono text-blue-700 text-center">{r.codigo}</td>
                   <td className="p-4 font-bold">{r.producto}</td>
@@ -3501,7 +3504,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     r.area === selectedArea && 
     ((r.item || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
      (r.code && r.code.toLowerCase().includes(searchTerm.toLowerCase())))
-  );
+  ).sort((a,b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4332,7 +4335,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     const searchString = `${safe(r.nroCotiz)} ${safe(r.cliente)} ${safe(r.ot)} ${formatDate(r.fechaCotiz)} ${formatDate(r.fechaEnvio)}`.toLowerCase();
     const matchesSearch = searchString.includes(searchTerm.toLowerCase());
     return matchesSituacion && matchesSearch;
-  });
+  }).sort((a,b) => (b.fechaEnvio || b.fechaCotiz || '').localeCompare(a.fechaEnvio || a.fechaCotiz || ''));
 
   const handleDelete = async (id: string) => {
     try {
@@ -4758,13 +4761,13 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
       <form className="p-8 space-y-8" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FormField label="N° COTIZACION">
-              <input className="w-full border-b p-2 text-sm font-bold" value={form.nroCotizacion} onChange={e => setForm({...form, nroCotizacion: e.target.value})} required placeholder="COT-001" />
+              <input className="w-full border-b p-2 text-sm font-bold" value={form.nroCotizacion || ''} onChange={e => setForm({...form, nroCotizacion: e.target.value})} required placeholder="COT-001" />
             </FormField>
             <FormField label="MV TRATANTE">
-              <input className="w-full border-b p-2 text-sm uppercase" value={form.mvTratante} onChange={e => setForm({...form, mvTratante: e.target.value})} required />
+              <input className="w-full border-b p-2 text-sm uppercase" value={form.mvTratante || ''} onChange={e => setForm({...form, mvTratante: e.target.value})} required />
             </FormField>
             <FormField label="N° ASIGNADO">
-              <input className="w-full border-b p-2 text-sm font-black text-blue-800" value={form.nroAsignado} onChange={e => setForm({...form, nroAsignado: e.target.value})} required />
+              <input className="w-full border-b p-2 text-sm font-black text-blue-800" value={form.nroAsignado || ''} onChange={e => setForm({...form, nroAsignado: e.target.value})} required />
             </FormField>
           </div>
 
@@ -4847,21 +4850,21 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-6 border-t border-slate-100">
             <FormField label="FECHA">
-              <input type="date" className="w-full border-b p-2 text-sm" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
+              <input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} required />
             </FormField>
             <FormField label="NOMBRE PREPARADOR">
-              <input className="w-full border-b p-2 text-sm font-bold" value={form.preparador} readOnly />
+              <input className="w-full border-b p-2 text-sm font-bold" value={form.preparador || ''} readOnly />
             </FormField>
             <FormField label="NOMBRE RESPONSABLE DE REVISIÓN">
               <input 
                 className="w-full border-b p-2 text-sm uppercase font-bold" 
-                value={form.responsableRevision} 
+                value={form.responsableRevision || ''} 
                 onChange={e => setForm({...form, responsableRevision: e.target.value})} 
                 placeholder="Nombre del responsable"
               />
             </FormField>
             <FormField label="OBSERVACION">
-              <input className="w-full border-b p-2 text-sm" value={form.observacion} onChange={e => setForm({...form, observacion: e.target.value})} />
+              <input className="w-full border-b p-2 text-sm" value={form.observacion || ''} onChange={e => setForm({...form, observacion: e.target.value})} />
             </FormField>
           </div>
 

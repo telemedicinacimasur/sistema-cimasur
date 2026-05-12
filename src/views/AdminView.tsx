@@ -38,7 +38,10 @@ import {
   PlusCircle,
   FileUp,
   DollarSign,
-  RefreshCw
+  RefreshCw,
+  GraduationCap,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
@@ -46,7 +49,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 import { addNotification } from '../lib/notifications';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'users' | 'logs';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'users' | 'logs';
 
 export default function AdminView() {
   const { user } = useAuth();
@@ -62,6 +65,7 @@ export default function AdminView() {
       if (view === 'sales_gestion') col = 'sales_gestion';
       if (view === 'dte') col = 'dte_records';
       if (view === 'pet_payments') col = 'pet_payments';
+      if (view === 'school_payments') col = 'school_payments';
       if (view === 'logs') col = 'audit_logs'; 
       const data = await localDB.getCollection(col);
       setRecords(data);
@@ -112,6 +116,12 @@ export default function AdminView() {
             icon={DollarSign}
             onClick={() => setView('pet_payments')}
           />
+          <ModuleCard 
+            title="Saldos Escuela Cimasur"
+            desc="Control de pagos de alumnos, meta mensual y gastos académicos."
+            icon={GraduationCap}
+            onClick={() => setView('school_payments')}
+          />
           {isAdmin && (
             <ModuleCard 
               title="Gestión de Usuarios"
@@ -148,6 +158,7 @@ export default function AdminView() {
       {view === 'sales_gestion' && <SalesGestionManager records={records} setRecords={setRecords} />}
       {view === 'dte' && <DTEManager records={records} setRecords={setRecords} />}
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
+      {view === 'school_payments' && <SchoolPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'users' && <UsersManager />}
       {view === 'logs' && <AuditLogManager records={records} />}
     </div>
@@ -263,11 +274,9 @@ function UsersManager() {
       alert('No puedes eliminar al administrador principal');
       return;
     }
-    if (window.confirm(`¿Está seguro que desea eliminar definitivamente al usuario ${targetUser?.displayName || targetUser?.email}?`)) {
-      await localAuth.deleteUser(uid);
-      refreshUsers();
-      alert('Usuario eliminado');
-    }
+    await localAuth.deleteUser(uid);
+    refreshUsers();
+    alert('Usuario eliminado');
   };
 
   return (
@@ -618,6 +627,10 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
     const matchesStart = !dateStart || date >= dateStart;
     const matchesEnd = !dateEnd || date <= dateEnd;
     return matchesSearch && matchesStart && matchesEnd;
+  }).sort((a,b) => {
+    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    if (d !== 0) return d;
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
 
   const totalVet = filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0);
@@ -692,11 +705,11 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
         </div>
         <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
           <div className="md:col-span-2 grid grid-cols-2 gap-4">
-             <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required /></FormField>
+             <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} required /></FormField>
              <FormField label="Tutor (Nombre Completo)">
                <input 
                 className="w-full border-b p-2 text-sm font-bold uppercase" 
-                value={form.tutor} 
+                value={form.tutor || ''} 
                 onChange={e => setForm({...form, tutor: e.target.value})} 
                 onBlur={e => handleTutorLookup(e.target.value)}
                 list="tutors-list"
@@ -708,15 +721,15 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
              </FormField>
           </div>
           <div className="md:col-span-2 grid grid-cols-3 gap-4">
-             <FormField label="Mail"><input type="email" className="w-full border-b p-2 text-sm" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></FormField>
-             <FormField label="Fono"><input className="w-full border-b p-2 text-sm" value={form.fono} onChange={e => setForm({...form, fono: e.target.value})} /></FormField>
-             <FormField label="Nombre MV"><input className="w-full border-b p-2 text-sm uppercase" value={form.nombreMV} onChange={e => setForm({...form, nombreMV: e.target.value})} /></FormField>
+             <FormField label="Mail"><input type="email" className="w-full border-b p-2 text-sm" value={form.mail || ''} onChange={e => setForm({...form, mail: e.target.value})} /></FormField>
+             <FormField label="Fono"><input className="w-full border-b p-2 text-sm" value={form.fono || ''} onChange={e => setForm({...form, fono: e.target.value})} /></FormField>
+             <FormField label="Nombre MV"><input className="w-full border-b p-2 text-sm uppercase" value={form.nombreMV || ''} onChange={e => setForm({...form, nombreMV: e.target.value})} /></FormField>
           </div>
           
           <div className="md:col-span-3 grid grid-cols-3 gap-4">
-            <FormField label="Pago Consulta ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.pagoConsulta} onChange={e => setForm({...form, pagoConsulta: parseInt(e.target.value) || 0})} /></FormField>
-            <FormField label="Pago Veterinario ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded border-blue-200" value={form.pagoVeterinario} onChange={e => setForm({...form, pagoVeterinario: parseInt(e.target.value) || 0})} /></FormField>
-            <FormField label="Fecha de Pago"><input type="date" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.fechaPago} onChange={e => setForm({...form, fechaPago: e.target.value})} /></FormField>
+            <FormField label="Pago Consulta ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.pagoConsulta ?? 0} onChange={e => setForm({...form, pagoConsulta: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Pago Veterinario ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded border-blue-200" value={form.pagoVeterinario ?? 0} onChange={e => setForm({...form, pagoVeterinario: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Fecha de Pago"><input type="date" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} /></FormField>
           </div>
           <div className="md:col-span-1 flex flex-col justify-end gap-3">
              <button type="submit" className={cn(
@@ -834,7 +847,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredRecords.sort((a,b) => b.fecha.localeCompare(a.fecha)).map(r => (
+              {filteredRecords.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-4 font-mono text-slate-400">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold text-[#001736] uppercase">{r.tutor}</td>
@@ -1022,9 +1035,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
       return matchesSearch && matchesDate && matchesStatus;
     })
     .sort((a, b) => {
-      const numA = parseInt(a.nroCotiz) || 0;
-      const numB = parseInt(b.nroCotiz) || 0;
-      return numA - numB;
+      return (Number(b.nroCotiz) || 0) - (Number(a.nroCotiz) || 0);
     });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1155,8 +1166,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
           </FormField>
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           <FormField label="Observaciones"><input className="w-full border-b p-2 text-sm" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
-          <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal ?? 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="Und Inventario"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits ?? 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="Und Inventario"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits || 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
           <FormField label="Und a hacer">
             <div className="w-full p-2 text-sm font-bold text-amber-700 bg-amber-50 rounded border-b border-amber-200">
               {form.todoUnits}
@@ -1431,6 +1442,10 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
       if (!text.includes(s)) match = false;
     }
     return match;
+  }).sort((a,b) => {
+    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    if (d !== 0) return d;
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
 
   const getConsolidatedProducts = () => {
@@ -1543,13 +1558,13 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
           <FormField label="Fact / Boleta"><input className="w-full border-b p-2 text-sm" value={form.documento || ''} onChange={e => setForm({...form, documento: e.target.value})} required /></FormField>
           <FormField label="Cliente"><input className="w-full border-b p-2 text-sm" value={form.cliente || ''} onChange={e => setForm({...form, cliente: e.target.value})} required /></FormField>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="N° Frascos"><input type="number" className="w-full border-b p-2 text-sm" value={form.nroFrascos ?? 0} onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} /></FormField>
-            <FormField label="Valor Cotización ($)"><input type="number" className="w-full border-b p-2 text-sm" value={form.valorCotizacion ?? 0} onChange={e => setForm({...form, valorCotizacion: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="N° Frascos"><input type="number" className="w-full border-b p-2 text-sm" value={form.nroFrascos || 0} onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Valor Cotización ($)"><input type="number" className="w-full border-b p-2 text-sm" value={form.valorCotizacion || 0} onChange={e => setForm({...form, valorCotizacion: parseInt(e.target.value) || 0})} /></FormField>
           </div>
           <FormField label="Detalle de Productos Solicitados">
             <textarea 
               className="w-full border p-2 text-xs rounded h-24 outline-none focus:ring-1 focus:ring-blue-200" 
-              value={form.detalleProductos} 
+              value={form.detalleProductos || ''} 
               onChange={e => setForm({...form, detalleProductos: e.target.value})}
               placeholder="Ej: 2x Omega 3, 1x Multivitamínico..."
             />
@@ -1844,6 +1859,10 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
       if (!text.includes(s)) match = false;
     }
     return match;
+  }).sort((a,b) => {
+    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    if (d !== 0) return d;
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
 
   const totalFrascos = filteredRecords.reduce((sum, r) => sum + (Number(r.nroFrascos) || 0), 0);
@@ -1916,7 +1935,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
           <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
           <FormField label="Fact / Boleta"><input className="w-full border-b p-2 text-sm" value={form.documento || ''} onChange={e => setForm({...form, documento: e.target.value})} required /></FormField>
           <FormField label="Cliente"><input className="w-full border-b p-2 text-sm" value={form.cliente || ''} onChange={e => setForm({...form, cliente: e.target.value})} required /></FormField>
-          <FormField label="N° Frascos"><input type="number" className="w-full border-b p-2 text-sm" value={form.nroFrascos ?? 0} onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} /></FormField>
+          <FormField label="N° Frascos"><input type="number" className="w-full border-b p-2 text-sm" value={form.nroFrascos || 0} onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} /></FormField>
           <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold mt-2 hover:bg-opacity-90">GUARDAR VENTA</button>
         </form>
       </div>
@@ -2035,6 +2054,391 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
   );
 }
 
+function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+  const { user } = useAuth();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [monthFilter, setMonthFilter] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()));
+  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
+  const [meta, setMeta] = useState(5000000);
+  const [isEditingMeta, setIsEditingMeta] = useState(false);
+  const [showTotals, setShowTotals] = useState(false);
+
+  const [form, setForm] = useState({
+    tipo: 'Ingreso Alumno', // 'Ingreso Alumno' | 'Pago Profesor' | 'Gasto Mensual'
+    nombreAlumno: '',
+    rut: '',
+    direccion: '',
+    email: '',
+    telefono: '',
+    fechaPago: new Date().toISOString().split('T')[0],
+    montoTotalPagado: 0,
+    montoTotalRecibido: 0,
+    nroFactura: '',
+    fechaFactura: '',
+    observaciones: ''
+  });
+
+  const filteredRecords = records.filter(r => {
+    if (!r.fechaPago) return false;
+    const rDate = new Date(r.fechaPago + 'T00:00:00');
+    if (isNaN(rDate.getTime())) return false;
+    const rMonth = new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(rDate);
+    const rYear = rDate.getFullYear().toString();
+    return rMonth.toLowerCase() === monthFilter.toLowerCase() && rYear === yearFilter;
+  }).sort((a,b) => {
+    const d = (b.fechaPago || '').localeCompare(a.fechaPago || '');
+    if (d !== 0) return d;
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+
+  const totalIngresos = filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
+  const totalPagosProfesores = filteredRecords.filter(r => r.tipo === 'Pago Profesor').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
+  const totalGastosMensuales = filteredRecords.filter(r => r.tipo === 'Gasto Mensual').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
+  const totalNeto = totalIngresos - totalPagosProfesores - totalGastosMensuales;
+  const faltante = meta - totalNeto;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingId) {
+      await localDB.updateInCollection('school_payments', editingId, form);
+      await addAuditLog(user!, `Actualizó registro de Escuela: ${form.nombreAlumno || form.tipo}`, 'Administración');
+      setEditingId(null);
+    } else {
+      await localDB.saveToCollection('school_payments', form);
+      await addAuditLog(user!, `Registró ${form.tipo}: ${form.nombreAlumno || form.tipo}`, 'Administración');
+    }
+    setForm({
+      tipo: 'Ingreso Alumno',
+      nombreAlumno: '',
+      rut: '',
+      email: '',
+      telefono: '',
+      fechaPago: new Date().toISOString().split('T')[0],
+      montoTotalPagado: 0,
+      montoTotalRecibido: 0,
+      nroFactura: '',
+      fechaFactura: '',
+      observaciones: ''
+    });
+    const updated = await localDB.getCollection('school_payments');
+    setRecords(updated);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await localDB.deleteFromCollection('school_payments', id);
+      const updated = await localDB.getCollection('school_payments');
+      setRecords(updated);
+      alert('Registro eliminado');
+    } catch (err) {
+      alert('No se pudo eliminar');
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white rounded-2xl border shadow-sm p-6 grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+        <button 
+           onClick={() => setShowTotals(!showTotals)}
+           className="absolute top-4 right-4 text-slate-400 hover:text-blue-600 transition-colors bg-slate-100 p-2 rounded-lg"
+           title={showTotals ? "Ocultar Totales" : "Mostrar Totales"}
+        >
+          {showTotals ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+        </button>
+        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <span className="block text-[10px] font-black uppercase text-blue-400 tracking-widest mb-1">Meta Mensual</span>
+          <div className="flex items-center gap-2">
+            {!isEditingMeta ? (
+               <>
+                 <span className="text-xl font-black text-blue-900">{showTotals ? formatCurrency(meta) : '***'}</span>
+                 {showTotals && <button onClick={() => setIsEditingMeta(true)} className="text-blue-400 hover:text-blue-600"><Edit className="w-4 h-4" /></button>}
+               </>
+            ) : (
+               <div className="flex items-center gap-2">
+                 <input 
+                   type="number" 
+                   className="w-32 border border-blue-300 rounded p-1 text-sm font-bold outline-none focus:border-blue-500" 
+                   autoFocus
+                   defaultValue={meta}
+                   onBlur={(e) => {
+                     setMeta(Number(e.target.value));
+                     setIsEditingMeta(false);
+                   }}
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter') {
+                       setMeta(Number(e.currentTarget.value));
+                       setIsEditingMeta(false);
+                     }
+                   }}
+                 />
+               </div>
+            )}
+          </div>
+        </div>
+        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+          <span className="block text-[10px] font-black uppercase text-emerald-400 tracking-widest mb-1">Acumulado Neto (Mes)</span>
+          <span className="text-xl font-black text-emerald-700">{showTotals ? formatCurrency(totalNeto) : '***'}</span>
+        </div>
+        <div className={cn(
+          "p-4 rounded-xl border",
+          faltante > 0 ? "bg-amber-50 border-amber-100" : "bg-emerald-50 border-emerald-100"
+        )}>
+          <span className="block text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">
+            {faltante > 0 ? 'Faltante para Meta' : '¡Meta Cumplida!'}
+          </span>
+          <span className={cn(
+            "text-xl font-black",
+            faltante > 0 ? "text-amber-700" : "text-emerald-700"
+          )}>{showTotals ? formatCurrency(Math.abs(faltante)) : '***'}</span>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+          <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Filtros</span>
+          <div className="flex gap-2">
+            <select className="bg-transparent font-bold text-xs outline-none" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}>
+              {['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'].map(m => (
+                <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+              ))}
+            </select>
+            <input className="bg-transparent font-bold text-xs outline-none w-16" type="number" value={yearFilter} onChange={e => setYearFilter(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* Registro Principal: Ingreso de Alumnos */}
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center cursor-pointer" onClick={() => setForm({...form, tipo: form.tipo === 'Ingreso Alumno' ? '' : 'Ingreso Alumno'})}>
+            <span>Registro de Pagos Escuela (Ingresos) {form.tipo === 'Ingreso Alumno' ? '▼' : '▶'}</span>
+            <span className="text-xl font-black">{form.tipo === 'Ingreso Alumno' ? formatCurrency(totalIngresos) : '***'}</span>
+          </div>
+          
+          {form.tipo === 'Ingreso Alumno' && (
+            <div className="p-6">
+              <form className="grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleSubmit}>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Nombre Alumno</label>
+                  <input className="w-full border-b p-2 font-bold" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">RUT</label>
+                  <input className="w-full border-b p-2" value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Dirección</label>
+                  <input className="w-full border-b p-2" value={form.direccion || ''} onChange={e => setForm({...form, direccion: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">E-mail</label>
+                  <input type="email" className="w-full border-b p-2" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Teléfono</label>
+                  <input className="w-full border-b p-2" value={form.telefono || ''} onChange={e => setForm({...form, telefono: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Fecha Pago</label>
+                  <input type="date" className="w-full border-b p-2" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total de la Venta</label>
+                  <input type="number" className="w-full border-b p-2" value={form.montoTotalPagado ?? 0} onChange={e => setForm({...form, montoTotalPagado: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Recibido en Cuenta</label>
+                  <input type="number" className="w-full border-b p-2 font-black text-emerald-700 bg-emerald-50 rounded" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">N° Factura</label>
+                  <input className="w-full border-b p-2" value={form.nroFactura || ''} onChange={e => setForm({...form, nroFactura: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Fecha Factura</label>
+                  <input type="date" className="w-full border-b p-2" value={form.fechaFactura || ''} onChange={e => setForm({...form, fechaFactura: e.target.value})} />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Observaciones</label>
+                  <input className="w-full border-b p-2 italic" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} />
+                </div>
+                <div className="md:col-span-4 flex justify-end mt-2">
+                  <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-md hover:bg-slate-800 transition-all">
+                    {editingId ? 'ACTUALIZAR INGRESO' : 'REGISTRAR INGRESO'}
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-8">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
+                      <th className="p-3">Fecha</th>
+                      <th className="p-3">Alumno</th>
+                      <th className="p-3 text-right">Monto Total</th>
+                      <th className="p-3 text-right">Recibido (Neto)</th>
+                      <th className="p-3 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 italic">
+                    {filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-3">{formatDate(r.fechaPago)}</td>
+                        <td className="p-3">
+                          <div className="font-bold text-[#001736]">{r.nombreAlumno}</div>
+                          <div className="text-[9px] text-slate-400">{r.rut} {r.email}</div>
+                          <div className="text-[9px] font-normal">{r.observaciones}</div>
+                        </td>
+                        <td className="p-3 text-right">{formatCurrency(r.montoTotalPagado)}</td>
+                        <td className="p-3 text-right font-black text-emerald-600">+{formatCurrency(r.montoTotalRecibido)}</td>
+                        <td className="p-3 text-center">
+                          <RecordActions onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').length === 0 && (
+                      <tr><td colSpan={5} className="p-8 text-center text-slate-400">No hay ingresos registrados.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Expediente: Pago a Profesores */}
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden border-orange-200">
+          <div className="bg-orange-500 p-4 text-white font-bold flex justify-between items-center cursor-pointer" onClick={() => setForm({...form, tipo: form.tipo === 'Pago Profesor' ? '' : 'Pago Profesor'})}>
+            <span>Expediente: Pago a Profesores (Gastos) {form.tipo === 'Pago Profesor' ? '▼' : '▶'}</span>
+            <span className="text-xl font-black">{form.tipo === 'Pago Profesor' ? formatCurrency(totalPagosProfesores) : '***'}</span>
+          </div>
+          
+          {form.tipo === 'Pago Profesor' && (
+            <div className="p-6">
+              <form className="grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleSubmit}>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-[10px] font-black uppercase text-orange-600/70 tracking-wider">Nombre del Profesor / A quien</label>
+                  <input className="w-full border-b border-orange-200 p-2 font-bold focus:border-orange-500 outline-none" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-orange-600/70 tracking-wider">Fecha de Pago</label>
+                  <input type="date" className="w-full border-b border-orange-200 p-2 focus:border-orange-500 outline-none" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-orange-600 tracking-wider">Monto Pagado</label>
+                  <input type="number" className="w-full border-b border-orange-200 p-2 font-black text-orange-700 bg-orange-50 rounded outline-none" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
+                </div>
+                <div className="md:col-span-4 space-y-1">
+                  <label className="text-[10px] font-black uppercase text-orange-600/70 tracking-wider">Detalle del Pago</label>
+                  <input className="w-full border-b border-orange-200 p-2 italic focus:border-orange-500 outline-none" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
+                </div>
+                <div className="md:col-span-4 flex justify-end mt-2">
+                  <button type="submit" className="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-md hover:bg-orange-700 transition-all">
+                    {editingId ? 'ACTUALIZAR PAGO' : 'REGISTRAR PAGO'}
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-8 border-t border-orange-100 pt-4">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] font-black text-orange-400 uppercase tracking-widest text-left">
+                      <th className="p-3">Fecha</th>
+                      <th className="p-3">Profesor (A quien)</th>
+                      <th className="p-3">Detalle</th>
+                      <th className="p-3 text-right">Monto</th>
+                      <th className="p-3 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-orange-50 italic">
+                    {filteredRecords.filter(r => r.tipo === 'Pago Profesor').map(r => (
+                      <tr key={r.id} className="hover:bg-orange-50/30 transition-colors">
+                        <td className="p-3">{formatDate(r.fechaPago)}</td>
+                        <td className="p-3 font-bold text-orange-950">{r.nombreAlumno}</td>
+                        <td className="p-3 text-slate-500">{r.observaciones}</td>
+                        <td className="p-3 text-right font-black text-orange-600">-{formatCurrency(r.montoTotalRecibido)}</td>
+                        <td className="p-3 text-center">
+                          <RecordActions onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredRecords.filter(r => r.tipo === 'Pago Profesor').length === 0 && (
+                      <tr><td colSpan={5} className="p-8 text-center text-orange-300">No hay pagos a profesores registrados.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Expediente: Otros Gastos */}
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden border-rose-200">
+          <div className="bg-rose-500 p-4 text-white font-bold flex justify-between items-center cursor-pointer" onClick={() => setForm({...form, tipo: form.tipo === 'Gasto Mensual' ? '' : 'Gasto Mensual'})}>
+            <span>Expediente: Otros Gastos Mensuales {form.tipo === 'Gasto Mensual' ? '▼' : '▶'}</span>
+            <span className="text-xl font-black">{form.tipo === 'Gasto Mensual' ? formatCurrency(totalGastosMensuales) : '***'}</span>
+          </div>
+          
+          {form.tipo === 'Gasto Mensual' && (
+            <div className="p-6">
+              <form className="grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleSubmit}>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-[10px] font-black uppercase text-rose-600/70 tracking-wider">Tipo de Gasto / Proveedor</label>
+                  <input className="w-full border-b border-rose-200 p-2 font-bold focus:border-rose-500 outline-none" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-rose-600/70 tracking-wider">Fecha del Gasto</label>
+                  <input type="date" className="w-full border-b border-rose-200 p-2 focus:border-rose-500 outline-none" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-rose-600 tracking-wider">Monto Gastado</label>
+                  <input type="number" className="w-full border-b border-rose-200 p-2 font-black text-rose-700 bg-rose-50 rounded outline-none" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
+                </div>
+                <div className="md:col-span-4 space-y-1">
+                  <label className="text-[10px] font-black uppercase text-rose-600/70 tracking-wider">Observaciones</label>
+                  <input className="w-full border-b border-rose-200 p-2 italic focus:border-rose-500 outline-none" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
+                </div>
+                <div className="md:col-span-4 flex justify-end mt-2">
+                  <button type="submit" className="bg-rose-600 text-white px-8 py-3 rounded-xl font-bold shadow-md hover:bg-rose-700 transition-all">
+                    {editingId ? 'ACTUALIZAR GASTO' : 'REGISTRAR GASTO'}
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-8 border-t border-rose-100 pt-4">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-left">
+                      <th className="p-3">Fecha</th>
+                      <th className="p-3">Gasto / Proveedor</th>
+                      <th className="p-3">Detalle</th>
+                      <th className="p-3 text-right">Monto</th>
+                      <th className="p-3 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rose-50 italic">
+                    {filteredRecords.filter(r => r.tipo === 'Gasto Mensual').map(r => (
+                      <tr key={r.id} className="hover:bg-rose-50/30 transition-colors">
+                        <td className="p-3">{formatDate(r.fechaPago)}</td>
+                        <td className="p-3 font-bold text-rose-950">{r.nombreAlumno}</td>
+                        <td className="p-3 text-slate-500">{r.observaciones}</td>
+                        <td className="p-3 text-right font-black text-rose-600">-{formatCurrency(r.montoTotalRecibido)}</td>
+                        <td className="p-3 text-center">
+                          <RecordActions onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredRecords.filter(r => r.tipo === 'Gasto Mensual').length === 0 && (
+                      <tr><td colSpan={5} className="p-8 text-center text-rose-300">No hay gastos registrados.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DTEManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -2070,6 +2474,10 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       if (!text.toLowerCase().includes(s)) match = false;
     }
     return match;
+  }).sort((a,b) => {
+    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    if (d !== 0) return d;
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2196,7 +2604,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       r.email || '',
       formatCurrency(r.montoNeto || 0),
       formatCurrency((r.montoNeto || 0) * 0.19),
-      formatCurrency((r.montoNeto || 0) * 1.19)
+      formatCurrency(r.total || 0)
     ]);
   };
   
@@ -2213,7 +2621,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       r.email || '',
       r.montoNeto || 0,
       (r.montoNeto || 0) * 0.19,
-      (r.montoNeto || 0) * 1.19
+      r.total || 0
     ]);
   };
 
@@ -2233,7 +2641,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
               onChange={handleFileUpload}
             />
             <button 
-              type="button"
+              type="button" 
               onClick={downloadExcelTemplate}
               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
               title="Descargar Plantilla Excel"
@@ -2384,7 +2792,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                 <th className="p-4 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 italic">
               {filteredRecords.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-4 text-slate-500">{formatDate(r.fecha)}</td>
@@ -2392,37 +2800,69 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                   <td className="p-4">{r.nombre}</td>
                   <td className="p-4 font-mono text-slate-400">{r.rut}</td>
                   <td className="p-4 text-right">{formatCurrency(r.montoNeto)}</td>
-                  <td className="p-4 text-right font-black text-blue-900">{formatCurrency(r.total)}</td>
-                    <td className="p-4 text-center">
-                      <RecordActions
-                        onView={() => {
-                          const dteData = [
-                            { label: 'N° Documento', value: r.nroDto },
-                            { label: 'Fecha', value: formatDate(r.fecha) },
-                            { label: 'Cliente', value: r.nombre },
-                            { label: 'RUT', value: r.rut },
-                            { label: 'Total', value: formatCurrency(r.total) }
-                          ];
-                          viewExpedienteInNewTab('Ficha: DTE', dteData, `dte_${r.nroDto}`);
-                        }}
-                        onEdit={() => handleEdit(r)}
-                        onDelete={async () => {
-                          if (true) {
-                            try {
-                              await localDB.deleteFromCollection('dte_records', r.id);
-                              const updated = await localDB.getCollection('dte_records');
-                              setRecords(updated);
-                              alert('DTE eliminado exitosamente');
-                            } catch (err) {
-                              alert('No se pudo eliminar el DTE');
-                            }
-                          }
-                        }}
-                      />
-                    </td>
+                  <td className={cn(
+                    "p-4 text-right font-black",
+                    String(r.nroDto || '').toUpperCase().startsWith('NCE') ? "text-red-600" : (String(r.nroDto || '').toUpperCase().startsWith('GDE') ? "text-slate-400" : "text-blue-900")
+                  )}>
+                    {formatCurrency(r.total)}
+                  </td>
+                  <td className="p-4 text-center">
+                    <RecordActions
+                      onView={() => {
+                        const dteData = [
+                          { label: 'N° Documento', value: r.nroDto },
+                          { label: 'Fecha', value: formatDate(r.fecha) },
+                          { label: 'Cliente', value: r.nombre },
+                          { label: 'RUT', value: r.rut },
+                          { label: 'Total', value: formatCurrency(r.total) }
+                        ];
+                        viewExpedienteInNewTab('Ficha: DTE', dteData, `dte_${r.nroDto}`);
+                      }}
+                      onEdit={() => handleEdit(r)}
+                      onDelete={async () => {
+                        try {
+                          await localDB.deleteFromCollection('dte_records', r.id);
+                          const updated = await localDB.getCollection('dte_records');
+                          setRecords(updated);
+                          alert('DTE eliminado exitosamente');
+                        } catch (err) {
+                          alert('No se pudo eliminar el DTE');
+                        }
+                      }}
+                    />
+                  </td>
                 </tr>
               ))}
+              {filteredRecords.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-10 text-center text-slate-400 italic">No hay documentos registrados para este filtro.</td>
+                </tr>
+              )}
             </tbody>
+            <tfoot className="bg-blue-50/50 font-black">
+              <tr>
+                <td colSpan={4} className="p-4 text-right uppercase text-slate-500 text-[9px] tracking-widest border-t border-slate-200">Sumas Totales:</td>
+                <td className="p-4 text-right text-blue-900 text-sm border-t border-slate-200">
+                  {formatCurrency(filteredRecords.reduce((sum, r) => {
+                    const nro = String(r.nroDto || '').toUpperCase();
+                    const val = Number(r.montoNeto) || 0;
+                    if (nro.startsWith('NCE')) return sum - val;
+                    if (nro.startsWith('GDE')) return sum;
+                    return sum + val;
+                  }, 0))}
+                </td>
+                <td className="p-4 text-right text-blue-900 text-sm border-t border-slate-200">
+                  {formatCurrency(filteredRecords.reduce((sum, r) => {
+                    const nro = String(r.nroDto || '').toUpperCase();
+                    const val = Number(r.total) || 0;
+                    if (nro.startsWith('NCE')) return sum - val;
+                    if (nro.startsWith('GDE')) return sum;
+                    return sum + val;
+                  }, 0))}
+                </td>
+                <td className="border-t border-slate-200"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

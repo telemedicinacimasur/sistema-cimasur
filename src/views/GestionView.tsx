@@ -701,7 +701,6 @@ function GestionList({
     // We remove the confirm here because we will move to RecordActions which has its own modal,
     // OR we keep it if we don't migrate to RecordActions immediately.
     // Given the user said it "doesn't work", I'll keep it for now but make it more robust.
-    if (!confirm(`¿Seguro que desea eliminar a ${name} de gestión?`)) return;
     if (!user) {
       alert("Error: Debes estar autenticado para realizar esta acción.");
       return;

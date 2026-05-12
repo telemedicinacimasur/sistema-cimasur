@@ -169,7 +169,8 @@ function CRMRegister() {
     categoria: 'Sin categoría',
     historialUnificado: '',
     responsable: '',
-    intranet: 'No'
+    intranet: 'No',
+    isGestionCustomer: false
   });
 
   useEffect(() => {
@@ -183,6 +184,23 @@ function CRMRegister() {
     if (!user) return;
     await localDB.saveToCollection('contacts', form);
     
+    if (form.isGestionCustomer) {
+      const gestionRecord = {
+        fechaIngreso: form.fechaIngreso,
+        nombre: form.name,
+        rut: form.rut,
+        tipoEmpresa: form.type,
+        comuna: form.region,
+        celular: form.phone,
+        email: form.email,
+        categoria: form.categoria,
+        estado: 'En proceso',
+        consultora: form.responsable,
+        observaciones: form.historialUnificado
+      };
+      await localDB.saveToCollection('gestion_records', gestionRecord);
+    }
+    
     await addNotification({
       title: 'Nuevo Cliente CRM',
       message: `${user.displayName || user.email} registró a ${form.name}`,
@@ -190,7 +208,7 @@ function CRMRegister() {
       sender: user.displayName || user.email || 'Sistema'
     });
     await addAuditLog(user, `Registró Cliente ${form.name}`, 'CRM');
-    alert('Cliente Guardado en CRM');
+    alert(`Cliente Guardado en CRM${form.isGestionCustomer ? ' y en Gestión' : ''}`);
     setForm({ 
       fechaIngreso: new Date().toISOString().split('T')[0],
       name: '',
@@ -202,7 +220,8 @@ function CRMRegister() {
       categoria: 'Sin categoría',
       historialUnificado: '',
       responsable: user.displayName,
-      intranet: 'No'
+      intranet: 'No',
+      isGestionCustomer: false
     });
     window.dispatchEvent(new Event('db-change'));
   };
@@ -373,28 +392,39 @@ function CRMRegister() {
       </div>
       <form className="p-8 space-y-8" onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-           <CRMField label="Fecha Ingreso"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaIngreso} onChange={e => setForm({...form, fechaIngreso: e.target.value})} /></CRMField>
-           <CRMField label="Nombre / Razón Social"><input className="w-full border-b p-2 text-sm font-bold" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required /></CRMField>
-           <CRMField label="RUT / ID"><input className="w-full border-b p-2 text-sm" value={form.rut} onChange={e => setForm({...form, rut: e.target.value})} required /></CRMField>
-           <CRMField label="Teléfono"><input className="w-full border-b p-2 text-sm" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></CRMField>
+           <CRMField label="Fecha Ingreso"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaIngreso || ''} onChange={e => setForm({...form, fechaIngreso: e.target.value})} /></CRMField>
+           <CRMField label="Nombre / Razón Social"><input className="w-full border-b p-2 text-sm font-bold" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} required /></CRMField>
+           <CRMField label="RUT / ID"><input className="w-full border-b p-2 text-sm" value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} required /></CRMField>
+           <CRMField label="Teléfono"><input className="w-full border-b p-2 text-sm" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} /></CRMField>
            
-           <CRMField label="Email"><input type="email" className="w-full border-b p-2 text-sm" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></CRMField>
-           <CRMField label="Comuna"><input className="w-full border-b p-2 text-sm" value={form.region} onChange={e => setForm({...form, region: e.target.value})} /></CRMField>
+           <CRMField label="Email"><input type="email" className="w-full border-b p-2 text-sm" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></CRMField>
+           <CRMField label="Comuna"><input className="w-full border-b p-2 text-sm" value={form.region || ''} onChange={e => setForm({...form, region: e.target.value})} /></CRMField>
            <CRMField label="Tipo de Cliente">
-              <select className="w-full border-b p-2 text-sm" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+              <select className="w-full border-b p-2 text-sm" value={form.type || ''} onChange={e => setForm({...form, type: e.target.value})}>
                 <option>Farmacia</option><option>Centro Médico</option><option>Empresa</option><option>Independiente</option><option>Otros</option>
               </select>
            </CRMField>
            <CRMField label="Categoría de Cliente">
-              <select className="w-full border-b p-2 text-sm font-black text-blue-600" value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})}>
+              <select className="w-full border-b p-2 text-sm font-black text-blue-600" value={form.categoria || ''} onChange={e => setForm({...form, categoria: e.target.value})}>
                 {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
               </select>
            </CRMField>
            <CRMField label="Inscrito en Intranet">
-              <select className="w-full border-b p-2 text-sm font-bold text-slate-700" value={form.intranet} onChange={e => setForm({...form, intranet: e.target.value})}>
+              <select className="w-full border-b p-2 text-sm font-bold text-slate-700" value={form.intranet || ''} onChange={e => setForm({...form, intranet: e.target.value})}>
                 <option value="No">No</option>
                 <option value="Si">Si</option>
               </select>
+           </CRMField>
+           <CRMField label="Opciones">
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-6">
+                <input 
+                  type="checkbox" 
+                  className="rounded"
+                  checked={form.isGestionCustomer || false}
+                  onChange={e => setForm({...form, isGestionCustomer: e.target.checked})}
+                />
+                Es Cliente de Gestión
+              </label>
            </CRMField>
         </div>
 
@@ -406,7 +436,7 @@ function CRMRegister() {
            <textarea 
              className="w-full h-48 p-4 border rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none text-sm leading-relaxed"
              placeholder="Narrequí todo el proceso con el cliente..."
-             value={form.historialUnificado}
+             value={form.historialUnificado || ''}
              onChange={e => setForm({...form, historialUnificado: e.target.value})}
            ></textarea>
         </div>
@@ -422,6 +452,7 @@ function CRMRegister() {
 }
 
 function CRMTable({ records, filters, setFilters, onComment }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void }) {
+  const { user } = useAuth();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [newHistory, setNewHistory] = useState('');
@@ -429,20 +460,23 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
   const [newRut, setNewRut] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [newIntranet, setNewIntranet] = useState('');
+  const [newIsGestionCustomer, setNewIsGestionCustomer] = useState<boolean | null>(null);
   const [activityType, setActivityType] = useState('Nota de Seguimiento');
   const [currentStatus, setCurrentStatus] = useState('En proceso');
 
-  const filtered = records.filter(r => {
-    const name = safe(r.name).toLowerCase();
-    const rut = safe(r.rut).toLowerCase();
-    const search = filters.search.toLowerCase();
-    const matchesSearch = name.includes(search) || rut.includes(search);
-    const matchesRegion = filters.region === 'Todas' || safe(r.region) === filters.region;
-    const matchesType = filters.type === 'Todos' || safe(r.type) === filters.type;
-    const matchesCategoria = filters.categoria === 'Todas' || safe(r.categoria) === filters.categoria;
-    const matchesIntranet = filters.intranet === 'Todos' || safe(r.intranet) === filters.intranet;
-    return matchesSearch && matchesRegion && matchesType && matchesCategoria && matchesIntranet;
-  });
+  const filtered = records
+    .filter(r => {
+      const name = safe(r.name).toLowerCase();
+      const rut = safe(r.rut).toLowerCase();
+      const search = filters.search.toLowerCase();
+      const matchesSearch = name.includes(search) || rut.includes(search);
+      const matchesRegion = filters.region === 'Todas' || safe(r.region) === filters.region;
+      const matchesType = filters.type === 'Todos' || safe(r.type) === filters.type;
+      const matchesCategoria = filters.categoria === 'Todas' || safe(r.categoria) === filters.categoria;
+      const matchesIntranet = filters.intranet === 'Todos' || safe(r.intranet) === filters.intranet;
+      return matchesSearch && matchesRegion && matchesType && matchesCategoria && matchesIntranet;
+    })
+    .sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -485,6 +519,9 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     
     const updatedHistory = (selectedClient.historialUnificado || '') + logHeader + (newHistory ? `\n[Estado: ${currentStatus}] - ${newHistory}` : `\n[Actualización de datos: ${currentStatus}]`);
     
+    const isGestion = newIsGestionCustomer !== null ? newIsGestionCustomer : !!selectedClient.isGestionCustomer;
+    const becameGestion = isGestion && !selectedClient.isGestionCustomer;
+
     await localDB.updateInCollection('contacts', selectedClient.id, { 
       name: newName || selectedClient.name,
       rut: newRut || selectedClient.rut,
@@ -492,8 +529,29 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
       email: selectedClient.email,
       categoria: newCategory || selectedClient.categoria,
       intranet: newIntranet || selectedClient.intranet || 'No',
+      isGestionCustomer: isGestion,
       historialUnificado: updatedHistory
     });
+
+    if (becameGestion) {
+      const gestionRecord = {
+        fechaIngreso: selectedClient.fechaIngreso,
+        nombre: newName || selectedClient.name,
+        rut: newRut || selectedClient.rut,
+        tipoEmpresa: selectedClient.type,
+        comuna: selectedClient.region,
+        celular: selectedClient.phone,
+        email: selectedClient.email,
+        categoria: newCategory || selectedClient.categoria,
+        estado: 'En proceso',
+        consultora: user?.displayName || user?.email || 'CRM',
+        observaciones: `Sincronizado desde Expediente CRM por ${user?.displayName || user?.email}\n\n${updatedHistory}`
+      };
+      await localDB.saveToCollection('gestion_records', gestionRecord);
+      await addAuditLog(user, `Sincronizó cliente ${selectedClient.name} a Gestión`, 'CRM');
+      alert('Cliente sincronizado exitosamente al módulo de Gestión.');
+    }
+
     alert('Expediente actualizado correctamente');
     setSelectedClient(null);
     setNewHistory('');
@@ -501,6 +559,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     setNewRut('');
     setNewCategory('');
     setNewIntranet('');
+    setNewIsGestionCustomer(null);
     window.dispatchEvent(new Event('db-change'));
   };
 
@@ -560,12 +619,22 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                     <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Fecha Ingreso</span>
                     <span className="text-sm font-bold text-[#001736]">{formatDate(selectedClient.fechaIngreso)}</span>
                  </div>
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100">
-                    <span className="block text-[9px] font-black uppercase text-blue-400 tracking-widest mb-1">Inscrito Intranet</span>
-                    <span className={cn(
-                      "text-sm font-black italic",
-                      (newIntranet || selectedClient.intranet) === 'Si' ? "text-emerald-600" : "text-red-500"
-                    )}>{newIntranet || selectedClient.intranet || 'No'}</span>
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex items-center justify-between">
+                    <div>
+                       <span className="block text-[9px] font-black uppercase text-blue-400 tracking-widest mb-1">Inscrito Intranet</span>
+                       <span className={cn(
+                         "text-sm font-black italic",
+                         (newIntranet || selectedClient.intranet) === 'Si' ? "text-emerald-600" : "text-red-500"
+                       )}>{newIntranet || selectedClient.intranet || 'No'}</span>
+                    </div>
+                    <button 
+                      onClick={handleUpdate}
+                      className="bg-[#FF7F50] hover:bg-[#FF6347] text-white p-2 rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                      title="Registrar Cambios en Expediente"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-black uppercase tracking-tighter">Registrar</span>
+                    </button>
                  </div>
               </div>
 
@@ -678,12 +747,21 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                     </select>
                 </CRMField>
 
-                <button 
-                  onClick={handleUpdate}
-                  className="w-full bg-[#001736] text-white py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)] hover:-translate-y-1 transition-all active:scale-95 text-xs ring-4 ring-white"
-                >
-                   <Save className="w-5 h-5" /> Registrar en Expediente
-                </button>
+                <CRMField label="Opciones">
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-2 group">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      checked={newIsGestionCustomer !== null ? newIsGestionCustomer : !!selectedClient.isGestionCustomer}
+                      onChange={e => setNewIsGestionCustomer(e.target.checked)}
+                    />
+                    <span className="font-bold group-hover:text-blue-600 transition-colors">Es Cliente de Gestión</span>
+                  </label>
+                </CRMField>
+
+                <div className="pt-4 border-t border-slate-100">
+                  <p className="text-[10px] text-slate-400 text-center italic">Utilice el botón "Registrar" junto a los datos para guardar los cambios.</p>
+                </div>
               </div>
            </div>
         </div>
@@ -786,7 +864,10 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                      console.warn('Could not fetch crm_activities (may not exist yet)', e);
                    }
                    const recs = await getCRMAIRecommendations(contacts, activities);
-                   alert("Recomendaciones de IA:\n\n" + JSON.stringify(recs, null, 2));
+                   const formattedRecs = recs.recomendaciones.map((r: any) => 
+                     `📌 ACCIÓN: ${r.accion}\n🎯 OBJETIVO: ${r.objetivo}\n💡 MOTIVO: ${r.motivo}`
+                   ).join('\n\n' + '─'.repeat(20) + '\n\n');
+                   alert("🤖 ANÁLISIS ESTRATÉGICO CRM\n\n" + formattedRecs);
                    console.log(recs);
                 }}
                 className="w-full bg-emerald-500 border border-emerald-200 text-white py-2 rounded-full font-bold text-xs hover:bg-emerald-600 flex items-center justify-center gap-2"
@@ -848,7 +929,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                          )}>{r.categoria}</span>
                       </td>
                       <td className="p-5 font-medium text-blue-900">{r.type}</td>
-                      <td className="p-5 text-right">
+                      <td className="p-5 text-right flex items-center justify-end gap-2">
                          <RecordActions 
                            onView={() => setSelectedClient(r)}
                            onDownload={() => {
@@ -921,6 +1002,14 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
                 <td className="p-5">{ client.email || '---' }</td>
                 <td className="p-5">{ client.categoria }</td>
                 <td className="p-5">{ formatDate(client.fechaIngreso) }</td>
+                <td className="p-5 text-right">
+                   <RecordActions 
+                     onDelete={async () => {
+                       await localDB.deleteFromCollection('contacts_intranet', client.id);
+                       window.dispatchEvent(new Event('db-change'));
+                     }}
+                   />
+                </td>
               </tr>
             ))}
             {clients.length === 0 && (
@@ -951,6 +1040,7 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
               <th className="p-5">Archivo</th>
               <th className="p-5">Cantidad</th>
               <th className="p-5">Responsable</th>
+              <th className="p-5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -960,6 +1050,14 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
                 <td className="p-5 font-medium">{ imp.archivoNombre }</td>
                 <td className="p-5 font-bold text-emerald-600">{ imp.cantidadImportada }</td>
                 <td className="p-5">{ imp.responsable }</td>
+                <td className="p-5 text-right">
+                  <RecordActions 
+                    onDelete={async () => {
+                      await localDB.deleteFromCollection('import_logs', imp.id);
+                      window.dispatchEvent(new Event('db-change'));
+                    }}
+                  />
+                </td>
               </tr>
             ))}
             {imports.length === 0 && (
@@ -1147,13 +1245,13 @@ function CRMActivities() {
         <form className="p-8 space-y-6" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <CRMField label="Fecha">
-              <input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
+              <input type="date" className="w-full border-b p-2" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} required />
             </CRMField>
             <CRMField label="Nombre de Campaña / Actividad">
               <input 
                 className="w-full border-b p-2 font-bold" 
                 placeholder="Ej: AGENDA DE INDUCCIÓN" 
-                value={form.campania} 
+                value={form.campania || ''} 
                 onChange={e => setForm({...form, campania: e.target.value})} 
                 required 
               />
@@ -1190,7 +1288,7 @@ function CRMActivities() {
             <textarea 
               className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
               placeholder="Detalle los objetivos y resultados de esta actividad..."
-              value={form.observaciones}
+              value={form.observaciones || ''}
               onChange={e => setForm({...form, observaciones: e.target.value})}
             />
           </CRMField>
