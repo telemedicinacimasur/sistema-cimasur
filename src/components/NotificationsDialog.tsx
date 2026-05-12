@@ -21,7 +21,7 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
   useEffect(() => {
     if (user) {
       const userRoles = user.roles || [user.role || 'viewer'];
-      const unsubscribe = subscribeToNotifications(userRoles, (data) => {
+      const unsubscribe = subscribeToNotifications(userRoles, user.displayName || user.email || 'Sistema', (data) => {
         setNotifications(data);
       });
       return () => unsubscribe();

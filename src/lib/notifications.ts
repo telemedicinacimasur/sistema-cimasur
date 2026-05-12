@@ -12,8 +12,11 @@ export interface Notification {
   read: boolean;
 }
 
-export const subscribeToNotifications = (userRoles: string[], callback: (notifications: Notification[]) => void) => {
+export const subscribeToNotifications = (userRoles: string[], currentUserName: string, callback: (notifications: Notification[]) => void) => {
   const isRecipient = (notification: Notification) => {
+    // Filter out notifications created by the same user
+    if (notification.sender === currentUserName) return false;
+
     if (!notification.recipientRoles || notification.recipientRoles.length === 0) return true;
     
     const normalizedUserRoles = userRoles.map(r => r.toLowerCase());

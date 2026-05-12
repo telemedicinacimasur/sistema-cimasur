@@ -30,8 +30,9 @@ export default function CRMView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
 
-  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'imports'>('register');
+  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'imports' | 'intranet'>('register');
   const [records, setRecords] = useState<any[]>([]);
+  const [intranetClients, setIntranetClients] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
   const [commentTarget, setCommentTarget] = useState<any | null>(null);
   const [filters, setFilters] = useState({
@@ -46,6 +47,8 @@ export default function CRMView() {
     const loadData = async () => {
       const data = await localDB.getCollection('contacts');
       setRecords(data);
+      const intranetData = await localDB.getCollection('intranet_clients');
+      setIntranetClients(intranetData);
       const importData = await localDB.getCollection('intranet_imports');
       setImports(importData);
     };
@@ -90,6 +93,15 @@ export default function CRMView() {
             Registro de Actividades
           </button>
           <button 
+            onClick={() => setActiveTab('intranet')}
+            className={cn(
+              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+              activeTab === 'intranet' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Clientes Intranet
+          </button>
+          <button 
             onClick={() => setActiveTab('imports')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
@@ -105,6 +117,7 @@ export default function CRMView() {
       {activeTab === 'list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
       {activeTab === 'activities' && <CRMActivities />}
       {activeTab === 'imports' && <CRMImportsTable imports={imports} />}
+      {activeTab === 'intranet' && <CRMIntranetTable clients={intranetClients} />}
       {commentTarget && (
         <CommentDialog 
            isOpen={!!commentTarget} 
@@ -266,27 +279,35 @@ function CRMRegister() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
+        const existingContacts = await localDB.getCollection('contacts');
         let importedCount = 0;
+        
         for (const row of data) {
           const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
+          const rut = safe(row["RUT / ID"]);
 
-          const newContact = {
-            fechaIngreso: fechaIngreso,
-            name: safe(row["Nombre / Razón Social"]),
-            rut: safe(row["RUT / ID"]),
-            phone: safe(row["Teléfono"]),
-            email: safe(row["Email"]),
-            region: safe(row["Comuna"]) || 'Metropolitana',
-            type: safe(row["Tipo de Cliente"]) || 'Farmacia',
-            categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
-            intranet: 'Si',
-            historialUnificado: `Importado desde Intranet el ${new Date().toLocaleDateString('es-CL')}`,
-            responsable: user.displayName || user.email || 'Sistema'
-          };
+          // Check for duplicate in contacts
+          const isDuplicate = existingContacts.some(c => c.rut === rut);
 
-          if (newContact.name && newContact.rut) {
-            await localDB.saveToCollection('contacts', newContact);
-            importedCount++;
+          if (!isDuplicate) {
+              const newContact = {
+                fechaIngreso: fechaIngreso,
+                name: safe(row["Nombre / Razón Social"]),
+                rut: rut,
+                phone: safe(row["Teléfono"]),
+                email: safe(row["Email"]),
+                region: safe(row["Comuna"]) || 'Metropolitana',
+                type: safe(row["Tipo de Cliente"]) || 'Farmacia',
+                categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
+                intranet: 'Si',
+                historialUnificado: `Importado desde Intranet el ${new Date().toLocaleDateString('es-CL')}`,
+                responsable: user.displayName || user.email || 'Sistema'
+              };
+
+              if (newContact.name && newContact.rut) {
+                await localDB.saveToCollection('intranet_clients', newContact);
+                importedCount++;
+              }
           }
         }
 
@@ -300,7 +321,7 @@ function CRMRegister() {
         }
 
         await addAuditLog(user, `Importó ${importedCount} clientes desde Intranet`, 'CRM');
-        alert(`Éxito: Se importaron ${importedCount} clientes desde Intranet correctamente.`);
+        alert(`Éxito: Se importaron ${importedCount} clientes únicos desde Intranet.`);
         window.dispatchEvent(new Event('db-change'));
       } catch (error) {
         console.error("Import Intranet Error:", error);
@@ -867,6 +888,48 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
               </tbody>
            </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+function CRMIntranetTable({ clients }: { clients: any[] }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
+      <div className="bg-[#002b5b] p-4 text-white font-bold">
+         <span className="flex items-center gap-2">
+           <UserCheck className="w-5 h-5" /> Clientes Importados de Intranet
+         </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-slate-50 border-b text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              <th className="p-5">Nombre / Razón Social</th>
+              <th className="p-5">RUT / ID</th>
+              <th className="p-5">Email</th>
+              <th className="p-5">Categoría</th>
+              <th className="p-5">Fecha Importación</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {clients.sort((a, b) => b.fechaIngreso.localeCompare(a.fechaIngreso)).map(client => (
+              <tr key={client.id} className="hover:bg-blue-50/30 transition-colors">
+                <td className="p-5 font-bold text-[#001736]">{ client.name }</td>
+                <td className="p-5 font-mono text-slate-500">{ client.rut }</td>
+                <td className="p-5">{ client.email || '---' }</td>
+                <td className="p-5">{ client.categoria }</td>
+                <td className="p-5">{ formatDate(client.fechaIngreso) }</td>
+              </tr>
+            ))}
+            {clients.length === 0 && (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-slate-400 italic">No hay clientes importados desde Intranet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
