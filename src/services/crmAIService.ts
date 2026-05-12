@@ -21,8 +21,6 @@ interface Activity {
 }
 
 export async function getCRMAIRecommendations(contacts: Contact[], activities: Activity[]) {
-  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-
   const prompt = `
     Analiza la siguiente base de clientes y el historial de campañas CRM para generar recomendaciones inteligentes de activación.
 
@@ -45,7 +43,11 @@ export async function getCRMAIRecommendations(contacts: Contact[], activities: A
     }
   `;
 
-  const result = await model.generateContent(prompt);
-  const jsonResponse = JSON.parse(result.response.text());
+  const result = await ai.models.generateContent({
+    model: "gemini-1.5-flash",
+    contents: prompt,
+  });
+
+  const jsonResponse = JSON.parse(result.text());
   return jsonResponse;
 }

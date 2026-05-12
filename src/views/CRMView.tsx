@@ -36,7 +36,9 @@ export default function CRMView() {
   const [filters, setFilters] = useState({
     search: '',
     region: 'Todas',
-    type: 'Todos'
+    type: 'Todos',
+    categoria: 'Todas',
+    intranet: 'Todos'
   });
 
   useEffect(() => {
@@ -332,7 +334,9 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     const matchesSearch = name.includes(search) || rut.includes(search);
     const matchesRegion = filters.region === 'Todas' || safe(r.region) === filters.region;
     const matchesType = filters.type === 'Todos' || safe(r.type) === filters.type;
-    return matchesSearch && matchesRegion && matchesType;
+    const matchesCategoria = filters.categoria === 'Todas' || safe(r.categoria) === filters.categoria;
+    const matchesIntranet = filters.intranet === 'Todos' || safe(r.intranet) === filters.intranet;
+    return matchesSearch && matchesRegion && matchesType && matchesCategoria && matchesIntranet;
   });
 
   const toggleSelect = (id: string) => {
@@ -612,6 +616,23 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
             <option value="Todos">Todos los tipos</option>
             <option>Farmacia</option><option>Centro Médico</option><option>Empresa</option><option>Independiente</option><option>Otros</option>
          </select>
+         <select 
+           className="text-xs border rounded-full px-4 py-2 w-full outline-none"
+           value={filters.categoria}
+           onChange={e => setFilters({...filters, categoria: e.target.value})}
+         >
+            <option value="Todas">Todas las categorías</option>
+            {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+         </select>
+         <select 
+           className="text-xs border rounded-full px-4 py-2 w-full outline-none"
+           value={filters.intranet}
+           onChange={e => setFilters({...filters, intranet: e.target.value})}
+         >
+            <option value="Todos">Intranet (Todos)</option>
+            <option value="Si">Si</option>
+            <option value="No">No</option>
+         </select>
          <div className="flex flex-col gap-2">
             <button 
               onClick={() => {
@@ -694,7 +715,10 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                         />
                       </td>
                       <td className="p-5">
-                         <div className="font-bold text-[#001736]">{r.name}</div>
+                         <div className="flex items-center gap-2">
+                             <div className="font-bold text-[#001736]">{r.name}</div>
+                             <span className="text-[10px] bg-slate-100 text-slate-600 font-black px-1.5 rounded" title="Cantidad de registros de actividad">{ (r.historialUnificado || '').split('---').length - 1 }</span>
+                          </div>
                          <div className="text-[10px] text-slate-400 font-mono">{r.rut}</div>
                       </td>
                       <td className="p-5 text-slate-500 italic">{r.region}</td>
