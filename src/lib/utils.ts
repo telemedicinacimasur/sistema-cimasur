@@ -29,6 +29,9 @@ export function formatDate(dateInput: any) {
 
   if (dateInput instanceof Date) {
     date = dateInput;
+  } else if (dateInput && typeof dateInput === 'object' && typeof dateInput.toDate === 'function') {
+    // Support for Firebase Timestamps
+    date = dateInput.toDate();
   } else if (typeof dateInput === 'string') {
     date = new Date(dateInput);
   } else {

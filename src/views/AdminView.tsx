@@ -37,15 +37,21 @@ import {
   Upload,
   PlusCircle,
   FileUp,
-  DollarSign
+  DollarSign,
+  RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 
+import { addNotification } from '../lib/notifications';
+
 type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'users' | 'logs';
 
 export default function AdminView() {
+  const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+  const isAdmin = userRoles.includes('admin');
   const [view, setView] = useState<AdminTab>('menu');
   const [records, setRecords] = useState<any[]>([]);
 
@@ -106,18 +112,22 @@ export default function AdminView() {
             icon={DollarSign}
             onClick={() => setView('pet_payments')}
           />
-          <ModuleCard 
-            title="Gestión de Usuarios"
-            desc="Control de accesos, restablecimiento de contraseñas y roles."
-            icon={Users}
-            onClick={() => setView('users')}
-          />
-          <ModuleCard 
-            title="Registro de Auditoría"
-            desc="Historial de acciones registradas en el sistema (Solo Admin)."
-            icon={FileText}
-            onClick={() => setView('logs')}
-          />
+          {isAdmin && (
+            <ModuleCard 
+              title="Gestión de Usuarios"
+              desc="Control de accesos, restablecimiento de contraseñas y roles."
+              icon={Users}
+              onClick={() => setView('users')}
+            />
+          )}
+          {isAdmin && (
+            <ModuleCard 
+              title="Registro de Auditoría"
+              desc="Historial de acciones registradas en el sistema (Solo Admin)."
+              icon={FileText}
+              onClick={() => setView('logs')}
+            />
+          )}
         </div>
       </div>
     );
@@ -146,6 +156,8 @@ export default function AdminView() {
 
 function UsersManager() {
   const { user, refreshUser } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+  const isAdmin = userRoles.includes('admin');
   const [users, setUsers] = useState<any[]>([]);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [newPass, setNewPass] = useState('');
@@ -158,16 +170,15 @@ function UsersManager() {
     pass: ''
   });
 
+  const [savingId, setSavingId] = useState<string | null>(null);
+
   const availableRoles = [
-    { id: 'admin', label: 'Administrador' },
-    { id: 'lab', label: 'Laboratorio' },
-    { id: 'crm', label: 'CRM' },
-    { id: 'school', label: 'Escuela' },
-    { id: 'gestion', label: 'Gestión' },
-    { id: 'viewer_lab', label: 'Lector Laboratorio' },
-    { id: 'viewer_crm', label: 'Lector CRM' },
-    { id: 'viewer_school', label: 'Lector Escuela' },
-    { id: 'viewer_gestion', label: 'Lector Gestión' }
+    { id: 'admin', label: 'Administrador Sistema', color: 'bg-red-100 text-red-700' },
+    { id: 'manager', label: 'Gestor Administrativo', color: 'bg-sky-100 text-sky-700' },
+    { id: 'lab', label: 'Laboratorio', color: 'bg-blue-100 text-blue-700' },
+    { id: 'crm', label: 'CRM Comercial', color: 'bg-blue-100 text-blue-700' },
+    { id: 'school', label: 'Escuela', color: 'bg-blue-100 text-blue-700' },
+    { id: 'gestion', label: 'Gestión', color: 'bg-blue-100 text-blue-700' }
   ];
 
   const refreshUsers = async () => {
@@ -184,13 +195,14 @@ function UsersManager() {
     if (!editingUser) return;
     
     try {
+        setSavingId(editingUser.uid);
         const validRoles = editingUser.roles && Array.isArray(editingUser.roles) && editingUser.roles.length > 0
             ? editingUser.roles.filter(r => r !== undefined && r !== null)
             : ['viewer'];
             
         if (validRoles.length === 0) validRoles.push('viewer');
 
-        console.log("Saving user:", editingUser.uid, "roles:", validRoles);
+        console.log("Saving user:", editingUser.uid, "Email:", editingUser.email, "roles:", validRoles);
 
         await localAuth.updateUser(editingUser.uid, {
           role: validRoles[0],
@@ -199,7 +211,7 @@ function UsersManager() {
           ...(newPass ? { pass: newPass } : {})
         });
         
-        // If the user editing is the currently logged in user, refresh the state
+        // Redundant but safe: trigger reload of current user state
         if (user?.uid === editingUser.uid) {
             await refreshUser();
         }
@@ -207,10 +219,12 @@ function UsersManager() {
         alert('Usuario actualizado correctamente');
         setEditingUser(null);
         setNewPass('');
-        refreshUsers();
+        await refreshUsers();
     } catch (error) {
         console.error("Error updating user:", error);
         alert('Error al guardar cambios: ' + error);
+    } finally {
+        setSavingId(null);
     }
   };
 
@@ -376,8 +390,15 @@ function UsersManager() {
                </div>
             </div>
             <div className="md:col-span-4 flex items-center justify-end gap-2 text-xs mt-4">
-              <button type="button" onClick={() => setEditingUser(null)} className="px-6 bg-slate-200 text-slate-700 py-2 rounded font-bold uppercase tracking-tighter hover:bg-slate-300">CERRAR</button>
-              <button type="submit" className="px-10 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 uppercase tracking-tighter shadow-lg">GUARDAR CAMBIOS</button>
+              <button type="button" onClick={() => setEditingUser(null)} className="px-6 bg-slate-200 text-slate-700 py-2 rounded font-bold uppercase tracking-tighter hover:bg-slate-300 transition-colors">CERRAR</button>
+              <button 
+                type="submit" 
+                disabled={!!savingId}
+                className="px-10 bg-[#001736] text-white py-2 rounded font-bold hover:bg-blue-900 uppercase tracking-tighter shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {savingId ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                {savingId ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
+              </button>
             </div>
           </form>
         )}
@@ -399,15 +420,18 @@ function UsersManager() {
                   <td className="p-4 font-bold text-blue-900 italic">{u.email}</td>
                   <td className="p-4 font-medium">{u.displayName}</td>
                   <td className="p-4 text-center">
-                    <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mx-auto">
-                      {(u.roles || [u.role]).map((r: string) => (
-                        <span key={r} className={cn(
-                          "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tight",
-                          r === 'admin' ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-blue-50 text-blue-700 border border-blue-100"
-                        )}>
-                          {r}
-                        </span>
-                      ))}
+                    <div className="flex flex-wrap gap-1 justify-center max-w-[250px] mx-auto">
+                      {(u.roles || [u.role || 'viewer']).map((roleId: string) => {
+                        const roleObj = availableRoles.find(ar => ar.id === roleId);
+                        return (
+                          <span key={roleId} className={cn(
+                            "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tight border",
+                            roleObj?.color || "bg-slate-50 text-slate-500 border-slate-100"
+                          )}>
+                            {roleObj?.label || roleId}
+                          </span>
+                        );
+                      })}
                     </div>
                   </td>
                   <td className="p-4 text-center font-mono text-slate-400">
@@ -609,6 +633,12 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
       alert('Registro de pago actualizado');
     } else {
       await localDB.saveToCollection('pet_payments', form);
+      await addNotification({
+        title: 'Nuevo Pago Veterinario',
+        message: `${user.displayName || user.email} registró pago de tutor ${form.tutor} por ${formatCurrency(form.pagoVeterinario)}`,
+        recipientRoles: ['admin'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Registró Pago Vet de ${form.tutor}`, 'Administración');
       alert('Pago registrado correctamente');
     }
@@ -1006,6 +1036,12 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
       alert('Cotización actualizada exitosamente');
     } else {
       await localDB.saveToCollection('quotes', form);
+      await addNotification({
+        title: 'Nueva Cotización Registrada',
+        message: `${user.displayName || user.email} ingresó la cotización N° ${form.nroCotiz} para ${form.cliente}`,
+        recipientRoles: ['admin'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Registró Cotización N° ${form.nroCotiz}`, 'Administración');
       alert('Cotización guardada exitosamente');
     }
@@ -1050,6 +1086,16 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
       if (!record) return;
       const newTotal = newStatus === 'Aprobada' ? (Number(record.invUnits || 0) + Number(record.todoUnits || 0)) : 0;
       await localDB.updateInCollection('quotes', id, { ...record, estado: newStatus, undTotal: newTotal });
+      
+      if (newStatus === 'Aprobada') {
+        await addNotification({
+          title: 'Cotización Aprobada',
+          message: `La cotización N° ${record.nroCotiz} para ${record.cliente} ha sido aprobada.`,
+          recipientRoles: ['admin', 'admin_lab', 'lab'],
+          sender: user?.displayName || user?.email || 'Sistema'
+        });
+      }
+
       await addAuditLog(user, `Cambió estado Cotización N° ${record.nroCotiz} a ${newStatus}`, 'Administración');
       const updated = await localDB.getCollection('quotes');
       setRecords(updated);
@@ -1435,6 +1481,12 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
       alert('Venta Gestión actualizada');
     } else {
       await localDB.saveToCollection('sales_gestion', form);
+      await addNotification({
+        title: 'Nueva Venta GESTIÓN',
+        message: `${user.displayName || user.email} registró venta Gestión: ${form.documento} (${form.cliente})`,
+        recipientRoles: ['admin', 'gestion'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Registró Venta Gestión Doc: ${form.documento}`, 'Administración');
       alert('Venta Gestión registrada');
     }
@@ -1805,6 +1857,12 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
       alert('Venta actualizada');
     } else {
       await localDB.saveToCollection('sales', form);
+      await addNotification({
+        title: 'Nueva Venta Registrada',
+        message: `${user.displayName || user.email} registró venta: ${form.documento} (${form.cliente})`,
+        recipientRoles: ['admin'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Registró Venta Doc: ${form.documento}`, 'Administración');
       alert('Venta registrada');
     }
@@ -2023,6 +2081,12 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       alert('DTE Actualizado');
     } else {
       await localDB.saveToCollection('dte_records', { ...form, iva, total });
+      await addNotification({
+        title: 'Nuevo DTE Registrado',
+        message: `${user.displayName || user.email} registró DTE N° ${form.nroDto} para ${form.nombre}`,
+        recipientRoles: ['admin'],
+        sender: user.displayName || user.email || 'Sistema'
+      });
       await addAuditLog(user, `Registró DTE N° ${form.nroDto}`, 'Administración');
       alert('DTE Registrado Admin');
     }

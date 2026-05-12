@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Download, Edit, Trash2, History, FileSpreadsheet, MessageCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RecordActionsProps {
   onView?: () => void;
@@ -13,6 +14,7 @@ interface RecordActionsProps {
 
 export const RecordActions = ({ onView, onDownload, onEdit, onDelete, onHistory, onExcel, onComment }: RecordActionsProps) => {
   const [showConfirm, setShowConfirm] = useState(false);
+  const { user } = useAuth();
 
   return (
     <div className="flex items-center justify-center gap-2 relative">

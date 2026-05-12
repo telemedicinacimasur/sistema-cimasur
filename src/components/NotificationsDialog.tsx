@@ -4,6 +4,7 @@ import { localDB } from '../lib/auth';
 import { formatDate } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import { subscribeToNotifications, Notification, markNotificationAsRead } from '../lib/notifications';
 
 interface NotificationsDialogProps {
   isOpen: boolean;
@@ -11,31 +12,24 @@ interface NotificationsDialogProps {
 }
 
 export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen, onClose }) => {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showRead, setShowRead] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const { user } = useAuth();
+  
+  const filteredNotifications = notifications.filter(n => showRead || !n.read);
 
   useEffect(() => {
-    if (isOpen && user) {
-      const loadNotifications = async () => {
-        const data = await localDB.getCollection('notifications');
-        const userRoles = user.roles || [];
-        
-        // Filter by role
-        const filtered = data.filter((n: any) => {
-          if (!n.recipientRoles || n.recipientRoles.length === 0) return true;
-          return n.recipientRoles.some((role: string) => userRoles.includes(role));
-        });
-
-        // Sort by date desc
-        setNotifications(filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      };
-      loadNotifications();
+    if (user) {
+      const userRoles = user.roles || [user.role || 'viewer'];
+      const unsubscribe = subscribeToNotifications(userRoles, (data) => {
+        setNotifications(data);
+      });
+      return () => unsubscribe();
     }
-  }, [isOpen, user]);
+  }, [user]);
 
   const markAsRead = async (id: string) => {
-    await localDB.updateInCollection('notifications', id, { read: true });
-    setNotifications(prev => prev.map(n => n.id === id ? {...n, read: true} : n));
+    await markNotificationAsRead(id);
   };
 
   if (!isOpen) return null;
@@ -47,12 +41,17 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
           <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
             <Bell className="w-5 h-5 text-blue-600" /> Notificaciones
           </h2>
-          <button onClick={onClose}><X className="w-5 h-5" /></button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowRead(!showRead)} className={cn("text-xs px-2 py-1 rounded", showRead ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600")}>
+              {showRead ? 'Ocultar leídas' : 'Ver todas'}
+            </button>
+            <button onClick={onClose}><X className="w-5 h-5" /></button>
+          </div>
         </div>
         
         <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-          {notifications.length === 0 && <p className="text-sm text-slate-500 text-center">No hay notificaciones.</p>}
-          {notifications.map((n: any) => (
+          {filteredNotifications.length === 0 && <p className="text-sm text-slate-500 text-center">No hay notificaciones.</p>}
+          {filteredNotifications.map((n: any) => (
             <div key={n.id} className={cn("p-4 rounded-lg border", n.read ? "bg-slate-50 border-slate-100" : "bg-blue-50 border-blue-100")}>
               <div className="flex justify-between items-start mb-1">
                 <h4 className="font-bold text-sm text-slate-800">{n.title}</h4>

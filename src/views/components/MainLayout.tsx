@@ -20,10 +20,9 @@ import { cn, formatDate } from '../../lib/utils';
 import { exportTableToPDF } from '../../lib/pdfUtils';
 import { localDB } from '../../lib/auth';
 import { UserSettingsDialog } from '../../components/UserSettingsDialog';
-
 import { NotificationsDialog } from '../../components/NotificationsDialog';
-
 import { DataBackup } from '../../components/DataBackup';
+import { subscribeToNotifications, Notification } from '../../lib/notifications';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -32,9 +31,22 @@ interface MainLayoutProps {
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const location = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  React.useEffect(() => {
+    if (user) {
+      const userRoles = user.roles || [user.role || 'viewer'];
+      const unsubscribe = subscribeToNotifications(userRoles, (data) => {
+        setNotifications(data);
+      });
+      return () => unsubscribe();
+    }
+  }, [user]);
 
   const handleGlobalExport = async () => {
     const path = location.pathname;
@@ -57,12 +69,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   };
 
   const menuItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'lab', 'crm', 'school', 'viewer_lab', 'viewer_crm', 'viewer_school', 'viewer_gestion'] },
-    { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab', 'viewer_lab'] },
-    { name: 'Administración', icon: ShieldCheck, path: '/administracion', roles: ['admin'] },
-    { name: 'CRM Comercial', icon: TrendingUp, path: '/crm', roles: ['admin', 'crm', 'viewer_crm'] },
-    { name: 'Gestión', icon: Activity, path: '/gestion', roles: ['admin', 'gestion', 'viewer_gestion'] },
-    { name: 'Escuela CIMASUR', icon: GraduationCap, path: '/escuela', roles: ['admin', 'school', 'viewer_school'] },
+    { name: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'manager', 'lab', 'crm', 'school', 'gestion'] },
+    { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab'] },
+    { name: 'Administración', icon: ShieldCheck, path: '/administracion', roles: ['admin', 'manager'] },
+    { name: 'CRM Comercial', icon: TrendingUp, path: '/crm', roles: ['admin', 'crm'] },
+    { name: 'Gestión', icon: Activity, path: '/gestion', roles: ['admin', 'gestion'] },
+    { name: 'Escuela CIMASUR', icon: GraduationCap, path: '/escuela', roles: ['admin', 'school'] },
   ];
 
   const filteredMenuItems = menuItems.filter(item => {
@@ -154,8 +166,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               >
                 <FileText className="w-5 h-5" />
               </button>
-              <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
+              <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors relative">
                 <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-white">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
               <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
                 <Settings className="w-5 h-5" />

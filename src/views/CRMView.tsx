@@ -27,6 +27,9 @@ import { CommentDialog } from '../components/CommentDialog';
 import { addNotification } from '../lib/notifications';
 
 export default function CRMView() {
+  const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities'>('register');
   const [records, setRecords] = useState<any[]>([]);
   const [commentTarget, setCommentTarget] = useState<any | null>(null);
@@ -94,10 +97,18 @@ export default function CRMView() {
            recordId={commentTarget.id}
            recordTitle={commentTarget.name}
            module="CRM"
-           recipientRoles={['Administrador']}
+           recipientRoles={['admin']}
            onSubmit={async (comment) => {
              const updatedHistory = (commentTarget.historialUnificado || '') + `\n\n--- Comentario (${new Date().toLocaleDateString('es-CL')}) ---\n${comment}`;
              await localDB.updateInCollection('contacts', commentTarget.id, { historialUnificado: updatedHistory });
+             
+             await addNotification({
+               title: 'Nuevo Comentario CRM',
+               message: `${user?.displayName || user?.email} comentó en ${commentTarget.name}: ${comment.substring(0, 50)}...`,
+               recipientRoles: ['admin', 'lab'],
+               sender: user?.displayName || user?.email || 'Sistema'
+             });
+
              window.dispatchEvent(new Event('db-change'));
              alert('Comentario registrado y notificación enviada.');
            }}
@@ -146,7 +157,7 @@ function CRMRegister() {
     await addNotification({
       title: 'Nuevo Cliente CRM',
       message: `${user.displayName || user.email} registró a ${form.name}`,
-      recipientRoles: ['admin', 'crm', 'viewer_crm'],
+      recipientRoles: ['admin', 'lab'],
       sender: user.displayName || user.email || 'Sistema'
     });
     await addAuditLog(user, `Registró Cliente ${form.name}`, 'CRM');
@@ -307,6 +318,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [newHistory, setNewHistory] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newRut, setNewRut] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [newIntranet, setNewIntranet] = useState('');
   const [activityType, setActivityType] = useState('Nota de Seguimiento');
@@ -364,8 +377,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     const updatedHistory = (selectedClient.historialUnificado || '') + logHeader + (newHistory ? `\n[Estado: ${currentStatus}] - ${newHistory}` : `\n[Actualización de datos: ${currentStatus}]`);
     
     await localDB.updateInCollection('contacts', selectedClient.id, { 
-      name: selectedClient.name,
-      rut: selectedClient.rut,
+      name: newName || selectedClient.name,
+      rut: newRut || selectedClient.rut,
       phone: selectedClient.phone,
       email: selectedClient.email,
       categoria: newCategory || selectedClient.categoria,
@@ -375,6 +388,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     alert('Expediente actualizado correctamente');
     setSelectedClient(null);
     setNewHistory('');
+    setNewName('');
+    setNewRut('');
     setNewCategory('');
     setNewIntranet('');
     window.dispatchEvent(new Event('db-change'));
@@ -480,6 +495,21 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                    <div className="h-px bg-slate-200 mb-8" />
                 </div>
 
+                <CRMField label="Nombre / Razón Social">
+                  <input 
+                    className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-bold outline-none" 
+                    value={newName || selectedClient.name}
+                    onChange={e => setNewName(e.target.value)}
+                  />
+                </CRMField>
+                <CRMField label="RUT / ID">
+                  <input 
+                    className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm outline-none" 
+                    value={newRut || selectedClient.rut}
+                    onChange={e => setNewRut(e.target.value)}
+                  />
+                </CRMField>
+
                 <CRMField label="Tipo de Actividad">
                   <select 
                     className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm focus:bg-white transition-all outline-none" 
@@ -490,6 +520,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                     <option>Llamada Telefónica</option>
                     <option>Reunión Presencial</option>
                     <option>Campaña Email</option>
+                    <option>Beneficios de Club</option>
                     <option>Otro</option>
                   </select>
                 </CRMField>
@@ -613,6 +644,19 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                 <Trash2 className="w-4 h-4" /> Eliminar ({selectedIds.length})
               </button>
             )}
+            <button 
+                onClick={async () => {
+                   const { getCRMAIRecommendations } = await import('../services/crmAIService');
+                   const contacts = await localDB.getCollection('contacts');
+                   const activities = await localDB.getCollection('crm_activities');
+                   const recs = await getCRMAIRecommendations(contacts, activities);
+                   alert("Recomendaciones de IA:\n\n" + JSON.stringify(recs, null, 2));
+                   console.log(recs);
+                }}
+                className="w-full bg-emerald-500 border border-emerald-200 text-white py-2 rounded-full font-bold text-xs hover:bg-emerald-600 flex items-center justify-center gap-2"
+              >
+                <TrendingUp className="w-3 h-3" /> Analizar con IA
+            </button>
          </div>
       </div>
 
@@ -712,6 +756,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
 function CRMActivities() {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const [activities, setActivities] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailView, setDetailView] = useState<any | null>(null);
@@ -754,7 +800,7 @@ function CRMActivities() {
       await addNotification({
         title: 'Nueva Actividad Comercial',
         message: `${user.displayName || user.email} registró: ${form.campania} (${form.tipo})`,
-        recipientRoles: ['admin', 'crm', 'viewer_crm'],
+        recipientRoles: ['admin', 'lab'],
         sender: user.displayName || user.email || 'Sistema'
       });
       await addAuditLog(user, `Registró Actividad: ${form.campania}`, 'CRM');
@@ -898,6 +944,7 @@ function CRMActivities() {
                 <option>Inducción</option>
                 <option>Email Marketing</option>
                 <option>Instagram y whatsapp</option>
+                <option>Beneficios de Club</option>
                 <option>otros (detallar cuál)</option>
               </select>
             </CRMField>

@@ -23,7 +23,7 @@ export default function DashboardView() {
       icon: FlaskConical,
       path: '/laboratorio',
       color: 'bg-[#a9c7ff]/10 text-[#001736]',
-      roles: ['admin', 'lab', 'viewer_lab']
+      roles: ['admin', 'lab']
     },
     {
       name: 'Administración',
@@ -31,7 +31,7 @@ export default function DashboardView() {
       icon: ShieldCheck,
       path: '/administracion',
       color: 'bg-[#002b5b]/10 text-[#001736]',
-      roles: ['admin']
+      roles: ['admin', 'manager']
     },
     {
       name: 'Comercial CRM',
@@ -39,7 +39,7 @@ export default function DashboardView() {
       icon: TrendingUp,
       path: '/crm',
       color: 'bg-[#91cef1]/10 text-[#001736]',
-      roles: ['admin', 'crm', 'viewer_crm']
+      roles: ['admin', 'crm']
     },
     {
       name: 'Gestión',
@@ -47,7 +47,7 @@ export default function DashboardView() {
       icon: TrendingUp,
       path: '/gestion',
       color: 'bg-green-50 text-green-700',
-      roles: ['admin', 'gestion', 'viewer_gestion']
+      roles: ['admin', 'gestion']
     },
     {
       name: 'Escuela CIMASUR',
@@ -55,7 +55,7 @@ export default function DashboardView() {
       icon: GraduationCap,
       path: '/escuela',
       color: 'bg-primary/10 text-primary',
-      roles: ['admin', 'school', 'viewer_school']
+      roles: ['admin', 'school']
     }
   ];
 

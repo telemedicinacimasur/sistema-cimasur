@@ -48,6 +48,9 @@ function parseExcelDate(serial: any) {
 }
 
 export default function GestionView() {
+  const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
   const [records, setRecords] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
@@ -139,6 +142,8 @@ export default function GestionView() {
 
 function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const [newNote, setNewNote] = useState('');
   const [newCategory, setNewCategory] = useState(client.categoria || 'Sin categoría');
   const [newState, setNewState] = useState(client.estado || 'En proceso');
@@ -177,7 +182,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
       await addNotification({
         title: 'Nueva Actividad en Gestión',
         message: `${user.displayName || user.email} registró: ${newActivityType} para ${client.nombre || client.cliente}`,
-        recipientRoles: ['admin', 'gestion', 'viewer_gestion'],
+        recipientRoles: ['admin'],
         sender: user.displayName || user.email || 'Sistema'
       });
       
@@ -304,82 +309,82 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
           </div>
 
           {/* Action Sidebar (Right) */}
-          <div className="w-full lg:w-96 border-l border-slate-200 p-8 space-y-8 bg-white shrink-0">
+          <div className="w-full lg:w-96 border-l border-slate-200 p-8 space-y-8 bg-white shrink-0 overflow-y-auto">
             <div className="space-y-6">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-600 tracking-widest border-b pb-4">
                  <Save className="w-4 h-4 text-blue-600" />
                  Nueva Gestión / Seguimiento
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Actividad</label>
-                  <select 
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
-                    value={newActivityType}
-                    onChange={e => setNewActivityType(e.target.value)}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Actividad</label>
+                    <select 
+                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                      value={newActivityType}
+                      onChange={e => setNewActivityType(e.target.value)}
+                    >
+                      <option value="Seguimiento">Nota de Seguimiento</option>
+                      <option value="Actualización de categoría">Actualización de Categoría</option>
+                      <option value="Capacitación">Capacitación</option>
+                      <option value="Envío de regalos">Envío de Regalos</option>
+                      <option value="Tipos de regalos">Tipos de Regalos</option>
+                      <option value="Interesado en Charlas">Interesado en Charlas</option>
+                      <option value="Visita Técnica">Visita Técnica</option>
+                      <option value="Cierre de Venta">Cierre de Venta</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalle de la Actividad</label>
+                    <textarea 
+                      className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all resize-none"
+                      placeholder="Escriba los pormenores de la gestión realizada..."
+                      value={newNote}
+                      onChange={e => setNewNote(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoría</label>
+                      <select 
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                        value={newCategory}
+                        onChange={e => setNewCategory(e.target.value)}
+                      >
+                        {CATEGORIAS_GP.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado Actual</label>
+                      <select 
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                        value={newState}
+                        onChange={e => setNewState(e.target.value)}
+                      >
+                        {ESTADOS.filter(est => est !== 'Todos').map(est => <option key={est} value={est}>{est}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleAddActivity}
+                    disabled={loading}
+                    className="w-full bg-[#0b1c30] text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:translate-y-[-2px] hover:shadow-blue-900/20 active:translate-y-0 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
                   >
-                    <option value="Seguimiento">Nota de Seguimiento</option>
-                    <option value="Actualización de categoría">Actualización de Categoría</option>
-                    <option value="Capacitación">Capacitación</option>
-                    <option value="Envío de regalos">Envío de Regalos</option>
-                    <option value="Tipos de regalos">Tipos de Regalos</option>
-                    <option value="Interesado en Charlas">Interesado en Charlas</option>
-                    <option value="Visita Técnica">Visita Técnica</option>
-                    <option value="Cierre de Venta">Cierre de Venta</option>
-                    <option value="Otro">Otro</option>
-                  </select>
+                    {loading ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Save className="w-5 h-5" />
+                        Registrar en Expediente
+                      </>
+                    )}
+                  </button>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalle de la Actividad</label>
-                  <textarea 
-                    className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all resize-none"
-                    placeholder="Escriba los pormenores de la gestión realizada..."
-                    value={newNote}
-                    onChange={e => setNewNote(e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoría</label>
-                    <select 
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
-                      value={newCategory}
-                      onChange={e => setNewCategory(e.target.value)}
-                    >
-                      {CATEGORIAS_GP.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado Actual</label>
-                    <select 
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
-                      value={newState}
-                      onChange={e => setNewState(e.target.value)}
-                    >
-                      {ESTADOS.filter(est => est !== 'Todos').map(est => <option key={est} value={est}>{est}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={handleAddActivity}
-                  disabled={loading}
-                  className="w-full bg-[#0b1c30] text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:translate-y-[-2px] hover:shadow-blue-900/20 active:translate-y-0 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
-                >
-                  {loading ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Save className="w-5 h-5" />
-                      Registrar en Expediente
-                    </>
-                  )}
-                </button>
               </div>
-            </div>
 
             {/* Initial Observations Alert */}
             {client.observaciones && (
@@ -401,6 +406,8 @@ const TIPOS_EMPRESA = ['Clinica', 'Farmacia', 'Petshop', 'Hospital', 'Independie
 
 function GestionRegister({ initialData, onCancel }: { initialData?: any, onCancel?: () => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fechaIngreso: new Date().toISOString().split('T')[0],
@@ -462,7 +469,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
       await addNotification({
         title: 'Nuevo Cliente en Gestión',
         message: `${user.displayName || user.email} añadió a ${form.nombre} (${form.rut})`,
-        recipientRoles: ['admin', 'gestion', 'viewer_gestion'],
+        recipientRoles: ['admin'],
         sender: user.displayName || user.email || 'Sistema'
       });
       await addAuditLog(user, `Añadió Cliente a Gestión: ${form.nombre}`, 'Gestión');

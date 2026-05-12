@@ -56,7 +56,7 @@ export default function App() {
                         />
                         <Route 
                           path="/administracion" 
-                          element={<RoleRoute roles={['admin']}><AdminView /></RoleRoute>} 
+                          element={<RoleRoute roles={['admin', 'manager']}><AdminView /></RoleRoute>} 
                         />
                         <Route 
                           path="/crm" 
@@ -68,7 +68,7 @@ export default function App() {
                         />
                         <Route 
                           path="/gestion" 
-                          element={<RoleRoute roles={['admin', 'crm', 'gestion']}><GestionView /></RoleRoute>} 
+                          element={<RoleRoute roles={['admin', 'gestion']}><GestionView /></RoleRoute>} 
                         />
                       </Routes>
                     </Suspense>

@@ -42,6 +42,9 @@ import { Expediente } from '../components/Expediente';
 import { addNotification } from '../lib/notifications';
 
 export default function SchoolView() {
+  const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities'>('register');
   const [data, setData] = useState<any[]>([]);
 
@@ -98,6 +101,8 @@ function TabButton({ active, onClick, icon: Icon, children }: any) {
 
 function ContactRegister({ records }: { records: any[] }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -121,7 +126,7 @@ function ContactRegister({ records }: { records: any[] }) {
     await addNotification({
       title: 'Nuevo Lead Académico',
       message: `${user?.displayName || user?.email} registró a ${form.name}`,
-      recipientRoles: ['admin', 'school', 'viewer_school'],
+      recipientRoles: ['admin'],
       sender: user?.displayName || user?.email || 'Sistema'
     });
     if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
@@ -203,7 +208,7 @@ function ContactRegister({ records }: { records: any[] }) {
       await addNotification({
         title: 'Nuevo Alumno Matriculado',
         message: `${user?.displayName || user?.email} matriculó a ${lead.name}`,
-        recipientRoles: ['admin', 'school', 'viewer_school'],
+        recipientRoles: ['admin'],
         sender: user?.displayName || user?.email || 'Sistema'
       });
       await localDB.deleteFromCollection('school_leads', lead.id);
@@ -233,62 +238,62 @@ function ContactRegister({ records }: { records: any[] }) {
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
           <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
-             <span className="flex items-center gap-2">Registro de Potenciales Alumnos</span>
-             <div className="flex gap-2">
-               <input 
-                 type="file" 
-                 ref={fileInputRef} 
-                 className="hidden" 
-                 accept=".xlsx, .xls"
-                 onChange={handleFileUpload}
-               />
-               <button 
-                 type="button"
-                 onClick={downloadExcelTemplate}
-                 className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-                 title="Descargar Plantilla Excel"
-               >
-                 <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+               <span className="flex items-center gap-2">Registro de Potenciales Alumnos</span>
+               <div className="flex gap-2">
+                 <input 
+                   type="file" 
+                   ref={fileInputRef} 
+                   className="hidden" 
+                   accept=".xlsx, .xls"
+                   onChange={handleFileUpload}
+                 />
+                 <button 
+                   type="button"
+                   onClick={downloadExcelTemplate}
+                   className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+                   title="Descargar Plantilla Excel"
+                 >
+                   <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+                 </button>
+                 <button 
+                   type="button"
+                   onClick={() => fileInputRef.current?.click()}
+                   className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+                 >
+                   <Upload className="w-3.5 h-3.5" /> Importar
+                 </button>
+               </div>
+            </div>
+            <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
+               <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
+               <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required /></FormGroup>
+               <FormGroup label="RUT Escrito"><input className="w-full border-b p-2" value={form.rut} onChange={e => setForm({...form, rut: e.target.value})} required /></FormGroup>
+               <FormGroup label="Email"><input type="email" className="w-full border-b p-2" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></FormGroup>
+               <FormGroup label="Teléfono / WhatsApp"><input className="w-full border-b p-2" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></FormGroup>
+               
+               <FormGroup label="CLASIFICACIÓN PROFESIONAL">
+                  <select className="w-full border-b p-2 text-sm font-bold text-blue-700" value={form.clasificacion} onChange={e => setForm({...form, clasificacion: e.target.value})}>
+                    {CLASIFICACIONES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+               </FormGroup>
+
+               <FormGroup label="Programa de Interés">
+                  <select className="w-full border-b p-2 text-sm" value={form.interes} onChange={e => setForm({...form, interes: e.target.value})}>
+                    {PROGRAMAS.map(p => <option key={p}>{p}</option>)}
+                  </select>
+               </FormGroup>
+
+               <div className="col-span-full">
+                  <FormGroup label="Observaciones de seguimiento">
+                    <textarea className="w-full border rounded-xl p-4 h-24 bg-slate-50 outline-none focus:bg-white" value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} />
+                  </FormGroup>
+               </div>
+               
+               <button type="submit" className="col-span-full bg-[#001736] text-white py-4 rounded-xl font-bold shadow-xl flex items-center justify-center gap-3">
+                  <Save className="w-5 h-5" /> GUARDAR LEAD ACADÉMICO
                </button>
-               <button 
-                 type="button"
-                 onClick={() => fileInputRef.current?.click()}
-                 className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-               >
-                 <Upload className="w-3.5 h-3.5" /> Importar
-               </button>
-             </div>
+            </form>
           </div>
-          <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
-             <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
-             <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required /></FormGroup>
-             <FormGroup label="RUT Escrito"><input className="w-full border-b p-2" value={form.rut} onChange={e => setForm({...form, rut: e.target.value})} required /></FormGroup>
-             <FormGroup label="Email"><input type="email" className="w-full border-b p-2" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></FormGroup>
-             <FormGroup label="Teléfono / WhatsApp"><input className="w-full border-b p-2" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></FormGroup>
-             
-             <FormGroup label="CLASIFICACIÓN PROFESIONAL">
-                <select className="w-full border-b p-2 text-sm font-bold text-blue-700" value={form.clasificacion} onChange={e => setForm({...form, clasificacion: e.target.value})}>
-                  {CLASIFICACIONES.map(c => <option key={c}>{c}</option>)}
-                </select>
-             </FormGroup>
-
-             <FormGroup label="Programa de Interés">
-                <select className="w-full border-b p-2 text-sm" value={form.interes} onChange={e => setForm({...form, interes: e.target.value})}>
-                  {PROGRAMAS.map(p => <option key={p}>{p}</option>)}
-                </select>
-             </FormGroup>
-
-             <div className="col-span-full">
-                <FormGroup label="Observaciones de seguimiento">
-                  <textarea className="w-full border rounded-xl p-4 h-24 bg-slate-50 outline-none focus:bg-white" value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} />
-                </FormGroup>
-             </div>
-             
-             <button type="submit" className="col-span-full bg-[#001736] text-white py-4 rounded-xl font-bold shadow-xl flex items-center justify-center gap-3">
-                <Save className="w-5 h-5" /> GUARDAR LEAD ACADÉMICO
-             </button>
-          </form>
-        </div>
 
         {selectedLead && (
           <Expediente
@@ -863,6 +868,8 @@ function TrackingView() {
 
 function SchoolActivities() {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const [activities, setActivities] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailView, setDetailView] = useState<any | null>(null);
@@ -998,69 +1005,69 @@ function SchoolActivities() {
              <History className="w-5 h-5" /> 
              {editingId ? 'Editando Actividad Académica' : 'Registro de Actividades Académicas / Campañas'}
            </span>
-           {editingId && (
-             <button 
-               onClick={() => {
-                 setEditingId(null);
-                 setForm({
-                   fecha: new Date().toISOString().split('T')[0],
-                   actividad: '',
-                   tipo: 'Actividad Académica',
-                   observaciones: '',
-                   responsable: user?.displayName || user?.email || ''
-                 });
-               }}
-               className="text-[10px] bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded uppercase font-black transition-colors"
-             >
-               Cancelar Edición
-             </button>
-           )}
-        </div>
-        <form className="p-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FormGroup label="Fecha">
-              <input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
-            </FormGroup>
-            <FormGroup label="Nombre de Actividad / Campaña">
-              <input 
-                className="w-full border-b p-2 font-bold" 
-                placeholder="Ej: AGENDA DE INDUCCIÓN" 
-                value={form.actividad} 
-                onChange={e => setForm({...form, actividad: e.target.value})} 
-                required 
+             {editingId && (
+               <button 
+                 onClick={() => {
+                   setEditingId(null);
+                   setForm({
+                     fecha: new Date().toISOString().split('T')[0],
+                     actividad: '',
+                     tipo: 'Actividad Académica',
+                     observaciones: '',
+                     responsable: user?.displayName || user?.email || ''
+                   });
+                 }}
+                 className="text-[10px] bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded uppercase font-black transition-colors"
+               >
+                 Cancelar Edición
+               </button>
+             )}
+          </div>
+          <form className="p-8 space-y-6" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormGroup label="Fecha">
+                <input type="date" className="w-full border-b p-2" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} required />
+              </FormGroup>
+              <FormGroup label="Nombre de Actividad / Campaña">
+                <input 
+                  className="w-full border-b p-2 font-bold" 
+                  placeholder="Ej: AGENDA DE INDUCCIÓN" 
+                  value={form.actividad} 
+                  onChange={e => setForm({...form, actividad: e.target.value})} 
+                  required 
+                />
+              </FormGroup>
+              <FormGroup label="Tipo">
+                <select className="w-full border-b p-2" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
+                  <option>Actividad Académica</option>
+                  <option>Campaña de Venta</option>
+                  <option>Taller de Inducción</option>
+                  <option>Webinar Educativo</option>
+                  <option>Otros</option>
+                </select>
+              </FormGroup>
+              <FormGroup label="Categoría Objetivo">
+                <select className="w-full border-b p-2" value={form.categoriaObjetivo} onChange={e => setForm({...form, categoriaObjetivo: e.target.value})}>
+                  <option>Todos</option>
+                  {['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FormGroup>
+            </div>
+            <FormGroup label="Observaciones">
+              <textarea 
+                className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
+                placeholder="Detalle de la actividad..."
+                value={form.observaciones}
+                onChange={e => setForm({...form, observaciones: e.target.value})}
               />
             </FormGroup>
-            <FormGroup label="Tipo">
-              <select className="w-full border-b p-2" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
-                <option>Actividad Académica</option>
-                <option>Campaña de Venta</option>
-                <option>Taller de Inducción</option>
-                <option>Webinar Educativo</option>
-                <option>Otros</option>
-              </select>
-            </FormGroup>
-            <FormGroup label="Categoría Objetivo">
-              <select className="w-full border-b p-2" value={form.categoriaObjetivo} onChange={e => setForm({...form, categoriaObjetivo: e.target.value})}>
-                <option>Todos</option>
-                {['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'].map(c => <option key={c}>{c}</option>)}
-              </select>
-            </FormGroup>
-          </div>
-          <FormGroup label="Observaciones">
-            <textarea 
-              className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
-              placeholder="Detalle de la actividad..."
-              value={form.observaciones}
-              onChange={e => setForm({...form, observaciones: e.target.value})}
-            />
-          </FormGroup>
-          <div className="flex justify-end">
-            <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
-              <Save className="w-4 h-4" /> {editingId ? 'ACTUALIZAR CAMBIOS' : 'GUARDAR ACTIVIDAD'}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="flex justify-end">
+              <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
+                <Save className="w-4 h-4" /> {editingId ? 'ACTUALIZAR CAMBIOS' : 'GUARDAR ACTIVIDAD'}
+              </button>
+            </div>
+          </form>
+        </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center">

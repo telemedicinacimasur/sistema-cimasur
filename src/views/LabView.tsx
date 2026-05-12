@@ -210,6 +210,8 @@ function ModuleCard({ title, desc, icon: Icon, onClick, featured }: any) {
 
 function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -336,78 +338,78 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
             <Beaker className="w-5 h-5" /> Evaluación Gotas Puras
           </h3>
           <div className="flex gap-2">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-            />
-            <button 
-              type="button"
-              onClick={downloadExcelTemplate}
-              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-              title="Descargar Plantilla Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
-            </button>
-            <button 
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-            >
-              <Upload className="w-3.5 h-3.5" /> Importar
-            </button>
-          </div>
-        </div>
-        <form className="p-6 space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <FormField label="Fecha">
               <input 
-                type="date" 
-                className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm"
-                value={form.fecha || ''}
-                onChange={e => setForm({...form, fecha: e.target.value})}
-                required
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept=".xlsx, .xls"
+                onChange={handleFileUpload}
               />
-            </FormField>
-            <FormField label="Producto">
-              <input 
-                type="text" 
-                placeholder="Nombre del componente"
-                className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm font-medium"
-                value={form.producto || ''}
-                onChange={e => setForm({...form, producto: e.target.value})}
-                required
-              />
-            </FormField>
-            <FormField label="Estado">
-              <select 
-                className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm"
-                value={form.estado || 'Medio'}
-                onChange={e => setForm({...form, estado: e.target.value})}
+              <button 
+                type="button"
+                onClick={downloadExcelTemplate}
+                className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+                title="Descargar Plantilla Excel"
               >
-                <option value="Mínimo">Mínimo</option>
-                <option value="Bajo">Bajo</option>
-                <option value="Medio">Medio</option>
-                <option value="Óptimo">Óptimo</option>
-              </select>
-            </FormField>
-            <FormField label="Observaciones">
-              <textarea 
-                className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 h-24"
-                value={form.observaciones || ''}
-                onChange={e => setForm({...form, observaciones: e.target.value})}
-              />
-            </FormField>
+                <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+              </button>
+              <button 
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              >
+                <Upload className="w-3.5 h-3.5" /> Importar
+              </button>
+            </div>
           </div>
-          <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold hover:opacity-90 flex justify-center items-center gap-2 mt-4 shadow-lg">
-            <Save className="w-4 h-4" /> GUARDAR REGISTRO
-          </button>
-        </form>
-      </div>
+          <form className="p-6 space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <FormField label="Fecha">
+                <input 
+                  type="date" 
+                  className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm"
+                  value={form.fecha || ''}
+                  onChange={e => setForm({...form, fecha: e.target.value})}
+                  required
+                />
+              </FormField>
+              <FormField label="Producto">
+                <input 
+                  type="text" 
+                  placeholder="Nombre del componente"
+                  className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm font-medium"
+                  value={form.producto || ''}
+                  onChange={e => setForm({...form, producto: e.target.value})}
+                  required
+                />
+              </FormField>
+              <FormField label="Estado">
+                <select 
+                  className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm"
+                  value={form.estado || 'Medio'}
+                  onChange={e => setForm({...form, estado: e.target.value})}
+                >
+                  <option value="Mínimo">Mínimo</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Óptimo">Óptimo</option>
+                </select>
+              </FormField>
+              <FormField label="Observaciones">
+                <textarea 
+                  className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 h-24"
+                  value={form.observaciones || ''}
+                  onChange={e => setForm({...form, observaciones: e.target.value})}
+                />
+              </FormField>
+            </div>
+        <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold hover:opacity-90 flex justify-center items-center gap-2 mt-4 shadow-lg">
+          <Save className="w-4 h-4" /> GUARDAR REGISTRO
+        </button>
+      </form>
+    </div>
 
-      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden lg:col-span-2">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
           <div className="flex items-center gap-4">
             <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Evaluación</h3>
@@ -537,6 +539,8 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
 function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -905,6 +909,8 @@ const initialFormState = {
 
 function NosodesForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || ''];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1308,6 +1314,8 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
 
 function PreparacionForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [frascoSize, setFrascoSize] = useState<30 | 100>(30);
@@ -1519,52 +1527,52 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Preparación Gotas Puras</span>
-           <div className="flex gap-2">
-             <input 
-               type="file" 
-               ref={fileInputRef} 
-               className="hidden" 
-               accept=".xlsx, .xls"
-               onChange={handleFileUpload}
-             />
-             <button 
-               type="button"
-               onClick={downloadExcelTemplate}
-               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-               title="Descargar Plantilla Excel"
-             >
-               <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
-             </button>
-             <button 
-               type="button"
-               onClick={() => fileInputRef.current?.click()}
-               className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-             >
-               <Upload className="w-3.5 h-3.5" /> Importar
-             </button>
-             <button 
-               onClick={() => {
-                const data = records.filter(r => r.type === 'preparacion').map(r => [
-                  formatDate(r.fecha),
-                  r.producto,
-                  r.preparador,
-                  r.totalLambdas
-                ]);
-                exportTableToPDF(
-                  'Reporte: Preparación de Gotas Puras',
-                  ['Fecha', 'Producto', 'Preparador', 'Total Lambdas'],
-                  data,
-                  'preparacion_gotas_puras'
-                );
-               }}
-               className="text-white/70 hover:text-white" 
-               title="PDF"
-             >
-               <Download className="w-4 h-4" />
-             </button>
-           </div>
-        </div>
-        <form className="p-8" onSubmit={handleSubmit}>
+         <div className="flex gap-2">
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             className="hidden" 
+             accept=".xlsx, .xls"
+             onChange={handleFileUpload}
+           />
+           <button 
+             type="button"
+             onClick={downloadExcelTemplate}
+             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             title="Descargar Plantilla Excel"
+           >
+             <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+           </button>
+           <button 
+             type="button"
+             onClick={() => fileInputRef.current?.click()}
+             className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+           >
+             <Upload className="w-3.5 h-3.5" /> Importar
+           </button>
+           <button 
+             onClick={() => {
+              const data = records.filter(r => r.type === 'preparacion').map(r => [
+                formatDate(r.fecha),
+                r.producto,
+                r.preparador,
+                r.totalLambdas
+              ]);
+              exportTableToPDF(
+                'Reporte: Preparación de Gotas Puras',
+                ['Fecha', 'Producto', 'Preparador', 'Total Lambdas'],
+                data,
+                'preparacion_gotas_puras'
+              );
+             }}
+             className="text-white/70 hover:text-white" 
+             title="PDF"
+           >
+             <Download className="w-4 h-4" />
+           </button>
+         </div>
+      </div>
+      <form className="p-8" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
              <FormField label="Nombre Producto"><input className="w-full border-b p-2 text-sm font-black" value={form.producto || ''} onChange={e => setForm({...form, producto: e.target.value})} required /></FormField>
              <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
@@ -1802,6 +1810,8 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
 
 function TinturasMadresForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1944,79 +1954,79 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2"><Droplets className="w-5 h-5" /> Ficha Tinturas Madres {editingId ? '(Editando)' : ''}</span>
-           <div className="flex gap-2">
-             <input 
-               type="file" 
-               ref={fileInputRef} 
-               className="hidden" 
-               accept=".xlsx, .xls"
-               onChange={handleFileUpload}
-             />
-             <button 
-               type="button"
-               onClick={downloadExcelTemplate}
-               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-               title="Descargar Plantilla Excel"
-             >
-               <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
-             </button>
-             <button 
-               type="button"
-               onClick={() => fileInputRef.current?.click()}
-               className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-             >
-               <Upload className="w-3.5 h-3.5" /> Importar
-             </button>
-             <button 
-               onClick={() => {
-                  const data = records.filter(r => r.type === 'tinturas').map(r => [
-                    formatDate(r.fecha),
-                    r.insumo,
-                    r.nroAsignado,
-                    r.elaborador,
-                    r.estado,
-                    r.proporcion || '---',
-                    r.elaboracion || '---',
-                    r.riesgos || '---',
-                    r.etiqueta || '---',
-                    r.firma || '---',
-                    r.responsable || '---'
-                  ]);
-                  exportTableToPDF(
-                    'Reporte: Tinturas Madre - Detalle Completo',
-                    ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado', 'Prop.', 'Elab.', 'Riesgos', 'Etiqueta', 'Firma', 'Resp.'],
-                    data,
-                    'tinturas_madre_completo',
-                    'l'
-                  );
-               }}
-               className="text-white/70 hover:text-white" 
-               title="PDF"
-             >
-               <Download className="w-4 h-4" />
-             </button>
-           </div>
-        </div>
-        <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
-           <FormField label="Insumo"><input className="w-full border-b p-2 text-sm font-black" value={form.insumo || ''} onChange={e => setForm({...form, insumo: e.target.value})} required /></FormField>
-           <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
-           <FormField label="N° Asignado"><input className="w-full border-b p-2 text-sm font-mono" value={form.nroAsignado || ''} onChange={e => setForm({...form, nroAsignado: e.target.value})} required /></FormField>
-           <FormField label="Elaborado por"><input className="w-full border-b p-2 text-sm" value={form.elaborador || ''} onChange={e => setForm({...form, elaborador: e.target.value})} /></FormField>
-           
-           <FormField label="Estado"><input className="w-full border-b p-2 text-sm" value={form.estado || ''} onChange={e => setForm({...form, estado: e.target.value})} /></FormField>
-           <FormField label="Proporción"><input className="w-full border-b p-2 text-sm" value={form.proporcion || ''} onChange={e => setForm({...form, proporcion: e.target.value})} /></FormField>
-           <FormField label="Detalle Elaboración"><input className="w-full border-b p-2 text-sm" value={form.elaboracion || ''} onChange={e => setForm({...form, elaboracion: e.target.value})} /></FormField>
-           <FormField label="Riesgos/Precauciones"><input className="w-full border-b p-2 text-sm" value={form.riesgos || ''} onChange={e => setForm({...form, riesgos: e.target.value})} /></FormField>
-           
-           <FormField label="Información Etiqueta"><input className="w-full border-b p-2 text-sm" value={form.etiqueta || ''} onChange={e => setForm({...form, etiqueta: e.target.value})} /></FormField>
-           <FormField label="Firma Responsable"><input className="w-full border-b p-2 text-sm italic" value={form.firma || ''} onChange={e => setForm({...form, firma: e.target.value})} required /></FormField>
-           
-           <div className="md:col-span-2 flex items-end gap-2">
-              <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded-xl font-bold">{editingId ? 'GUARDAR CAMBIOS' : 'REGISTRAR TINTURA'}</button>
-              {editingId && <button type="button" onClick={() => { setEditingId(null); setForm({insumo: '', fecha: new Date().toISOString().split('T')[0], nroAsignado: '', elaborador: '', estado: 'Óptimo', proporcion: '', elaboracion: '', riesgos: '', etiqueta: '', firma: ''}); }} className="w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold">CANCELAR</button>}
-           </div>
-        </form>
+         <div className="flex gap-2">
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             className="hidden" 
+             accept=".xlsx, .xls"
+             onChange={handleFileUpload}
+           />
+           <button 
+             type="button"
+             onClick={downloadExcelTemplate}
+             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             title="Descargar Plantilla Excel"
+           >
+             <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+           </button>
+           <button 
+             type="button"
+             onClick={() => fileInputRef.current?.click()}
+             className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+           >
+             <Upload className="w-3.5 h-3.5" /> Importar
+           </button>
+           <button 
+             onClick={() => {
+                const data = records.filter(r => r.type === 'tinturas').map(r => [
+                  formatDate(r.fecha),
+                  r.insumo,
+                  r.nroAsignado,
+                  r.elaborador,
+                  r.estado,
+                  r.proporcion || '---',
+                  r.elaboracion || '---',
+                  r.riesgos || '---',
+                  r.etiqueta || '---',
+                  r.firma || '---',
+                  r.responsable || '---'
+                ]);
+                exportTableToPDF(
+                  'Reporte: Tinturas Madre - Detalle Completo',
+                  ['Fecha', 'Insumo', 'N° Asignado', 'Elaborador', 'Estado', 'Prop.', 'Elab.', 'Riesgos', 'Etiqueta', 'Firma', 'Resp.'],
+                  data,
+                  'tinturas_madre_completo',
+                  'l'
+                );
+             }}
+             className="text-white/70 hover:text-white" 
+             title="PDF"
+           >
+             <Download className="w-4 h-4" />
+           </button>
+         </div>
       </div>
+      <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
+         <FormField label="Insumo"><input className="w-full border-b p-2 text-sm font-black" value={form.insumo || ''} onChange={e => setForm({...form, insumo: e.target.value})} required /></FormField>
+         <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
+         <FormField label="N° Asignado"><input className="w-full border-b p-2 text-sm font-mono" value={form.nroAsignado || ''} onChange={e => setForm({...form, nroAsignado: e.target.value})} required /></FormField>
+         <FormField label="Elaborado por"><input className="w-full border-b p-2 text-sm" value={form.elaborador || ''} onChange={e => setForm({...form, elaborador: e.target.value})} /></FormField>
+         
+         <FormField label="Estado"><input className="w-full border-b p-2 text-sm" value={form.estado || ''} onChange={e => setForm({...form, estado: e.target.value})} /></FormField>
+         <FormField label="Proporción"><input className="w-full border-b p-2 text-sm" value={form.proporcion || ''} onChange={e => setForm({...form, proporcion: e.target.value})} /></FormField>
+         <FormField label="Detalle Elaboración"><input className="w-full border-b p-2 text-sm" value={form.elaboracion || ''} onChange={e => setForm({...form, elaboracion: e.target.value})} /></FormField>
+         <FormField label="Riesgos/Precauciones"><input className="w-full border-b p-2 text-sm" value={form.riesgos || ''} onChange={e => setForm({...form, riesgos: e.target.value})} /></FormField>
+         
+         <FormField label="Información Etiqueta"><input className="w-full border-b p-2 text-sm" value={form.etiqueta || ''} onChange={e => setForm({...form, etiqueta: e.target.value})} /></FormField>
+         <FormField label="Firma Responsable"><input className="w-full border-b p-2 text-sm italic" value={form.firma || ''} onChange={e => setForm({...form, firma: e.target.value})} required /></FormField>
+         
+         <div className="md:col-span-2 flex items-end gap-2">
+            <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded-xl font-bold">{editingId ? 'GUARDAR CAMBIOS' : 'REGISTRAR TINTURA'}</button>
+            {editingId && <button type="button" onClick={() => { setEditingId(null); setForm({insumo: '', fecha: new Date().toISOString().split('T')[0], nroAsignado: '', elaborador: '', estado: 'Óptimo', proporcion: '', elaboracion: '', riesgos: '', etiqueta: '', firma: ''}); }} className="w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold">CANCELAR</button>}
+         </div>
+      </form>
+    </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
@@ -2179,6 +2189,8 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
 
 function InsumosForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     codigoCimasur: '',
@@ -2361,27 +2373,27 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2 text-xs uppercase tracking-tighter"><Package className="w-5 h-5" /> Registro de Insumos laboratorio T.M. y otros {editingId ? '(Editando)' : ''}</span>
-           <div className="flex gap-2">
-             <div className="relative border-r border-white/20 pr-2 mr-2 hidden md:block">
-               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50" />
-               <input 
-                 type="text" 
-                 placeholder="Filtrar historial..." 
-                 className="bg-white/10 border-none rounded pl-7 pr-2 py-1 text-[10px] text-white placeholder:text-white/30 focus:bg-white/20 outline-none w-32"
-                 value={searchTerm}
-                 onChange={e => setSearchTerm(e.target.value)}
-               />
-             </div>
+         <div className="flex gap-2">
+           <div className="relative border-r border-white/20 pr-2 mr-2 hidden md:block">
+             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50" />
              <input 
-               type="file" 
-               ref={fileInputRef} 
-               className="hidden" 
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-            />
-            <button 
-              type="button"
-              onClick={downloadExcelTemplate}
+               type="text" 
+               placeholder="Filtrar historial..." 
+               className="bg-white/10 border-none rounded pl-7 pr-2 py-1 text-[10px] text-white placeholder:text-white/30 focus:bg-white/20 outline-none w-32"
+               value={searchTerm}
+               onChange={e => setSearchTerm(e.target.value)}
+             />
+           </div>
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             className="hidden" 
+            accept=".xlsx, .xls"
+            onChange={handleFileUpload}
+          />
+          <button 
+            type="button"
+            onClick={downloadExcelTemplate}
               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
               title="Descargar Plantilla Excel"
             >
@@ -2466,6 +2478,7 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
            </div>
         </form>
       </div>
+
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
@@ -2556,6 +2569,8 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
 
 function VademecumForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
@@ -2660,80 +2675,80 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2"><BookOpen className="w-5 h-5" /> Vademécum {editingId ? '(Editando)' : ''}</span>
-           <div className="flex gap-2">
-             <input 
-               type="file" 
-               ref={fileInputRef} 
-               className="hidden" 
-               accept=".xlsx, .xls"
-               onChange={handleFileUpload}
-             />
-             <button 
-               type="button"
-               onClick={downloadExcelTemplate}
-               className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-               title="Descargar Plantilla Excel"
-             >
-               <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
-             </button>
-             <button 
-               type="button"
-               onClick={() => fileInputRef.current?.click()}
-               className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-             >
-               <Upload className="w-3.5 h-3.5" /> Importar
-             </button>
-             <button 
-               onClick={() => {
-                 const data = records.filter(r => r.type === 'vademecum').map(r => [
-                   formatDate(r.fechaCotiz),
-                   r.producto || '',
-                   r.nombreAlternativo || '',
-                   r.proveedor || '',
-                   r.valor || '',
-                   r.prioridad || '',
-                   formatDate(r.fechaCompra),
-                   r.estado || '',
-                   r.dilucion || '',
-                   r.observaciones || ''
-                 ]);
-                 exportTableToPDF(
-                   'Reporte: Vademécum de Compras',
-                   ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'],
-                   data,
-                   'vademecum_compras',
-                   'l'
-                 );
-               }}
-               className="text-white/70 hover:text-white" 
-               title="PDF"
-             >
-               <Download className="w-4 h-4" />
-             </button>
-             <button 
-               onClick={() => {
-                 const data = records.filter(r => r.type === 'vademecum').map(r => [
-                   formatDateForExcel(r.fechaCotiz) || '',
-                   r.producto || '',
-                   r.nombreAlternativo || '',
-                   r.proveedor || '',
-                   r.valor || '',
-                   r.prioridad || '',
-                   formatDateForExcel(r.fechaCompra) || '',
-                   r.estado || '',
-                   r.dilucion || '',
-                   r.observaciones || ''
-                 ]);
-                 exportTableToExcel('Vademécum de Compras', ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'], data, 'vademecum_compras');
-               }}
-               className="text-white/70 hover:text-white ml-2" 
-               title="Excel"
-             >
-               <FileSpreadsheet className="w-4 h-4" />
-             </button>
-           </div>
-        </div>
-        <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
+         <div className="flex gap-2">
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             className="hidden" 
+             accept=".xlsx, .xls"
+             onChange={handleFileUpload}
+           />
+           <button 
+             type="button"
+             onClick={downloadExcelTemplate}
+             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             title="Descargar Plantilla Excel"
+           >
+             <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+           </button>
+           <button 
+             type="button"
+             onClick={() => fileInputRef.current?.click()}
+             className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+           >
+             <Upload className="w-3.5 h-3.5" /> Importar
+           </button>
+           <button 
+             onClick={() => {
+               const data = records.filter(r => r.type === 'vademecum').map(r => [
+                 formatDate(r.fechaCotiz),
+                 r.producto || '',
+                 r.nombreAlternativo || '',
+                 r.proveedor || '',
+                 r.valor || '',
+                 r.prioridad || '',
+                 formatDate(r.fechaCompra),
+                 r.estado || '',
+                 r.dilucion || '',
+                 r.observaciones || ''
+               ]);
+               exportTableToPDF(
+                 'Reporte: Vademécum de Compras',
+                 ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'],
+                 data,
+                 'vademecum_compras',
+                 'l'
+               );
+             }}
+             className="text-white/70 hover:text-white" 
+             title="PDF"
+           >
+             <Download className="w-4 h-4" />
+           </button>
+           <button 
+             onClick={() => {
+               const data = records.filter(r => r.type === 'vademecum').map(r => [
+                 formatDateForExcel(r.fechaCotiz) || '',
+                 r.producto || '',
+                 r.nombreAlternativo || '',
+                 r.proveedor || '',
+                 r.valor || '',
+                 r.prioridad || '',
+                 formatDateForExcel(r.fechaCompra) || '',
+                 r.estado || '',
+                 r.dilucion || '',
+                 r.observaciones || ''
+               ]);
+               exportTableToExcel('Vademécum de Compras', ['F.Cotiz', 'Producto', 'N.Alt', 'Prov', 'Valor', 'Prior.', 'F.Compra', 'Estado', 'Dil.', 'Obs'], data, 'vademecum_compras');
+             }}
+             className="text-white/70 hover:text-white ml-2" 
+             title="Excel"
+           >
+             <FileSpreadsheet className="w-4 h-4" />
+           </button>
+         </div>
+      </div>
+      <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
            <FormField label="Fecha Cotiz"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaCotiz || ''} onChange={e => setForm({...form, fechaCotiz: e.target.value})} /></FormField>
            <FormField label="Producto"><input className="w-full border-b p-2 text-sm font-bold" value={form.producto || ''} onChange={e => setForm({...form, producto: e.target.value})} required /></FormField>
            <FormField label="Nombre Alternativo"><input className="w-full border-b p-2 text-sm" value={form.nombreAlternativo || ''} onChange={e => setForm({...form, nombreAlternativo: e.target.value})} /></FormField>
@@ -2921,6 +2936,8 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 
 function MantenimientoForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
@@ -3135,86 +3152,86 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><Settings className="w-5 h-5" /> Mantención</span>
-          <div className="flex gap-2">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-            />
-            <button 
-              type="button"
-              onClick={downloadExcelTemplate}
-              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-              title="Descargar Plantilla Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
-            </button>
-            <button 
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
-            >
-              <Upload className="w-3.5 h-3.5" /> Importar
-            </button>
-            <button 
-              onClick={() => {
-                const data = records.filter(r => r.type === 'mantenimiento').map(r => [
-                  r.codigo || '',
-                  r.producto || '',
-                  formatDate(r.fechaCompra),
-                  r.marca || '',
-                  r.modelo || '',
-                  r.valor || '',
-                  r.proveedor || '',
-                  r.responsable || '',
-                  r.estado || '',
-                  r.area || '',
-                  r.comentarios || ''
-                ]);
-                exportTableToPDF(
-                  'Reporte: Inventario de Equipos y Mantención',
-                  ['Código', 'Equipo', 'F. Compra', 'Marca', 'Modelo', 'Valor', 'Proveedor', 'Responsable', 'Estado', 'Área', 'Comentarios'],
-                  data,
-                  'mantenimiento_equipos',
-                  'l'
-                );
-              }}
-              className="text-white/70 hover:text-white" 
-              title="PDF"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        <div className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6">
-          <FormField label="Código Equipo"><input className="w-full border-b p-2 text-sm font-mono" value={form.codigo || ''} onChange={e => setForm({...form, codigo: e.target.value})} /></FormField>
-          <FormField label="Producto / Equipo"><input className="w-full border-b p-2 text-sm font-bold" value={form.producto || ''} onChange={e => setForm({...form, producto: e.target.value})} /></FormField>
-          <FormField label="Área">
-            <select className="w-full border-b p-2 text-sm" value={form.area || 'L.A.B'} onChange={e => setForm({...form, area: e.target.value})}>
-               {areas.map(a => <option key={a}>{a}</option>)}
-            </select>
-          </FormField>
-          <FormField label="Fecha Compra"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaCompra || ''} onChange={e => setForm({...form, fechaCompra: e.target.value})} /></FormField>
-          <FormField label="Marca"><input className="w-full border-b p-2 text-sm" value={form.marca || ''} onChange={e => setForm({...form, marca: e.target.value})} /></FormField>
-          <FormField label="Modelo"><input className="w-full border-b p-2 text-sm" value={form.modelo || ''} onChange={e => setForm({...form, modelo: e.target.value})} /></FormField>
-          <FormField label="Valor"><input type="text" className="w-full border-b p-2 text-sm" value={form.valor || ''} onChange={e => setForm({...form, valor: e.target.value.replace(/[^0-9.,]/g, '')})} /></FormField>
-          <FormField label="Proveedor"><input className="w-full border-b p-2 text-sm" value={form.proveedor || ''} onChange={e => setForm({...form, proveedor: e.target.value})} /></FormField>
-          <FormField label="Responsable"><input className="w-full border-b p-2 text-sm" value={form.responsable || ''} onChange={e => setForm({...form, responsable: e.target.value})} /></FormField>
-          <FormField label="Estado Actual">
-             <select className="w-full border-b p-2 text-sm font-black text-blue-600" value={form.estado || 'Bueno'} onChange={e => setForm({...form, estado: e.target.value})}>
-                {statusOptions.map(o => <option key={o}>{o}</option>)}
-             </select>
-          </FormField>
-          <div className="md:col-span-4">
-             <FormField label="Comentarios Técnicos"><textarea className="w-full border rounded p-3 text-xs h-20 bg-slate-50" value={form.comentarios || ''} onChange={e => setForm({...form, comentarios: e.target.value})} /></FormField>
-          </div>
-          <div className="md:col-span-4 flex justify-end">
-             <button type="button" onClick={handleSubmit} className="bg-[#001736] text-white px-10 py-3 rounded-xl font-bold">REGISTRAR ESTADO EQUIPO Y ACCIÓN</button>
-          </div>
+        <div className="flex gap-2">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept=".xlsx, .xls"
+            onChange={handleFileUpload}
+          />
+          <button 
+            type="button"
+            onClick={downloadExcelTemplate}
+            className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+            title="Descargar Plantilla Excel"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+          </button>
+          <button 
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+          >
+            <Upload className="w-3.5 h-3.5" /> Importar
+          </button>
+          <button 
+            onClick={() => {
+              const data = records.filter(r => r.type === 'mantenimiento').map(r => [
+                r.codigo || '',
+                r.producto || '',
+                formatDate(r.fechaCompra),
+                r.marca || '',
+                r.modelo || '',
+                r.valor || '',
+                r.proveedor || '',
+                r.responsable || '',
+                r.estado || '',
+                r.area || '',
+                r.comentarios || ''
+              ]);
+              exportTableToPDF(
+                'Reporte: Inventario de Equipos y Mantención',
+                ['Código', 'Equipo', 'F. Compra', 'Marca', 'Modelo', 'Valor', 'Proveedor', 'Responsable', 'Estado', 'Área', 'Comentarios'],
+                data,
+                'mantenimiento_equipos',
+                'l'
+              );
+            }}
+            className="text-white/70 hover:text-white" 
+            title="PDF"
+          >
+            <Download className="w-4 h-4" />
+          </button>
         </div>
       </div>
+      <div className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+        <FormField label="Código Equipo"><input className="w-full border-b p-2 text-sm font-mono" value={form.codigo || ''} onChange={e => setForm({...form, codigo: e.target.value})} /></FormField>
+        <FormField label="Producto / Equipo"><input className="w-full border-b p-2 text-sm font-bold" value={form.producto || ''} onChange={e => setForm({...form, producto: e.target.value})} /></FormField>
+        <FormField label="Área">
+          <select className="w-full border-b p-2 text-sm" value={form.area || 'L.A.B'} onChange={e => setForm({...form, area: e.target.value})}>
+             {areas.map(a => <option key={a}>{a}</option>)}
+          </select>
+        </FormField>
+        <FormField label="Fecha Compra"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaCompra || ''} onChange={e => setForm({...form, fechaCompra: e.target.value})} /></FormField>
+        <FormField label="Marca"><input className="w-full border-b p-2 text-sm" value={form.marca || ''} onChange={e => setForm({...form, marca: e.target.value})} /></FormField>
+        <FormField label="Modelo"><input className="w-full border-b p-2 text-sm" value={form.modelo || ''} onChange={e => setForm({...form, modelo: e.target.value})} /></FormField>
+        <FormField label="Valor"><input type="text" className="w-full border-b p-2 text-sm" value={form.valor || ''} onChange={e => setForm({...form, valor: e.target.value.replace(/[^0-9.,]/g, '')})} /></FormField>
+        <FormField label="Proveedor"><input className="w-full border-b p-2 text-sm" value={form.proveedor || ''} onChange={e => setForm({...form, proveedor: e.target.value})} /></FormField>
+        <FormField label="Responsable"><input className="w-full border-b p-2 text-sm" value={form.responsable || ''} onChange={e => setForm({...form, responsable: e.target.value})} /></FormField>
+        <FormField label="Estado Actual">
+           <select className="w-full border-b p-2 text-sm font-black text-blue-600" value={form.estado || 'Bueno'} onChange={e => setForm({...form, estado: e.target.value})}>
+              {statusOptions.map(o => <option key={o}>{o}</option>)}
+           </select>
+        </FormField>
+        <div className="md:col-span-4">
+           <FormField label="Comentarios Técnicos"><textarea className="w-full border rounded p-3 text-xs h-20 bg-slate-50" value={form.comentarios || ''} onChange={e => setForm({...form, comentarios: e.target.value})} /></FormField>
+        </div>
+        <div className="md:col-span-4 flex justify-end">
+           <button type="button" onClick={handleSubmit} className="bg-[#001736] text-white px-10 py-3 rounded-xl font-bold">REGISTRAR ESTADO EQUIPO Y ACCIÓN</button>
+        </div>
+      </div>
+    </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center text-[#002b5b]">
@@ -4008,6 +4025,8 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 
 function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [trackingRecords, setTrackingRecords] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -4635,6 +4654,8 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
 function MagistralesForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role];
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [compositionRows, setCompositionRows] = useState([
@@ -4727,14 +4748,14 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-[#0b2447] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2">
             <FileText className="w-5 h-5" /> {editingId ? 'Editando Fórmula Magistral' : 'Elaboración de Fórmulas Magistrales'}
           </span>
         </div>
-        <form className="p-8 space-y-8" onSubmit={handleSubmit}>
+      <form className="p-8 space-y-8" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FormField label="N° COTIZACION">
               <input className="w-full border-b p-2 text-sm font-bold" value={form.nroCotizacion} onChange={e => setForm({...form, nroCotizacion: e.target.value})} required placeholder="COT-001" />
