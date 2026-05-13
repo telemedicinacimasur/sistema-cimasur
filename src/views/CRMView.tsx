@@ -279,7 +279,7 @@ function CRMRegister() {
         window.dispatchEvent(new Event('db-change'));
       } catch (error) {
         console.error("Import Error:", error);
-        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
+        alert(`Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}. Asegúrese de usar la plantilla correcta y que el archivo no esté abierto.`);
       }
     };
     reader.readAsBinaryString(file);

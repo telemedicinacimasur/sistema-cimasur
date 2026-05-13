@@ -914,7 +914,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "Und a hacer", "UND Total", "UND Inventario", "Observaciones"]
+      ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "UND Inventario", "UND Total", "Und a hacer", "Observaciones"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -1167,8 +1167,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           <FormField label="Observaciones"><input className="w-full border-b p-2 text-sm" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="Und a hacer"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits || 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="Und Inventario">
+          <FormField label="UND Inventario"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits || 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="Und a hacer">
             <div className="w-full p-2 text-sm font-bold text-amber-700 bg-amber-50 rounded border-b border-amber-200">
               {form.todoUnits}
             </div>

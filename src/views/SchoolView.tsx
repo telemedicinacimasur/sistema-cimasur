@@ -131,35 +131,40 @@ function ContactRegister({ records }: { records: any[] }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-       await localDB.updateInCollection('school_leads', editingId, form);
-       if (user) await addAuditLog(user, `Actualizó lead académico: ${form.name}`, 'SCHOOL');
-       alert('Lead Académico Actualizado');
-       setEditingId(null);
-    } else {
-       await localDB.saveToCollection('school_leads', form);
-       await addNotification({
-         title: 'Nuevo Lead Académico',
-         message: `${user?.displayName || user?.email} registró a ${form.name}`,
-         recipientRoles: ['admin'],
-         sender: user?.displayName || user?.email || 'Sistema'
-       });
-       if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
-       alert('Lead Académico Registrado');
+    try {
+      if (editingId) {
+        await localDB.updateInCollection('school_leads', editingId, form);
+        if (user) await addAuditLog(user, `Actualizó lead académico: ${form.name}`, 'SCHOOL');
+        alert('Lead Académico Actualizado');
+        setEditingId(null);
+      } else {
+        await localDB.saveToCollection('school_leads', form);
+        await addNotification({
+          title: 'Nuevo Lead Académico',
+          message: `${user?.displayName || user?.email} registró a ${form.name}`,
+          recipientRoles: ['admin'],
+          sender: user?.displayName || user?.email || 'Sistema'
+        });
+        if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
+        alert('Lead Académico Registrado');
+      }
+      setForm({ 
+        ...form, 
+        name: '', 
+        rut: '', 
+        email: '', 
+        phone: '', 
+        observaciones: '',
+        montoTotalPagado: 0,
+        montoTotalRecibido: 0,
+        nroFactura: '',
+        fechaFactura: '',
+        observacionesPago: ''
+      });
+    } catch (error) {
+      console.error("Error saving lead:", error);
+      alert('Error al guardar: ' + (error instanceof Error ? error.message : String(error)));
     }
-    setForm({ 
-      ...form, 
-      name: '', 
-      rut: '', 
-      email: '', 
-      phone: '', 
-      observaciones: '',
-      montoTotalPagado: 0,
-      montoTotalRecibido: 0,
-      nroFactura: '',
-      fechaFactura: '',
-      observacionesPago: ''
-    });
   };
 
   const downloadExcelTemplate = () => {
