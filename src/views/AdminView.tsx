@@ -8,6 +8,8 @@ import {
   exportExpedienteToPDF 
 } from '../lib/pdfUtils';
 import { RecordActions } from '../components/RecordActions';
+import { UsersManager } from '../components/settings/UsersManager';
+import { AuditLogManager } from '../components/settings/AuditLogManager';
 
 export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -41,22 +43,36 @@ import {
   RefreshCw,
   GraduationCap,
   Eye,
-  EyeOff
+  EyeOff,
+  Settings,
+  Lock,
+  ShieldCheck,
+  LayoutGrid,
+  AlertCircle,
+  FlaskConical,
+  Activity
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 import { addNotification } from '../lib/notifications';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'users' | 'logs';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments';
 
 export default function AdminView() {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
-  const isAdmin = userRoles.includes('admin');
-  const [view, setView] = useState<AdminTab>('menu');
+  const location = useLocation();
+  const [view, setView] = useState<AdminTab>((location.state as any)?.view || 'menu');
   const [records, setRecords] = useState<any[]>([]);
+
+  // Effect to sync view with location state for external deep links
+  useEffect(() => {
+    if (location.state && (location.state as any).view) {
+      setView((location.state as any).view);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -66,7 +82,6 @@ export default function AdminView() {
       if (view === 'dte') col = 'dte_records';
       if (view === 'pet_payments') col = 'pet_payments';
       if (view === 'school_payments') col = 'school_payments';
-      if (view === 'logs') col = 'audit_logs'; 
       const data = await localDB.getCollection(col);
       setRecords(data);
     };
@@ -80,9 +95,12 @@ export default function AdminView() {
   if (view === 'menu') {
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <div>
-          <h2 className="text-2xl font-bold text-[#001736]">Módulo de Administración</h2>
-          <p className="text-slate-500 text-sm">Gestión del ciclo financiero, presupuestario y documental interno.</p>
+        <div className="flex justify-between items-center bg-white p-8 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full translate-x-16 -translate-y-16 opacity-50" />
+          <div className="relative z-10">
+            <h2 className="text-3xl font-black text-[#001736] tracking-tighter uppercase italic">Módulo de Administración</h2>
+            <p className="text-slate-500 text-sm font-bold uppercase tracking-widest opacity-60">Gestión del ciclo financiero, presupuestario y documental interno.</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -118,26 +136,10 @@ export default function AdminView() {
           />
           <ModuleCard 
             title="Saldos Escuela Cimasur"
-            desc="Control de pagos de alumnos, meta mensual y gastos académicos."
+            desc="Control de pagos de alumnos, meta anual y gastos académicos."
             icon={GraduationCap}
             onClick={() => setView('school_payments')}
           />
-          {isAdmin && (
-            <ModuleCard 
-              title="Gestión de Usuarios"
-              desc="Control de accesos, restablecimiento de contraseñas y roles."
-              icon={Users}
-              onClick={() => setView('users')}
-            />
-          )}
-          {isAdmin && (
-            <ModuleCard 
-              title="Registro de Auditoría"
-              desc="Historial de acciones registradas en el sistema (Solo Admin)."
-              icon={FileText}
-              onClick={() => setView('logs')}
-            />
-          )}
         </div>
       </div>
     );
@@ -159,367 +161,6 @@ export default function AdminView() {
       {view === 'dte' && <DTEManager records={records} setRecords={setRecords} />}
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'school_payments' && <SchoolPaymentsManager records={records} setRecords={setRecords} />}
-      {view === 'users' && <UsersManager />}
-      {view === 'logs' && <AuditLogManager records={records} />}
-    </div>
-  );
-}
-
-function UsersManager() {
-  const { user, refreshUser } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
-  const isAdmin = userRoles.includes('admin');
-  const [users, setUsers] = useState<any[]>([]);
-  const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [newPass, setNewPass] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
-  const [newUser, setNewUser] = useState({
-    email: '',
-    displayName: '',
-    role: 'viewer',
-    roles: ['viewer'] as string[],
-    pass: ''
-  });
-
-  const [savingId, setSavingId] = useState<string | null>(null);
-
-  const availableRoles = [
-    { id: 'admin', label: 'Administrador Sistema', color: 'bg-red-100 text-red-700' },
-    { id: 'manager', label: 'Gestor Administrativo', color: 'bg-sky-100 text-sky-700' },
-    { id: 'lab', label: 'Laboratorio', color: 'bg-blue-100 text-blue-700' },
-    { id: 'crm', label: 'CRM Comercial', color: 'bg-blue-100 text-blue-700' },
-    { id: 'school', label: 'Escuela', color: 'bg-blue-100 text-blue-700' },
-    { id: 'gestion', label: 'Gestión', color: 'bg-blue-100 text-blue-700' }
-  ];
-
-  const refreshUsers = async () => {
-    const data = await localAuth.getAllUsers();
-    setUsers(data);
-  };
-
-  useEffect(() => {
-    refreshUsers();
-  }, []);
-
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUser) return;
-    
-    try {
-        setSavingId(editingUser.uid);
-        const validRoles = editingUser.roles && Array.isArray(editingUser.roles) && editingUser.roles.length > 0
-            ? editingUser.roles.filter(r => r !== undefined && r !== null)
-            : ['viewer'];
-            
-        if (validRoles.length === 0) validRoles.push('viewer');
-
-        console.log("Saving user:", editingUser.uid, "Email:", editingUser.email, "roles:", validRoles);
-
-        await localAuth.updateUser(editingUser.uid, {
-          role: validRoles[0],
-          roles: validRoles,
-          displayName: editingUser.displayName,
-          ...(newPass ? { pass: newPass } : {})
-        });
-        
-        // Redundant but safe: trigger reload of current user state
-        if (user?.uid === editingUser.uid) {
-            await refreshUser();
-        }
-        
-        alert('Usuario actualizado correctamente');
-        setEditingUser(null);
-        setNewPass('');
-        await refreshUsers();
-    } catch (error) {
-        console.error("Error updating user:", error);
-        alert('Error al guardar cambios: ' + error);
-    } finally {
-        setSavingId(null);
-    }
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUser.email || !newUser.pass) return;
-    
-    await localAuth.createUser({
-      ...newUser,
-      role: newUser.roles.length > 0 ? newUser.roles[0] : 'viewer',
-      uid: `user-${Date.now()}`,
-      photoURL: ''
-    });
-    
-    alert('Usuario creado correctamente');
-    setNewUser({ email: '', displayName: '', role: 'viewer', roles: ['viewer'], pass: '' });
-    setShowCreate(false);
-    refreshUsers();
-  };
-
-  const toggleRole = (currentRoles: string[], roleId: string) => {
-    if (currentRoles.includes(roleId)) {
-      return currentRoles.filter(r => r !== roleId);
-    } else {
-      return [...currentRoles, roleId];
-    }
-  };
-
-  const handleDelete = async (uid: string) => {
-    if (uid === user?.uid) {
-      alert('No puedes eliminarte a ti mismo mientras estás en sesión');
-      return;
-    }
-    const targetUser = users.find(u => u.uid === uid);
-    if (targetUser?.email === 'admin@cimasur.cl') {
-      alert('No puedes eliminar al administrador principal');
-      return;
-    }
-    await localAuth.deleteUser(uid);
-    refreshUsers();
-    alert('Usuario eliminado');
-  };
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5" /> PANEL DE CONTROL DE ACCESOS (CPANEL)
-          </div>
-          <button 
-            onClick={() => setShowCreate(!showCreate)}
-            className="bg-blue-500 hover:bg-blue-400 text-xs px-3 py-1 rounded transition-colors"
-          >
-            {showCreate ? 'CANCELAR' : '+ NUEVO USUARIO'}
-          </button>
-        </div>
-        
-        {showCreate && (
-          <form className="p-6 bg-blue-50 border-b border-blue-100 grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleCreate}>
-            <div className="md:col-span-4">
-              <h4 className="text-sm font-bold text-blue-900 mb-2 uppercase tracking-widest">Registrar Nuevo Acceso</h4>
-            </div>
-            <FormField label="Correo Electrónico">
-              <input 
-                type="email"
-                required
-                className="w-full border-b border-blue-200 bg-transparent p-2 text-sm" 
-                value={newUser.email} 
-                onChange={e => setNewUser({...newUser, email: e.target.value})} 
-              />
-            </FormField>
-            <FormField label="Nombre Completo">
-              <input 
-                className="w-full border-b border-blue-200 bg-transparent p-2 text-sm" 
-                value={newUser.displayName} 
-                onChange={e => setNewUser({...newUser, displayName: e.target.value})} 
-              />
-            </FormField>
-            <FormField label="Contraseña Inicial">
-              <input 
-                type="text"
-                required
-                className="w-full border-b border-blue-200 bg-transparent p-2 text-sm font-mono" 
-                value={newUser.pass} 
-                onChange={e => setNewUser({...newUser, pass: e.target.value})} 
-              />
-            </FormField>
-            <div className="md:col-span-1">
-               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Accesos / Roles</label>
-               <div className="grid grid-cols-2 gap-2">
-                  {availableRoles.map(r => (
-                    <label key={r.id} className="flex items-center gap-2 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        className="w-3 h-3 rounded border-blue-200 text-blue-600 focus:ring-blue-500"
-                        checked={newUser.roles.includes(r.id)}
-                        onChange={() => setNewUser({...newUser, roles: toggleRole(newUser.roles, r.id)})}
-                      />
-                      <span className="text-[10px] font-bold text-blue-900 group-hover:text-blue-600 transition-colors uppercase">{r.label}</span>
-                    </label>
-                  ))}
-               </div>
-            </div>
-            <div className="md:col-span-4 flex justify-end mt-4">
-              <button type="submit" className="bg-blue-600 text-white px-8 py-2 rounded font-bold hover:bg-blue-700 uppercase text-xs tracking-widest">CREAR ACCESO</button>
-            </div>
-          </form>
-        )}
-
-        {editingUser && (
-          <form className="p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleUpdate}>
-            <div className="md:col-span-4">
-              <h4 className="text-sm font-bold text-slate-700 mb-2">Editando Usuario: {editingUser.email}</h4>
-            </div>
-            <FormField label="Nombre Completo">
-              <input 
-                className="w-full border-b p-2 text-sm" 
-                value={editingUser.displayName} 
-                onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} 
-              />
-            </FormField>
-            <FormField label="Modificar Contraseña">
-              <div className="relative">
-                <input 
-                  type="text"
-                  placeholder="Vacío para mantener"
-                  className="w-full border-b p-2 text-sm font-mono" 
-                  value={newPass} 
-                  onChange={e => setNewPass(e.target.value)} 
-                />
-                <Key className="absolute right-2 top-2 w-4 h-4 text-slate-300" />
-              </div>
-            </FormField>
-            <div className="md:col-span-2">
-               <div className="flex justify-between items-center mb-2">
-                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Modificar Accesos</label>
-                 <button 
-                   type="button" 
-                   onClick={() => setEditingUser({...editingUser, roles: availableRoles.filter(ar => ar.id !== 'viewer').map(ar => ar.id)})}
-                   className="text-[9px] font-black text-blue-600 hover:underline"
-                 >
-                   Marcar Todos (Full Access)
-                 </button>
-               </div>
-               <div className="grid grid-cols-3 gap-2">
-                  {availableRoles.map(r => (
-                    <label key={r.id} className="flex items-center gap-2 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        checked={(editingUser.roles || [editingUser.role]).includes(r.id)}
-                        onChange={() => {
-                          const current = editingUser.roles || [editingUser.role];
-                          setEditingUser({...editingUser, roles: toggleRole(current, r.id)});
-                        }}
-                      />
-                      <span className="text-[10px] font-bold text-slate-700 group-hover:text-blue-600 transition-colors uppercase">{r.label}</span>
-                    </label>
-                  ))}
-               </div>
-            </div>
-            <div className="md:col-span-4 flex items-center justify-end gap-2 text-xs mt-4">
-              <button type="button" onClick={() => setEditingUser(null)} className="px-6 bg-slate-200 text-slate-700 py-2 rounded font-bold uppercase tracking-tighter hover:bg-slate-300 transition-colors">CERRAR</button>
-              <button 
-                type="submit" 
-                disabled={!!savingId}
-                className="px-10 bg-[#001736] text-white py-2 rounded font-bold hover:bg-blue-900 uppercase tracking-tighter shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
-              >
-                {savingId ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                {savingId ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-slate-50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4">Usuario / Email</th>
-                <th className="p-4">Nombre</th>
-                <th className="p-4 text-center">Permisos (Roles)</th>
-                <th className="p-4 text-center">Clave Actual</th>
-                <th className="p-4 text-center">Gestión</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map(u => (
-                <tr key={u.email} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 font-bold text-blue-900 italic">{u.email}</td>
-                  <td className="p-4 font-medium">{u.displayName}</td>
-                  <td className="p-4 text-center">
-                    <div className="flex flex-wrap gap-1 justify-center max-w-[250px] mx-auto">
-                      {(u.roles || [u.role || 'viewer']).map((roleId: string) => {
-                        const roleObj = availableRoles.find(ar => ar.id === roleId);
-                        return (
-                          <span key={roleId} className={cn(
-                            "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tight border",
-                            roleObj?.color || "bg-slate-50 text-slate-500 border-slate-100"
-                          )}>
-                            {roleObj?.label || roleId}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </td>
-                  <td className="p-4 text-center font-mono text-slate-400">
-                    {u.pass}
-                  </td>
-                  <td className="p-4 text-center">
-                    <RecordActions 
-                      onEdit={() => {
-                        setEditingUser({
-                          ...u,
-                          roles: Array.isArray(u.roles) 
-                            ? u.roles 
-                            : (u.roles && typeof u.roles === 'object' ? Object.values(u.roles) : (u.role ? [u.role] : ['viewer']))
-                        });
-                        setNewPass('');
-                        setShowCreate(false);
-                      }}
-                      onDelete={() => handleDelete(u.uid)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 items-start">
-          <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="text-xs text-amber-800 leading-relaxed italic">
-            <p className="font-bold mb-1 uppercase tracking-widest text-[10px]">Seguridad Jerárquica:</p>
-            Solo el perfil <strong>Administrador</strong> puede ver esta sección. Desde aquí puedes crear accesos específicos 
-            para cada departamento (Lab, CRM, Escuela) y asignarles contraseñas únicas.
-          </div>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3 items-start">
-          <Key className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-          <div className="text-xs text-blue-800 leading-relaxed italic">
-            <p className="font-bold mb-1 uppercase tracking-widest text-[10px]">Restablecimiento Global:</p>
-            Si un usuario olvida su clave, búscalo en la tabla y usa el botón "EDITAR" para asignar una nueva 
-            contraseña manualmente. El cambio es instantáneo.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AuditLogManager({ records }: { records: any[] }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#001736] p-4 text-white font-bold flex items-center gap-2">
-        <FileText className="w-5 h-5" /> Registro de Auditoría Global
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-slate-50 text-left border-b font-black text-slate-500 uppercase">
-              <th className="p-4">Timestamp</th>
-              <th className="p-4">Usuario</th>
-              <th className="p-4">Email</th>
-              <th className="p-4">Módulo</th>
-              <th className="p-4">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {records.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map(r => (
-              <tr key={r.id || r.timestamp} className="hover:bg-slate-50 transition-colors italic">
-                <td className="p-4">{formatDateTimeChile(r.timestamp)}</td>
-                <td className="p-4 font-bold">{r.displayName}</td>
-                <td className="p-4 text-slate-500">{r.email}</td>
-                <td className="p-4 font-black text-[#001736]">{r.module}</td>
-                <td className="p-4">{r.action}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
@@ -531,6 +172,8 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [searchTutor, setSearchTutor] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [students, setStudents] = useState<any[]>([]);
 
   const downloadExcelTemplate = () => {
@@ -622,11 +265,14 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   };
 
   const filteredRecords = records.filter(r => {
+    const rDate = new Date(r.fecha);
+    const mMatch = filterMonth ? (rDate.getMonth() + 1).toString() === filterMonth : true;
+    const yMatch = filterYear ? rDate.getFullYear().toString() === filterYear : true;
     const matchesSearch = !searchTutor || r.tutor?.toLowerCase().includes(searchTutor.toLowerCase());
     const date = r.fecha;
     const matchesStart = !dateStart || date >= dateStart;
     const matchesEnd = !dateEnd || date <= dateEnd;
-    return matchesSearch && matchesStart && matchesEnd;
+    return mMatch && yMatch && matchesSearch && matchesStart && matchesEnd;
   }).sort((a,b) => {
     const d = (b.fecha || '').localeCompare(a.fecha || '');
     if (d !== 0) return d;
@@ -746,29 +392,58 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros de Búsqueda y Rango</span>
-            <div className="flex items-center gap-2">
-              <input type="date" className="text-[10px] border p-1 rounded" value={dateStart} onChange={e => setDateStart(e.target.value)} />
-              <span className="text-slate-300">al</span>
-              <input type="date" className="text-[10px] border p-1 rounded" value={dateEnd} onChange={e => setDateEnd(e.target.value)} />
+        <div className="p-4 bg-slate-50 border-b flex flex-col xl:flex-row justify-between items-center gap-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-col gap-1">
+               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">Mes / Año</span>
+               <div className="flex items-center gap-1">
+                  <select 
+                    className="text-[10px] border p-1 rounded font-bold outline-none" 
+                    value={filterMonth} 
+                    onChange={e => setFilterMonth(e.target.value)}
+                  >
+                    <option value="">Mes...</option>
+                    {Array.from({length: 12}, (_, i) => (
+                      <option key={i+1} value={(i+1).toString()}>{new Date(2024, i).toLocaleString('es', {month: 'long'})}</option>
+                    ))}
+                  </select>
+                  <select 
+                    className="text-[10px] border p-1 rounded font-bold outline-none" 
+                    value={filterYear} 
+                    onChange={e => setFilterYear(e.target.value)}
+                  >
+                    {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y.toString()}>{y}</option>)}
+                  </select>
+               </div>
             </div>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-              <input 
-                placeholder="Tutor..." 
-                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none" 
-                value={searchTutor}
-                onChange={e => setSearchTutor(e.target.value)}
-              />
+
+            <div className="flex flex-col gap-1">
+               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">Rango Exacto (Desde / Hasta)</span>
+               <div className="flex items-center gap-1">
+                 <input type="date" className="text-[10px] border p-1 rounded" value={dateStart} onChange={e => setDateStart(e.target.value)} />
+                 <span className="text-slate-300">-</span>
+                 <input type="date" className="text-[10px] border p-1 rounded" value={dateEnd} onChange={e => setDateEnd(e.target.value)} />
+               </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">Búsqueda rápida</span>
+               <div className="relative">
+                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                 <input 
+                   placeholder="Tutor..." 
+                   className="pl-7 pr-3 py-1.5 text-[10px] border rounded-full w-44 outline-none focus:border-blue-500 transition-all font-bold" 
+                   value={searchTutor}
+                   onChange={e => setSearchTutor(e.target.value)}
+                 />
+               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <span className="block text-[8px] font-black text-slate-400 uppercase">Total Veterinaria</span>
-              <span className="text-sm font-black text-blue-900 tracking-tighter">{formatCurrency(totalVet)}</span>
+          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="px-4 border-r border-slate-100">
+               <span className="block text-[8px] font-black text-slate-400 uppercase tracking-tighter">Total Selección</span>
+               <span className="text-sm font-black text-blue-900 tracking-tighter">{formatCurrency(totalVet)}</span>
             </div>
             
             <input 
@@ -781,18 +456,19 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
             <div className="flex gap-1">
               <button 
                 onClick={downloadExcelTemplate}
-                className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 shadow-sm transition-colors"
+                className="bg-emerald-50 text-emerald-600 p-2 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"
                 title="Descargar Plantilla Excel"
               >
                 <FileSpreadsheet className="w-4 h-4" />
               </button>
               <button 
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-amber-600 text-white p-2 rounded hover:bg-amber-700 shadow-sm transition-colors"
+                className="bg-amber-50 text-amber-600 p-2 rounded-xl hover:bg-amber-600 hover:text-white transition-all"
                 title="Importar desde Excel"
               >
                 <Upload className="w-4 h-4" />
               </button>
+              <div className="w-px h-8 bg-slate-100 mx-1" />
               <button 
                 onClick={() => {
                   const data = filteredRecords.map(r => [
@@ -804,7 +480,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                   ]);
                   exportTableToPDF('Reporte Pagos Veterinarios', ['Fecha', 'Tutor', 'Consulta', 'Veterinario', 'Fecha Pago'], data, 'reporte_pagos_vet', 'l');
                 }}
-                className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 shadow-sm"
+                className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100"
                 title="Descargar PDF"
               >
                 <Download className="w-4 h-4" />
@@ -824,7 +500,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                   ]);
                   exportTableToExcel('Reporte Pagos Veterinarios', headers, data, 'reporte_pagos_vet');
                 }}
-                className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 shadow-sm"
+                className="bg-emerald-600 text-white p-2 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100"
                 title="Exportar a Excel"
               >
                 <FileSpreadsheet className="w-4 h-4" />
@@ -861,6 +537,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                   <td className="p-4 text-center font-mono opacity-60 italic">{formatDate(r.fechaPago || r.pagoVeterinario)}</td>
                   <td className="p-4 text-center">
                     <RecordActions 
+                      module="admin"
                       onEdit={() => handleEdit(r)}
                       onDelete={() => handleDelete(r.id)}
                     />
@@ -914,7 +591,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "UND Inventario", "UND Total", "Und a hacer", "Observaciones"]
+      ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "Und a hacer", "UND Total", "UND Inventario", "Observaciones"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -954,7 +631,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
              continue;
           }
 
-          const invVal = parseInt(safe(row["UND Inventario"])) || 0;
+          const todoVal = parseInt(safe(row["Und a hacer"])) || parseInt(safe(row["UND Inventario"])) || 0;
           const totalVal = parseInt(safe(row["UND Total"])) || 0;
 
           const newQuote = {
@@ -966,9 +643,9 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
             vendedor: safe(row["Vendedor"]) || 'CIMASUR',
             estado: safe(row["Estado"]) || 'Pendiente',
             fechaAprob: parseExcelDate(row["Fecha Aprob"]) || "",
-            invUnits: invVal,
+            todoUnits: todoVal,
             undTotal: totalVal,
-            todoUnits: Math.max(0, totalVal - invVal),
+            invUnits: Math.max(0, totalVal - todoVal),
             observaciones: safe(row["Observaciones"])
           };
 
@@ -1013,15 +690,15 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
     setForm(prev => ({ 
       ...prev, 
       undTotal: val,
-      todoUnits: Math.max(0, val - (prev.invUnits || 0))
+      invUnits: Math.max(0, val - (prev.todoUnits || 0))
     }));
   };
 
-  const handleInvChange = (val: number) => {
+  const handleTodoChange = (val: number) => {
     setForm(prev => ({ 
       ...prev, 
-      invUnits: val,
-      todoUnits: Math.max(0, (prev.undTotal || 0) - val)
+      todoUnits: val,
+      invUnits: Math.max(0, (prev.undTotal || 0) - val)
     }));
   };
 
@@ -1167,10 +844,10 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           <FormField label="Observaciones"><input className="w-full border-b p-2 text-sm" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="UND Inventario"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits || 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="Und a hacer">
+          <FormField label="Und a hacer"><input type="number" className="w-full border-b p-2 text-sm" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="UND Inventario">
             <div className="w-full p-2 text-sm font-bold text-amber-700 bg-amber-50 rounded border-b border-amber-200">
-              {form.todoUnits}
+              {form.invUnits || 0}
             </div>
           </FormField>
           <div className="flex items-end">
@@ -1280,6 +957,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                   <td className="p-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                     <RecordActions
+                      module="admin"
                       onView={() => {
                         const data = [
                           { label: 'N° Cotiz', value: r.nroCotiz || '' },
@@ -1712,6 +1390,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <RecordActions
+                          module="admin"
                           onView={() => {
                             const data = [
                               { label: 'Documento', value: r.documento || '' },
@@ -2017,6 +1696,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <RecordActions
+                          module="admin"
                           onEdit={() => {
                             setEditingId(r.id);
                             setForm(r);
@@ -2059,19 +1739,85 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   const [editingId, setEditingId] = useState<string | null>(null);
   const [monthFilter, setMonthFilter] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()));
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [meta, setMeta] = useState(5000000);
   const [isEditingMeta, setIsEditingMeta] = useState(false);
-  const [showTotals, setShowTotals] = useState(false);
+  
+  // Individual visibility states for metrics
+  const [showMeta, setShowMeta] = useState(false);
+  const [showAcumulado, setShowAcumulado] = useState(false);
+  const [showFaltante, setShowFaltante] = useState(false);
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Tipo", "Nombre", "RUT", "Dirección", "Email", "Teléfono", "Fecha Pago", "Monto Total Pagado", "Monto Recibido", "N° Factura", "Fecha Factura", "Observaciones"]
+      ["Tipo", "Nombre Alumno / Profesor / Gasto", "RUT", "Email", "Teléfono", "Fecha", "Monto Total Pagado", "Monto Recibido", "N° Factura", "Fecha Factura", "Observaciones"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 20 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pagos Escuela");
-    XLSX.writeFile(wb, "plantilla_importacion_pagos_escuela.xlsx");
+    XLSX.writeFile(wb, "plantilla_importacion_pagos.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+
+        let importedCount = 0;
+        for (const row of data as any[]) {
+          if (!row["Tipo"]) continue;
+          
+          await localDB.saveToCollection('school_payments', {
+            tipo: row["Tipo"] || 'Ingreso Alumno',
+            nombreAlumno: row["Nombre Alumno / Profesor / Gasto"] || '',
+            rut: row["RUT"] || '',
+            email: row["Email"] || '',
+            telefono: row["Teléfono"] || '',
+            fechaPago: row["Fecha"] || new Date().toISOString().split('T')[0],
+            montoTotalPagado: typeof row["Monto Total Pagado"] === 'string' ? parseInt(row["Monto Total Pagado"].replace(/\D/g, '')) : (row["Monto Total Pagado"] || 0),
+            montoTotalRecibido: typeof row["Monto Recibido"] === 'string' ? parseInt(row["Monto Recibido"].replace(/\D/g, '')) : (row["Monto Recibido"] || 0),
+            nroFactura: row["N° Factura"] || '',
+            fechaFactura: row["Fecha Factura"] || '',
+            observaciones: row["Observaciones"] || ''
+          });
+          importedCount++;
+        }
+        alert(`Se han importado ${importedCount} registros exitosamente.`);
+        const updated = await localDB.getCollection('school_payments');
+        setRecords(updated);
+      } catch (error) {
+        alert("Error al importar el archivo. Asegúrese de usar la plantilla correcta.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const exportFiltered = (format: 'pdf'|'excel') => {
+    if (format === 'pdf') {
+       const exportData = filteredRecords.map(r => [
+          r.tipo, r.nombreAlumno || r.rut, formatDate(r.fechaPago), formatCurrency(r.montoTotalRecibido), r.nroFactura || '---'
+       ]);
+       exportTableToPDF('Saldos Escuela - Filtro', ['Tipo', 'Nombre/RUT', 'Fecha', 'Monto Recibido', 'N° Factura'], exportData, 'saldos_escuela');
+    } else {
+       const exportData = filteredRecords.map(r => ({
+          Tipo: r.tipo, Nombre: r.nombreAlumno, RUT: r.rut, Fecha: formatDate(r.fechaPago), MontoRecibido: r.montoTotalRecibido, Factura: r.nroFactura, Obs: r.observaciones
+       }));
+       const ws = XLSX.utils.json_to_sheet(exportData);
+       const wb = XLSX.utils.book_new();
+       XLSX.utils.book_append_sheet(wb, ws, "Saldos");
+       XLSX.writeFile(wb, "saldos_escuela_export.xlsx");
+    }
   };
 
   const [form, setForm] = useState({
@@ -2090,12 +1836,28 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   });
 
   const filteredRecords = records.filter(r => {
+    if (searchTerm) {
+       const term = searchTerm.toLowerCase();
+       const matchesSearch = (r.nombreAlumno || '').toLowerCase().includes(term) || (r.rut || '').toLowerCase().includes(term) || (r.observaciones || '').toLowerCase().includes(term) || (r.tipo || '').toLowerCase().includes(term);
+       if (!matchesSearch) return false;
+    }
     if (!r.fechaPago) return false;
-    const rDate = new Date(r.fechaPago + 'T00:00:00');
-    if (isNaN(rDate.getTime())) return false;
-    const rMonth = new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(rDate);
-    const rYear = rDate.getFullYear().toString();
-    return rMonth.toLowerCase() === monthFilter.toLowerCase() && rYear === yearFilter;
+    
+    // Date range filter
+    if (dateFrom && r.fechaPago < dateFrom) return false;
+    if (dateTo && r.fechaPago > dateTo) return false;
+
+    // Month/Year filter only if range is not set
+    if (!dateFrom && !dateTo) {
+      const rDate = new Date(r.fechaPago + 'T00:00:00');
+      if (!isNaN(rDate.getTime())) {
+        const rMonth = new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(rDate);
+        const rYear = rDate.getFullYear().toString();
+        if (rMonth.toLowerCase() !== monthFilter.toLowerCase() || rYear !== yearFilter) return false;
+      }
+    }
+    
+    return true;
   }).sort((a,b) => {
     const d = (b.fechaPago || '').localeCompare(a.fechaPago || '');
     if (d !== 0) return d;
@@ -2148,36 +1910,66 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-2xl border shadow-sm p-6 grid grid-cols-1 md:grid-cols-4 gap-6 relative">
-        <div className="absolute top-4 right-4 flex gap-2">
-          <button 
-             onClick={downloadExcelTemplate}
-             className="text-emerald-700 hover:text-emerald-800 transition-colors bg-emerald-50 p-2 rounded-lg"
-             title="Descargar Plantilla Excel"
-          >
-            <FileSpreadsheet className="w-5 h-5" />
-          </button>
-          <button 
-             onClick={() => setShowTotals(!showTotals)}
-             className="text-slate-400 hover:text-blue-600 transition-colors bg-slate-100 p-2 rounded-lg"
-             title={showTotals ? "Ocultar Totales" : "Mostrar Totales"}
-          >
-            {showTotals ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-          </button>
-        </div>
-        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-          <span className="block text-[10px] font-black uppercase text-blue-400 tracking-widest mb-1">Meta Mensual</span>
-          <div className="flex items-center gap-2">
+      {/* Search & Date Filters Row */}
+      <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[200px] space-y-1">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Búsqueda General</label>
+             <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white transition-all outline-none" placeholder="Nombre, RUT, Glosa..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+             </div>
+          </div>
+          <div className="space-y-1">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center block">Desde</label>
+             <input type="date" className="p-2 border border-slate-200 rounded-xl text-sm outline-none bg-slate-50 focus:bg-white" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center block">Hasta</label>
+             <input type="date" className="p-2 border border-slate-200 rounded-xl text-sm outline-none bg-slate-50 focus:bg-white" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Mes</label>
+             <select className="p-2 border border-slate-200 rounded-xl text-sm outline-none bg-slate-50" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}>
+                {['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'].map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+             </select>
+          </div>
+          <div className="space-y-1">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Año</label>
+             <input type="number" className="p-2 border border-slate-200 rounded-xl text-sm outline-none w-20 bg-slate-50" value={yearFilter} onChange={e => setYearFilter(e.target.value)} />
+          </div>
+          <div className="flex gap-2">
+             <div className="flex items-center bg-slate-100 rounded-xl p-1">
+                <button onClick={() => exportFiltered('excel')} className="p-2 text-emerald-600 hover:bg-white rounded-lg transition-all" title="Excel"><FileSpreadsheet className="w-5 h-5"/></button>
+                <button onClick={() => exportFiltered('pdf')} className="p-2 text-rose-600 hover:bg-white rounded-lg transition-all" title="PDF"><Download className="w-5 h-5"/></button>
+                <label className="p-2 text-blue-600 hover:bg-white rounded-lg transition-all cursor-pointer" title="Importar Excel">
+                   <Upload className="w-5 h-5" />
+                   <input type="file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
+                </label>
+             </div>
+          </div>
+      </div>
+
+      <div className="bg-white rounded-3xl border shadow-xl p-8 grid grid-cols-1 md:grid-cols-3 gap-8 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-emerald-500 to-indigo-600" />
+        
+        <div className="bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 flex flex-col justify-between group">
+          <div className="flex justify-between items-start mb-4">
+             <span className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] italic">Meta Anual Acumulada</span>
+             <button onClick={() => setShowMeta(!showMeta)} className="text-blue-300 hover:text-blue-600 transition-colors">
+                {showMeta ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+             </button>
+          </div>
+          <div className="flex items-center gap-3">
             {!isEditingMeta ? (
                <>
-                 <span className="text-xl font-black text-blue-900">{showTotals ? formatCurrency(meta) : '***'}</span>
-                 {showTotals && <button onClick={() => setIsEditingMeta(true)} className="text-blue-400 hover:text-blue-600"><Edit className="w-4 h-4" /></button>}
+                 <span className="text-3xl font-black text-blue-900 tracking-tighter">{showMeta ? formatCurrency(meta) : '••••••••'}</span>
+                 {showMeta && <button onClick={() => setIsEditingMeta(true)} className="p-2 bg-white rounded-full shadow-sm text-blue-400 hover:scale-110 transition-transform"><Edit className="w-3.5 h-3.5" /></button>}
                </>
             ) : (
-               <div className="flex items-center gap-2">
+               <div className="flex items-center gap-2 w-full">
                  <input 
                    type="number" 
-                   className="w-32 border border-blue-300 rounded p-1 text-sm font-bold outline-none focus:border-blue-500" 
+                   className="w-full border-2 border-blue-400 rounded-xl p-2 text-lg font-black outline-none focus:bg-white" 
                    autoFocus
                    defaultValue={meta}
                    onBlur={(e) => {
@@ -2195,41 +1987,62 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
             )}
           </div>
         </div>
-        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-          <span className="block text-[10px] font-black uppercase text-emerald-400 tracking-widest mb-1">Acumulado Neto (Mes)</span>
-          <span className="text-xl font-black text-emerald-700">{showTotals ? formatCurrency(totalNeto) : '***'}</span>
-        </div>
-        <div className={cn(
-          "p-4 rounded-xl border",
-          faltante > 0 ? "bg-amber-50 border-amber-100" : "bg-emerald-50 border-emerald-100"
-        )}>
-          <span className="block text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">
-            {faltante > 0 ? 'Faltante para Meta' : '¡Meta Cumplida!'}
-          </span>
-          <span className={cn(
-            "text-xl font-black",
-            faltante > 0 ? "text-amber-700" : "text-emerald-700"
-          )}>{showTotals ? formatCurrency(Math.abs(faltante)) : '***'}</span>
-        </div>
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-          <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Filtros</span>
-          <div className="flex gap-2">
-            <select className="bg-transparent font-bold text-xs outline-none" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}>
-              {['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'].map(m => (
-                <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
-              ))}
-            </select>
-            <input className="bg-transparent font-bold text-xs outline-none w-16" type="number" value={yearFilter} onChange={e => setYearFilter(e.target.value)} />
+
+        <div className="bg-emerald-50/50 p-6 rounded-[2rem] border border-emerald-100 flex flex-col justify-between group">
+          <div className="flex justify-between items-start mb-4">
+             <span className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em] italic">Acumulado Neto {dateFrom ? '(Periodo)' : '(Mes)'}</span>
+             <button onClick={() => setShowAcumulado(!showAcumulado)} className="text-emerald-300 hover:text-emerald-600 transition-colors">
+                {showAcumulado ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+             </button>
           </div>
+          <span className="text-3xl font-black text-emerald-700 tracking-tighter">{showAcumulado ? formatCurrency(totalNeto) : '••••••••'}</span>
+        </div>
+
+        <div className={cn(
+          "p-6 rounded-[2rem] border flex flex-col justify-between group",
+          faltante > 0 ? "bg-indigo-50/50 border-indigo-100" : "bg-teal-50 border-teal-100"
+        )}>
+          <div className="flex justify-between items-start mb-4">
+             <span className="text-[10px] font-black uppercase text-indigo-500 tracking-[0.2em] italic">
+               {faltante > 0 ? 'Faltante para Meta' : '¡SUPERÁVIT!'}
+             </span>
+             <button onClick={() => setShowFaltante(!showFaltante)} className="text-indigo-300 hover:text-indigo-600 transition-colors">
+                {showFaltante ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+             </button>
+          </div>
+          <span className={cn(
+            "text-3xl font-black tracking-tighter",
+            faltante > 0 ? "text-indigo-700" : "text-teal-700"
+          )}>{showFaltante ? formatCurrency(faltante) : '••••••••'}</span>
         </div>
       </div>
 
       <div className="space-y-4">
-        {/* Registro Principal: Ingreso de Alumnos */}
-        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-          <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center cursor-pointer" onClick={() => setForm({...form, tipo: form.tipo === 'Ingreso Alumno' ? '' : 'Ingreso Alumno'})}>
-            <span>Registro de Pagos Escuela (Ingresos) {form.tipo === 'Ingreso Alumno' ? '▼' : '▶'}</span>
-            <span className="text-xl font-black">{form.tipo === 'Ingreso Alumno' ? formatCurrency(totalIngresos) : '***'}</span>
+        {/* Registro de Pagos Alumnos */}
+        <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-blue-100 group">
+          <div 
+            className="bg-[#001736] p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors" 
+            onClick={() => setForm({...form, tipo: form.tipo === 'Ingreso Alumno' ? '' : 'Ingreso Alumno'})}
+          >
+            <div className="flex items-center gap-4">
+               <div className="p-2 bg-white/20 rounded-lg">
+                  <GraduationCap className="w-6 h-6" />
+               </div>
+               <div className="flex items-center gap-3">
+                  <span className="tracking-tight italic">Registro de Pagos Escuela (Ingresos)</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); downloadExcelTemplate(); }}
+                    className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all shadow-lg active:scale-95"
+                    title="Exportar Plantilla Excel para Ingresos"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </button>
+               </div>
+            </div>
+            <div className="flex items-center gap-4">
+               <span className="text-3xl tracking-tighter">{form.tipo === 'Ingreso Alumno' ? formatCurrency(totalIngresos) : '••••••••'}</span>
+               {form.tipo === 'Ingreso Alumno' ? <EyeOff className="w-6 h-6 opacity-40" /> : <Eye className="w-6 h-6 opacity-40 text-blue-400" />}
+            </div>
           </div>
           
           {form.tipo === 'Ingreso Alumno' && (
@@ -2309,7 +2122,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                         <td className="p-3 text-right">{formatCurrency(r.montoTotalPagado)}</td>
                         <td className="p-3 text-right font-black text-emerald-600">+{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
-                          <RecordActions onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                          <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
                         </td>
                       </tr>
                     ))}
@@ -2324,39 +2137,50 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
         </div>
 
         {/* Expediente: Pago a Profesores */}
-        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden border-orange-200">
-          <div className="bg-orange-500 p-4 text-white font-bold flex justify-between items-center cursor-pointer" onClick={() => setForm({...form, tipo: form.tipo === 'Pago Profesor' ? '' : 'Pago Profesor'})}>
-            <span>Expediente: Pago a Profesores (Gastos) {form.tipo === 'Pago Profesor' ? '▼' : '▶'}</span>
-            <span className="text-xl font-black">{form.tipo === 'Pago Profesor' ? formatCurrency(totalPagosProfesores) : '***'}</span>
+        <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-orange-100 group">
+          <div 
+            className="bg-orange-500 p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-orange-600 transition-colors" 
+            onClick={() => setForm({...form, tipo: form.tipo === 'Pago Profesor' ? '' : 'Pago Profesor'})}
+          >
+            <div className="flex items-center gap-4">
+               <div className="p-2 bg-white/20 rounded-lg">
+                  <Briefcase className="w-6 h-6" />
+               </div>
+               <span className="tracking-tight italic">Expediente: Pago a Profesores (Gastos)</span>
+            </div>
+            <div className="flex items-center gap-4">
+               <span className="text-3xl tracking-tighter text-orange-100">{form.tipo === 'Pago Profesor' ? formatCurrency(totalPagosProfesores) : '••••••••'}</span>
+               {form.tipo === 'Pago Profesor' ? <EyeOff className="w-6 h-6 opacity-40" /> : <Eye className="w-6 h-6 opacity-40 text-orange-200" />}
+            </div>
           </div>
           
           {form.tipo === 'Pago Profesor' && (
-            <div className="p-6">
-              <form className="grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleSubmit}>
+            <div className="p-4">
+              <form className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-orange-50/50 p-4 rounded-xl border border-orange-100" onSubmit={handleSubmit}>
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-black uppercase text-orange-600/70 tracking-wider">Nombre del Profesor / A quien</label>
-                  <input className="w-full border-b border-orange-200 p-2 font-bold focus:border-orange-500 outline-none" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
+                  <label className="text-[9px] font-black uppercase text-orange-600/70 tracking-wider">Profesor (A quien)</label>
+                  <input className="w-full border border-orange-200 rounded p-1.5 focus:border-orange-500 outline-none text-xs font-medium" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-orange-600/70 tracking-wider">Fecha de Pago</label>
-                  <input type="date" className="w-full border-b border-orange-200 p-2 focus:border-orange-500 outline-none" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} required />
+                  <label className="text-[9px] font-black uppercase text-orange-600/70 tracking-wider">Fecha</label>
+                  <input type="date" className="w-full border border-orange-200 rounded p-1.5 focus:border-orange-500 outline-none text-xs" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-orange-600 tracking-wider">Monto Pagado</label>
-                  <input type="number" className="w-full border-b border-orange-200 p-2 font-black text-orange-700 bg-orange-50 rounded outline-none" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
+                  <label className="text-[9px] font-black uppercase text-orange-600 tracking-wider">Monto</label>
+                  <input type="number" className="w-full border border-orange-200 rounded p-1.5 font-bold text-orange-700 bg-white outline-none text-xs" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
                 </div>
-                <div className="md:col-span-4 space-y-1">
-                  <label className="text-[10px] font-black uppercase text-orange-600/70 tracking-wider">Detalle del Pago</label>
-                  <input className="w-full border-b border-orange-200 p-2 italic focus:border-orange-500 outline-none" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
+                <div className="md:col-span-3 space-y-1">
+                  <label className="text-[9px] font-black uppercase text-orange-600/70 tracking-wider">Detalle del Pago</label>
+                  <input className="w-full border border-orange-200 rounded p-1.5 italic focus:border-orange-500 outline-none text-xs" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
                 </div>
-                <div className="md:col-span-4 flex justify-end mt-2">
-                  <button type="submit" className="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-md hover:bg-orange-700 transition-all">
-                    {editingId ? 'ACTUALIZAR PAGO' : 'REGISTRAR PAGO'}
+                <div className="flex items-end justify-end mt-1">
+                  <button type="submit" className="bg-orange-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-700 transition-all w-full md:w-auto h-8">
+                    {editingId ? 'ACTUALIZAR' : 'REGISTRAR'}
                   </button>
                 </div>
               </form>
 
-              <div className="mt-8 border-t border-orange-100 pt-4">
+              <div className="mt-4">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-[10px] font-black text-orange-400 uppercase tracking-widest text-left">
@@ -2375,7 +2199,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                         <td className="p-3 text-slate-500">{r.observaciones}</td>
                         <td className="p-3 text-right font-black text-orange-600">-{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
-                          <RecordActions onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                          <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
                         </td>
                       </tr>
                     ))}
@@ -2390,39 +2214,50 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
         </div>
 
         {/* Expediente: Otros Gastos */}
-        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden border-rose-200">
-          <div className="bg-rose-500 p-4 text-white font-bold flex justify-between items-center cursor-pointer" onClick={() => setForm({...form, tipo: form.tipo === 'Gasto Mensual' ? '' : 'Gasto Mensual'})}>
-            <span>Expediente: Otros Gastos Mensuales {form.tipo === 'Gasto Mensual' ? '▼' : '▶'}</span>
-            <span className="text-xl font-black">{form.tipo === 'Gasto Mensual' ? formatCurrency(totalGastosMensuales) : '***'}</span>
+        <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-rose-100 group">
+          <div 
+            className="bg-rose-500 p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-rose-600 transition-colors" 
+            onClick={() => setForm({...form, tipo: form.tipo === 'Gasto Mensual' ? '' : 'Gasto Mensual'})}
+          >
+            <div className="flex items-center gap-4">
+               <div className="p-2 bg-white/20 rounded-lg">
+                  <Receipt className="w-6 h-6" />
+               </div>
+               <span className="tracking-tight italic">Expediente: Otros Gastos Mensuales</span>
+            </div>
+            <div className="flex items-center gap-4">
+               <span className="text-3xl tracking-tighter text-rose-100">{form.tipo === 'Gasto Mensual' ? formatCurrency(totalGastosMensuales) : '••••••••'}</span>
+               {form.tipo === 'Gasto Mensual' ? <EyeOff className="w-6 h-6 opacity-40" /> : <Eye className="w-6 h-6 opacity-40 text-rose-200" />}
+            </div>
           </div>
           
           {form.tipo === 'Gasto Mensual' && (
-            <div className="p-6">
-              <form className="grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={handleSubmit}>
+            <div className="p-4">
+              <form className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-rose-50/50 p-4 rounded-xl border border-rose-100" onSubmit={handleSubmit}>
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-black uppercase text-rose-600/70 tracking-wider">Tipo de Gasto / Proveedor</label>
-                  <input className="w-full border-b border-rose-200 p-2 font-bold focus:border-rose-500 outline-none" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
+                  <label className="text-[9px] font-black uppercase text-rose-600/70 tracking-wider">Gasto / Proveedor</label>
+                  <input className="w-full border border-rose-200 rounded p-1.5 focus:border-rose-500 outline-none text-xs font-medium" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-rose-600/70 tracking-wider">Fecha del Gasto</label>
-                  <input type="date" className="w-full border-b border-rose-200 p-2 focus:border-rose-500 outline-none" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} required />
+                  <label className="text-[9px] font-black uppercase text-rose-600/70 tracking-wider">Fecha</label>
+                  <input type="date" className="w-full border border-rose-200 rounded p-1.5 focus:border-rose-500 outline-none text-xs" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-rose-600 tracking-wider">Monto Gastado</label>
-                  <input type="number" className="w-full border-b border-rose-200 p-2 font-black text-rose-700 bg-rose-50 rounded outline-none" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
+                  <label className="text-[9px] font-black uppercase text-rose-600 tracking-wider">Monto</label>
+                  <input type="number" className="w-full border border-rose-200 rounded p-1.5 font-bold text-rose-700 bg-white outline-none text-xs" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
                 </div>
-                <div className="md:col-span-4 space-y-1">
-                  <label className="text-[10px] font-black uppercase text-rose-600/70 tracking-wider">Observaciones</label>
-                  <input className="w-full border-b border-rose-200 p-2 italic focus:border-rose-500 outline-none" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
+                <div className="md:col-span-3 space-y-1">
+                  <label className="text-[9px] font-black uppercase text-rose-600/70 tracking-wider">Observaciones</label>
+                  <input className="w-full border border-rose-200 rounded p-1.5 italic focus:border-rose-500 outline-none text-xs" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
                 </div>
-                <div className="md:col-span-4 flex justify-end mt-2">
-                  <button type="submit" className="bg-rose-600 text-white px-8 py-3 rounded-xl font-bold shadow-md hover:bg-rose-700 transition-all">
-                    {editingId ? 'ACTUALIZAR GASTO' : 'REGISTRAR GASTO'}
+                <div className="flex items-end justify-end mt-1">
+                  <button type="submit" className="bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-rose-700 transition-all w-full md:w-auto h-8">
+                    {editingId ? 'ACTUALIZAR' : 'REGISTRAR'}
                   </button>
                 </div>
               </form>
 
-              <div className="mt-8 border-t border-rose-100 pt-4">
+              <div className="mt-4">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-left">
@@ -2441,7 +2276,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                         <td className="p-3 text-slate-500">{r.observaciones}</td>
                         <td className="p-3 text-right font-black text-rose-600">-{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
-                          <RecordActions onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                          <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
                         </td>
                       </tr>
                     ))}
@@ -2828,6 +2663,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                   </td>
                   <td className="p-4 text-center">
                     <RecordActions
+                      module="admin"
                       onView={() => {
                         const dteData = [
                           { label: 'N° Documento', value: r.nroDto },
@@ -2886,6 +2722,115 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CPanelManager({ records }: { records: any[] }) {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'modules'>('users');
+
+  return (
+    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 mt-4 min-h-[600px]">
+       <div className="bg-[#001736] p-10 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-16 opacity-10">
+             <Settings className="w-56 h-56 rotate-12" />
+          </div>
+          <div className="relative z-10 flex items-center gap-6">
+             <div className="p-4 bg-blue-500 rounded-2xl shadow-lg">
+                <ShieldCheck className="w-10 h-10" />
+             </div>
+             <div>
+                <h3 className="text-4xl font-black uppercase tracking-tighter italic leading-none">CPANEL CONTROL</h3>
+                <p className="text-blue-300 text-[10px] font-black uppercase tracking-[0.3em] opacity-80 mt-2">Configuración Central de Privilegios y Gobernanza de Datos</p>
+             </div>
+          </div>
+       </div>
+
+       <div className="flex border-b border-slate-100 bg-slate-50/50 p-2 gap-2">
+          {[
+            { id: 'users', label: 'Gestión de Accesos', icon: Users, color: 'text-blue-600' },
+            { id: 'logs', label: 'Traza de Auditoría', icon: ShieldCheck, color: 'text-emerald-600' },
+            { id: 'modules', label: 'Módulos & API', icon: LayoutGrid, color: 'text-amber-600' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "px-8 py-4 text-[10px] font-black uppercase tracking-widest flex items-center gap-3 transition-all rounded-2xl",
+                activeTab === tab.id ? "bg-white shadow-md text-blue-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100/50"
+              )}
+            >
+              <tab.icon className={cn("w-4 h-4", activeTab === tab.id ? tab.color : "")} />
+              {tab.label}
+            </button>
+          ))}
+       </div>
+
+       <div className="p-10">
+          {activeTab === 'users' && <UsersManager />}
+          {activeTab === 'logs' && <AuditLogManager records={records} />}
+          {activeTab === 'modules' && (
+             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                      <div>
+                         <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                            <FlaskConical className="w-6 h-6" />
+                         </div>
+                         <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight italic">Módulo Laboratorio</h4>
+                         <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">Control de producción homeopática, inventario de cepas y despacho logístico.</p>
+                      </div>
+                      <div className="mt-6 flex items-center justify-between">
+                         <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
+                         <button className="text-blue-600 font-black text-[10px] uppercase hover:underline">Configurar</button>
+                      </div>
+                   </div>
+
+                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                      <div>
+                         <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                            <GraduationCap className="w-6 h-6" />
+                         </div>
+                         <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight italic">Módulo Escuela</h4>
+                         <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">Gestión de alumnos, diplomados, motor de pagos y analíticas de retención.</p>
+                      </div>
+                      <div className="mt-6 flex items-center justify-between">
+                         <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
+                         <button className="text-blue-600 font-black text-[10px] uppercase hover:underline">Configurar</button>
+                      </div>
+                   </div>
+
+                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                      <div>
+                         <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                            <TrendingUp className="w-6 h-6" />
+                         </div>
+                         <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight italic">Módulo CRM</h4>
+                         <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">Automatización de ventas, campañas masivas y seguimiento de prospectos (Leads).</p>
+                      </div>
+                      <div className="mt-6 flex items-center justify-between">
+                         <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
+                         <button className="text-blue-600 font-black text-[10px] uppercase hover:underline">Configurar</button>
+                      </div>
+                   </div>
+
+                   <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 text-white flex flex-col justify-between">
+                      <div>
+                         <div className="w-12 h-12 bg-slate-800 text-blue-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-slate-700">
+                            <Lock className="w-6 h-6" />
+                         </div>
+                         <h4 className="text-lg font-black uppercase tracking-tight italic">API Integración</h4>
+                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2 italic">Servicios externos de courier y pasarelas de pago. Próximamente integración con Redelcom/Transbank.</p>
+                      </div>
+                      <div className="mt-6">
+                         <span className="text-[10px] font-black uppercase text-slate-500 px-3 py-1 bg-slate-800 rounded-full">Beta v5.0</span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          )}
+       </div>
     </div>
   );
 }

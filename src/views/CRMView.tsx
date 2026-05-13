@@ -26,11 +26,13 @@ import { CommentDialog } from '../components/CommentDialog';
 
 import { addNotification } from '../lib/notifications';
 
+import { SmartCampaigns } from '../components/crm/SmartCampaigns';
+
 export default function CRMView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
 
-  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'imports' | 'intranet'>('register');
+  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'intranet' | 'smart'>('register');
   const [records, setRecords] = useState<any[]>([]);
   const [intranetClients, setIntranetClients] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
@@ -102,13 +104,13 @@ export default function CRMView() {
             Clientes Intranet
           </button>
           <button 
-            onClick={() => setActiveTab('imports')}
+            onClick={() => setActiveTab('smart')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'imports' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'smart' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
             )}
           >
-            Historial de Importaciones
+            Motor Comercial
           </button>
         </div>
       </div>
@@ -116,8 +118,8 @@ export default function CRMView() {
       {activeTab === 'register' && <CRMRegister />}
       {activeTab === 'list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
       {activeTab === 'activities' && <CRMActivities />}
-      {activeTab === 'imports' && <CRMImportsTable imports={imports} />}
       {activeTab === 'intranet' && <CRMIntranetTable clients={intranetClients} />}
+      {activeTab === 'smart' && <SmartCampaigns />}
       {commentTarget && (
         <CommentDialog 
            isOpen={!!commentTarget} 
@@ -848,34 +850,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                 <Trash2 className="w-4 h-4" /> Eliminar ({selectedIds.length})
               </button>
             )}
-            <button 
-                onClick={async () => {
-                   const { getCRMAIRecommendations } = await import('../services/crmAIService');
-                   let contacts = [];
-                   try {
-                     contacts = await localDB.getCollection('contacts');
-                   } catch (e) {
-                     console.warn('Could not fetch contacts (may not exist yet)', e);
-                   }
-                   let activities = [];
-                   try {
-                     activities = await localDB.getCollection('crm_activities');
-                   } catch (e) {
-                     console.warn('Could not fetch crm_activities (may not exist yet)', e);
-                   }
-                   const recs = await getCRMAIRecommendations(contacts, activities);
-                   const formattedRecs = recs.recomendaciones.map((r: any) => 
-                     `📌 ACCIÓN: ${r.accion}\n🎯 OBJETIVO: ${r.objetivo}\n💡 MOTIVO: ${r.motivo}`
-                   ).join('\n\n' + '─'.repeat(20) + '\n\n');
-                   alert("🤖 ANÁLISIS ESTRATÉGICO CRM\n\n" + formattedRecs);
-                   console.log(recs);
-                }}
-                className="w-full bg-emerald-500 border border-emerald-200 text-white py-2 rounded-full font-bold text-xs hover:bg-emerald-600 flex items-center justify-center gap-2"
-              >
-                <TrendingUp className="w-3 h-3" /> Analizar con IA
-            </button>
-         </div>
-      </div>
+          </div>
+       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -931,6 +907,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                       <td className="p-5 font-medium text-blue-900">{r.type}</td>
                       <td className="p-5 text-right flex items-center justify-end gap-2">
                          <RecordActions 
+                           module="crm"
                            onView={() => setSelectedClient(r)}
                            onDownload={() => {
                              const expediteData = [
@@ -1004,6 +981,7 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
                 <td className="p-5">{ formatDate(client.fechaIngreso) }</td>
                 <td className="p-5 text-right">
                    <RecordActions 
+                     module="crm"
                      onDelete={async () => {
                        await localDB.deleteFromCollection('contacts_intranet', client.id);
                        window.dispatchEvent(new Event('db-change'));
@@ -1052,6 +1030,7 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
                 <td className="p-5">{ imp.responsable }</td>
                 <td className="p-5 text-right">
                   <RecordActions 
+                    module="crm"
                     onDelete={async () => {
                       await localDB.deleteFromCollection('import_logs', imp.id);
                       window.dispatchEvent(new Event('db-change'));
@@ -1333,6 +1312,7 @@ function CRMActivities() {
                   <td className="p-4 text-slate-500">{act.responsable}</td>
                   <td className="p-4 text-right">
                     <RecordActions 
+                      module="crm"
                       onView={() => setDetailView(act)}
                       onEdit={() => handleEdit(act)}
                       onDelete={async () => {

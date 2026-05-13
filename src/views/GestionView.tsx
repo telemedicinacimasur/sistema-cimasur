@@ -427,6 +427,8 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
     observaciones: ''
   });
 
+  const [duplicateToCRM, setDuplicateToCRM] = useState(!initialData?.id);
+
   useEffect(() => {
     if (initialData) {
       setForm({
@@ -446,6 +448,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
         estado: initialData.estado || 'En proceso',
         observaciones: initialData.observaciones || ''
       });
+      setDuplicateToCRM(false);
     }
   }, [initialData]);
 
@@ -465,6 +468,25 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
       if (onCancel) onCancel();
     } else {
       await localDB.saveToCollection('gestion_records', recordToSave);
+
+      if (duplicateToCRM) {
+        await localDB.saveToCollection('crm_clients', {
+          date: recordToSave.fechaIngreso,
+          name: recordToSave.nombre,
+          company: recordToSave.tipoEmpresa || 'Clínica',
+          phone: recordToSave.celular,
+          email: recordToSave.email,
+          service: recordToSave.especialidadCliente || 'Gestión Integral',
+          status: 'Prospecto',
+          probability: 50,
+          value: 0,
+          rut: recordToSave.rut,
+          category: recordToSave.categoria,
+          nextContact: '',
+          notes: 'Cliente importado desde Módulo de Gestión. ' + (recordToSave.observaciones || '')
+        });
+        await addAuditLog(user, `Duplicó Cliente a CRM Comercial: ${form.nombre}`, 'CRM Comercial');
+      }
       
       await addNotification({
         title: 'Nuevo Cliente en Gestión',
@@ -642,6 +664,22 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
              placeholder="Primeras notas sobre el cliente..."
            />
         </GestionField>
+        
+        {!initialData && (
+          <div className="flex items-center gap-2 p-4 bg-[#f0f4f8] rounded-xl border border-blue-100">
+            <input 
+              type="checkbox" 
+              id="duplicateCRM" 
+              checked={duplicateToCRM}
+              onChange={e => setDuplicateToCRM(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded bg-white border-blue-300 focus:ring-blue-500"
+            />
+            <label htmlFor="duplicateCRM" className="text-sm font-bold text-slate-700 select-none">
+              Duplicar automáticamente este registro en <span className="text-blue-600">CRM Comercial</span>
+            </label>
+          </div>
+        )}
+
         <div className="flex justify-end pt-4 border-t gap-4">
            {initialData && (
              <button 

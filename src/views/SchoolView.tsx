@@ -33,19 +33,21 @@ import {
   Edit,
   Upload,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Lightbulb
 } from 'lucide-react';
 
 import { RecordActions } from '../components/RecordActions';
 import { Expediente } from '../components/Expediente';
 
 import { addNotification } from '../lib/notifications';
+import { SmartCampaigns } from '../components/crm/SmartCampaigns';
 
 export default function SchoolView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
 
-  const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities'>('register');
+  const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities' | 'commercial'>('register');
   const [data, setData] = useState<any[]>([]);
 
   useEffect(() => {
@@ -70,6 +72,7 @@ export default function SchoolView() {
            <TabButton active={activeView === 'register'} onClick={() => setActiveView('register')} icon={UserPlus}>Captación</TabButton>
            <TabButton active={activeView === 'students'} onClick={() => setActiveView('students')} icon={GraduationCap}>Alumnos</TabButton>
            <TabButton active={activeView === 'tracking'} onClick={() => setActiveView('tracking')} icon={LineChart}>Vista 360°</TabButton>
+           <TabButton active={activeView === 'commercial'} onClick={() => setActiveView('commercial')} icon={Lightbulb}>Motor Escuela</TabButton>
            <TabButton active={activeView === 'activities'} onClick={() => setActiveView('activities')} icon={History}>Actividades</TabButton>
         </div>
       </div>
@@ -78,6 +81,7 @@ export default function SchoolView() {
         {activeView === 'register' && <ContactRegister records={data} />}
         {activeView === 'students' && <StudentManager records={data} />}
         {activeView === 'tracking' && <TrackingView />}
+        {activeView === 'commercial' && <SmartCampaigns isSchool={true} />}
         {activeView === 'activities' && <SchoolActivities />}
       </div>
     </div>
@@ -119,7 +123,8 @@ function ContactRegister({ records }: { records: any[] }) {
     montoTotalRecibido: 0,
     nroFactura: '',
     fechaFactura: '',
-    observacionesPago: ''
+    observacionesPago: '',
+    estadoPago: 'Pendiente'
   });
 
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
@@ -128,17 +133,33 @@ function ContactRegister({ records }: { records: any[] }) {
   const [activityType, setActivityType] = useState('Nota de Seguimiento');
   const [currentStatus, setCurrentStatus] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredRecords = records.filter(r => {
+    const name = safe(r.name).toLowerCase();
+    const rut = safe(r.rut).toLowerCase();
+    const email = safe(r.email).toLowerCase();
+    const term = searchTerm.toLowerCase();
+    return name.includes(term) || rut.includes(term) || email.includes(term);
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const dataToSave = {
+        ...form,
+        montoTotalPagado: form.montoTotalPagado === '' ? '' : Number(form.montoTotalPagado),
+        montoTotalRecibido: form.montoTotalRecibido === '' ? 0 : Number(form.montoTotalRecibido)
+      };
+
+      console.log("Saving lead:", editingId, dataToSave);
       if (editingId) {
-        await localDB.updateInCollection('school_leads', editingId, form);
+        await localDB.updateInCollection('school_leads', editingId, dataToSave);
         if (user) await addAuditLog(user, `Actualizó lead académico: ${form.name}`, 'SCHOOL');
         alert('Lead Académico Actualizado');
         setEditingId(null);
       } else {
-        await localDB.saveToCollection('school_leads', form);
+        await localDB.saveToCollection('school_leads', dataToSave);
         await addNotification({
           title: 'Nuevo Lead Académico',
           message: `${user?.displayName || user?.email} registró a ${form.name}`,
@@ -148,6 +169,7 @@ function ContactRegister({ records }: { records: any[] }) {
         if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
         alert('Lead Académico Registrado');
       }
+      window.dispatchEvent(new Event('db-change'));
       setForm({ 
         ...form, 
         name: '', 
@@ -159,7 +181,8 @@ function ContactRegister({ records }: { records: any[] }) {
         montoTotalRecibido: 0,
         nroFactura: '',
         fechaFactura: '',
-        observacionesPago: ''
+        observacionesPago: '',
+        estadoPago: 'Pendiente'
       });
     } catch (error) {
       console.error("Error saving lead:", error);
@@ -203,6 +226,11 @@ function ContactRegister({ records }: { records: any[] }) {
             canal: 'Importación Excel',
             estado: 'Nuevo',
             observaciones: safe(row["Observaciones de seguimiento"]),
+            observacionesPago: safe(row["Observaciones Pago"]),
+            montoTotalPagado: Number(row["Monto Total Pagado"]) || 0,
+            montoTotalRecibido: Number(row["Monto Recibido"]) || 0,
+            nroFactura: safe(row["N° Factura"]),
+            fechaFactura: parseExcelDate(row["Fecha Factura"]),
             responsable: user.displayName || user.email || 'Sistema'
           };
 
@@ -228,6 +256,7 @@ function ContactRegister({ records }: { records: any[] }) {
     montoTotalPagado: 0,
     montoTotalRecibido: 0,
     fechaPago: new Date().toISOString().split('T')[0],
+    estadoPago: 'Pendiente',
     nroFactura: '',
     fechaFactura: '',
     observaciones: ''
@@ -243,16 +272,19 @@ function ContactRegister({ records }: { records: any[] }) {
         rut: lead.rut,
         email: lead.email,
         phone: lead.phone,
+        region: lead.region || '',
         clasificacion: lead.clasificacion,
         diplomado: lead.interes,
-        pago: transferPaymentForm.montoTotalRecibido > 0 ? 'Pagado' : 'Pendiente',
+        pago: transferPaymentForm.estadoPago,
         avance: 0,
-        observacionesAcademicas: 'Inscrito desde Captación',
-        montoTotalPagado: transferPaymentForm.montoTotalPagado,
-        montoTotalRecibido: transferPaymentForm.montoTotalRecibido,
+        observacionesAcademicas: lead.observaciones || 'Inscrito desde Captación',
+        observacionesPago: transferPaymentForm.observaciones || lead.observacionesPago || '',
+        montoTotalPagado: transferPaymentForm.montoTotalPagado === '' ? 0 : Number(transferPaymentForm.montoTotalPagado),
+        montoTotalRecibido: transferPaymentForm.montoTotalRecibido === '' ? 0 : Number(transferPaymentForm.montoTotalRecibido),
         nroFactura: transferPaymentForm.nroFactura,
         fechaFactura: transferPaymentForm.fechaFactura
       };
+      console.log("Saving student data:", studentData);
       await localDB.saveToCollection('students', studentData);
       
       // Sincronizar automáticamente con el módulo administrativo de Escuela
@@ -264,12 +296,13 @@ function ContactRegister({ records }: { records: any[] }) {
         email: lead.email,
         telefono: lead.phone,
         fechaPago: transferPaymentForm.fechaPago || new Date().toISOString().split('T')[0],
-        montoTotalPagado: transferPaymentForm.montoTotalPagado,
-        montoTotalRecibido: transferPaymentForm.montoTotalRecibido,
+        montoTotalPagado: transferPaymentForm.montoTotalPagado === '' ? 0 : Number(transferPaymentForm.montoTotalPagado),
+        montoTotalRecibido: transferPaymentForm.montoTotalRecibido === '' ? 0 : Number(transferPaymentForm.montoTotalRecibido),
         nroFactura: transferPaymentForm.nroFactura,
         fechaFactura: transferPaymentForm.fechaFactura,
-        observaciones: transferPaymentForm.observaciones || `Matrícula desde Captación: ${lead.interes}`
+        observaciones: transferPaymentForm.observaciones || lead.observacionesPago || `Matrícula desde Captación: ${lead.interes}`
       };
+      console.log("Saving school payment:", schoolPayment);
       await localDB.saveToCollection('school_payments', schoolPayment);
       
       await addNotification({
@@ -283,7 +316,8 @@ function ContactRegister({ records }: { records: any[] }) {
       window.dispatchEvent(new Event('db-change'));
       alert(`${lead.name} ahora es ALUMNO VIGENTE`);
     } catch(err) {
-      alert('Error en la transferencia de alumno');
+      console.error("Transfer error:", err);
+      alert('Error en la transferencia de alumno: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -331,6 +365,14 @@ function ContactRegister({ records }: { records: any[] }) {
                  </button>
                </div>
             </div>
+            <div className="bg-white p-6 border-b flex justify-between items-center">
+              <input 
+                className="w-64 border rounded-full px-4 py-2 text-xs" 
+                placeholder="Buscar por nombre, RUT o email..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
             <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
                <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
                <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} required /></FormGroup>
@@ -359,8 +401,8 @@ function ContactRegister({ records }: { records: any[] }) {
                <div className="col-span-full border-t border-slate-200 mt-4 pt-6">
                   <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Datos de Matrícula / Pago</h4>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                     <FormGroup label="Total de Venta (Opcional)"><input type="number" className="w-full border-b p-2" value={form.montoTotalPagado ?? 0} onChange={e => setForm({...form, montoTotalPagado: Number(e.target.value)})} /></FormGroup>
-                     <FormGroup label="Monto Recibido"><input type="number" className="w-full border-b p-2 font-black text-emerald-600 bg-emerald-50 rounded" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} /></FormGroup>
+                     <FormGroup label="Total de Venta (Opcional)"><input type="number" className="w-full border-b p-2" value={form.montoTotalPagado ?? ''} onChange={e => setForm({...form, montoTotalPagado: e.target.value})} /></FormGroup>
+                     <FormGroup label="Monto Recibido"><input type="number" className="w-full border-b p-2 font-black text-emerald-600 bg-emerald-50 rounded" value={form.montoTotalRecibido ?? ''} onChange={e => setForm({...form, montoTotalRecibido: e.target.value})} /></FormGroup>
                      <FormGroup label="N° Factura"><input className="w-full border-b p-2" value={form.nroFactura || ''} onChange={e => setForm({...form, nroFactura: e.target.value})} /></FormGroup>
                      <FormGroup label="Fecha Factura"><input type="date" className="w-full border-b p-2" value={form.fechaFactura || ''} onChange={e => setForm({...form, fechaFactura: e.target.value})} /></FormGroup>
                      <div className="col-span-1 md:col-span-4">
@@ -400,6 +442,27 @@ function ContactRegister({ records }: { records: any[] }) {
             showComuna={false}
             onClose={() => setSelectedLead(null)}
             onUpdate={async(data) => {
+               if (data.isProfileUpdate) {
+                  const { updatedProfile } = data;
+                  const currentDate = new Date().toLocaleString();
+                  const userStamp = user?.displayName || user?.email || 'Admin';
+                  const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
+                  const newMerged = (selectedLead.observaciones ? selectedLead.observaciones + '\n\n' : '') + baseUpdateEntry;
+
+                  await localDB.updateInCollection('school_leads', selectedLead.id, {
+                     rut: updatedProfile.rut,
+                     clasificacion: updatedProfile.region,
+                     fecha: updatedProfile.fechaIngreso,
+                     interes: updatedProfile.type,
+                     montoTotalPagado: updatedProfile.montoTotalPagado,
+                     montoTotalRecibido: updatedProfile.montoTotalRecibido,
+                     observaciones: newMerged
+                  });
+                  setSelectedLead({ ...selectedLead, ...updatedProfile, observaciones: newMerged });
+                  alert('Datos base de prospecto actualizados y registrados en el historial');
+                  return;
+               }
+
                const currentDate = new Date().toLocaleString();
                const userStamp = user?.displayName || user?.email || 'Admin';
                const header = `[${currentDate}] - ${userStamp}\n\u25b6 Actividad: ${data.activityType || activityType}\n\u25b6 Estado: ${data.currentStatus || currentStatus}`;
@@ -451,6 +514,15 @@ function ContactRegister({ records }: { records: any[] }) {
                     <input type="date" className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.fechaFactura || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, fechaFactura: e.target.value})} />
                   </div>
                   <div className="col-span-2 space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Estado Pago</label>
+                    <select className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.estadoPago} onChange={e => setTransferPaymentForm({...transferPaymentForm, estadoPago: e.target.value})}>
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="Pagado">Pagado</option>
+                      <option value="En cuotas">En cuotas</option>
+                      <option value="Por mensualidad">Por mensualidad</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2 space-y-1">
                     <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Observación Pago</label>
                     <input className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none italic" value={transferPaymentForm.observaciones || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, observaciones: e.target.value})} placeholder={`Matrícula: ${selectedLead.interes}`} />
                   </div>
@@ -492,7 +564,7 @@ function ContactRegister({ records }: { records: any[] }) {
                 </button>
             </h4>
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-               {records.map(r => (
+               {filteredRecords.map(r => (
                  <div key={r.id} className="border-b border-slate-50 pb-4 group">
                     <div className="flex justify-between items-start">
                        <div>
@@ -503,12 +575,22 @@ function ContactRegister({ records }: { records: any[] }) {
                         <button 
                           onClick={() => {
                             setSelectedLead(r);
+                          }}
+                          className="text-[#002b5b] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-slate-100 p-1.5 rounded hover:bg-blue-100"
+                          title="Ver Expediente"
+                        >
+                          <FileText className="w-3 h-3" /> Expediente
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setSelectedLead(r);
                             setTransferPaymentForm({
                               montoTotalPagado: r.montoTotalPagado || 0,
                               montoTotalRecibido: r.montoTotalRecibido || 0,
                               nroFactura: r.nroFactura || '',
                               fechaFactura: r.fechaFactura || '',
                               observaciones: r.observacionesPago || '',
+                              estadoPago: r.estadoPago || 'Pendiente',
                               fechaPago: new Date().toISOString().split('T')[0]
                             });
                           }}
@@ -518,6 +600,7 @@ function ContactRegister({ records }: { records: any[] }) {
                           <ArrowRight className="w-3 h-3" />
                         </button>
                         <RecordActions 
+                          module="school"
                           onEdit={() => {
                             setForm({
                               ...form,
@@ -606,13 +689,41 @@ function StudentManager({ records }: { records: any[] }) {
     });
   };
 
-  const handleSaveAndAddNote = async () => {
+  const handleSaveAndAddNote = async (data?: any) => {
     if (!selectedStudent) return;
+
+    if (data?.isProfileUpdate) {
+        const { updatedProfile } = data;
+        const currentDate = new Date().toLocaleString();
+        const userStamp = !!localStorage ? 'Admin' : 'Admin'; // simple fallback
+        const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
+        const newMerged = (selectedStudent.observacionesAcademicas ? selectedStudent.observacionesAcademicas + '\n\n' : '') + baseUpdateEntry;
+
+        const updates = {
+            name: updatedProfile.name,
+            rut: updatedProfile.rut,
+            email: updatedProfile.email,
+            phone: updatedProfile.phone,
+            region: updatedProfile.region,
+            clasificacion: updatedProfile.clasificacion || selectedStudent.clasificacion,
+            fechaIngreso: updatedProfile.fechaIngreso,
+            diplomado: updatedProfile.type,
+            montoTotalPagado: updatedProfile.montoTotalPagado,
+            montoTotalRecibido: updatedProfile.montoTotalRecibido,
+            pago: updatedProfile.pago || selectedStudent.pago,
+            observacionesAcademicas: newMerged
+        };
+        await localDB.updateInCollection('students', selectedStudent.id, updates);
+        setSelectedStudent({ ...selectedStudent, ...updates });
+        window.dispatchEvent(new Event('db-change'));
+        alert('Datos base actualizados y registrados en el historial');
+        return;
+    }
 
     // 1. Prepare updated notes (if academicNote exists)
     let newNotes = selectedStudent.observacionesAcademicas || '';
-    if (academicNote) {
-        newNotes = newNotes + `\n[${new Date().toLocaleString('es-CL')}] ${academicNote}`;
+    if (data?.newHistory || academicNote) {
+        newNotes = newNotes + `\n[${new Date().toLocaleString('es-CL')}] ${data?.newHistory || academicNote}`;
     }
     
     // 2. Prepare the update object covering ALL fields
@@ -627,6 +738,7 @@ function StudentManager({ records }: { records: any[] }) {
 
     // 3. Update DB
     await localDB.updateInCollection('students', selectedStudent.id, updates);
+    window.dispatchEvent(new Event('db-change'));
     
     // 4. Update UI
     setSelectedStudent({
@@ -859,9 +971,9 @@ function StudentManager({ records }: { records: any[] }) {
                             onClick={() => setSelectedStudent(s)}
                             className="text-[#002b5b] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1"
                           >
-                             <BadgeCheck className="w-3 h-3" /> Ver Ficha
+                             <FileText className="w-3 h-3" /> Ver Expediente
                           </button>
-                          <RecordActions onDelete={async () => { await localDB.deleteFromCollection('students', s.id); window.dispatchEvent(new Event('db-change')); }} />
+                          <RecordActions module="school" onDelete={async () => { await localDB.deleteFromCollection('students', s.id); window.dispatchEvent(new Event('db-change')); }} />
                        </div>
                     </td>
                 </tr>
@@ -880,6 +992,7 @@ function StudentManager({ records }: { records: any[] }) {
 function TrackingView() {
   const [filter, setFilter] = useState<'all' | 'leads' | 'students'>('all');
   const [search, setSearch] = useState('');
+  const [selectedClient, setSelectedClient] = useState<any>(null);
   
   const [leads, setLeads] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
@@ -1009,6 +1122,12 @@ function TrackingView() {
                    <td className="p-5 text-right space-y-1">
                       <p className="flex items-center justify-end gap-2 text-slate-500 font-medium">{item.email} <Mail className="w-3 h-3" /></p>
                       <p className="flex items-center justify-end gap-2 text-slate-500 font-medium">{item.phone} <Smartphone className="w-3 h-3" /></p>
+                      <button 
+                        onClick={() => setSelectedClient(item)}
+                        className="flex items-center justify-end gap-1 text-[10px] font-black text-amber-700 hover:text-amber-900 uppercase"
+                      >
+                        <FileText className="w-3 h-3" /> Ver Expediente
+                      </button>
                    </td>
                 </tr>
               ))}
@@ -1020,6 +1139,72 @@ function TrackingView() {
            </tbody>
         </table>
       </div>
+      {selectedClient && (
+        <Expediente
+          selectedClient={{
+            ...selectedClient,
+            name: selectedClient.name,
+            rut: selectedClient.rut,
+            region: selectedClient.clasificacion,
+            type: selectedClient.type,
+            fechaIngreso: selectedClient.fecha || selectedClient.fechaPago || new Date().toISOString(),
+            historialUnificado: selectedClient.observaciones || selectedClient.observacionesAcademicas || '[SISTEMA] Sin registros.'
+          }}
+          showIntranet={false}
+          showComuna={false}
+          onClose={() => setSelectedClient(null)}
+          onUpdate={async(data) => {
+             // Logic to update the correct entity (lead or student)
+             const collection = selectedClient.type === 'Lead' ? 'school_leads' : 'students';
+             const field = selectedClient.type === 'Lead' ? 'observaciones' : 'observacionesAcademicas';
+             
+             if (data.isProfileUpdate) {
+                // The user updated base specs via Expediente edits
+                const { updatedProfile } = data;
+                const currentDate = new Date().toLocaleString();
+                const userStamp = 'Admin'; // simpler fallback
+                const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
+                const currentObs = selectedClient[field] || '';
+                const newMerged = (currentObs ? currentObs + '\n\n' : '') + baseUpdateEntry;
+
+                await localDB.updateInCollection(collection, selectedClient.id, {
+                   rut: updatedProfile.rut,
+                   clasificacion: updatedProfile.region,
+                   fecha: updatedProfile.fechaIngreso,
+                   type: updatedProfile.type,
+                   montoTotalPagado: updatedProfile.montoTotalPagado,
+                   montoTotalRecibido: updatedProfile.montoTotalRecibido,
+                   pago: updatedProfile.pago || selectedClient.pago,
+                   [field]: newMerged
+                });
+                setSelectedClient({ ...selectedClient, ...updatedProfile, [field]: newMerged });
+                alert('Datos base actualizados y registrados en el historial');
+             } else {
+                const currentDate = new Date().toLocaleString();
+                const newEntry = `\n[${currentDate}] Actividad: ${data.activityType}. Obs: ${data.newHistory}`;
+                const currentObs = selectedClient[field] || '';
+                const updatedObs = currentObs + newEntry;
+
+                await localDB.updateInCollection(collection, selectedClient.id, { [field]: updatedObs });
+                setSelectedClient({ ...selectedClient, [field]: updatedObs });
+                alert('Expediente actualizado');
+             }
+          }}
+          onTransfer={async() => {}}
+          extraTransferFields={null}
+          newHistory={''}
+          setNewHistory={() => {}}
+          newCategory={selectedClient.clasificacion}
+          setNewCategory={() => {}}
+          newIntranet={'No'}
+          setNewIntranet={() => {}}
+          activityType={''}
+          setActivityType={() => {}}
+          currentStatus={''}
+          setCurrentStatus={() => {}}
+          categories={['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro']}
+        />
+      )}
     </div>
   );
 }
@@ -1035,6 +1220,7 @@ function SchoolActivities() {
     fecha: new Date().toISOString().split('T')[0],
     actividad: '',
     tipo: 'Actividad Académica',
+    audienciaObjetivo: 'Ambos',
     categoriaObjetivo: 'Todos',
     observaciones: '',
     responsable: ''
@@ -1045,15 +1231,21 @@ function SchoolActivities() {
     setActivities(data);
   };
   
-  const autoRegisterInExpedientes = async (activity: string, tipo: string, categoria: string, observaciones: string) => {
+  const autoRegisterInExpedientes = async (activity: string, tipo: string, categoria: string, observaciones: string, audienciaObjetivo: string) => {
     const allStudents = await localDB.getCollection('students');
     const allLeads = await localDB.getCollection('school_leads');
-    const allRecords = [...allStudents, ...allLeads.map(l => ({...l, isLead: true}))];
     
-    const matchingRecords = allRecords.filter(r => categoria === 'Todos' || r.clasificacion === categoria);
+    let matchingRecords: any[] = [];
+    if (audienciaObjetivo === 'Ambos' || audienciaObjetivo === 'Alumnos') {
+        matchingRecords.push(...allStudents.filter(r => categoria === 'Todos' || r.clasificacion === categoria));
+    }
+    if (audienciaObjetivo === 'Ambos' || audienciaObjetivo === 'Leads') {
+        matchingRecords.push(...allLeads.filter(r => categoria === 'Todos' || r.clasificacion === categoria).map(l => ({...l, isLead: true})));
+    }
     
     for (const record of matchingRecords) {
-        const newEntry = `\n[${new Date().toLocaleString('es-CL')}] Actividad: ${activity} (${tipo}). Obs: ${observaciones}`;
+        let audText = "Enviada a: " + (audienciaObjetivo === 'Ambos' ? 'Leads y Alumnos' : audienciaObjetivo);
+        const newEntry = `\n[${new Date().toLocaleString('es-CL')}] Actividad: ${activity} (${tipo}). ${audText}. Obs: ${observaciones}`;
         if (record.isLead) {
             await localDB.updateInCollection('school_leads', record.id, { observaciones: (record.observaciones || '') + newEntry });
         } else {
@@ -1078,7 +1270,7 @@ function SchoolActivities() {
       setEditingId(null);
     } else {
       await localDB.saveToCollection('school_activities', form);
-      await autoRegisterInExpedientes(form.actividad, form.tipo, form.categoriaObjetivo, form.observaciones);
+      await autoRegisterInExpedientes(form.actividad, form.tipo, form.categoriaObjetivo, form.observaciones, form.audienciaObjetivo || 'Ambos');
       await addAuditLog(user, `Registró Actividad Escuela: ${form.actividad}`, 'SCHOOL');
       alert('Actividad Académica Registrada y Expedientes Actualizados');
     }
@@ -1088,6 +1280,7 @@ function SchoolActivities() {
       actividad: '', 
       tipo: 'Actividad Académica',
       categoriaObjetivo: 'Todos',
+      audienciaObjetivo: 'Ambos',
       observaciones: '',
       responsable: user.displayName || user.email || ''
     });
@@ -1100,6 +1293,8 @@ function SchoolActivities() {
       fecha: act.fecha,
       actividad: act.actividad,
       tipo: act.tipo,
+      categoriaObjetivo: act.categoriaObjetivo || 'Todos',
+      audienciaObjetivo: act.audienciaObjetivo || 'Ambos',
       observaciones: act.observaciones,
       responsable: act.responsable
     });
@@ -1210,6 +1405,13 @@ function SchoolActivities() {
                   {['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'].map(c => <option key={c}>{c}</option>)}
                 </select>
               </FormGroup>
+              <FormGroup label="Audiencia Objetivo">
+                <select className="w-full border-b p-2" value={form.audienciaObjetivo || 'Ambos'} onChange={e => setForm({...form, audienciaObjetivo: e.target.value})}>
+                  <option value="Ambos">Ambos (Leads y Alumnos)</option>
+                  <option value="Leads">Solo Leads</option>
+                  <option value="Alumnos">Solo Alumnos</option>
+                </select>
+              </FormGroup>
             </div>
             <FormGroup label="Observaciones">
               <textarea 
@@ -1283,6 +1485,7 @@ function SchoolActivities() {
                   <td className="p-4 text-slate-500">{act.responsable}</td>
                   <td className="p-4 text-right">
                     <RecordActions 
+                      module="school"
                       onView={() => setDetailView(act)}
                       onEdit={() => handleEdit(act)}
                       onDelete={async () => {

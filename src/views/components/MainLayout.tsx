@@ -10,18 +10,13 @@ import {
   LogOut,
   Bell,
   Settings,
-  Search,
-  FileText,
   Home,
   Activity
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { cn, formatDate } from '../../lib/utils';
-import { exportTableToPDF } from '../../lib/pdfUtils';
-import { localDB } from '../../lib/auth';
+import { cn } from '../../lib/utils';
 import { UserSettingsDialog } from '../../components/UserSettingsDialog';
 import { NotificationsDialog } from '../../components/NotificationsDialog';
-import { DataBackup } from '../../components/DataBackup';
 import { subscribeToNotifications, Notification } from '../../lib/notifications';
 
 interface MainLayoutProps {
@@ -48,27 +43,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     }
   }, [user]);
 
-  const handleGlobalExport = async () => {
-    const path = location.pathname;
-    
-    if (path === '/laboratorio') {
-      const records = await localDB.getCollection('lab_records');
-      const data = records.map(r => [formatDate(new Date().toISOString()), r.type, r.producto || r.nroRegistro || r.nroIngreso, r.responsable || r.elaborador || '']);
-      exportTableToPDF('Reporte Maestro: Laboratorio', ['Fecha', 'Tipo', 'Detalle/Producto', 'Responsable'], data, 'reporte_maestro_laboratorio');
-    } else if (path === '/escuela') {
-      const students = await localDB.getCollection('students');
-      const data = students.map(s => [s.name, s.diplomado, s.pago, `${s.avance}%`]);
-      exportTableToPDF('Reporte Maestro: Escuela', ['Alumno', 'Programa', 'Pago', 'Avance'], data, 'reporte_maestro_escuela');
-    } else if (path === '/crm') {
-      const contacts = await localDB.getCollection('contacts');
-      const data = contacts.map(c => [c.name, c.rut, c.region, c.categoria, c.type]);
-      exportTableToPDF('Cartera de Clientes CRM', ['Razón Social', 'RUT', 'Región', 'Categoría', 'Tipo'], data, 'crm_cartera_clientes');
-    } else {
-      alert('Esta vista no soporta exportación global por el momento. Use los botones de exportación dentro de cada módulo.');
-    }
-  };
-
   const menuItems = [
+    { name: 'CPANEL SISTEMA', icon: ShieldCheck, path: '/cpanel', roles: ['admin'] },
     { name: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'manager', 'lab', 'crm', 'school', 'gestion'] },
     { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab'] },
     { name: 'Administración', icon: ShieldCheck, path: '/administracion', roles: ['admin', 'manager'] },
@@ -109,6 +85,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <nav className="flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 group text-sm font-medium text-blue-100/70 hover:text-white hover:bg-[#1e40af]/50 mb-2"
+          >
+            <Settings className="w-5 h-5" />
+            <span>Mi Perfil</span>
+          </button>
+
           {filteredMenuItems.map((item) => (
             <Link
               key={item.path}
@@ -159,13 +143,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
-              <button 
-                onClick={handleGlobalExport}
-                className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors" 
-                title="Exportar PDF"
-              >
-                <FileText className="w-5 h-5" />
-              </button>
               <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors relative">
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
@@ -174,8 +151,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   </span>
                 )}
               </button>
-              <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
+              <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors group relative" title="Mi Perfil">
                 <Settings className="w-5 h-5" />
+                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Mi Perfil</span>
               </button>
               
               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
@@ -204,7 +182,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           {children}
         </div>
       </main>
-      <DataBackup />
       <UserSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} user={user} onUpdate={() => window.location.reload()} />
       <NotificationsDialog isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>

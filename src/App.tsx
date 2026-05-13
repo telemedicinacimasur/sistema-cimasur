@@ -11,6 +11,7 @@ const LabView = React.lazy(() => import('./views/LabView'));
 const AdminView = React.lazy(() => import('./views/AdminView'));
 const CRMView = React.lazy(() => import('./views/CRMView'));
 const GestionView = React.lazy(() => import('./views/GestionView'));
+const CPanelView = React.lazy(() => import('./views/CPanelView'));
 
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -69,6 +70,10 @@ export default function App() {
                         <Route 
                           path="/gestion" 
                           element={<RoleRoute roles={['admin', 'gestion']}><GestionView /></RoleRoute>} 
+                        />
+                        <Route 
+                          path="/cpanel" 
+                          element={<RoleRoute roles={['admin']}><CPanelView /></RoleRoute>} 
                         />
                       </Routes>
                     </Suspense>

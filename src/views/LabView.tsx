@@ -383,7 +383,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                   required
                 />
               </FormField>
-              <FormField label="Estado">
+            <FormField label="Estado">
                 <select 
                   className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm"
                   value={form.estado || 'Medio'}
@@ -393,6 +393,8 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                   <option value="Bajo">Bajo</option>
                   <option value="Medio">Medio</option>
                   <option value="Óptimo">Óptimo</option>
+                  <option value="Elaborado">Elaborado</option>
+                  <option value="Pendiente">Pendiente</option>
                 </select>
               </FormField>
               <FormField label="Observaciones">
@@ -496,6 +498,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                   </td>
                   <td className="px-6 py-4 text-center">
                     <RecordActions
+                      module="lab"
                       onView={() => {
                         const recordData = [
                           { label: 'Fecha', value: formatDate(record.fecha) },
@@ -823,6 +826,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
                   </td>
                   <td className="p-4 text-center">
                     <RecordActions
+                      module="lab"
                       onView={() => {
                         const recordData = [
                           { label: 'Fecha', value: formatDate(r.fecha) },
@@ -1234,6 +1238,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
                   <td className="p-4">{r.producto}</td>
                   <td className="p-4 text-center">
                     <RecordActions
+                      module="lab"
                       onView={() => {
                         const nosodeData = [
                           { label: 'Fecha Ficha', value: formatDate(r.fechaFicha) },
@@ -1486,7 +1491,7 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     e.preventDefault();
     if (!user) return;
     
-    let finalData = { ...form, formulaTotal: formulaDis, type: 'preparacion' };
+    let finalData = { ...form, formulaTotal: formulaDis, type: 'preparacion', totalLambdas: String(totalML) };
 
     if (editingId) {
       finalData = { 
@@ -1748,6 +1753,7 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                   <td className="p-4 text-center font-black text-blue-600">{r.totalLambdas}</td>
                   <td className="p-4 text-center">
                       <RecordActions
+                        module="lab"
                         onView={() => {
                            const prepData = [
                              { label: 'Producto', value: r.producto },
@@ -2133,6 +2139,7 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
                   </td>
                   <td className="px-6 py-4 text-center">
                     <RecordActions
+                      module="lab"
                       onView={() => {
                           const tinturaData = [
                              { label: 'Insumo', value: r.insumo },
@@ -2509,6 +2516,7 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
                   <td className="px-6 py-4 font-black">{r.cantidad || '0'}</td>
                   <td className="px-6 py-4 text-center">
                     <RecordActions
+                      module="lab"
                       onView={() => {
                         const recordData = [
                           { label: 'Nombre Insumo', value: r.nombre },
@@ -2884,6 +2892,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
                   </td>
                   <td className="px-6 py-4">
                     <RecordActions
+                      module="lab"
                       onView={() => {
                         const data = [
                           { label: 'Producto', value: r.producto || '' },
@@ -3339,6 +3348,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
                         </button>
                       </div>
                       <RecordActions
+                        module="lab"
                         onView={() => {
                           const data = [
                             { label: 'Código', value: r.codigo || '' },
@@ -3979,7 +3989,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-100">
-                    {followups.slice().reverse().map((f: any, i: number) => (
+                    {followups.slice().reverse().filter(f => f.area === selectedArea).map((f: any, i: number) => (
                       <tr key={i} className="hover:bg-slate-50 italic">
                         <td className="p-3">{formatDate(f.fecha)}</td>
                         <td className="p-3 font-bold text-[#002b5b]">{f.item}</td>
@@ -4335,7 +4345,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     const searchString = `${safe(r.nroCotiz)} ${safe(r.cliente)} ${safe(r.ot)} ${formatDate(r.fechaCotiz)} ${formatDate(r.fechaEnvio)}`.toLowerCase();
     const matchesSearch = searchString.includes(searchTerm.toLowerCase());
     return matchesSituacion && matchesSearch;
-  }).sort((a,b) => (b.fechaEnvio || b.fechaCotiz || '').localeCompare(a.fechaEnvio || a.fechaCotiz || ''));
+  }).sort((a,b) => (b.fechaCotiz || '').localeCompare(a.fechaCotiz || ''));
 
   const handleDelete = async (id: string) => {
     try {
@@ -4634,6 +4644,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
                    </td>
                    <td className="p-2 text-center">
                      <RecordActions 
+                       module="lab"
                        onView={() => setShowDetail(r)}
                        onDownload={() => handleExportPDF(r)}
                        onEdit={() => handleEdit(r)}
@@ -4992,6 +5003,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                     <td className="p-4">{r.preparador}</td>
                     <td className="p-4 text-center">
                       <RecordActions 
+                        module="lab"
                         onEdit={() => {
                           setEditingId(r.id);
                           setForm(r);

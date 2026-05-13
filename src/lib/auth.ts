@@ -9,6 +9,8 @@ export interface UserProfile {
   photoURL: string;
   role: string;
   roles?: string[];
+  password?: string;
+  permissions?: any;
 }
 
 export const localAuth = {
