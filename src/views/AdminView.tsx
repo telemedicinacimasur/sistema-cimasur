@@ -914,7 +914,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "UND Inventario", "UND Total", "Observaciones"]
+      ["Año", "Mes", "N° Cotiz", "Fecha Elab", "Cliente", "Vendedor", "Estado", "Fecha Aprob", "Und a hacer", "UND Total", "UND Inventario", "Observaciones"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -1166,9 +1166,9 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
           </FormField>
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           <FormField label="Observaciones"><input className="w-full border-b p-2 text-sm" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
-          <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="Und Inventario"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits || 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="Und a hacer">
+           <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="Und a hacer"><input type="number" className="w-full border-b p-2 text-sm" value={form.invUnits || 0} onChange={e => handleInvChange(parseInt(e.target.value) || 0)} /></FormField>
+          <FormField label="Und Inventario">
             <div className="w-full p-2 text-sm font-bold text-amber-700 bg-amber-50 rounded border-b border-amber-200">
               {form.todoUnits}
             </div>
@@ -2063,6 +2063,17 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [showTotals, setShowTotals] = useState(false);
 
+  const downloadExcelTemplate = () => {
+    const headers = [
+      ["Tipo", "Nombre", "RUT", "Dirección", "Email", "Teléfono", "Fecha Pago", "Monto Total Pagado", "Monto Recibido", "N° Factura", "Fecha Factura", "Observaciones"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 20 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pagos Escuela");
+    XLSX.writeFile(wb, "plantilla_importacion_pagos_escuela.xlsx");
+  };
+
   const [form, setForm] = useState({
     tipo: 'Ingreso Alumno', // 'Ingreso Alumno' | 'Pago Profesor' | 'Gasto Mensual'
     nombreAlumno: '',
@@ -2138,13 +2149,22 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-2xl border shadow-sm p-6 grid grid-cols-1 md:grid-cols-4 gap-6 relative">
-        <button 
-           onClick={() => setShowTotals(!showTotals)}
-           className="absolute top-4 right-4 text-slate-400 hover:text-blue-600 transition-colors bg-slate-100 p-2 rounded-lg"
-           title={showTotals ? "Ocultar Totales" : "Mostrar Totales"}
-        >
-          {showTotals ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-        </button>
+        <div className="absolute top-4 right-4 flex gap-2">
+          <button 
+             onClick={downloadExcelTemplate}
+             className="text-emerald-700 hover:text-emerald-800 transition-colors bg-emerald-50 p-2 rounded-lg"
+             title="Descargar Plantilla Excel"
+          >
+            <FileSpreadsheet className="w-5 h-5" />
+          </button>
+          <button 
+             onClick={() => setShowTotals(!showTotals)}
+             className="text-slate-400 hover:text-blue-600 transition-colors bg-slate-100 p-2 rounded-lg"
+             title={showTotals ? "Ocultar Totales" : "Mostrar Totales"}
+          >
+            {showTotals ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        </div>
         <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
           <span className="block text-[10px] font-black uppercase text-blue-400 tracking-widest mb-1">Meta Mensual</span>
           <div className="flex items-center gap-2">

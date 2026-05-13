@@ -164,7 +164,7 @@ function ContactRegister({ records }: { records: any[] }) {
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Registro", "Nombre Apellido", "RUT Escrito", "Email", "Teléfono / WhatsApp", "CLASIFICACIÓN PROFESIONAL", "Programa de Interés", "Observaciones de seguimiento"]
+      ["Fecha Registro", "Nombre Apellido", "RUT Escrito", "Email", "Teléfono / WhatsApp", "CLASIFICACIÓN PROFESIONAL", "Programa de Interés", "Observaciones de seguimiento", "Monto Total Pagado", "Monto Recibido", "N° Factura", "Fecha Factura", "Observaciones Pago"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     const wb = XLSX.utils.book_new();
