@@ -71,7 +71,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('register')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'register' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'register' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Ficha Registro
@@ -80,7 +80,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('list')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'list' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'list' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Cartera de Clientes
@@ -89,7 +89,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('activities')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'activities' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'activities' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Registro de Actividades
@@ -98,7 +98,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('intranet')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'intranet' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'intranet' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Clientes Intranet
@@ -354,7 +354,7 @@ function CRMRegister() {
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+      <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
          <span className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Ficha de Registro de Cliente</span>
          <div className="flex gap-2">
            <input 
@@ -955,7 +955,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 function CRMIntranetTable({ clients }: { clients: any[] }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#002b5b] p-4 text-white font-bold">
+      <div className="bg-[#001736] p-4 text-white font-bold">
          <span className="flex items-center gap-2">
            <UserCheck className="w-5 h-5" /> Clientes Importados de Intranet
          </span>
@@ -1005,7 +1005,7 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
 function CRMImportsTable({ imports }: { imports: any[] }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#002b5b] p-4 text-white font-bold">
+      <div className="bg-[#001736] p-4 text-white font-bold">
          <span className="flex items-center gap-2">
            <FileSpreadsheet className="w-5 h-5" /> Historial de Importaciones de Intranet
          </span>
@@ -1151,7 +1151,7 @@ function CRMActivities() {
       {detailView && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-[#002b5b] p-6 text-white flex justify-between items-center">
+            <div className="bg-[#001736] p-6 text-white flex justify-between items-center">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <FileText className="w-6 h-6" /> Detalle de Actividad
               </h3>
@@ -1198,7 +1198,7 @@ function CRMActivities() {
       )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2">
              <TrendingUp className="w-5 h-5" /> 
              {editingId ? 'Editando Actividad / Campaña' : 'Registro de Actividades / Campañas'}

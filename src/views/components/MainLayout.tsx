@@ -70,12 +70,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f8f9ff] text-[#0b1c30] font-sans antialiased">
+    <div className="flex h-screen bg-[#f8f9ff] text-[#0b1c30] font-sans antialiased overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 fixed left-0 top-0 h-screen bg-[#001736] border-r border-[#1e3a8a]/20 shadow-xl flex flex-col py-6 px-4 z-40">
-        <div className="px-2 mb-8 flex flex-col items-center">
+      <aside className="w-64 flex-shrink-0 bg-[#001736] border-r border-[#1e3a8a]/20 shadow-xl flex flex-col py-6 px-4 z-40">
+        <div className="px-2 mb-8 flex flex-col items-center flex-shrink-0">
           <div className="flex flex-col items-center justify-center w-full relative drop-shadow-md">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#1FA2D6] to-[#002b5b] rounded-full flex items-center justify-center mb-2 shadow-lg border-2 border-[#1FA2D6]">
+            <div className="w-16 h-16 bg-gradient-to-br from-[#1FA2D6] to-[#001736] rounded-full flex items-center justify-center mb-2 shadow-lg border-2 border-[#1FA2D6]">
               <span className="text-white font-serif text-3xl font-black italic">C</span>
             </div>
             <div className="text-white font-serif text-2xl tracking-widest z-10 font-black drop-shadow-sm uppercase">
@@ -85,14 +85,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <nav className="flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
-          <button 
-            onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 group text-sm font-medium text-blue-100/70 hover:text-white hover:bg-[#1e40af]/50 mb-2"
-          >
-            <Settings className="w-5 h-5" />
-            <span>Mi Perfil</span>
-          </button>
-
           {filteredMenuItems.map((item) => (
             <Link
               key={item.path}
@@ -110,7 +102,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           ))}
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-[#1e40af]/30 flex flex-col gap-1">
+        <div className="mt-auto pt-6 border-t border-[#1e40af]/30 flex flex-col gap-1 flex-shrink-0">
           <a href="mailto:formacion@cimasur.cl" className="flex items-center gap-3 text-blue-100/70 hover:text-white px-4 py-2 hover:bg-[#1e40af]/50 transition-all rounded-lg text-left text-sm font-medium">
             <HelpCircle className="w-5 h-5" />
             <span>Soporte</span>
@@ -126,9 +118,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 ml-64 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-[#e2e8f0] h-16 sticky top-0 z-50 flex justify-between items-center px-6">
+        <header className="bg-white border-b border-[#e2e8f0] h-16 flex-shrink-0 z-50 flex justify-between items-center px-6 sticky top-0">
           <div className="flex items-center gap-4">
             <Link
               to="/"
@@ -151,9 +143,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   </span>
                 )}
               </button>
-              <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors group relative" title="Mi Perfil">
+              <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors group relative" title="Ajustes">
                 <Settings className="w-5 h-5" />
-                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Mi Perfil</span>
+                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Ajustes</span>
               </button>
               
               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
@@ -178,7 +170,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </header>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-6 overflow-auto flex-1">
           {children}
         </div>
       </main>

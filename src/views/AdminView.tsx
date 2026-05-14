@@ -50,7 +50,8 @@ import {
   LayoutGrid,
   AlertCircle,
   FlaskConical,
-  Activity
+  Activity,
+  Database
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
@@ -59,7 +60,9 @@ import { useLocation } from 'react-router-dom';
 
 import { addNotification } from '../lib/notifications';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments';
+import CimasurInventoryManager from './admin/CimasurInventoryManager';
+
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones';
 
 export default function AdminView() {
   const { user } = useAuth();
@@ -140,13 +143,19 @@ export default function AdminView() {
             icon={GraduationCap}
             onClick={() => setView('school_payments')}
           />
+          <ModuleCard 
+            title="Gestión de Códigos y Diluciones"
+            desc="Submódulo maestro para administración de Excel, correlativos y catálogos."
+            icon={Database}
+            onClick={() => setView('codigos_y_diluciones')}
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <button 
         onClick={() => setView('menu')}
         className="flex items-center gap-2 text-[#001736] font-bold hover:text-blue-600 transition-colors mb-2"
@@ -155,12 +164,22 @@ export default function AdminView() {
         <span className="text-sm uppercase tracking-widest">Volver al Menú de Administración</span>
       </button>
 
+      {view === 'codigos_y_diluciones' && <CimasurInventoryManager />}
       {view === 'quotes' && <QuoteManager records={records} setRecords={setRecords} />}
       {view === 'sales' && <SalesManager records={records} setRecords={setRecords} />}
       {view === 'sales_gestion' && <SalesGestionManager records={records} setRecords={setRecords} />}
       {view === 'dte' && <DTEManager records={records} setRecords={setRecords} />}
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'school_payments' && <SchoolPaymentsManager records={records} setRecords={setRecords} />}
+      
+      {/* Scroll to Top Button */}
+      <button 
+        className="fixed bottom-8 right-8 p-4 bg-[#001736] text-white rounded-full shadow-2xl hover:bg-slate-800 transition-all hover:-translate-y-1 z-50 flex items-center justify-center opacity-80 hover:opacity-100"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        title="Volver Arriba"
+      >
+         <TrendingUp className="w-5 h-5 -rotate-90" />
+      </button>
     </div>
   );
 }
@@ -341,7 +360,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#0b2447] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2">
             <DollarSign className="w-5 h-5" /> {editingId ? 'Editando Pago Veterinario' : 'Control de Pagos Veterinarios'}
           </span>
@@ -392,8 +411,8 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex flex-col xl:flex-row justify-between items-center gap-6">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="p-4 bg-[#001736] text-white border-b flex flex-col xl:flex-row justify-between items-center gap-6">
+          <div className="flex flex-wrap items-center gap-4 text-white">
             <div className="flex flex-col gap-1">
                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">Mes / Año</span>
                <div className="flex items-center gap-1">
@@ -441,11 +460,6 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
           </div>
 
           <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="px-4 border-r border-slate-100">
-               <span className="block text-[8px] font-black text-slate-400 uppercase tracking-tighter">Total Selección</span>
-               <span className="text-sm font-black text-blue-900 tracking-tighter">{formatCurrency(totalVet)}</span>
-            </div>
-            
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -511,15 +525,15 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4">Fecha</th>
-                <th className="p-4">Tutor</th>
-                <th className="p-4">Nombre MV</th>
-                <th className="p-4">Mail / Fono</th>
-                <th className="p-4 text-right">Consulta</th>
+              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
+                <th className="p-4 bg-[#001736]">Fecha</th>
+                <th className="p-4 bg-[#001736]">Tutor</th>
+                <th className="p-4 bg-[#001736]">Nombre MV</th>
+                <th className="p-4 bg-[#001736]">Mail / Fono</th>
+                <th className="p-4 text-right bg-[#001736]">Consulta</th>
                 <th className="p-4 text-right text-blue-900 bg-blue-50/30">Pago Vet</th>
-                <th className="p-4 text-center">Fecha Pago</th>
-                <th className="p-4 text-center">Gestión</th>
+                <th className="p-4 text-center bg-[#001736]">Fecha Pago</th>
+                <th className="p-4 text-center bg-[#001736]">Gestión</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -581,7 +595,7 @@ function FormField({ label, children }: { label: string, children: React.ReactNo
   );
 }
 
-function QuoteManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
+function QuoteManager({ records, setRecords }: { records: any[], setRecords: (val: any[]) => void }) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -795,9 +809,9 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" /> Seguimiento de Cotizaciones
+            <TrendingUp className="w-5 h-5" /> Seguimiento de Pedidos
           </div>
           <div className="flex items-center gap-2">
             <input 
@@ -843,24 +857,22 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
           </FormField>
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           <FormField label="Observaciones"><input className="w-full border-b p-2 text-sm" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
-           <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="Und a hacer"><input type="number" className="w-full border-b p-2 text-sm" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
-          <FormField label="UND Inventario">
-            <div className="w-full p-2 text-sm font-bold text-amber-700 bg-amber-50 rounded border-b border-amber-200">
-              {form.invUnits || 0}
-            </div>
-          </FormField>
+          <div className="grid grid-cols-3 gap-2">
+            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
+            <FormField label="Und a hacer"><input type="number" className="w-full border-b p-2 text-sm font-bold text-amber-700 bg-amber-50" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
+            <FormField label="UND Inventario (Auto)"><input type="number" className="w-full border-b p-2 text-sm font-bold text-slate-500 bg-slate-50" value={form.invUnits || 0} readOnly /></FormField>
+          </div>
           <div className="flex items-end">
-            <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold shadow-lg hover:opacity-90 flex items-center justify-center gap-2">
-              <Save className="w-4 h-4" /> GUARDAR COTIZACIÓN
-            </button>
+              <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold shadow-lg hover:opacity-90 flex items-center justify-center gap-2 uppercase tracking-widest">
+                <Save className="w-4 h-4" /> GUARDAR PEDIDO
+              </button>
           </div>
         </form>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex flex-wrap gap-4 items-center justify-between">
-          <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Histórico de Cotizaciones</h3>
+        <div className="p-4 bg-[#001736] border-b flex flex-wrap gap-4 items-center justify-between text-white">
+          <h3 className="text-[10px] font-black uppercase text-white tracking-widest">Histórico de Pedidos</h3>
           
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
@@ -905,7 +917,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                     r.undTotal || 0,
                     r.observaciones || ''
                   ]);
-                  exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_cotizaciones', 'l');
+                  exportTableToPDF('Reporte: Pedidos', ['Año/Mes', 'N° Pedido', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_pedidos', 'l');
                 }}
                 className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition-colors hover:bg-blue-700 flex items-center gap-1" 
                 title="Descargar PDF Filtrado"
@@ -918,14 +930,14 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4 text-center">Año/Mes</th>
-                <th className="p-4">N° Cotiz</th>
-                <th className="p-4">Cliente</th>
-                <th className="p-4">Vendedor</th>
-                <th className="p-4 text-center">Estado (Editable)</th>
-                <th className="p-4 text-center">UND Total</th>
-                <th className="p-4 text-center">Acción</th>
+              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
+                <th className="p-4 text-center bg-[#001736]">Año/Mes</th>
+                <th className="p-4 bg-[#001736]">N° Pedido</th>
+                <th className="p-4 bg-[#001736]">Cliente</th>
+                <th className="p-4 bg-[#001736]">Vendedor</th>
+                <th className="p-4 text-center bg-[#001736]">Estado (Editable)</th>
+                <th className="p-4 text-center bg-[#001736]">UND Total</th>
+                <th className="p-4 text-center bg-[#001736]">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -969,7 +981,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                           { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` },
                           { label: 'Observaciones', value: r.observaciones || '' }
                         ];
-                        viewExpedienteInNewTab('Ficha: Cotización', data, `cotizacion_${r.nroCotiz}`);
+                        viewExpedienteInNewTab('Ficha: Pedido', data, `cotizacion_${r.nroCotiz}`);
                       }}
                       onDownload={() => {
                         const data = [
@@ -982,7 +994,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                           { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` },
                           { label: 'Observaciones', value: r.observaciones || '' }
                         ];
-                        exportExpedienteToPDF('Ficha: Cotización', data, `cotizacion_${r.nroCotiz}`);
+                        exportExpedienteToPDF('Ficha: Pedido', data, `cotizacion_${r.nroCotiz}`);
                       }}
                       onEdit={() => {
                         setEditingId(r.id);
@@ -1009,15 +1021,6 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (da
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-blue-50/50 font-black">
-              <tr>
-                <td colSpan={5} className="p-4 text-right uppercase text-slate-500 text-[9px] tracking-widest">Suma Total Unidades Vendidas:</td>
-                <td className="p-4 text-center text-blue-700 text-sm">
-                  {filteredRecords.reduce((sum, r) => sum + (Number(r.undTotal) || 0), 0)}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
           </table>
         </div>
       </div>
@@ -1200,7 +1203,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
       <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas GESTIÓN</span>
           <div className="flex gap-2">
             <input 
@@ -1253,8 +1256,8 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
 
       <div className="lg:col-span-8 space-y-4">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-            <h3 className="font-black text-[10px] uppercase text-slate-400 tracking-widest">Detalle de Ventas GESTIÓN Registradas</h3>
+          <div className="p-4 bg-[#001736] border-b flex justify-between items-center text-white">
+            <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas GESTIÓN</h3>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase">Mes:</span>
@@ -1370,13 +1373,13 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                  <th className="p-4">Fecha</th>
-                  <th className="p-4">Documento</th>
-                  <th className="p-4">Cliente</th>
-                  <th className="p-4 text-center">Fcos</th>
-                  <th className="p-4 text-right">Valor Cotiz</th>
-                  <th className="p-4 text-center">Acción</th>
+              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
+                <th className="p-4 bg-[#001736]">Fecha</th>
+                  <th className="p-4 bg-[#001736]">Documento</th>
+                  <th className="p-4 bg-[#001736]">Cliente</th>
+                  <th className="p-4 text-center bg-[#001736]">Fcos</th>
+                  <th className="p-4 text-right bg-[#001736]">Valor Cotiz</th>
+                  <th className="p-4 text-center bg-[#001736]">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 italic">
@@ -1434,14 +1437,6 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-blue-50/50 font-black">
-                <tr>
-                  <td colSpan={3} className="p-4 text-right uppercase text-slate-500 text-[9px] tracking-widest">Totales en Selección:</td>
-                  <td className="p-4 text-center text-blue-700 text-sm">{totalFrascos}</td>
-                  <td className="p-4 text-right text-blue-700 text-sm">{formatCurrency(totalCotizacion)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         </div>
@@ -1579,7 +1574,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
       <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas</span>
           <div className="flex gap-2">
             <input 
@@ -1621,8 +1616,8 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 
       <div className="lg:col-span-8 space-y-4">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-            <h3 className="font-black text-[10px] uppercase text-slate-400 tracking-widest">Detalle de Ventas Registradas</h3>
+          <div className="p-4 bg-[#001736] border-b flex justify-between items-center text-white">
+            <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas</h3>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
@@ -1678,12 +1673,12 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                  <th className="p-4">Fecha</th>
-                  <th className="p-4">Documento</th>
-                  <th className="p-4">Cliente</th>
-                  <th className="p-4 text-center">N° Fcos</th>
-                  <th className="p-4 text-center">Acción</th>
+              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
+                <th className="p-4 bg-[#001736]">Fecha</th>
+                  <th className="p-4 bg-[#001736]">Documento</th>
+                  <th className="p-4 bg-[#001736]">Cliente</th>
+                  <th className="p-4 text-center bg-[#001736]">N° Fcos</th>
+                  <th className="p-4 text-center bg-[#001736]">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 italic">
@@ -1720,12 +1715,6 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-blue-50/50 font-black">
-                <tr>
-                  <td colSpan={4} className="p-4 text-right uppercase text-slate-500 text-[9px] tracking-widest">Total Frascos en Selección:</td>
-                  <td className="p-4 text-center text-blue-700 text-sm">{totalFrascos}</td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         </div>
@@ -1949,74 +1938,6 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
           </div>
       </div>
 
-      <div className="bg-white rounded-3xl border shadow-xl p-8 grid grid-cols-1 md:grid-cols-3 gap-8 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-emerald-500 to-indigo-600" />
-        
-        <div className="bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 flex flex-col justify-between group">
-          <div className="flex justify-between items-start mb-4">
-             <span className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] italic">Meta Anual Acumulada</span>
-             <button onClick={() => setShowMeta(!showMeta)} className="text-blue-300 hover:text-blue-600 transition-colors">
-                {showMeta ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-             </button>
-          </div>
-          <div className="flex items-center gap-3">
-            {!isEditingMeta ? (
-               <>
-                 <span className="text-3xl font-black text-blue-900 tracking-tighter">{showMeta ? formatCurrency(meta) : '••••••••'}</span>
-                 {showMeta && <button onClick={() => setIsEditingMeta(true)} className="p-2 bg-white rounded-full shadow-sm text-blue-400 hover:scale-110 transition-transform"><Edit className="w-3.5 h-3.5" /></button>}
-               </>
-            ) : (
-               <div className="flex items-center gap-2 w-full">
-                 <input 
-                   type="number" 
-                   className="w-full border-2 border-blue-400 rounded-xl p-2 text-lg font-black outline-none focus:bg-white" 
-                   autoFocus
-                   defaultValue={meta}
-                   onBlur={(e) => {
-                     setMeta(Number(e.target.value));
-                     setIsEditingMeta(false);
-                   }}
-                   onKeyDown={(e) => {
-                     if (e.key === 'Enter') {
-                       setMeta(Number(e.currentTarget.value));
-                       setIsEditingMeta(false);
-                     }
-                   }}
-                 />
-               </div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-emerald-50/50 p-6 rounded-[2rem] border border-emerald-100 flex flex-col justify-between group">
-          <div className="flex justify-between items-start mb-4">
-             <span className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em] italic">Acumulado Neto {dateFrom ? '(Periodo)' : '(Mes)'}</span>
-             <button onClick={() => setShowAcumulado(!showAcumulado)} className="text-emerald-300 hover:text-emerald-600 transition-colors">
-                {showAcumulado ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-             </button>
-          </div>
-          <span className="text-3xl font-black text-emerald-700 tracking-tighter">{showAcumulado ? formatCurrency(totalNeto) : '••••••••'}</span>
-        </div>
-
-        <div className={cn(
-          "p-6 rounded-[2rem] border flex flex-col justify-between group",
-          faltante > 0 ? "bg-indigo-50/50 border-indigo-100" : "bg-teal-50 border-teal-100"
-        )}>
-          <div className="flex justify-between items-start mb-4">
-             <span className="text-[10px] font-black uppercase text-indigo-500 tracking-[0.2em] italic">
-               {faltante > 0 ? 'Faltante para Meta' : '¡SUPERÁVIT!'}
-             </span>
-             <button onClick={() => setShowFaltante(!showFaltante)} className="text-indigo-300 hover:text-indigo-600 transition-colors">
-                {showFaltante ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-             </button>
-          </div>
-          <span className={cn(
-            "text-3xl font-black tracking-tighter",
-            faltante > 0 ? "text-indigo-700" : "text-teal-700"
-          )}>{showFaltante ? formatCurrency(faltante) : '••••••••'}</span>
-        </div>
-      </div>
-
       <div className="space-y-4">
         {/* Registro de Pagos Alumnos */}
         <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-blue-100 group">
@@ -2102,7 +2023,13 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
               <div className="mt-8">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-slate-50 border-b text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
+                    <tr className="bg-[#001736] text-white text-[10px] font-black uppercase tracking-widest text-left border-b border-white/10">
+                      <td colSpan={2} className="p-2 text-right italic">Sumas en Selección:</td>
+                      <td className="p-2 text-right">{formatCurrency(filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalPagado) || 0), 0))}</td>
+                      <td className="p-2 text-right text-emerald-400 font-bold">{formatCurrency(totalIngresos)}</td>
+                      <td></td>
+                    </tr>
+                    <tr className="bg-[#001736] border-b text-[10px] font-black text-white uppercase tracking-widest text-left">
                       <th className="p-3">Fecha</th>
                       <th className="p-3">Alumno</th>
                       <th className="p-3 text-right">Monto Total</th>
@@ -2130,6 +2057,14 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       <tr><td colSpan={5} className="p-8 text-center text-slate-400">No hay ingresos registrados.</td></tr>
                     )}
                   </tbody>
+                  <tfoot className="bg-[#001736] text-white font-black">
+                    <tr>
+                      <td colSpan={2} className="p-4 text-right uppercase text-[9px] tracking-widest italic tracking-widest">Totales Finales Histórico:</td>
+                      <td className="p-4 text-right">{formatCurrency(filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalPagado) || 0), 0))}</td>
+                      <td className="p-4 text-right text-emerald-400 text-sm">{formatCurrency(totalIngresos)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -2139,7 +2074,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
         {/* Expediente: Pago a Profesores */}
         <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-orange-100 group">
           <div 
-            className="bg-orange-500 p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-orange-600 transition-colors" 
+            className="bg-[#001736] p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-[#001736]/90 transition-all shadow-md group" 
             onClick={() => setForm({...form, tipo: form.tipo === 'Pago Profesor' ? '' : 'Pago Profesor'})}
           >
             <div className="flex items-center gap-4">
@@ -2183,6 +2118,11 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
               <div className="mt-4">
                 <table className="w-full text-xs">
                   <thead>
+                    <tr className="bg-[#001736] text-white text-[10px] font-black uppercase tracking-widest text-left border-b border-white/10 italic">
+                      <td colSpan={3} className="p-2 text-right">Suma Pagos Periodo:</td>
+                      <td className="p-2 text-right font-bold text-orange-100 italic">-{formatCurrency(totalPagosProfesores)}</td>
+                      <td></td>
+                    </tr>
                     <tr className="text-[10px] font-black text-orange-400 uppercase tracking-widest text-left">
                       <th className="p-3">Fecha</th>
                       <th className="p-3">Profesor (A quien)</th>
@@ -2207,6 +2147,13 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       <tr><td colSpan={5} className="p-8 text-center text-orange-300">No hay pagos a profesores registrados.</td></tr>
                     )}
                   </tbody>
+                  <tfoot className="bg-orange-600 text-white font-black">
+                    <tr>
+                      <td colSpan={3} className="p-4 text-right uppercase text-[9px] tracking-widest italic tracking-widest">Suma Histórica Pagos:</td>
+                      <td className="p-4 text-right text-sm italic">-{formatCurrency(totalPagosProfesores)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -2216,7 +2163,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
         {/* Expediente: Otros Gastos */}
         <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-rose-100 group">
           <div 
-            className="bg-rose-500 p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-rose-600 transition-colors" 
+            className="bg-[#001736] p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-[#001736]/90 transition-all shadow-md group" 
             onClick={() => setForm({...form, tipo: form.tipo === 'Gasto Mensual' ? '' : 'Gasto Mensual'})}
           >
             <div className="flex items-center gap-4">
@@ -2260,6 +2207,11 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
               <div className="mt-4">
                 <table className="w-full text-xs">
                   <thead>
+                    <tr className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest text-left border-b border-white/10 italic">
+                      <td colSpan={3} className="p-2 text-right">Suma Gastos Periodo:</td>
+                      <td className="p-2 text-right font-bold text-rose-100 italic">-{formatCurrency(totalGastosMensuales)}</td>
+                      <td></td>
+                    </tr>
                     <tr className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-left">
                       <th className="p-3">Fecha</th>
                       <th className="p-3">Gasto / Proveedor</th>
@@ -2284,6 +2236,13 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       <tr><td colSpan={5} className="p-8 text-center text-rose-300">No hay gastos registrados.</td></tr>
                     )}
                   </tbody>
+                  <tfoot className="bg-rose-600 text-white font-black text-sm">
+                    <tr>
+                      <td colSpan={3} className="p-4 text-right uppercase text-[9px] tracking-widest italic tracking-widest">Suma Histórica Gastos:</td>
+                      <td className="p-4 text-right italic">-{formatCurrency(totalGastosMensuales)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -2300,6 +2259,26 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredRecords = records.filter(r => {
+    let match = true;
+    if (dateFrom && r.fecha < dateFrom) match = false;
+    if (dateTo && r.fecha > dateTo) match = false;
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      const text = String(r.nroDto || '') + ' ' + String(r.nombre || '') + ' ' + String(r.rut || '');
+      if (!text.toLowerCase().includes(s)) match = false;
+    }
+    return match;
+  }).sort((a,b) => {
+    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    if (d !== 0) return d;
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+
+  const totalNeto = filteredRecords.reduce((acc, curr) => acc + (Number(curr.montoNeto) || 0), 0);
+  const totalIva = filteredRecords.reduce((acc, curr) => acc + (Number(curr.iva) || 0), 0);
+  const totalGeneral = filteredRecords.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
 
   const [form, setForm] = useState({
     anio: new Date().getFullYear().toString(),
@@ -2318,22 +2297,6 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
 
   const iva = (Number(form.montoNeto) || 0) * 0.19;
   const total = (Number(form.montoNeto) || 0) + iva;
-
-  const filteredRecords = records.filter(r => {
-    let match = true;
-    if (dateFrom && r.fecha < dateFrom) match = false;
-    if (dateTo && r.fecha > dateTo) match = false;
-    if (searchTerm) {
-      const s = searchTerm.toLowerCase();
-      const text = String(r.nroDto || '') + ' ' + String(r.nombre || '') + ' ' + String(r.rut || '');
-      if (!text.toLowerCase().includes(s)) match = false;
-    }
-    return match;
-  }).sort((a,b) => {
-    const d = (b.fecha || '').localeCompare(a.fecha || '');
-    if (d !== 0) return d;
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2483,7 +2446,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#0b2447] p-4 text-white font-bold flex flex-wrap gap-4 items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex flex-wrap gap-4 items-center justify-between">
           <span className="flex items-center gap-2">
             <Receipt className="w-5 h-5" /> {editingId ? 'Editando Registro DTE' : 'Registro Administrativo de DTE'}
           </span>
@@ -2584,7 +2547,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex flex-wrap justify-between items-center font-black text-[10px] text-slate-400 uppercase tracking-widest gap-4">
+        <div className="p-4 bg-[#001736] border-b flex flex-wrap justify-between items-center font-black text-[10px] text-white uppercase tracking-widest gap-4">
           <span>Consulta de Registros DTE</span>
           <div className="flex items-center gap-2 flex-wrap text-normal normal-case">
               <div className="flex items-center gap-1">
@@ -2635,16 +2598,16 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs font-medium">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4">Fecha</th>
-                <th className="p-4">N° Dcto</th>
-                <th className="p-4">Razón Social</th>
-                <th className="p-4">RUT</th>
-                <th className="p-4 text-right">Neto</th>
-                <th className="p-4 text-right">Total</th>
-                <th className="p-4 text-center">Acciones</th>
+              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
+                <th className="p-4 bg-[#001736]">Fecha</th>
+                <th className="p-4 bg-[#001736]">N° Dcto</th>
+                <th className="p-4 bg-[#001736]">Razón Social</th>
+                <th className="p-4 bg-[#001736]">RUT</th>
+                <th className="p-4 text-right bg-[#001736]">Neto</th>
+                <th className="p-4 text-right bg-[#001736]">Total</th>
+                <th className="p-4 text-center bg-[#001736]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
@@ -2695,30 +2658,6 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                 </tr>
               )}
             </tbody>
-            <tfoot className="bg-blue-50/50 font-black">
-              <tr>
-                <td colSpan={4} className="p-4 text-right uppercase text-slate-500 text-[9px] tracking-widest border-t border-slate-200">Sumas Totales:</td>
-                <td className="p-4 text-right text-blue-900 text-sm border-t border-slate-200">
-                  {formatCurrency(filteredRecords.reduce((sum, r) => {
-                    const nro = String(r.nroDto || '').toUpperCase();
-                    const val = Number(r.montoNeto) || 0;
-                    if (nro.startsWith('NCE')) return sum - val;
-                    if (nro.startsWith('GDE')) return sum;
-                    return sum + val;
-                  }, 0))}
-                </td>
-                <td className="p-4 text-right text-blue-900 text-sm border-t border-slate-200">
-                  {formatCurrency(filteredRecords.reduce((sum, r) => {
-                    const nro = String(r.nroDto || '').toUpperCase();
-                    const val = Number(r.total) || 0;
-                    if (nro.startsWith('NCE')) return sum - val;
-                    if (nro.startsWith('GDE')) return sum;
-                    return sum + val;
-                  }, 0))}
-                </td>
-                <td className="border-t border-slate-200"></td>
-              </tr>
-            </tfoot>
           </table>
         </div>
       </div>

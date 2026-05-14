@@ -198,7 +198,7 @@ function ModuleCard({ title, desc, icon: Icon, onClick, featured }: any) {
     >
       <div className={cn(
         "p-3 rounded-lg inline-block mb-4 transition-colors",
-        featured ? "bg-[#002b5b] text-white" : "bg-slate-100 text-[#001736] group-hover:bg-[#00658d] group-hover:text-white"
+        featured ? "bg-[#001736] text-white" : "bg-slate-100 text-[#001736] group-hover:bg-[#00658d] group-hover:text-white"
       )}>
         <Icon className="w-8 h-8" />
       </div>
@@ -215,10 +215,12 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterEstado, setFilterEstado] = useState('Todos');
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
     producto: '',
     estado: 'Medio',
+    estadoFinal: 'PENDIENTE',
     observaciones: '',
     responsable: '',
     creadoPor: '',
@@ -333,7 +335,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-[#002b5b] text-white px-6 py-4 flex justify-between items-center">
+        <div className="bg-[#001736] text-white px-6 py-4 flex justify-between items-center">
           <h3 className="text-lg font-bold flex items-center gap-2 text-white">
             <Beaker className="w-5 h-5" /> Evaluación Gotas Puras
           </h3>
@@ -386,15 +388,26 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
             <FormField label="Estado">
                 <select 
                   className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm"
-                  value={form.estado || 'Medio'}
+                  value={form.estado || 'Pendiente'}
                   onChange={e => setForm({...form, estado: e.target.value})}
                 >
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="OK">OK</option>
                   <option value="Mínimo">Mínimo</option>
                   <option value="Bajo">Bajo</option>
                   <option value="Medio">Medio</option>
                   <option value="Óptimo">Óptimo</option>
                   <option value="Elaborado">Elaborado</option>
-                  <option value="Pendiente">Pendiente</option>
+                </select>
+              </FormField>
+              <FormField label="Estado Final">
+                <select 
+                  className="w-full border-b border-slate-200 p-2 outline-none focus:border-blue-500 text-sm font-bold"
+                  value={form.estadoFinal || 'PENDIENTE'}
+                  onChange={e => setForm({...form, estadoFinal: e.target.value})}
+                >
+                  <option value="PENDIENTE">PENDIENTE</option>
+                  <option value="OK">OK</option>
                 </select>
               </FormField>
               <FormField label="Observaciones">
@@ -415,6 +428,15 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
           <div className="flex items-center gap-4">
             <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Evaluación</h3>
+            <select 
+              className="text-[10px] border rounded-full px-3 py-1 outline-none"
+              value={filterEstado}
+              onChange={e => setFilterEstado(e.target.value)}
+            >
+              <option value="Todos">Todos</option>
+              <option value="Ok">Ok</option>
+              <option value="Pendiente">Pendiente</option>
+            </select>
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
               <input 
@@ -452,10 +474,11 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 formatDateForExcel(r.fecha),
                 r.producto || '',
                 r.estado || '',
+                r.estadoFinal || '',
                 r.observaciones || '',
                 r.creadoPor || r.responsable || 'Administrador Cimasur'
               ]);
-              exportTableToExcel('Evaluación Gotas Puras', ['Fecha', 'Producto', 'Estado', 'Observaciones', 'Responsable'], data, 'evaluacion_gotas_puras');
+              exportTableToExcel('Evaluación Gotas Puras', ['Fecha', 'Producto', 'Estado', 'Estado Final', 'Observaciones', 'Responsable'], data, 'evaluacion_gotas_puras');
             }}
             className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded text-[10px] font-bold uppercase hover:bg-white transition-colors text-emerald-600"
           >
@@ -469,14 +492,17 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Fecha</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Producto</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Estado</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Estado Final</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Observaciones</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500 text-center">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {records.filter(r => r.type === 'gotas-puras').filter(r => {
-                const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.observaciones || ''} ${formatDate(r.fecha)}`.toLowerCase();
-                return searchStr.includes(searchTerm.toLowerCase());
+                const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.estadoFinal || ''} ${r.observaciones || ''} ${formatDate(r.fecha)}`.toLowerCase();
+                const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
+                const matchesEstado = filterEstado === 'Todos' || (filterEstado === 'Ok' ? (r.estadoFinal === 'OK' || r.estado === 'OK') : (r.estadoFinal === filterEstado || r.estado === filterEstado));
+                return matchesSearch && matchesEstado;
               })
               .sort((a,b) => (b.fecha || '').localeCompare(a.fecha || ''))
               .map((record) => (
@@ -486,9 +512,17 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                   <td className="px-6 py-4">
                     <span className={cn(
                       "text-[10px] font-black px-2 py-0.5 rounded uppercase",
-                      record.estado === 'Óptimo' ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                      (record.estado === 'Óptimo' || record.estado === 'OK') ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
                     )}>
                       {record.estado}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={cn(
+                      "text-[10px] font-black px-2 py-0.5 rounded uppercase",
+                      record.estadoFinal === 'OK' ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                    )}>
+                      {record.estadoFinal || 'PENDIENTE'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500 italic max-w-xs truncate">{record.observaciones}</td>
@@ -675,7 +709,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center">
+        <div className="bg-[#001736] p-4 text-white font-bold flex justify-between items-center">
           <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Elaboración Gotas y Diluciones</span>
           <div className="flex gap-2">
             <input 
@@ -1078,7 +1112,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center">
+        <div className="bg-[#001736] p-4 text-white font-bold flex justify-between items-center">
           <span className="flex items-center gap-2"><Microscope className="w-5 h-5" /> Ingreso Nosodes</span>
           <div className="flex gap-2">
             <input 
@@ -1147,7 +1181,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
 
           <div className="flex justify-between items-end">
             <FormField label="Responsable (Nombre y Firma)"><input className="w-64 border-b p-2 text-sm italic" value={form.responsable || ''} onChange={e => setForm({...form, responsable: e.target.value})} required /></FormField>
-            <button type="submit" className="bg-[#0b2447] text-white px-10 py-3 rounded-xl font-bold shadow-xl flex items-center gap-2 hover:opacity-95">
+            <button type="submit" className="bg-[#001736] text-white px-10 py-3 rounded-xl font-bold shadow-xl flex items-center gap-2 hover:opacity-95">
               <Save className="w-4 h-4" /> REGISTRAR FICHA TÉCNICA
             </button>
           </div>
@@ -1491,7 +1525,12 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     e.preventDefault();
     if (!user) return;
     
-    let finalData = { ...form, formulaTotal: formulaDis, type: 'preparacion', totalLambdas: String(totalML) };
+    let finalData = { 
+      ...form, 
+      formulaTotal: formulaDis,
+      totalLambdas: `${sumaUL} UL + ${sumaML} ML = ${totalML.toFixed(2)} ML`,
+      type: 'preparacion' 
+    };
 
     if (editingId) {
       finalData = { 
@@ -1524,15 +1563,22 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     setRecords(updated);
     setForm({
       producto: '', fecha: new Date().toISOString().split('T')[0], preparador: '',
-      filas: Array(15).fill({ composicion: '', nroCimasur: '', dilucion: '', lambdas: '' }),
+      filas: Array(5).fill({ composicion: '', nroCimasur: '', dilucion: '', lambdas: '' }),
       formulaTotal: '', observaciones: '', responsable: user.displayName
+    });
+  };
+
+  const addRow = () => {
+    setForm({
+      ...form,
+      filas: [...form.filas, { composicion: '', nroCimasur: '', dilucion: '', lambdas: '' }]
     });
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Preparación Gotas Puras</span>
          <div className="flex gap-2">
            <input 
@@ -1563,7 +1609,7 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                 formatDate(r.fecha),
                 r.producto,
                 r.preparador,
-                r.totalLambdas
+                r.totalLambdas || '---'
               ]);
               exportTableToPDF(
                 'Reporte: Preparación de Gotas Puras',
@@ -1586,26 +1632,30 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
              <FormField label="Nombre Preparador"><input className="w-full border-b p-2 text-sm" value={form.preparador || ''} onChange={e => setForm({...form, preparador: e.target.value})} /></FormField>
              <FormField label="Frasco">
                <div className="flex gap-2">
-                 <button type="button" onClick={() => setFrascoSize(30)} className={cn("px-4 py-2 border rounded text-xs font-bold", frascoSize === 30 ? "bg-[#002b5b] text-white" : "bg-white")}>30 mL</button>
-                 <button type="button" onClick={() => setFrascoSize(100)} className={cn("px-4 py-2 border rounded text-xs font-bold", frascoSize === 100 ? "bg-[#002b5b] text-white" : "bg-white")}>100 mL</button>
+                 <button type="button" onClick={() => setFrascoSize(30)} className={cn("px-4 py-2 border rounded text-xs font-bold", frascoSize === 30 ? "bg-[#001736] text-white" : "bg-white")}>30 mL</button>
+                 <button type="button" onClick={() => setFrascoSize(100)} className={cn("px-4 py-2 border rounded text-xs font-bold", frascoSize === 100 ? "bg-[#001736] text-white" : "bg-white")}>100 mL</button>
                </div>
              </FormField>
           </div>
 
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-black uppercase text-[#001736] tracking-widest">Composición / Terapia</h3>
+          </div>
           <div className="border border-slate-100 rounded-lg overflow-hidden mb-8">
             <table className="w-full text-xs">
-               <thead className="bg-[#001736] text-white text-[10px] uppercase font-black">
-                  <tr>
+               <thead>
+                  <tr className="bg-[#001736] text-white text-[10px] uppercase font-black">
                      <th className="p-3 text-center border-r border-white/10 w-12">#</th>
                      <th className="p-3 text-left border-r border-white/10">Composición / Terapia</th>
                      <th className="p-3 text-center border-r border-white/10">N° Cimasur</th>
                      <th className="p-3 text-center border-r border-white/10">Dilución</th>
-                     <th className="p-3 text-center">Lambdas</th>
+                     <th className="p-3 text-center border-r border-white/10 text-emerald-400">Lambdas</th>
+                     <th className="p-3 text-center"></th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
                   {form.filas.map((fila, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-blue-50/30' : 'bg-white'}>
                       <td className="p-1 text-center font-bold text-slate-300 border-r border-slate-50">{idx + 1}</td>
                       <td className="p-1 border-r border-slate-50">
                         <SearchableRefInput 
@@ -1628,16 +1678,29 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                       <td className="p-1 border-r border-slate-50"><input className="w-full p-2 outline-none bg-transparent text-center font-mono" value={fila.nroCimasur || ''} onChange={e => updateFila(idx, 'nroCimasur', e.target.value)} /></td>
                       <td className="p-1 border-r border-slate-50"><input className="w-full p-2 outline-none bg-transparent text-center" value={fila.dilucion || ''} onChange={e => updateFila(idx, 'dilucion', e.target.value)} /></td>
                       <td className="p-1"><input className="w-full p-2 outline-none bg-transparent text-center font-bold" value={fila.lambdas || ''} onChange={e => updateFila(idx, 'lambdas', e.target.value)} /></td>
+                      <td className="p-1 text-center">
+                        <button type="button" onClick={() => setForm({...form, filas: form.filas.filter((_, i) => i !== idx)})} className="text-red-500 hover:text-red-700">
+                           <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                </tbody>
-               <tfoot className="bg-slate-50 font-black text-[#001736]">
+               <tfoot className="bg-blue-50 font-black text-[#001736] border-t border-slate-200">
                   <tr>
                     <td colSpan={4} className="p-3 text-right uppercase tracking-widest text-[10px]">Suma Total Lambdas:</td>
-                    <td className="p-3 text-center text-lg">{sumaUL} UL + {sumaML} ML</td>
+                    <td className="p-3 text-center text-lg">{sumaUL} UL + {sumaML} ML = {totalML.toFixed(2)} ML</td>
                   </tr>
                </tfoot>
             </table>
+            <button 
+              type="button" 
+              onClick={addRow}
+              className="w-full bg-slate-100 hover:bg-emerald-50 text-emerald-700 py-3 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2 border-t border-slate-200"
+              title="Agregar Fila"
+            >
+              <Plus className="w-5 h-5" /> AÑADIR NUEVA FILA
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
@@ -1960,7 +2023,7 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2"><Droplets className="w-5 h-5" /> Ficha Tinturas Madres {editingId ? '(Editando)' : ''}</span>
          <div className="flex gap-2">
            <input 
@@ -2381,7 +2444,7 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2 text-xs uppercase tracking-tighter"><Package className="w-5 h-5" /> Registro de Insumos laboratorio T.M. y otros {editingId ? '(Editando)' : ''}</span>
          <div className="flex gap-2">
            <div className="relative border-r border-white/20 pr-2 mr-2 hidden md:block">
@@ -2493,6 +2556,16 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
           <h3 className="text-[10px] font-black uppercase text-[#001736] tracking-widest">Historial Insumos / Materia Prima</h3>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar..." 
+              className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none focus:ring-1 focus:ring-blue-500"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -2684,7 +2757,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2"><BookOpen className="w-5 h-5" /> Vademécum {editingId ? '(Editando)' : ''}</span>
          <div className="flex gap-2">
            <input 
@@ -3134,7 +3207,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 
             <div className="max-h-60 overflow-y-auto border rounded-xl">
               <table className="w-full text-xs">
-                <thead className="bg-[#002b5b] text-white sticky top-0">
+                <thead className="bg-[#001736] text-white sticky top-0">
                   <tr>
                     <th className="p-2 text-left">Fecha</th>
                     <th className="p-2 text-left">Técnico</th>
@@ -3162,7 +3235,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
       )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><Settings className="w-5 h-5" /> Mantención</span>
         <div className="flex gap-2">
           <input 
@@ -3730,7 +3803,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
       <div className="lg:col-span-1 space-y-4">
-        <div className="bg-[#002b5b] p-4 rounded-xl text-white shadow-lg">
+        <div className="bg-[#001736] p-4 rounded-xl text-white shadow-lg">
            <div className="flex justify-between items-center mb-4">
              <h3 className="text-[10px] font-black uppercase tracking-widest">Control por Área</h3>
              <button className="text-white/70 hover:text-white" title="PDF"><Download className="w-3.5 h-3.5" /></button>
@@ -3956,6 +4029,16 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                 <Download className="w-3 h-3" />
                 <span className="text-[9px] font-black uppercase tracking-tighter">Descargar Historial</span>
               </button>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar..." 
+                  className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none focus:ring-1 focus:ring-blue-500"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => {
@@ -4365,7 +4448,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       {showDetail && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full translate-y-0 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-[#002b5b] p-4 text-white font-bold flex justify-between items-center">
+            <div className="bg-[#001736] p-4 text-white font-bold flex justify-between items-center">
               <div className="flex items-center gap-2"><FileText className="w-5 h-5" /> Detalle Completo de Seguimiento: {safe(showDetail.nroCotiz)}</div>
               <button onClick={() => setShowDetail(null)} className="text-white hover:bg-white/10 p-1 rounded transition-colors">✕</button>
             </div>
@@ -4466,7 +4549,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5" /> Seguimiento Logístico de Pedidos
           </div>
@@ -4764,7 +4847,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-[#0b2447] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <span className="flex items-center gap-2">
             <FileText className="w-5 h-5" /> {editingId ? 'Editando Fórmula Magistral' : 'Elaboración de Fórmulas Magistrales'}
           </span>

@@ -10,6 +10,10 @@
   body {
     @apply bg-[#f8f9ff] text-[#0b1c30];
   }
+  
+  thead th {
+    @apply sticky top-0 z-10 backdrop-blur-md bg-white/90;
+  }
 }
 
 @layer utilities {

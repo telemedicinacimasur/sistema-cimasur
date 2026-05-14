@@ -20,11 +20,11 @@ export const exportTableToPDF = (title: string, headers: string[], data: any[][]
   
   // Add title 
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(16);
+  doc.setFontSize(24);
   doc.text(title, 14, 45);
   
   // Add Date
-  doc.setFontSize(10);
+  doc.setFontSize(12);
   doc.setTextColor(100, 100, 100);
   doc.text(`Fecha de exportación: ${new Date().toLocaleString('es-CL')}`, 14, 52);
   
@@ -74,15 +74,28 @@ export const exportExpedienteToPDF = (
   doc.setFontSize(10);
   doc.text('Gestión Académica y Laboratorio', pageWidth/2, 25, { align: 'center' });
   
+  // Extract prominent title dynamically (like Producto or Paciente)
+  const productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
+  const mainSubtitle = productItem && productItem.value ? productItem.value : title;
+  const secondaryTitle = productItem ? title : '';
+
   // Title
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(16);
-  doc.text(title, 14, 45);
-  doc.setFontSize(10);
+  doc.setTextColor(0, 23, 54);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(26);
+  const mainText = mainSubtitle.replace('Expediente: ', '');
+  doc.text(mainText.toUpperCase(), 14, 45);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(14);
   doc.setTextColor(100, 100, 100);
-  doc.text(`Fecha de exportación: ${new Date().toLocaleString('es-CL')}`, 14, 52);
+  if (secondaryTitle) {
+      doc.text(secondaryTitle.replace('Expediente: ', ''), 14, 54);
+  }
+  doc.setFontSize(10);
+  doc.text(`Fecha de exportación: ${new Date().toLocaleString('es-CL')}`, 14, secondaryTitle ? 60 : 54);
   
-  let currentY = 60;
+  let currentY = secondaryTitle ? 68 : 62;
 
   // Main Fields Table
   autoTable(doc, {
@@ -138,15 +151,26 @@ export const viewExpedienteInNewTab = (
   doc.setFontSize(10);
   doc.text('Gestión Académica y Laboratorio', pageWidth/2, 25, { align: 'center' });
   
+  // Extract prominent title dynamically (like Producto or Paciente)
+  const productItem2 = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
+  const mainSubtitle2 = productItem2 && productItem2.value ? productItem2.value : title;
+  const secondaryTitle2 = productItem2 ? title : '';
+
   // Title
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(16);
-  doc.text(title, 14, 45);
-  doc.setFontSize(10);
+  doc.setFontSize(18);
+  const mainText2 = mainSubtitle2.replace('Expediente: ', '');
+  doc.text(mainText2.toUpperCase(), 14, 45);
+
+  doc.setFontSize(12);
   doc.setTextColor(100, 100, 100);
-  doc.text(`Fecha de exportación: ${new Date().toLocaleString('es-CL')}`, 14, 52);
+  if (secondaryTitle2) {
+      doc.text(secondaryTitle2.replace('Expediente: ', ''), 14, 52);
+  }
+  doc.setFontSize(10);
+  doc.text(`Fecha de exportación: ${new Date().toLocaleString('es-CL')}`, 14, secondaryTitle2 ? 58 : 52);
   
-  let currentY = 60;
+  let currentY = secondaryTitle2 ? 65 : 60;
 
   // Main Fields Table
   autoTable(doc, {

@@ -90,7 +90,7 @@ export default function GestionView() {
             onClick={() => setActiveTab('register')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'register' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'register' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Ingreso de Cliente
@@ -99,7 +99,7 @@ export default function GestionView() {
             onClick={() => setActiveTab('list')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'list' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'list' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Gestión de Clientes
@@ -222,7 +222,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[1000] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-7xl h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="bg-[#0b1c30] p-6 text-white flex justify-between items-center shrink-0 border-b border-white/10 shadow-lg">
+        <div className="bg-[#001736] p-6 text-white flex justify-between items-center shrink-0 border-b border-white/10 shadow-lg">
           <div className="flex items-center gap-4">
              <div className="p-2 bg-blue-500/20 rounded-xl">
                <FileText className="w-6 h-6 text-blue-400" />
@@ -372,7 +372,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                   <button 
                     onClick={handleAddActivity}
                     disabled={loading}
-                    className="w-full bg-[#0b1c30] text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:translate-y-[-2px] hover:shadow-blue-900/20 active:translate-y-0 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
+                    className="w-full bg-[#001736] text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:translate-y-[-2px] hover:shadow-blue-900/20 active:translate-y-0 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
                   >
                     {loading ? (
                       <RefreshCw className="w-5 h-5 animate-spin" />
@@ -569,7 +569,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#0b1c30] p-4 text-white font-bold flex items-center justify-between">
+      <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
         <div className="flex items-center gap-2">
           <UserPlus className="w-5 h-5" /> Registro de Nuevo Cliente en Gestión
         </div>

@@ -94,7 +94,7 @@ function TabButton({ active, onClick, icon: Icon, children }: any) {
       onClick={onClick}
       className={cn(
         "flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
-        active ? "bg-white text-[#002b5b] shadow-sm" : "text-slate-400 hover:text-slate-600"
+        active ? "bg-white text-[#001736] shadow-sm" : "text-slate-400 hover:text-slate-600"
       )}
     >
       <Icon className="w-4 h-4" />
@@ -338,7 +338,7 @@ function ContactRegister({ records }: { records: any[] }) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-          <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
+          <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
                <span className="flex items-center gap-2">Registro de Potenciales Alumnos</span>
                <div className="flex gap-2">
                  <input 
@@ -533,8 +533,6 @@ function ContactRegister({ records }: { records: any[] }) {
             setNewHistory={setNewHistory}
             newCategory={newCategory || selectedLead.clasificacion}
             setNewCategory={setNewCategory}
-            newIntranet={'No'}
-            setNewIntranet={() => {}}
             activityType={activityType}
             setActivityType={setActivityType}
             currentStatus={currentStatus || selectedLead.estado}
@@ -545,7 +543,7 @@ function ContactRegister({ records }: { records: any[] }) {
       </div>
 
       <div className="space-y-6">
-         <div className="bg-[#002b5b] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
+         <div className="bg-[#001736] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
             <TrendingUp className="absolute top-[-10px] right-[-10px] w-24 h-24 text-white/5 group-hover:scale-110 transition-transform" />
             <h4 className="text-[10px] font-black uppercase opacity-70 tracking-widest mb-1">Potenciales Alumnos Registrados</h4>
             <p className="text-4xl font-black">{records.length}</p>
@@ -789,8 +787,6 @@ function StudentManager({ records }: { records: any[] }) {
         setNewHistory={setAcademicNote}
         newCategory={selectedStudent.clasificacion}
         setNewCategory={(val) => handleFieldLocalChange('clasificacion', val)}
-        newIntranet={selectedStudent.intranet || 'No'}
-        setNewIntranet={(val) => handleFieldLocalChange('intranet', val)}
         activityType={activityType}
         setActivityType={setActivityType}
         currentStatus={currentStatus}
@@ -1029,7 +1025,7 @@ function TrackingView() {
             >Detalle de clientes</button>
             <button 
               onClick={() => setFilter('leads')}
-              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'leads' ? "bg-blue-900 text-white shadow-sm" : "text-slate-400")}
+              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'leads' ? "bg-[#001736] text-white shadow-sm" : "text-slate-400")}
             >Leads</button>
             <button 
               onClick={() => setFilter('students')}
@@ -1196,8 +1192,6 @@ function TrackingView() {
           setNewHistory={() => {}}
           newCategory={selectedClient.clasificacion}
           setNewCategory={() => {}}
-          newIntranet={'No'}
-          setNewIntranet={() => {}}
           activityType={''}
           setActivityType={() => {}}
           currentStatus={''}
@@ -1306,7 +1300,7 @@ function SchoolActivities() {
       {detailView && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-[#002b5b] p-6 text-white flex justify-between items-center">
+            <div className="bg-[#001736] p-6 text-white flex justify-between items-center">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <FileText className="w-6 h-6" /> Detalle Actividad Académica
               </h3>
@@ -1431,7 +1425,7 @@ function SchoolActivities() {
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-          <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-[#002b5b]">Historial Académico</h3>
+          <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-[#001736]">Historial Académico</h3>
           <div className="flex gap-2">
             <button 
               onClick={() => {

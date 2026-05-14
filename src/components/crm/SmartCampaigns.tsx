@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Lightbulb, Target, TrendingUp, AlertCircle, ArrowUpRight, Mail, Phone, Clock, FileText, CheckCircle2, ChevronRight, MessageSquare, ExternalLink, UserPlus, BadgeCheck } from 'lucide-react';
+import { RefreshCw, Lightbulb, Target, TrendingUp, AlertCircle, ArrowUpRight, Mail, Phone, Clock, FileText, CheckCircle2, ChevronRight, MessageSquare, ExternalLink, UserPlus, BadgeCheck, Activity } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { cn } from '../../lib/utils';
 
@@ -192,6 +192,52 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping" />
                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Algoritmo Escuela Activo</span>
             </div>
+        </div>
+      </div>
+
+      {/* AI Strategy Configurator */}
+      <div className="bg-slate-900 rounded-[2.5rem] p-8 lg:p-12 shadow-2xl relative overflow-hidden border border-slate-800">
+        <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
+           <Activity className="w-64 h-64 text-white" />
+        </div>
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12">
+           <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-6">
+                 <div className="w-3 h-3 bg-indigo-400 rounded-full animate-pulse" />
+                 <h3 className="text-lg font-black text-white uppercase tracking-widest">Entrenar Motor Estratégico (IA)</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed font-bold">
+                 Escribe las instrucciones directas para la Inteligencia Artificial. Por ejemplo: qué clientes tienen qué beneficios, promociones especiales, y reglas de filtrado de categoría.
+              </p>
+              <textarea 
+                className="w-full h-40 bg-slate-800/50 border border-slate-700 rounded-2xl p-6 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none resize-none font-medium placeholder-slate-500"
+                placeholder="Ej: Analiza los clientes Bronce y ofréceles un 10% de descuento si compran esta semana. Para los VIP, ofréceles un taller gratuito."
+                defaultValue="Identifica a los clientes Plata y dales acceso anticipado al nuevo diplomado. A los morosos, envíales una propuesta de pago en 3 cuotas con descuento del 5% si pagan hoy."
+              />
+              <button 
+                onClick={() => alert("Generando Plan Estratégico desde Motor de Inteligencia (Simulado)")}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black uppercase tracking-widest text-xs py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                 <RefreshCw className="w-4 h-4" /> Generar Plan Estratégico Global
+              </button>
+           </div>
+           
+           <div className="bg-slate-950 rounded-3xl p-8 border border-slate-800 flex flex-col">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                 <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Plan Estratégico Generado</h4>
+                 <div className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase rounded">V.4 IA Outputs</div>
+              </div>
+              <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar-white pr-2">
+                 <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Acción Sugerida #1</p>
+                    <p className="text-sm text-slate-200 font-medium leading-relaxed">Ejecutar campaña cruzada para 45 clientes nivel "Plata" con enlace VIP exclusivo.</p>
+                 </div>
+                 <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Acción Sugerida #2</p>
+                    <p className="text-sm text-slate-200 font-medium leading-relaxed">Configurar secuencia automatizada en WhatsApp para 12 alumnos morosos con el plan de 3 cuotas.</p>
+                 </div>
+              </div>
+           </div>
         </div>
       </div>
 

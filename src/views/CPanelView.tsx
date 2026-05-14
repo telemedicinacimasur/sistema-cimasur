@@ -397,7 +397,7 @@ function UsersManager() {
                               className="w-3 h-3 rounded border-slate-200 text-amber-500"
                               checked={editingUser.permissions?.[r.id]?.edit ?? true}
                               onChange={(e) => {
-                                const perms = { ...editingUser.permissions } || {};
+                                const perms = { ...editingUser.permissions };
                                 perms[r.id] = { ...(perms[r.id] || { edit: true, delete: true }), edit: e.target.checked };
                                 setEditingUser({ ...editingUser, permissions: perms });
                               }}
@@ -410,7 +410,7 @@ function UsersManager() {
                               className="w-3 h-3 rounded border-slate-200 text-red-500"
                               checked={editingUser.permissions?.[r.id]?.delete ?? true}
                               onChange={(e) => {
-                                const perms = { ...editingUser.permissions } || {};
+                                const perms = { ...editingUser.permissions };
                                 perms[r.id] = { ...(perms[r.id] || { edit: true, delete: true }), delete: e.target.checked };
                                 setEditingUser({ ...editingUser, permissions: perms });
                               }}
