@@ -18,6 +18,7 @@ import { cn } from '../../lib/utils';
 import { UserSettingsDialog } from '../../components/UserSettingsDialog';
 import { NotificationsDialog } from '../../components/NotificationsDialog';
 import { subscribeToNotifications, Notification } from '../../lib/notifications';
+import { BackToTop } from '../../components/BackToTop';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -70,46 +71,46 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <div className="flex h-screen bg-[#f8f9ff] text-[#0b1c30] font-sans antialiased overflow-hidden">
+    <div className="flex h-screen bg-[#0D1527] text-white font-[Inter,sans-serif] antialiased overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 bg-[#001736] border-r border-[#1e3a8a]/20 shadow-xl flex flex-col py-6 px-4 z-40">
+      <aside className="w-64 flex-shrink-0 bg-[#0D1527] border-r border-[#1E293B] flex flex-col py-6 px-4 z-40 relative shadow-xl">
         <div className="px-2 mb-8 flex flex-col items-center flex-shrink-0">
-          <div className="flex flex-col items-center justify-center w-full relative drop-shadow-md">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#1FA2D6] to-[#001736] rounded-full flex items-center justify-center mb-2 shadow-lg border-2 border-[#1FA2D6]">
-              <span className="text-white font-serif text-3xl font-black italic">C</span>
+          <div className="flex flex-col items-center justify-center w-full relative">
+            <div className="w-16 h-16 bg-[#152035] rounded-2xl flex items-center justify-center mb-3 border border-[#334155] shadow-lg group hover:border-[#38BDF8] transition-colors">
+              <span className="text-white font-sans text-3xl font-black italic">C</span>
             </div>
-            <div className="text-white font-serif text-2xl tracking-widest z-10 font-black drop-shadow-sm uppercase">
+            <div className="text-white font-sans text-xl tracking-widest z-10 font-black uppercase">
               Cimasur
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-2">
           {filteredMenuItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 group text-sm font-medium",
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group text-sm font-black uppercase",
                 location.pathname === item.path 
-                  ? "bg-[#1e40af] text-white border-l-4 border-[#60a5fa] shadow-md" 
-                  : "text-blue-100/70 hover:text-white hover:bg-[#1e40af]/50"
+                  ? "bg-[#38BDF8] text-black shadow-[0_4px_20px_rgba(56,189,248,0.2)]" 
+                  : "text-slate-400 hover:text-white hover:bg-[#1E293B]"
               )}
             >
-              <item.icon className={cn("w-5 h-5", location.pathname === item.path ? "scale-105" : "group-hover:scale-110 duration-150")} />
+              <item.icon className={cn("w-5 h-5", location.pathname === item.path ? "text-black" : "text-slate-400 group-hover:text-white")} />
               <span>{item.name}</span>
             </Link>
           ))}
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-[#1e40af]/30 flex flex-col gap-1 flex-shrink-0">
-          <a href="mailto:formacion@cimasur.cl" className="flex items-center gap-3 text-blue-100/70 hover:text-white px-4 py-2 hover:bg-[#1e40af]/50 transition-all rounded-lg text-left text-sm font-medium">
+        <div className="mt-auto pt-6 border-t border-[#1E293B] flex flex-col gap-2 flex-shrink-0">
+          <a href="mailto:formacion@cimasur.cl" className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-sm font-black border border-transparent">
             <HelpCircle className="w-5 h-5" />
             <span>Soporte</span>
           </a>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 text-blue-100/70 hover:text-white px-4 py-2 hover:bg-[#1e40af]/50 transition-all rounded-lg text-left text-sm font-medium"
+            className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-sm font-black border border-transparent"
           >
             <LogOut className="w-5 h-5" />
             <span>Cerrar Sesión</span>
@@ -118,48 +119,46 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-[#0D1527]">
         {/* Header */}
-        <header className="bg-white border-b border-[#e2e8f0] h-16 flex-shrink-0 z-50 flex justify-between items-center px-6 sticky top-0">
-          <div className="flex items-center gap-4">
+        <header className="bg-[#152035]/90 backdrop-blur-md border-b border-[#1E293B] h-20 flex-shrink-0 z-50 flex justify-between items-center px-8 sticky top-0 shadow-lg">
+          <div className="flex items-center gap-6">
             <Link
               to="/"
-              className="flex items-center gap-2 px-3 py-1.5 text-[#001736] font-semibold hover:bg-slate-50 transition-colors rounded-lg"
+              className="flex items-center gap-2 p-2 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-xl transition-all"
             >
               <Home className="w-5 h-5" />
-              <span className="text-sm tracking-tight text-slate-500 font-bold uppercase">Menú</span>
             </Link>
-            <div className="h-6 w-px bg-slate-200 mx-2" />
-            <h2 className="text-xl font-bold tracking-wider text-[#001736] uppercase">{getPageTitle()}</h2>
+            <div className="h-8 w-px bg-[#1E293B] mx-1" />
+            <h2 className="text-xl font-bold tracking-wider text-white uppercase">{getPageTitle()}</h2>
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors relative">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-xl transition-all relative">
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-white">
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]">
                     {unreadCount}
                   </span>
                 )}
               </button>
-              <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors group relative" title="Ajustes">
+              <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-xl transition-all group relative">
                 <Settings className="w-5 h-5" />
-                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Ajustes</span>
               </button>
               
-              <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+              <div className="flex items-center gap-4 pl-6 border-l border-[#1E293B]">
                 <div className="text-right hidden sm:block overflow-hidden max-w-[150px]">
-                  <p className="text-xs font-bold text-[#001736] leading-tight truncate">{user?.displayName || user?.email}</p>
-                  <p className="text-[10px] text-slate-500 leading-tight uppercase font-medium truncate" title={(user?.roles || [user?.role]).join(' / ')}>
+                  <p className="text-sm font-bold text-white leading-tight truncate">{user?.displayName || user?.email}</p>
+                  <p className="text-[10px] text-[#38BDF8] leading-tight uppercase font-black tracking-widest truncate mt-0.5">
                     {(user?.roles || [user?.role]).join(' / ')}
                   </p>
                 </div>
-                <div className="h-9 w-9 rounded-full bg-blue-100 border border-blue-200 overflow-hidden shadow-sm">
+                <div className="h-10 w-10 rounded-xl bg-[#152035] border border-[#1E293B] overflow-hidden shadow-sm flex items-center justify-center">
                   {user?.photoURL ? (
                     <img alt="User" className="w-full h-full object-cover" src={user.photoURL} />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center font-bold text-[#001736] text-xs">
+                    <div className="w-full h-full flex items-center justify-center font-bold text-[#38BDF8] text-sm">
                       {user?.displayName?.charAt(0)}
                     </div>
                   )}
@@ -170,10 +169,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </header>
 
         {/* Content */}
-        <div className="p-6 overflow-auto flex-1">
+        <div className="p-8 overflow-auto flex-1 custom-scrollbar text-white">
           {children}
         </div>
       </main>
+      <BackToTop />
       <UserSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} user={user} onUpdate={() => window.location.reload()} />
       <NotificationsDialog isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>

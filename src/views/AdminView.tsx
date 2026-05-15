@@ -99,11 +99,11 @@ export default function AdminView() {
   if (view === 'menu') {
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="flex justify-between items-center bg-white p-8 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full translate-x-16 -translate-y-16 opacity-50" />
+        <div className="flex justify-between items-center bg-[#152035] p-8 rounded-3xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#152035] rounded-full translate-x-16 -translate-y-16 opacity-50" />
           <div className="relative z-10">
-            <h2 className="text-3xl font-black text-[#001736] tracking-tighter uppercase italic">Módulo de Administración</h2>
-            <p className="text-slate-500 text-sm font-bold uppercase tracking-widest opacity-60">Gestión del ciclo financiero, presupuestario y documental interno.</p>
+            <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Módulo de Administración</h2>
+            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest opacity-60">Gestión del ciclo financiero, presupuestario y documental interno.</p>
           </div>
         </div>
 
@@ -164,27 +164,11 @@ export default function AdminView() {
 
   return (
     <div className="space-y-6 relative font-bold">
-      <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-2">
-         <button 
-           className="p-4 bg-[#001736] text-white rounded-full shadow-2xl hover:bg-slate-800 transition-all hover:-translate-y-1 flex items-center justify-center opacity-80 hover:opacity-100 border-2 border-white/20"
-           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-           title="Volver Arriba"
-         >
-            <TrendingUp className="w-5 h-5 -rotate-90" />
-         </button>
-         <button 
-           onClick={() => setView('menu')}
-           className="bg-white text-[#001736] p-4 rounded-full shadow-2xl hover:scale-110 transition-all border-2 border-[#001736]/10 font-bold flex items-center group"
-         >
-           <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-         </button>
-      </div>
-
       <button 
         onClick={() => setView('menu')}
-        className="flex items-center gap-2 text-[#001736] font-bold hover:text-blue-600 transition-colors mb-2"
+        className="flex items-center gap-2 text-slate-400 hover:text-[#38BDF8] transition-colors mb-2 group w-fit"
       >
-        <ArrowLeft className="w-5 h-5" />
+        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
         <span className="text-sm uppercase tracking-widest">Volver al Menú de Administración</span>
       </button>
 
@@ -196,14 +180,6 @@ export default function AdminView() {
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'school_payments' && <SchoolPaymentsManager records={records} setRecords={setRecords} />}
       
-      {/* Scroll to Top Button */}
-      <button 
-        className="fixed bottom-8 right-8 p-4 bg-[#001736] text-white rounded-full shadow-2xl hover:bg-slate-800 transition-all hover:-translate-y-1 z-50 flex items-center justify-center opacity-80 hover:opacity-100"
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        title="Volver Arriba"
-      >
-         <TrendingUp className="w-5 h-5 -rotate-90" />
-      </button>
     </div>
   );
 }
@@ -383,12 +359,12 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
 
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
           <span className="flex items-center gap-2">
             <DollarSign className="w-5 h-5" /> {editingId ? 'Editando Pago Veterinario' : 'Control de Pagos Veterinarios'}
           </span>
-          <div className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-black uppercase tracking-widest">
+          <div className="text-[10px] bg-[#152035]/20 px-2 py-0.5 rounded font-black uppercase tracking-widest">
             Administración Financiera
           </div>
         </div>
@@ -416,14 +392,14 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
           </div>
           
           <div className="md:col-span-3 grid grid-cols-3 gap-4">
-            <FormField label="Pago Consulta ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.pagoConsulta ?? 0} onChange={e => setForm({...form, pagoConsulta: parseInt(e.target.value) || 0})} /></FormField>
-            <FormField label="Pago Veterinario ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded border-blue-200" value={form.pagoVeterinario ?? 0} onChange={e => setForm({...form, pagoVeterinario: parseInt(e.target.value) || 0})} /></FormField>
-            <FormField label="Fecha de Pago"><input type="date" className="w-full border-b p-4 text-lg font-bold bg-slate-50/50 rounded" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} /></FormField>
+            <FormField label="Pago Consulta ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-[#152035]/50 rounded" value={form.pagoConsulta ?? 0} onChange={e => setForm({...form, pagoConsulta: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Pago Veterinario ($)"><input type="number" className="w-full border-b p-4 text-lg font-bold bg-[#152035]/50 rounded border-blue-200" value={form.pagoVeterinario ?? 0} onChange={e => setForm({...form, pagoVeterinario: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Fecha de Pago"><input type="date" className="w-full border-b p-4 text-lg font-bold bg-[#152035]/50 rounded" value={form.fechaPago || ''} onChange={e => setForm({...form, fechaPago: e.target.value})} /></FormField>
           </div>
           <div className="md:col-span-1 flex flex-col justify-end gap-3">
              <button type="submit" className={cn(
-               "w-full py-4 rounded-xl font-black shadow-xl hover:translate-y-[-2px] transition-all",
-               editingId ? "bg-amber-600 text-white" : "bg-[#001736] text-white"
+               "w-full py-4 rounded-2xl font-black shadow-xl hover:translate-y-[-2px] transition-all",
+               editingId ? "bg-amber-600 text-white" : "bg-[#1E3A5F]  hover:bg-[#1D3557] border-[#1E293B] "
              )}>
                {editingId ? 'ACTUALIZAR REGISTRO' : 'REGISTRAR PAGO'}
              </button>
@@ -434,20 +410,20 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-[#001736] text-white border-b flex flex-col xl:flex-row justify-between items-center gap-6">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  border-b flex flex-col xl:flex-row justify-between items-center gap-6">
           <div className="flex flex-wrap items-center gap-6 text-white grow">
-             <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-2xl border border-white/20 shadow-inner group">
+             <div className="flex items-center gap-3 bg-[#1E293B]/80 px-4 py-2 rounded-2xl border border-white/20 shadow-inner group">
                 <Search className="w-4 h-4 text-white/40 group-focus-within:text-blue-400 transition-colors" />
                 <input 
                   type="text" 
                   placeholder="Buscador rápido..." 
-                  className="bg-transparent border-none outline-none text-[10px] w-32 placeholder:text-white/20"
+                  className="bg-[#152035] border-none outline-none text-[10px] w-32 placeholder:text-white/20"
                   value={searchTutor}
                   onChange={e => setSearchTutor(e.target.value)}
                 />
              </div>
-             <div className="flex items-center gap-3 bg-white/10 px-4 py-1.5 rounded-2xl border border-white/20">
+             <div className="flex items-center gap-3 bg-[#1E293B]/80 px-4 py-1.5 rounded-2xl border border-white/20">
                 <div className="flex flex-col">
                    <span className="text-[8px] font-black uppercase text-blue-400 tracking-widest">Suma Honorarios</span>
                    <span className="text-[13px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
@@ -493,7 +469,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                  <input 
                    placeholder="Tutor..." 
-                   className="pl-7 pr-3 py-1.5 text-[10px] border rounded-full w-44 outline-none focus:border-blue-500 transition-all font-bold" 
+                   className="pl-7 pr-3 py-1.5 text-[10px] border rounded-full w-44 outline-none focus:border-[#38BDF8] transition-all font-bold" 
                    value={searchTutor}
                    onChange={e => setSearchTutor(e.target.value)}
                  />
@@ -501,7 +477,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
             </div>
           </div>
 
-          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-3 bg-[#152035] p-2 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -512,19 +488,19 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
             <div className="flex gap-1">
               <button 
                 onClick={downloadExcelTemplate}
-                className="bg-emerald-50 text-emerald-600 p-2 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"
+                className="bg-emerald-50 text-emerald-600 p-2 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all"
                 title="Descargar Plantilla Excel"
               >
                 <FileSpreadsheet className="w-4 h-4" />
               </button>
               <button 
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-amber-50 text-amber-600 p-2 rounded-xl hover:bg-amber-600 hover:text-white transition-all"
+                className="bg-amber-50 text-amber-600 p-2 rounded-2xl hover:bg-amber-600 hover:text-white transition-all"
                 title="Importar desde Excel"
               >
                 <Upload className="w-4 h-4" />
               </button>
-              <div className="w-px h-8 bg-slate-100 mx-1" />
+              <div className="w-px h-8 bg-[#111A2E] mx-1" />
               <button 
                 onClick={() => {
                   const data = filteredRecords.map(r => [
@@ -536,7 +512,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                   ]);
                   exportTableToPDF('Reporte Pagos Veterinarios', ['Fecha', 'Tutor', 'Consulta', 'Veterinario', 'Fecha Pago'], data, 'reporte_pagos_vet', 'l');
                 }}
-                className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100"
+                className="bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 text-white p-2 rounded-2xl hover:bg-[#38BDF8]/30 shadow-lg shadow-blue-100"
                 title="Descargar PDF"
               >
                 <Download className="w-4 h-4" />
@@ -556,7 +532,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                   ]);
                   exportTableToExcel('Reporte Pagos Veterinarios', headers, data, 'reporte_pagos_vet');
                 }}
-                className="bg-emerald-600 text-white p-2 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100"
+                className="bg-emerald-600 text-white p-2 rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-100"
                 title="Exportar a Excel"
               >
                 <FileSpreadsheet className="w-4 h-4" />
@@ -567,29 +543,29 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
-                <th className="p-4 bg-[#001736]">Fecha</th>
-                <th className="p-4 bg-[#001736]">Tutor</th>
-                <th className="p-4 bg-[#001736]">Nombre MV</th>
-                <th className="p-4 bg-[#001736]">Mail / Fono</th>
-                <th className="p-4 text-right bg-[#001736]">Consulta</th>
-                <th className="p-4 text-right text-blue-900 bg-blue-50/30">Pago Vet</th>
-                <th className="p-4 text-center bg-[#001736]">Fecha Pago</th>
-                <th className="p-4 text-center bg-[#001736]">Gestión</th>
+              <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Tutor</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Nombre MV</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Mail / Fono</th>
+                <th className="p-4 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Consulta</th>
+                <th className="p-4 text-right text-blue-900 bg-[#1E293B]/50">Pago Vet</th>
+                <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Pago</th>
+                <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Gestión</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {filteredRecords.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={r.id} className="hover:bg-[#152035] transition-colors">
                   <td className="p-4 font-mono text-slate-400">{formatDate(r.fecha)}</td>
-                  <td className="p-4 font-bold text-[#001736] uppercase">{r.tutor}</td>
-                  <td className="p-4 text-slate-500 uppercase">{r.nombreMV}</td>
-                  <td className="p-4 italic text-slate-500">
+                  <td className="p-4 font-bold text-white uppercase">{r.tutor}</td>
+                  <td className="p-4 text-slate-400 uppercase">{r.nombreMV}</td>
+                  <td className="p-4 italic text-slate-400">
                     <span className="block">{r.mail}</span>
                     <span className="text-[10px]">{r.fono}</span>
                   </td>
                   <td className="p-4 text-right">{formatCurrency(r.pagoConsulta || r.pago1 || 0)}</td>
-                  <td className="p-4 text-right font-black bg-blue-50/10 text-blue-900 border-x border-slate-50">{formatCurrency(r.pagoVeterinario || r.pago2 || 0)}</td>
+                  <td className="p-4 text-right font-black bg-[#1E293B]/80 text-blue-900 border-x border-[#1E293B]">{formatCurrency(r.pagoVeterinario || r.pago2 || 0)}</td>
                   <td className="p-4 text-center font-mono opacity-60 italic">{formatDate(r.fechaPago || r.pagoVeterinario)}</td>
                   <td className="p-4 text-center">
                     <RecordActions 
@@ -619,11 +595,11 @@ function ModuleCard({ title, desc, icon: Icon, onClick, color = 'blue' }: any) {
     emerald: 'from-emerald-600 to-emerald-700 shadow-emerald-100 text-emerald-600',
     rose: 'from-rose-600 to-rose-700 shadow-rose-100 text-rose-600',
     amber: 'from-amber-600 to-amber-700 shadow-amber-100 text-amber-600',
-    blue: 'from-blue-600 to-blue-700 shadow-blue-100 text-blue-600',
+    blue: 'from-blue-600 to-blue-700 shadow-blue-100 text-[#38BDF8]',
     purple: 'from-purple-600 to-purple-700 shadow-purple-100 text-purple-600',
     teal: 'from-teal-600 to-teal-700 shadow-teal-100 text-teal-600',
     orange: 'from-orange-600 to-orange-700 shadow-orange-100 text-orange-600',
-    slate: 'from-slate-600 to-slate-700 shadow-slate-100 text-slate-600'
+    slate: 'from-slate-600 to-slate-700 shadow-slate-100 text-slate-300'
   };
 
   const selectedColor = colorMap[color] || colorMap.blue;
@@ -633,7 +609,7 @@ function ModuleCard({ title, desc, icon: Icon, onClick, color = 'blue' }: any) {
   return (
     <div 
       onClick={onClick}
-      className="group relative bg-white rounded-[2rem] p-8 border border-slate-100 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[220px]"
+      className="group relative bg-[#152035] rounded-[2rem] p-8 border border-[#1E293B] shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[220px]"
     >
       <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${bgColor} opacity-0 group-hover:opacity-5 transition-all duration-700 rounded-bl-[5rem]`} />
       
@@ -641,14 +617,14 @@ function ModuleCard({ title, desc, icon: Icon, onClick, color = 'blue' }: any) {
         <div className={`w-16 h-16 bg-gradient-to-br ${bgColor} rounded-2xl flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
           <Icon className="w-8 h-8 text-white" />
         </div>
-        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic leading-tight group-hover:text-blue-600 transition-colors">{title}</h3>
+        <h3 className="text-xl font-black text-white uppercase tracking-tighter italic leading-tight group-hover:text-[#38BDF8] transition-colors">{title}</h3>
         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-3 opacity-60 leading-relaxed">{desc}</p>
       </div>
 
       <div className="relative z-10 flex items-center justify-between mt-6">
         <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${textColor}`}>Explorar Módulo</span>
-        <div className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-          <ArrowLeft className="w-4 h-4 text-slate-300 group-hover:text-blue-500 rotate-180" />
+        <div className="w-8 h-8 bg-[#152035] rounded-full flex items-center justify-center group-hover:bg-[#152035] transition-colors">
+          <ArrowLeft className="w-4 h-4 text-slate-300 group-hover:text-[#38BDF8] rotate-180" />
         </div>
       </div>
     </div>
@@ -877,8 +853,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
 
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" /> Seguimiento de Cotizaciones
           </div>
@@ -893,7 +869,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
             <button 
               type="button"
               onClick={downloadExcelTemplate}
-              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-sm"
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
               title="Descargar Plantilla Excel"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
@@ -901,7 +877,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
             <button 
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-sm"
+              className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
             >
               <Upload className="w-3.5 h-3.5" /> Importar
             </button>
@@ -929,7 +905,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
           <div className="md:col-span-4">
              <FormField label="Observaciones">
                <textarea 
-                 className="w-full border p-3 text-sm font-bold italic bg-white rounded-lg focus:ring-1 focus:ring-blue-100 outline-none" 
+                 className="w-full border p-3 text-sm font-bold italic bg-[#152035] rounded-2xl focus:ring-1 focus:ring-blue-100 outline-none" 
                  rows={2}
                  value={form.observaciones || ''} 
                  onChange={e => setForm({...form, observaciones: e.target.value})} 
@@ -938,11 +914,11 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
           </div>
 
           <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-6">
-            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-3 text-lg font-black text-blue-700 bg-blue-50 rounded-t" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
+            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-3 text-lg font-black text-[#38BDF8] bg-[#152035] rounded-t" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
             <FormField label="Und a hacer"><input type="number" className="w-full border-b p-3 text-lg font-bold text-amber-700 bg-amber-50 rounded-t" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
-            <FormField label="UND Inventario (Auto)"><input type="number" className="w-full border-b p-3 text-lg font-bold text-slate-500 bg-slate-50 rounded-t" value={form.invUnits || 0} readOnly /></FormField>
+            <FormField label="UND Inventario (Auto)"><input type="number" className="w-full border-b p-3 text-lg font-bold text-slate-400 bg-[#152035] rounded-t" value={form.invUnits || 0} readOnly /></FormField>
             <div className="flex items-end">
-                <button type="submit" className="w-full bg-[#001736] text-white py-4 rounded-xl font-black shadow-xl hover:bg-slate-800 flex items-center justify-center gap-2 uppercase tracking-widest transition-all active:scale-95 text-xs">
+                <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-4 rounded-2xl font-black shadow-xl hover:bg-[#152035] flex items-center justify-center gap-2 uppercase tracking-widest transition-all active:scale-95 text-xs">
                   <Save className="w-5 h-5 text-emerald-400" /> GUARDAR COTIZACIÓN
                 </button>
             </div>
@@ -950,11 +926,11 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-[#001736] border-b flex flex-wrap gap-4 items-center justify-between text-white">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex flex-wrap gap-4 items-center justify-between ">
           <div className="flex items-center gap-4">
              <h3 className="text-[10px] font-black uppercase text-white tracking-widest">Histórico de Cotizaciones</h3>
-             <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+             <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
                 <span className="text-[9px] font-black uppercase text-emerald-400">Total Aprobadas:</span>
                 <span className="text-[11px] font-black">{filteredRecords.filter(r => r.estado === 'Aprobada').reduce((s, r) => s + (Number(r.undTotal) || 0), 0)} UNDs</span>
              </div>
@@ -966,7 +942,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                 <span className="text-sm font-black text-white">{filteredRecords.filter(r => r.estado === 'Aprobada').reduce((s, r) => s + (Number(r.undTotal) || 0), 0)} UNDs</span>
              </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Filtros:</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Filtros:</span>
               <input 
                 type="date" 
                 className="text-[10px] border rounded p-1 outline-none" 
@@ -995,7 +971,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
               />
             </div>
 
-            <div className="flex items-center gap-2 border-l pl-3 border-slate-200">
+            <div className="flex items-center gap-2 border-l pl-3 border-[#1E293B]">
               <button 
                 onClick={() => {
                   const data = filteredRecords.map(r => [
@@ -1009,7 +985,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                   ]);
                   exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_cotizaciones', 'l');
                 }}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition-colors hover:bg-blue-700 flex items-center gap-1" 
+                className="bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition-colors hover:bg-[#38BDF8]/30 flex items-center gap-1" 
                 title="Descargar PDF Filtrado"
               >
                 <Download className="w-3.5 h-3.5" /> PDF
@@ -1020,21 +996,21 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
-                <th className="p-4 text-center bg-indigo-900 border-r border-white/5">Año/Mes</th>
-                <th className="p-4 bg-blue-900 border-r border-white/5 tracking-tighter">N° Cotiz</th>
-                <th className="p-4 bg-[#001736]">Cliente</th>
-                <th className="p-4 bg-slate-800 border-r border-white/5">Vendedor</th>
-                <th className="p-4 text-center bg-amber-700 border-r border-white/5">Estado (Editable)</th>
-                <th className="p-4 text-center bg-emerald-800 border-r border-white/5">UND Total</th>
-                <th className="p-4 text-center bg-[#001736]">Acción</th>
+              <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
+                <th className="p-4 text-center bg-indigo-900 border-r border-[#1E293B]/50">Año/Mes</th>
+                <th className="p-4 bg-blue-900 border-r border-[#1E293B]/50 tracking-tighter">N° Cotiz</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cliente</th>
+                <th className="p-4 bg-[#152035] border-r border-[#1E293B]/50">Vendedor</th>
+                <th className="p-4 text-center bg-amber-700 border-r border-[#1E293B]/50">Estado (Editable)</th>
+                <th className="p-4 text-center bg-emerald-800 border-r border-[#1E293B]/50">UND Total</th>
+                <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acción</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {filteredRecords.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors italic">
+                <tr key={r.id} className="hover:bg-[#152035] transition-colors italic">
                   <td className="p-4 text-center text-slate-400">{r.anio || ''} / {r.mes || ''}</td>
-                  <td className="p-4 font-bold text-[#001736]">{r.nroCotiz || ''}</td>
+                  <td className="p-4 font-bold text-white">{r.nroCotiz || ''}</td>
                   <td className="p-4 font-black">{r.cliente || ''}</td>
                   <td className="p-4 font-bold">{r.vendedor || ''}</td>
                   <td className="p-4 text-center">
@@ -1050,7 +1026,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                       {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
-                  <td className="p-4 text-center font-black text-blue-700 italic">
+                  <td className="p-4 text-center font-black text-[#38BDF8] italic">
                     <div className="flex flex-col items-center">
                       <span>{r.undTotal || 0}</span>
                       <span className="text-[8px] text-slate-400 font-normal">Inv: {r.invUnits || 0} / Pro: {r.todoUnits || 0}</span>
@@ -1111,7 +1087,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-[#001736] text-white font-black text-sm uppercase italic">
+            <tfoot className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  font-black text-sm uppercase italic">
               <tr>
                 <td colSpan={5} className="p-4 text-right tracking-widest">Suma Total de Cotizaciones Aprobadas:</td>
                 <td className="p-4 text-center text-emerald-400 text-lg underline decoration-2 underline-offset-4">
@@ -1301,8 +1277,8 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
-      <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit">
-        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+      <div className="lg:col-span-4 bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden h-fit">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas GESTIÓN</span>
           <div className="flex gap-2">
             <input 
@@ -1323,7 +1299,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
             <button 
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
             >
               <Upload className="w-3.5 h-3.5" /> Importar
             </button>
@@ -1349,25 +1325,25 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
               placeholder="Ej: 2x Omega 3, 1x Multivitamínico..."
             />
           </FormField>
-          <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold mt-2 hover:bg-opacity-90">GUARDAR VENTA GESTIÓN</button>
+          <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-3 rounded font-bold mt-2 hover:bg-opacity-90">GUARDAR VENTA GESTIÓN</button>
         </form>
       </div>
 
       <div className="lg:col-span-8 space-y-4">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-[#001736] border-b flex justify-between items-center text-white">
+        <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+          <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex justify-between items-center ">
             <div className="flex items-center gap-4">
                <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas GESTIÓN</h3>
-               <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+               <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
                   <span className="text-[9px] font-black uppercase text-emerald-400">Total Cotiz:</span>
                   <span className="text-[11px] font-black">{totalCotizacion.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
                </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Mes:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Mes:</span>
                 <select 
-                  className="text-xs border rounded p-1 w-28 text-slate-600"
+                  className="text-xs border rounded p-1 w-28 text-slate-300"
                   value={filterMonth}
                   onChange={e => setFilterMonth(e.target.value)}
                 >
@@ -1378,19 +1354,19 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                 </select>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  className="text-xs border rounded p-1 w-28 text-slate-300" 
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Hasta:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  className="text-xs border rounded p-1 w-28 text-slate-300" 
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
                 />
@@ -1399,7 +1375,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                 <Search className="w-3.5 h-3.5 text-slate-400" />
                 <input 
                   placeholder="Buscar..."
-                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  className="text-xs border rounded p-1 w-28 text-slate-300" 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -1410,7 +1386,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                   data.push(['', '', 'TOTAL', totalFrascos, formatCurrency(totalCotizacion)]);
                   exportTableToPDF('Reporte: Ventas Gestión', ['Fecha', 'Documento', 'Cliente', 'Frascos', 'Valor Cotiz'], data, 'reporte_ventas_gestion');
                 }}
-                className="text-white bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-blue-700 flex items-center gap-1" 
+                className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1" 
                 title="Descargar PDF"
               >
                 <Download className="w-3.5 h-3.5" /> PDF
@@ -1419,7 +1395,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                 onClick={() => setShowProductSummary(!showProductSummary)}
                 className={cn(
                   "px-3 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1 transition-all",
-                  showProductSummary ? "bg-amber-500 text-white" : "bg-slate-700 text-white hover:bg-slate-800"
+                  showProductSummary ? "bg-amber-500 text-white" : "bg-slate-700 text-white hover:bg-[#152035]"
                 )}
                 title="Ver resumen de productos"
               >
@@ -1433,7 +1409,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                <h4 className="text-[10px] font-black text-amber-800 uppercase mb-3 flex items-center gap-2">
                  <ListChecks className="w-4 h-4" /> Resumen Consolidado de Productos ({filterMonth})
                </h4>
-               <div className="bg-white p-0 rounded-lg border border-amber-200 shadow-inner max-h-80 overflow-y-auto">
+               <div className="bg-[#152035] p-0 rounded-2xl border border-amber-200 shadow-inner max-h-80 overflow-y-auto">
                  {consolidated.length > 0 ? (
                    <table className="w-full text-xs">
                      <thead className="bg-amber-100/50 sticky top-0">
@@ -1445,7 +1421,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                      <tbody className="divide-y divide-amber-100">
                        {consolidated.map((item, i) => (
                          <tr key={i} className="hover:bg-amber-50/50 transition-colors">
-                           <td className="p-2 font-bold text-slate-700">{item.name}</td>
+                           <td className="p-2 font-bold text-slate-200">{item.name}</td>
                            <td className="p-2 text-center">
                              <span className="bg-amber-600 text-white px-2 py-0.5 rounded-full font-black text-[10px]">
                                {item.qty}
@@ -1478,23 +1454,23 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
-                <th className="p-4 bg-[#001736]">Fecha</th>
-                  <th className="p-4 bg-[#001736]">Documento</th>
-                  <th className="p-4 bg-[#001736]">Cliente</th>
-                  <th className="p-4 text-center bg-[#001736]">Fcos</th>
-                  <th className="p-4 text-right bg-[#001736]">Valor Cotiz</th>
-                  <th className="p-4 text-center bg-[#001736]">Acción</th>
+              <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
+                  <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Documento</th>
+                  <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cliente</th>
+                  <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fcos</th>
+                  <th className="p-4 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Valor Cotiz</th>
+                  <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 italic">
+              <tbody className="divide-y divide-slate-200 italic">
                 {filteredRecords.map(r => (
                   <tr key={r.id}>
                     <td className="p-4">{formatDate(r.fecha)}</td>
-                    <td className="p-4 font-bold text-[#001736]">{r.documento}</td>
+                    <td className="p-4 font-bold text-white">{r.documento}</td>
                     <td className="p-4">{r.cliente}</td>
                     <td className="p-4 text-center font-black">{r.nroFrascos}</td>
-                    <td className="p-4 text-right font-black text-blue-700">{formatCurrency(r.valorCotizacion || 0)}</td>
+                    <td className="p-4 text-right font-black text-[#38BDF8]">{formatCurrency(r.valorCotizacion || 0)}</td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <RecordActions
@@ -1678,8 +1654,8 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
-      <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit">
-        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+      <div className="lg:col-span-4 bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden h-fit">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas</span>
           <div className="flex gap-2">
             <input 
@@ -1700,7 +1676,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
             <button 
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
             >
               <Upload className="w-3.5 h-3.5" /> Importar
             </button>
@@ -1715,35 +1691,35 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
           <FormField label="Fact / Boleta"><input className="w-full border-b p-2 text-sm" value={form.documento || ''} onChange={e => setForm({...form, documento: e.target.value})} required /></FormField>
           <FormField label="Cliente"><input className="w-full border-b p-2 text-sm" value={form.cliente || ''} onChange={e => setForm({...form, cliente: e.target.value})} required /></FormField>
           <FormField label="N° Frascos"><input type="number" className="w-full border-b p-2 text-sm" value={form.nroFrascos || 0} onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} /></FormField>
-          <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold mt-2 hover:bg-opacity-90">GUARDAR VENTA</button>
+          <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-3 rounded font-bold mt-2 hover:bg-opacity-90">GUARDAR VENTA</button>
         </form>
       </div>
 
       <div className="lg:col-span-8 space-y-4">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-[#001736] border-b flex justify-between items-center text-white">
+        <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+          <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex justify-between items-center ">
             <div className="flex items-center gap-4">
                <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas</h3>
-               <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+               <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
                   <span className="text-[9px] font-black uppercase text-blue-400">Total Fcos:</span>
                   <span className="text-[11px] font-black">{totalFrascos} UNDS</span>
                </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  className="text-xs border rounded p-1 w-28 text-slate-300" 
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Hasta:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  className="text-xs border rounded p-1 w-28 text-slate-300" 
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
                 />
@@ -1752,7 +1728,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                 <Search className="w-3.5 h-3.5 text-slate-400" />
                 <input 
                   placeholder="Buscar..."
-                  className="text-xs border rounded p-1 w-28 text-slate-600" 
+                  className="text-xs border rounded p-1 w-28 text-slate-300" 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -1763,7 +1739,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                 data.push(['', '', 'TOTAL', totalFrascos]);
                 exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
               }}
-              className="text-white bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-blue-700 flex items-center gap-1" 
+              className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1" 
               title="Descargar PDF"
             >
               <Download className="w-3.5 h-3.5" /> PDF
@@ -1784,19 +1760,19 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
-                <th className="p-4 bg-[#001736]">Fecha</th>
-                  <th className="p-4 bg-[#001736]">Documento</th>
-                  <th className="p-4 bg-[#001736]">Cliente</th>
-                  <th className="p-4 text-center bg-[#001736]">N° Fcos</th>
-                  <th className="p-4 text-center bg-[#001736]">Acción</th>
+              <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
+                  <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Documento</th>
+                  <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cliente</th>
+                  <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">N° Fcos</th>
+                  <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 italic">
+              <tbody className="divide-y divide-slate-200 italic">
                 {filteredRecords.map(r => (
                   <tr key={r.id}>
                     <td className="p-4">{formatDate(r.fecha)}</td>
-                    <td className="p-4 font-bold text-[#001736]">{r.documento}</td>
+                    <td className="p-4 font-bold text-white">{r.documento}</td>
                     <td className="p-4">{r.cliente}</td>
                     <td className="p-4 text-center font-black">{r.nroFrascos}</td>
                     <td className="p-4 text-center">
@@ -2013,11 +1989,11 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Dashboard de Métricas Escuela */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-         <div className="bg-[#001736] p-6 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden relative group">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-all" />
+         <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6 rounded-[2rem] border border-[#1E293B] shadow-xl overflow-hidden relative group">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#1E293B]/30 rounded-full blur-2xl group-hover:bg-[#1E293B]/80 transition-all" />
             <div className="relative z-10 flex flex-col justify-between h-full">
                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400">
+                  <div className="p-2 bg-[#152035]/20 rounded-2xl text-blue-400">
                      <Target className="w-5 h-5" />
                   </div>
                   <div className="flex items-center gap-2">
@@ -2032,7 +2008,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                   {isEditingMeta ? (
                     <input 
                       type="number" 
-                      className="text-2xl font-black bg-transparent border-b border-indigo-500 outline-none w-full text-white mt-1" 
+                      className="text-2xl font-black bg-[#152035] border-b border-indigo-500 outline-none w-full text-white mt-1" 
                       value={meta} 
                       onChange={e => setMeta(Number(e.target.value))}
                       onBlur={() => setIsEditingMeta(false)}
@@ -2048,10 +2024,10 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
          </div>
 
          <div className="bg-emerald-600 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#1E293B]/80 rounded-full blur-2xl group-hover:bg-[#152035]/20 transition-all" />
             <div className="relative z-10">
                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-white/20 w-max rounded-xl text-white">
+                  <div className="p-2 bg-[#152035]/20 w-max rounded-2xl text-white">
                      <TrendingUp className="w-5 h-5" />
                   </div>
                   <button onClick={() => setShowAcumulado(!showAcumulado)} className="text-white/50 hover:text-white transition-colors">
@@ -2063,7 +2039,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                  {showAcumulado ? formatCurrency(totalNeto) : '$ *.*.*'}
                </p>
                <div className={`mt-3 flex items-center gap-2 ${!showAcumulado ? 'blur-sm opacity-50' : ''}`}>
-                  <div className="h-1.5 flex-1 bg-white/20 rounded-full overflow-hidden">
+                  <div className="h-1.5 flex-1 bg-[#152035]/20 rounded-full overflow-hidden">
                      <div className="h-full bg-emerald-300" style={{ width: `${Math.min(100, (totalNeto/meta)*100)}%` }} />
                   </div>
                   <span className="text-[10px] font-black text-emerald-100 italic">{Math.round((totalNeto/meta)*100)}%</span>
@@ -2072,10 +2048,10 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
          </div>
 
          <div className="bg-orange-500 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#1E293B]/80 rounded-full blur-2xl group-hover:bg-[#152035]/20 transition-all" />
             <div className="relative z-10">
                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-white/20 w-max rounded-xl text-white">
+                  <div className="p-2 bg-[#152035]/20 w-max rounded-2xl text-white">
                      <DollarSign className="w-5 h-5" />
                   </div>
                   <button onClick={() => setShowGastos(!showGastos)} className="text-white/50 hover:text-white transition-colors">
@@ -2089,18 +2065,18 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
             </div>
          </div>
 
-         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl relative overflow-hidden group">
+         <div className="bg-[#152035] p-6 rounded-[2rem] border border-[#1E293B] shadow-xl relative overflow-hidden group">
             <div className="relative z-10">
                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-slate-100 w-max rounded-xl text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
+                  <div className="p-2 bg-[#111A2E] w-max rounded-2xl text-slate-400 group-hover:bg-[#111A2E] group-hover:text-indigo-500 transition-all">
                      <AlertCircle className="w-5 h-5" />
                   </div>
-                  <button onClick={() => setShowFaltante(!showFaltante)} className="text-slate-400 hover:text-slate-800 transition-colors">
+                  <button onClick={() => setShowFaltante(!showFaltante)} className="text-slate-400 hover:text-white transition-colors">
                      {showFaltante ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                </div>
                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Diferencia para Meta</p>
-               <p className={`text-2xl font-black text-slate-800 mt-1 leading-none italic ${!showFaltante ? 'blur-sm select-none opacity-50' : ''}`}>
+               <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showFaltante ? 'blur-sm select-none opacity-50' : ''}`}>
                  {showFaltante ? (faltante > 0 ? formatCurrency(faltante) : 'META CUMPLIDA! ✨') : '$ *.*.*'}
                </p>
             </div>
@@ -2108,37 +2084,37 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
       </div>
 
       {/* Search & Date Filters Row */}
-      <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-wrap gap-4 items-end">
+      <div className="bg-[#152035] p-6 rounded-2xl border shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px] space-y-1">
              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Búsqueda General</label>
              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white transition-all outline-none" placeholder="Nombre, RUT, Glosa..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <input className="w-full pl-10 pr-4 py-2 bg-[#152035] border border-[#1E293B] rounded-2xl text-sm focus:bg-[#152035] transition-all outline-none" placeholder="Nombre, RUT, Glosa..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
              </div>
           </div>
           <div className="space-y-1">
              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center block">Desde</label>
-             <input type="date" className="p-2 border border-slate-200 rounded-xl text-sm outline-none bg-slate-50 focus:bg-white" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+             <input type="date" className="p-2 border border-[#1E293B] rounded-2xl text-sm outline-none bg-[#152035] focus:bg-[#152035]" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
           </div>
           <div className="space-y-1">
              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center block">Hasta</label>
-             <input type="date" className="p-2 border border-slate-200 rounded-xl text-sm outline-none bg-slate-50 focus:bg-white" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+             <input type="date" className="p-2 border border-[#1E293B] rounded-2xl text-sm outline-none bg-[#152035] focus:bg-[#152035]" value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </div>
           <div className="space-y-1">
              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Mes</label>
-             <select className="p-2 border border-slate-200 rounded-xl text-sm outline-none bg-slate-50" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}>
+             <select className="p-2 border border-[#1E293B] rounded-2xl text-sm outline-none bg-[#152035]" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}>
                 {['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'].map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
              </select>
           </div>
           <div className="space-y-1">
              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Año</label>
-             <input type="number" className="p-2 border border-slate-200 rounded-xl text-sm outline-none w-20 bg-slate-50" value={yearFilter} onChange={e => setYearFilter(e.target.value)} />
+             <input type="number" className="p-2 border border-[#1E293B] rounded-2xl text-sm outline-none w-20 bg-[#152035]" value={yearFilter} onChange={e => setYearFilter(e.target.value)} />
           </div>
           <div className="flex gap-2">
-             <div className="flex items-center bg-slate-100 rounded-xl p-1">
-                <button onClick={() => exportFiltered('excel')} className="p-2 text-emerald-600 hover:bg-white rounded-lg transition-all" title="Excel"><FileSpreadsheet className="w-5 h-5"/></button>
-                <button onClick={() => exportFiltered('pdf')} className="p-2 text-rose-600 hover:bg-white rounded-lg transition-all" title="PDF"><Download className="w-5 h-5"/></button>
-                <label className="p-2 text-blue-600 hover:bg-white rounded-lg transition-all cursor-pointer" title="Importar Excel">
+             <div className="flex items-center bg-[#111A2E] rounded-2xl p-1">
+                <button onClick={() => exportFiltered('excel')} className="p-2 text-emerald-600 hover:bg-[#152035] rounded-2xl transition-all" title="Excel"><FileSpreadsheet className="w-5 h-5"/></button>
+                <button onClick={() => exportFiltered('pdf')} className="p-2 text-rose-600 hover:bg-[#152035] rounded-2xl transition-all" title="PDF"><Download className="w-5 h-5"/></button>
+                <label className="p-2 text-[#38BDF8] hover:bg-[#152035] rounded-2xl transition-all cursor-pointer" title="Importar Excel">
                    <Upload className="w-5 h-5" />
                    <input type="file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
                 </label>
@@ -2148,20 +2124,20 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
 
       <div className="space-y-4">
         {/* Registro de Pagos Alumnos */}
-        <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-blue-100 group">
+        <div className="bg-[#152035] rounded-3xl border shadow-lg overflow-hidden border-blue-100 group">
           <div 
-            className="bg-[#001736] p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors" 
+            className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  font-black flex justify-between items-center cursor-pointer hover:bg-[#152035] transition-colors" 
             onClick={() => setForm({...form, tipo: form.tipo === 'Ingreso Alumno' ? '' : 'Ingreso Alumno'})}
           >
             <div className="flex items-center gap-4">
-               <div className="p-2 bg-white/20 rounded-lg">
+               <div className="p-2 bg-[#152035]/20 rounded-2xl">
                   <GraduationCap className="w-6 h-6" />
                </div>
                <div className="flex items-center gap-3">
                   <span className="tracking-tight italic">Registro de Pagos Escuela (Ingresos)</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); downloadExcelTemplate(); }}
-                    className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all shadow-lg active:scale-95"
+                    className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl transition-all shadow-lg active:scale-95"
                     title="Exportar Plantilla Excel para Ingresos"
                   >
                     <FileSpreadsheet className="w-4 h-4" />
@@ -2222,7 +2198,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                   <input className="w-full border-b p-2 italic" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} />
                 </div>
                 <div className="md:col-span-4 flex justify-end mt-2">
-                  <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-md hover:bg-slate-800 transition-all">
+                  <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-8 py-3 rounded-2xl font-bold shadow-md hover:bg-[#152035] transition-all">
                     {editingId ? 'ACTUALIZAR INGRESO' : 'REGISTRAR INGRESO'}
                   </button>
                 </div>
@@ -2231,26 +2207,26 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
               <div className="mt-8">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-[#001736] text-white text-[10px] font-black uppercase tracking-widest text-left border-b border-white/10">
+                    <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  text-[10px] font-black uppercase tracking-widest text-left border-b border-[#1E293B]">
                       <td colSpan={2} className="p-2 text-right italic">Sumas en Selección:</td>
                       <td className="p-2 text-right">{formatCurrency(filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalPagado) || 0), 0))}</td>
                       <td className="p-2 text-right text-emerald-400 font-bold">{formatCurrency(totalIngresos)}</td>
                       <td></td>
                     </tr>
-                    <tr className="bg-[#001736] border-b text-[10px] font-black text-white uppercase tracking-widest text-left">
-                      <th className="p-3 bg-[#001736]">Fecha</th>
-                      <th className="p-3 bg-[#001736]">Alumno</th>
-                      <th className="p-3 text-right bg-[#001736]">Monto Total</th>
-                      <th className="p-3 text-right bg-[#001736]">Recibido (Neto)</th>
-                      <th className="p-3 text-center bg-[#001736]">Acciones</th>
+                    <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b text-[10px] font-black  uppercase tracking-widest text-left">
+                      <th className="p-3 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
+                      <th className="p-3 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Alumno</th>
+                      <th className="p-3 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Monto Total</th>
+                      <th className="p-3 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Recibido (Neto)</th>
+                      <th className="p-3 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 italic">
+                  <tbody className="divide-y divide-slate-200 italic">
                     {filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').map(r => (
-                      <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={r.id} className="hover:bg-[#152035] transition-colors">
                         <td className="p-3">{formatDate(r.fechaPago)}</td>
                         <td className="p-3">
-                          <div className="font-bold text-[#001736]">{r.nombreAlumno}</div>
+                          <div className="font-bold text-white">{r.nombreAlumno}</div>
                           <div className="text-[9px] text-slate-400">{r.rut} {r.email}</div>
                           <div className="text-[9px] font-normal">{r.observaciones}</div>
                         </td>
@@ -2265,7 +2241,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       <tr><td colSpan={5} className="p-8 text-center text-slate-400">No hay ingresos registrados.</td></tr>
                     )}
                   </tbody>
-                  <tfoot className="bg-[#001736] text-white font-black">
+                  <tfoot className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  font-black">
                     <tr>
                       <td colSpan={2} className="p-4 text-right uppercase text-[9px] tracking-widest italic tracking-widest">Totales Finales Histórico:</td>
                       <td className="p-4 text-right">{formatCurrency(filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalPagado) || 0), 0))}</td>
@@ -2280,13 +2256,13 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
         </div>
 
         {/* Expediente: Pago a Profesores */}
-        <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-orange-100 group">
+        <div className="bg-[#152035] rounded-3xl border shadow-lg overflow-hidden border-orange-100 group">
           <div 
-            className="bg-[#001736] p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-[#001736]/90 transition-all shadow-md group" 
+            className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  font-black flex justify-between items-center cursor-pointer hover:bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]/90 transition-all shadow-md group" 
             onClick={() => setForm({...form, tipo: form.tipo === 'Pago Profesor' ? '' : 'Pago Profesor'})}
           >
             <div className="flex items-center gap-4">
-               <div className="p-2 bg-white/20 rounded-lg">
+               <div className="p-2 bg-[#152035]/20 rounded-2xl">
                   <Briefcase className="w-6 h-6" />
                </div>
                <span className="tracking-tight italic">Expediente: Pago a Profesores (Gastos)</span>
@@ -2299,7 +2275,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
           
           {form.tipo === 'Pago Profesor' && (
             <div className="p-4">
-              <form className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-orange-50/50 p-4 rounded-xl border border-orange-100" onSubmit={handleSubmit}>
+              <form className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-orange-50/50 p-4 rounded-2xl border border-orange-100" onSubmit={handleSubmit}>
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[9px] font-black uppercase text-orange-600/70 tracking-wider">Profesor (A quien)</label>
                   <input className="w-full border border-orange-200 rounded p-1.5 focus:border-orange-500 outline-none text-xs font-medium" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
@@ -2310,14 +2286,14 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-orange-600 tracking-wider">Monto</label>
-                  <input type="number" className="w-full border border-orange-200 rounded p-1.5 font-bold text-orange-700 bg-white outline-none text-xs" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
+                  <input type="number" className="w-full border border-orange-200 rounded p-1.5 font-bold text-orange-700 bg-[#152035] outline-none text-xs" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
                 </div>
                 <div className="md:col-span-3 space-y-1">
                   <label className="text-[9px] font-black uppercase text-orange-600/70 tracking-wider">Detalle del Pago</label>
                   <input className="w-full border border-orange-200 rounded p-1.5 italic focus:border-orange-500 outline-none text-xs" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
                 </div>
                 <div className="flex items-end justify-end mt-1">
-                  <button type="submit" className="bg-orange-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-700 transition-all w-full md:w-auto h-8">
+                  <button type="submit" className="bg-orange-600 text-white px-4 py-1.5 rounded-2xl text-xs font-bold hover:bg-orange-700 transition-all w-full md:w-auto h-8">
                     {editingId ? 'ACTUALIZAR' : 'REGISTRAR'}
                   </button>
                 </div>
@@ -2326,7 +2302,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
               <div className="mt-4">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-[#001736] text-white text-[10px] font-black uppercase tracking-widest text-left border-b border-white/10 italic">
+                    <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  text-[10px] font-black uppercase tracking-widest text-left border-b border-[#1E293B] italic">
                       <td colSpan={3} className="p-2 text-right">Suma Pagos Periodo:</td>
                       <td className="p-2 text-right font-bold text-orange-100 italic">-{formatCurrency(totalPagosProfesores)}</td>
                       <td></td>
@@ -2344,7 +2320,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       <tr key={r.id} className="hover:bg-orange-50/30 transition-colors">
                         <td className="p-3">{formatDate(r.fechaPago)}</td>
                         <td className="p-3 font-bold text-orange-950">{r.nombreAlumno}</td>
-                        <td className="p-3 text-slate-500">{r.observaciones}</td>
+                        <td className="p-3 text-slate-400">{r.observaciones}</td>
                         <td className="p-3 text-right font-black text-orange-600">-{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
                           <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
@@ -2369,13 +2345,13 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
         </div>
 
         {/* Expediente: Otros Gastos */}
-        <div className="bg-white rounded-3xl border shadow-lg overflow-hidden border-rose-100 group">
+        <div className="bg-[#152035] rounded-3xl border shadow-lg overflow-hidden border-rose-100 group">
           <div 
-            className="bg-[#001736] p-6 text-white font-black flex justify-between items-center cursor-pointer hover:bg-[#001736]/90 transition-all shadow-md group" 
+            className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  font-black flex justify-between items-center cursor-pointer hover:bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]/90 transition-all shadow-md group" 
             onClick={() => setForm({...form, tipo: form.tipo === 'Gasto Mensual' ? '' : 'Gasto Mensual'})}
           >
             <div className="flex items-center gap-4">
-               <div className="p-2 bg-white/20 rounded-lg">
+               <div className="p-2 bg-[#152035]/20 rounded-2xl">
                   <Receipt className="w-6 h-6" />
                </div>
                <span className="tracking-tight italic">Expediente: Otros Gastos Mensuales</span>
@@ -2388,7 +2364,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
           
           {form.tipo === 'Gasto Mensual' && (
             <div className="p-4">
-              <form className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-rose-50/50 p-4 rounded-xl border border-rose-100" onSubmit={handleSubmit}>
+              <form className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-rose-50/50 p-4 rounded-2xl border border-rose-100" onSubmit={handleSubmit}>
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[9px] font-black uppercase text-rose-600/70 tracking-wider">Gasto / Proveedor</label>
                   <input className="w-full border border-rose-200 rounded p-1.5 focus:border-rose-500 outline-none text-xs font-medium" value={form.nombreAlumno || ''} onChange={e => setForm({...form, nombreAlumno: e.target.value})} required />
@@ -2399,14 +2375,14 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-rose-600 tracking-wider">Monto</label>
-                  <input type="number" className="w-full border border-rose-200 rounded p-1.5 font-bold text-rose-700 bg-white outline-none text-xs" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
+                  <input type="number" className="w-full border border-rose-200 rounded p-1.5 font-bold text-rose-700 bg-[#152035] outline-none text-xs" value={form.montoTotalRecibido ?? 0} onChange={e => setForm({...form, montoTotalRecibido: Number(e.target.value)})} required/>
                 </div>
                 <div className="md:col-span-3 space-y-1">
                   <label className="text-[9px] font-black uppercase text-rose-600/70 tracking-wider">Observaciones</label>
                   <input className="w-full border border-rose-200 rounded p-1.5 italic focus:border-rose-500 outline-none text-xs" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} required />
                 </div>
                 <div className="flex items-end justify-end mt-1">
-                  <button type="submit" className="bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-rose-700 transition-all w-full md:w-auto h-8">
+                  <button type="submit" className="bg-rose-600 text-white px-4 py-1.5 rounded-2xl text-xs font-bold hover:bg-rose-700 transition-all w-full md:w-auto h-8">
                     {editingId ? 'ACTUALIZAR' : 'REGISTRAR'}
                   </button>
                 </div>
@@ -2415,7 +2391,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
               <div className="mt-4">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest text-left border-b border-white/10 italic">
+                    <tr className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest text-left border-b border-[#1E293B] italic">
                       <td colSpan={3} className="p-2 text-right">Suma Gastos Periodo:</td>
                       <td className="p-2 text-right font-bold text-rose-100 italic">-{formatCurrency(totalGastosMensuales)}</td>
                       <td></td>
@@ -2433,7 +2409,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       <tr key={r.id} className="hover:bg-rose-50/30 transition-colors">
                         <td className="p-3">{formatDate(r.fechaPago)}</td>
                         <td className="p-3 font-bold text-rose-950">{r.nombreAlumno}</td>
-                        <td className="p-3 text-slate-500">{r.observaciones}</td>
+                        <td className="p-3 text-slate-400">{r.observaciones}</td>
                         <td className="p-3 text-right font-black text-rose-600">-{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
                           <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
@@ -2653,13 +2629,13 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
 
   return (
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#001736] p-4 text-white font-bold flex flex-wrap gap-4 items-center justify-between">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex flex-wrap gap-4 items-center justify-between">
           <div className="flex items-center gap-4">
              <span className="flex items-center gap-2">
                <Receipt className="w-5 h-5" /> {editingId ? 'Editando Registro DTE' : 'Registro Administrativo de DTE'}
              </span>
-             <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+             <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
                 <span className="text-[9px] font-black uppercase text-blue-400">Total DTE:</span>
                 <span className="text-[11px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.total) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
              </div>
@@ -2683,11 +2659,11 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
             <button 
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+              className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
             >
               <Upload className="w-3.5 h-3.5" /> Importar
             </button>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded ml-2">Uso Interno - No SII</span>
+            <span className="text-[10px] bg-[#152035]/20 px-2 py-0.5 rounded ml-2">Uso Interno - No SII</span>
           </div>
         </div>
         <form className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6" onSubmit={handleSubmit}>
@@ -2735,21 +2711,21 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
           </div>
           <div className="md:col-span-1 space-y-6">
              <FormField label="Monto Neto ($)">
-               <input type="number" className="w-full border-b border-blue-200 p-4 text-xl font-black bg-blue-50/50 rounded-t outline-none focus:bg-blue-50" value={form.montoNeto || ''} onChange={e => setForm({...form, montoNeto: parseInt(e.target.value) || 0})} />
+               <input type="number" className="w-full border-b border-blue-200 p-4 text-xl font-black bg-[#152035]/50 rounded-t outline-none focus:bg-[#152035]" value={form.montoNeto || ''} onChange={e => setForm({...form, montoNeto: parseInt(e.target.value) || 0})} />
              </FormField>
-             <div className="space-y-2 border-t border-slate-100 pt-4">
+             <div className="space-y-2 border-t border-[#1E293B] pt-4">
                 <div className="flex justify-between text-xs font-bold text-slate-400 uppercase">
                    <span>IVA (19%)</span>
                    <span>{formatCurrency(iva)}</span>
                 </div>
-                <div className="flex justify-between text-lg font-black text-[#001736]">
+                <div className="flex justify-between text-lg font-black text-white">
                    <span>TOTAL B/F</span>
                    <span>{formatCurrency(total)}</span>
                 </div>
              </div>
              <button type="submit" className={cn(
-               "w-full py-4 rounded-xl font-black shadow-xl hover:translate-y-[-2px] transition-all",
-               editingId ? "bg-amber-600 text-white" : "bg-[#001736] text-white"
+               "w-full py-4 rounded-2xl font-black shadow-xl hover:translate-y-[-2px] transition-all",
+               editingId ? "bg-amber-600 text-white" : "bg-[#1E3A5F]  hover:bg-[#1D3557] border-[#1E293B] "
              )}>
                {editingId ? 'ACTUALIZAR REGISTRO' : 'REGISTRAR DTE'}
              </button>
@@ -2760,30 +2736,30 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-[#001736] border-b flex flex-wrap justify-between items-center font-black text-[10px] text-white uppercase tracking-widest gap-4">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex flex-wrap justify-between items-center font-black text-[10px]  uppercase tracking-widest gap-4">
           <div className="flex items-center gap-4">
              <span>Consulta de Registros DTE</span>
-             <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+             <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
                 <span className="text-[9px] font-black uppercase text-emerald-400">Total Neto:</span>
                 <span className="text-[11px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.montoNeto) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
              </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap text-normal normal-case">
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 text-slate-600" 
+                  className="text-xs border rounded p-1 text-slate-300" 
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Hasta:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 text-slate-600" 
+                  className="text-xs border rounded p-1 text-slate-300" 
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
                 />
@@ -2792,7 +2768,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                 <Search className="w-3.5 h-3.5 text-slate-400" />
                 <input 
                   placeholder="Buscar..."
-                  className="text-xs border rounded p-1 w-28 text-slate-600 font-normal" 
+                  className="text-xs border rounded p-1 w-28 text-slate-300 font-normal" 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -2801,7 +2777,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                onClick={() => {
                  exportTableToPDF('Reporte: DTE', ['Año', 'Mes', 'Fecha', 'N° Dcto', 'Razón Social', 'RUT', 'Dirección', 'Ciudad', 'Email', 'Neto', 'IVA', 'Total'], getExportData(), 'reporte_dte', 'l');
                }}
-               className="text-white bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-blue-700 flex items-center gap-1"
+               className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1"
                title="Descargar PDF"
             >
               <Download className="w-3 h-3" /> PDF
@@ -2820,21 +2796,21 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
         <div className="overflow-x-auto">
           <table className="w-full text-xs font-medium">
             <thead>
-              <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
-                <th className="p-4 bg-[#001736]">Fecha</th>
-                <th className="p-4 bg-[#001736]">N° Dcto</th>
-                <th className="p-4 bg-[#001736]">Razón Social</th>
-                <th className="p-4 bg-[#001736]">RUT</th>
-                <th className="p-4 text-right bg-[#001736]">Neto</th>
-                <th className="p-4 text-right bg-[#001736]">Total</th>
-                <th className="p-4 text-center bg-[#001736]">Acciones</th>
+              <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">N° Dcto</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Razón Social</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">RUT</th>
+                <th className="p-4 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Neto</th>
+                <th className="p-4 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Total</th>
+                <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 italic">
+            <tbody className="divide-y divide-slate-200 italic">
               {filteredRecords.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 text-slate-500">{formatDate(r.fecha)}</td>
-                  <td className="p-4 font-bold text-[#001736]">{r.nroDto}</td>
+                <tr key={r.id} className="hover:bg-[#152035] transition-colors">
+                  <td className="p-4 text-slate-400">{formatDate(r.fecha)}</td>
+                  <td className="p-4 font-bold text-white">{r.nroDto}</td>
                   <td className="p-4">{r.nombre}</td>
                   <td className="p-4 font-mono text-slate-400">{r.rut}</td>
                   <td className="p-4 text-right">{formatCurrency(r.montoNeto)}</td>
@@ -2890,13 +2866,13 @@ function CPanelManager({ records }: { records: any[] }) {
   const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'modules'>('users');
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 mt-4 min-h-[600px]">
-       <div className="bg-[#001736] p-10 text-white relative overflow-hidden">
+    <div className="bg-[#152035] rounded-[2.5rem] border border-[#1E293B] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 mt-4 min-h-[600px]">
+       <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-10  relative overflow-hidden">
           <div className="absolute top-0 right-0 p-16 opacity-10">
              <Settings className="w-56 h-56 rotate-12" />
           </div>
           <div className="relative z-10 flex items-center gap-6">
-             <div className="p-4 bg-blue-500 rounded-2xl shadow-lg">
+             <div className="p-4 bg-[#152035] rounded-2xl shadow-lg">
                 <ShieldCheck className="w-10 h-10" />
              </div>
              <div>
@@ -2906,9 +2882,9 @@ function CPanelManager({ records }: { records: any[] }) {
           </div>
        </div>
 
-       <div className="flex border-b border-slate-100 bg-slate-50/50 p-2 gap-2">
+       <div className="flex border-b border-[#1E293B] bg-[#152035]/50 p-2 gap-2">
           {[
-            { id: 'users', label: 'Gestión de Accesos', icon: Users, color: 'text-blue-600' },
+            { id: 'users', label: 'Gestión de Accesos', icon: Users, color: 'text-[#38BDF8]' },
             { id: 'logs', label: 'Traza de Auditoría', icon: ShieldCheck, color: 'text-emerald-600' },
             { id: 'modules', label: 'Módulos & API', icon: LayoutGrid, color: 'text-amber-600' }
           ].map(tab => (
@@ -2917,7 +2893,7 @@ function CPanelManager({ records }: { records: any[] }) {
               onClick={() => setActiveTab(tab.id as any)}
               className={cn(
                 "px-8 py-4 text-[10px] font-black uppercase tracking-widest flex items-center gap-3 transition-all rounded-2xl",
-                activeTab === tab.id ? "bg-white shadow-md text-blue-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100/50"
+                activeTab === tab.id ? "bg-[#152035] shadow-md text-[#38BDF8]" : "text-slate-400 hover:text-slate-300 hover:bg-[#111A2E]/50"
               )}
             >
               <tab.icon className={cn("w-4 h-4", activeTab === tab.id ? tab.color : "")} />
@@ -2932,58 +2908,58 @@ function CPanelManager({ records }: { records: any[] }) {
           {activeTab === 'modules' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                   <div className="bg-[#152035] p-6 rounded-3xl border border-[#1E293B] flex flex-col justify-between">
                       <div>
-                         <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                         <div className="w-12 h-12 bg-[#111A2E] text-[#38BDF8] rounded-2xl flex items-center justify-center mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
                             <FlaskConical className="w-6 h-6" />
                          </div>
-                         <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight italic">Módulo Laboratorio</h4>
-                         <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">Control de producción homeopática, inventario de cepas y despacho logístico.</p>
+                         <h4 className="text-lg font-black text-white uppercase tracking-tight italic">Módulo Laboratorio</h4>
+                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2">Control de producción homeopática, inventario de cepas y despacho logístico.</p>
                       </div>
                       <div className="mt-6 flex items-center justify-between">
                          <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
-                         <button className="text-blue-600 font-black text-[10px] uppercase hover:underline">Configurar</button>
+                         <button className="text-[#38BDF8] font-black text-[10px] uppercase hover:underline">Configurar</button>
                       </div>
                    </div>
 
-                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                   <div className="bg-[#152035] p-6 rounded-3xl border border-[#1E293B] flex flex-col justify-between">
                       <div>
-                         <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                         <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
                             <GraduationCap className="w-6 h-6" />
                          </div>
-                         <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight italic">Módulo Escuela</h4>
-                         <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">Gestión de alumnos, diplomados, motor de pagos y analíticas de retención.</p>
+                         <h4 className="text-lg font-black text-white uppercase tracking-tight italic">Módulo Escuela</h4>
+                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2">Gestión de alumnos, diplomados, motor de pagos y analíticas de retención.</p>
                       </div>
                       <div className="mt-6 flex items-center justify-between">
                          <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
-                         <button className="text-blue-600 font-black text-[10px] uppercase hover:underline">Configurar</button>
+                         <button className="text-[#38BDF8] font-black text-[10px] uppercase hover:underline">Configurar</button>
                       </div>
                    </div>
 
-                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                   <div className="bg-[#152035] p-6 rounded-3xl border border-[#1E293B] flex flex-col justify-between">
                       <div>
-                         <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                         <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
                             <TrendingUp className="w-6 h-6" />
                          </div>
-                         <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight italic">Módulo CRM</h4>
-                         <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">Automatización de ventas, campañas masivas y seguimiento de prospectos (Leads).</p>
+                         <h4 className="text-lg font-black text-white uppercase tracking-tight italic">Módulo CRM</h4>
+                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2">Automatización de ventas, campañas masivas y seguimiento de prospectos (Leads).</p>
                       </div>
                       <div className="mt-6 flex items-center justify-between">
                          <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
-                         <button className="text-blue-600 font-black text-[10px] uppercase hover:underline">Configurar</button>
+                         <button className="text-[#38BDF8] font-black text-[10px] uppercase hover:underline">Configurar</button>
                       </div>
                    </div>
 
                    <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 text-white flex flex-col justify-between">
                       <div>
-                         <div className="w-12 h-12 bg-slate-800 text-blue-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-slate-700">
+                         <div className="w-12 h-12 bg-[#152035] text-blue-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-slate-700">
                             <Lock className="w-6 h-6" />
                          </div>
                          <h4 className="text-lg font-black uppercase tracking-tight italic">API Integración</h4>
                          <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2 italic">Servicios externos de courier y pasarelas de pago. Próximamente integración con Redelcom/Transbank.</p>
                       </div>
                       <div className="mt-6">
-                         <span className="text-[10px] font-black uppercase text-slate-500 px-3 py-1 bg-slate-800 rounded-full">Beta v5.0</span>
+                         <span className="text-[10px] font-black uppercase text-slate-400 px-3 py-1 bg-[#152035] rounded-full">Beta v5.0</span>
                       </div>
                    </div>
                 </div>

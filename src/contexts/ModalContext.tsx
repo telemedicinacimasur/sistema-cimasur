@@ -50,13 +50,13 @@ export function ModalProvider({ children }: { children: ReactNode }) {
       {children}
       {modalState.type && (
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
+          <div className="bg-[#152035] rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#1E293B] p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
             <h3 className="text-lg font-bold text-[#001736] mb-4">{modalState.message}</h3>
             
             {modalState.type === 'prompt' && (
               <input 
                 type="text" 
-                className="w-full border border-slate-300 rounded p-2 mb-4 outline-none focus:border-[#002b5b]"
+                className="w-full border border-[#1E293B] rounded p-2 mb-4 outline-none focus:border-[#002b5b]"
                 value={promptValue}
                 onChange={(e) => setPromptValue(e.target.value)}
                 autoFocus
@@ -71,7 +71,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               {(modalState.type === 'confirm' || modalState.type === 'prompt') && (
                 <button 
                   onClick={() => handleClose(modalState.type === 'prompt' ? null : false)}
-                  className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded font-bold text-sm transition-colors"
+                  className="px-4 py-2 text-slate-500 hover:bg-[#111A2E] rounded font-bold text-sm transition-colors"
                 >
                   Cancelar
                 </button>

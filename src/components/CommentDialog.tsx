@@ -39,7 +39,7 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 animate-in zoom-in-95">
+      <form onSubmit={handleSubmit} className="bg-[#152035] rounded-2xl w-full max-w-sm shadow-2xl p-6 animate-in zoom-in-95">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-blue-600" /> Nuevo Comentario

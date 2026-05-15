@@ -44,7 +44,7 @@ const PREFIX_MAP: Record<string, string> = {
 
 const FormField = ({ label, children }: { label: string, children: React.ReactNode }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{label}</label>
+    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{label}</label>
     {children}
   </div>
 );
@@ -420,11 +420,13 @@ export default function CimasurInventoryManager() {
   const isGeneric = isBaseModule && GENERIC_CATEGORIES.includes(form.categoria_tipo);
 
   const modules = [
-    { id: 'codigos' as SubModule, label: 'Códigos de Barra', desc: 'Módulo Maestro (Salina, Etanol, ADE)', icon: Hash, bg: 'bg-blue-50', text: 'text-blue-600' },
-    { id: 'DILUCIONES CIMASUR' as SubModule, label: 'Diluciones Cimasur', desc: 'Catálogo base', icon: Droplet, bg: 'bg-emerald-50', text: 'text-emerald-600' },
-    { id: 'GOTAS PURAS' as SubModule, label: 'Gotas Puras', desc: 'Códigos y productos', icon: Hexagon, bg: 'bg-indigo-50', text: 'text-indigo-600' },
-    { id: 'ALTAS DILUCIONES' as SubModule, label: 'Altas Diluciones', desc: 'C100/C200', icon: TestTube, bg: 'bg-purple-50', text: 'text-purple-600' },
-    { id: 'NOSODES CLIENTES' as SubModule, label: 'Nosodes Clientes', desc: 'Muestras Médicas', icon: Activity, bg: 'bg-rose-50', text: 'text-rose-600' },
+    { id: 'codigos' as SubModule, label: 'Códigos de Barra', desc: 'Módulo Maestro (Salina, Etanol, ADE)', icon: Hash, bg: 'bg-[#1E293B]', text: 'text-[#38BDF8]' },
+    { id: 'DILUCIONES CIMASUR' as SubModule, label: 'Diluciones Cimasur', desc: 'Catálogo base', icon: Droplet, bg: 'bg-[#1E293B]', text: 'text-emerald-400' },
+    { id: 'GOTAS PURAS' as SubModule, label: 'Gotas Puras', desc: 'Códigos y productos', icon: Hexagon, bg: 'bg-[#1E293B]', text: 'text-indigo-400' },
+    { id: 'ALTAS DILUCIONES' as SubModule, label: 'Altas Diluciones', desc: 'C100/C200', icon: TestTube, bg: 'bg-[#1E293B]', text: 'text-purple-400' },
+    { id: 'NOSODES CLIENTES' as SubModule, label: 'Nosodes Clientes', desc: 'Muestras Médicas', icon: Activity, bg: 'bg-[#1E293B]', text: 'text-rose-400' },
+    { id: 'FÓRMULAS MAGISTRALES' as SubModule, label: 'Fórmulas Magistrales Generales', desc: 'FM', icon: Layers, bg: 'bg-[#1E293B]', text: 'text-amber-400' },
+    { id: 'EC DR. CONEJEROS' as SubModule, label: 'Fórmulas EC', desc: 'Dr. Eduardo Conejeros', icon: FlaskConical, bg: 'bg-[#1E293B]', text: 'text-orange-400' },
   ];
 
   return (
@@ -433,16 +435,16 @@ export default function CimasurInventoryManager() {
         {activeModule !== 'dashboard' && (
           <button 
             onClick={() => setActiveModule('dashboard')}
-            className="p-2 bg-white border shadow-sm rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all"
+            className="p-2 bg-[#152035] border shadow-[0_4px_20px_rgba(0,0,0,0.4)] rounded-2xl text-slate-400 hover:text-[#38BDF8] hover:border-[#38BDF8]/50 hover:bg-[#152035] transition-all"
             title="Volver"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
         )}
-        <Database className="w-8 h-8 text-[#001736]" />
+        <Database className="w-8 h-8 text-white" />
         <div>
-          <h2 className="text-xl font-black text-[#001736] uppercase tracking-tighter">Gestión de Códigos y Diluciones</h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <h2 className="text-xl font-black text-white uppercase tracking-tighter">Gestión de Códigos y Diluciones</h2>
+          <p className="text-sm text-slate-400 font-medium">
             {activeModule === 'dashboard' ? 'Submódulo maestro para administración de Excel, correlativos y catálogos.' : 'Bases correlativas y catálogos de diluciones'}
           </p>
         </div>
@@ -456,188 +458,146 @@ export default function CimasurInventoryManager() {
               <button
                 key={mod.id}
                 onClick={() => handleModuleClick(mod.id)}
-                className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all text-left group"
+                className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-md hover:border-blue-300 transition-all text-left group"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <div className={cn("p-3 rounded-lg", mod.bg, mod.text)}>
+                  <div className={cn("p-3 rounded-2xl", mod.bg, mod.text)}>
                     <Icon className="w-6 h-6" />
                   </div>
                 </div>
-                <h3 className="font-bold text-[#001736] mb-1">{mod.label}</h3>
-                <p className="text-xs text-slate-500">{mod.desc}</p>
+                <h3 className="font-bold text-white mb-1">{mod.label}</h3>
+                <p className="text-xs text-slate-400">{mod.desc}</p>
               </button>
             );
           })}
         </div>
       ) : (
         <>
-          {activeModule === 'codigos' && (
-            <div className="flex gap-2 border-b overflow-x-auto no-scrollbar">
-              {(['MATRIZ COMPLETA', 'SALINA CS', 'ETANOL CS', 'ADE CS'] as MainTab[]).map(tab => (
+          <div className="sticky top-0 z-30 bg-[#0D1527]/90 backdrop-blur-md pt-2 pb-4 -mx-2 px-2 shadow-[0_4px_30px_rgba(0,0,0,0.5)] border-b border-[#1E293B] mb-4">
+            {activeModule === 'codigos' && (
+              <div className="flex gap-2 border-b border-[#1E293B] overflow-x-auto no-scrollbar mb-4 pb-2">
+                {(['MATRIZ COMPLETA', 'SALINA CS', 'ETANOL CS', 'ADE CS'] as MainTab[]).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => { setActiveTab(tab); setActiveCategory('TODOS'); }}
+                    className={cn(
+                      "px-6 py-2 font-bold text-sm uppercase tracking-widest border-b-2 transition-all whitespace-nowrap rounded-t-xl",
+                      activeTab === tab 
+                        ? "border-[#38BDF8] text-[#38BDF8] bg-[#38BDF8]/10" 
+                        : "border-[#1E293B] text-slate-400 hover:text-slate-300 hover:bg-[#111A2E]"
+                    )}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {(isBaseModule || isMatrixView) && (
+              <div className="flex flex-wrap items-center gap-2 mb-4">
                 <button
-                  key={tab}
-                  onClick={() => { setActiveTab(tab); setActiveCategory('TODOS'); }}
+                  onClick={() => setActiveCategory('TODOS')}
                   className={cn(
-                    "px-6 py-3 font-bold text-sm uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
-                    activeTab === tab 
-                      ? "border-blue-600 text-blue-700 bg-blue-50/50" 
-                      : "border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                    "px-4 py-2 rounded-2xl text-[10px] uppercase tracking-widest font-bold transition-all whitespace-nowrap flex items-center justify-center",
+                    activeCategory === 'TODOS' 
+                      ? "bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 shadow-[0_0_15px_rgba(56,189,248,0.2)]" 
+                      : "bg-[#111A2E] text-slate-400 hover:bg-[#1E293B] border border-[#1E293B]"
                   )}
                 >
-                  {tab}
+                  TODOS
                 </button>
-              ))}
-            </div>
-          )}
-
-          {(isBaseModule || isMatrixView) && (
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setActiveCategory('TODOS')}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-[10px] uppercase tracking-widest font-bold transition-all whitespace-nowrap",
-                  activeCategory === 'TODOS' 
-                    ? "bg-[#001736] text-white shadow-sm" 
-                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                )}
-              >
-                TODOS
-              </button>
-            </div>
-          )}
-
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <div className="flex gap-4 w-full md:w-auto flex-1">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar por código, producto o solución..."
-                  className="w-full pl-10 pr-4 py-2 border-b border-slate-200 text-sm bg-transparent focus:outline-none focus:border-blue-500"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
               </div>
-              <div className="relative">
-                <select
-                  value={sortOrder}
-                  onChange={e => setSortOrder(e.target.value)}
-                  className="pl-4 pr-8 py-2 text-sm border-b border-slate-200 outline-none text-slate-600 font-medium"
+            )}
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#152035] p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]">
+              <div className="flex gap-4 w-full md:w-auto flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar por código, producto o solución..."
+                    className="w-full pl-10 pr-4 py-2 text-sm bg-[#152035] border-b border-[#1E293B] focus:outline-none focus:border-[#38BDF8] text-white transition-colors"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="relative">
+                  <select
+                    value={sortOrder}
+                    onChange={e => setSortOrder(e.target.value)}
+                    className="pl-4 pr-8 py-2 text-sm border-b border-[#1E293B] outline-none text-slate-300 font-medium bg-[#111A2E]"
+                  >
+                    <option value="menor_mayor">N° Menor a Mayor</option>
+                    <option value="mayor_menor">N° Mayor a Menor</option>
+                    <option value="a_z">A - Z (Producto)</option>
+                    <option value="z_a">Z - A (Producto)</option>
+                    <option value="mas_reciente">Más reciente</option>
+                    <option value="mas_antiguo">Más antiguo</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 w-full md:w-auto flex-wrap">
+                <label className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors cursor-pointer border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Importar Excel">
+                  <Upload className="w-4 h-4" /> Importar
+                  <input type="file" accept=".xlsx, .xls, .csv" onChange={importExcel} className="hidden" />
+                </label>
+                <button onClick={exportTemplate} className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Descargar Plantilla">
+                  <Download className="w-4 h-4" /> Plantilla
+                </button>
+                <button onClick={exportExcel} className="flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-emerald-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Exportar Excel">
+                  <FileSpreadsheet className="w-4 h-4" /> Excel
+                </button>
+                <button onClick={exportPDF} className="flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-red-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Exportar PDF">
+                  <Download className="w-4 h-4" /> PDF
+                </button>
+                <button 
+                  onClick={() => { 
+                      setEditingId(null); 
+                      setForm({ 
+                        codigo_barras: '', 
+                        nombre_producto: '', 
+                        solucion: '', 
+                        categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmicos' : activeCategory, 
+                        fecha: '', 
+                        doctor: '',
+                        base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab
+                      });
+                      setShowModal(true); 
+                  }} 
+                  className="flex items-center justify-center gap-2 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] border border-[#38BDF8]/50 px-5 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-all shadow-[0_0_15px_rgba(56,189,248,0.2)] ml-2"
                 >
-                  <option value="menor_mayor">N° Menor a Mayor</option>
-                  <option value="mayor_menor">N° Mayor a Menor</option>
-                  <option value="a_z">A - Z (Producto)</option>
-                  <option value="z_a">Z - A (Producto)</option>
-                  <option value="mas_reciente">Más reciente</option>
-                  <option value="mas_antiguo">Más antiguo</option>
-                </select>
+                  <Plus className="w-4 h-4" /> Agregar Nuevo
+                </button>
               </div>
-            </div>
-            
-            <div className="flex gap-2 w-full md:w-auto flex-wrap">
-              <label className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-200 shadow-sm" title="Importar Excel">
-                <Upload className="w-4 h-4" /> Importar
-                <input type="file" accept=".xlsx, .xls, .csv" onChange={importExcel} className="hidden" />
-              </label>
-              <button onClick={exportTemplate} className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-sm" title="Descargar Plantilla">
-                <Download className="w-4 h-4" /> Plantilla
-              </button>
-              <button onClick={exportExcel} className="flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors border border-emerald-200 shadow-sm" title="Exportar Excel">
-                <FileSpreadsheet className="w-4 h-4" /> Excel
-              </button>
-              <button onClick={exportPDF} className="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors border border-red-200 shadow-sm" title="Exportar PDF">
-                <Download className="w-4 h-4" /> PDF
-              </button>
-              <button 
-                onClick={() => { 
-                    setEditingId(null); 
-                    setForm({ 
-                      codigo_barras: '', 
-                      nombre_producto: '', 
-                      solucion: '', 
-                      categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmicos' : activeCategory, 
-                      fecha: '', 
-                      doctor: '',
-                      base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab
-                    });
-                    setShowModal(true); 
-                }} 
-                className="flex items-center justify-center gap-2 bg-[#001736] hover:bg-[#002b5b] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm ml-2"
-              >
-                <Plus className="w-4 h-4" /> Agregar Nuevo
-              </button>
             </div>
           </div>
 
           <div className="flex flex-col flex-1 min-h-0">
-            {(() => {
-              if (activeTab === 'MATRIZ COMPLETA') return null;
-              
-              const baseRecords = records.filter(r => r.base_master === activeTab);
-              const emptyRecords = baseRecords.filter(r => r.codigo_barras && r.codigo_barras !== 'CÓDIGO ÚNICO' && !safe(r.nombre_producto).trim());
-              
-              const nums: number[] = [];
-              for (const r of baseRecords) {
-                if (!r.codigo_barras || r.codigo_barras === 'CÓDIGO ÚNICO') continue;
-                const match = String(r.codigo_barras).match(/\d+/);
-                if (match) nums.push(parseInt(match[0], 10));
-              }
-              nums.sort((a,b) => a - b);
-              
-              const gaps: number[] = [];
-              for (let i = 0; i < nums.length - 1; i++) {
-                if (nums[i + 1] - nums[i] > 1) {
-                  for (let j = nums[i] + 1; j < nums[i + 1]; j++) {
-                    gaps.push(j);
-                  }
-                }
-              }
-              
-              if (emptyRecords.length > 0 || gaps.length > 0) {
-                return (
-                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-4 shadow-sm">
-                    <div className="flex gap-2 text-amber-800 font-bold items-center mb-1">
-                       <AlertCircle className="w-5 h-5" />
-                       Aviso de Correlativos Vacíos Disponibles
-                    </div>
-                    <ul className="list-disc pl-8 text-xs text-amber-700">
-                      {emptyRecords.map(r => (
-                        <li key={r.id}>Correlativo creado sin producto: <strong>{r.codigo_barras}</strong></li>
-                      ))}
-                      {gaps.length > 0 && (
-                        <li>Existen gaps numéricos sin usar: <strong>{gaps.join(', ')}</strong></li>
-                      )}
-                    </ul>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
+            <div className="bg-[#152035] border border-[#1E293B] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex-1 overflow-hidden flex flex-col">
               <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-[#f8fafc] border-b border-slate-200">
-                  <tr className="text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <thead className="bg-[#111A2E] border-b border-[#1E293B]">
+                  <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     {getHeadersForTab(activeTab).map((h, i) => (
-                      <th key={i} className={`p-4 border-r border-slate-100 ${i === 0 ? 'w-32' : ''}`}>{h}</th>
+                      <th key={i} className={`p-4 border-r border-[#1E293B] ${i === 0 ? 'w-32' : ''}`}>{h}</th>
                     ))}
                     <th className="p-4 w-12 text-center"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-200">
                   {filtered.length > 0 ? (
                     filtered.map((r, i) => {
                       const rowVals = getRowForTab(r, activeTab);
                       return (
-                      <tr key={r.id || i} className="hover:bg-blue-50/50 transition-colors">
+                      <tr key={r.id || i} className="hover:bg-[#1E293B] group transition-all duration-300">
                         {rowVals.map((val, idx) => (
-                           <td key={idx} className={`p-4 text-xs ${idx === 0 ? 'font-mono font-bold text-[#002b5b]' : idx === 1 ? 'font-bold text-sm' : 'text-slate-600'} border-r border-slate-50`}>
+                           <td key={idx} className={`p-4 text-xs ${idx === 0 ? 'font-mono font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : idx === 1 ? 'font-bold text-sm' : 'text-slate-300'} border-r border-[#1E293B]`}>
                              {val || '---'}
                            </td>
                         ))}
                         <td className="p-4 text-center">
-                          <button onClick={() => handleEdit(r)} className="p-1.5 text-slate-400 hover:text-blue-600 bg-white shadow-sm border rounded-md hover:border-blue-200 transition-colors" title="Editar">
+                          <button onClick={() => handleEdit(r)} className="p-1.5 text-slate-400 hover:text-[#38BDF8] bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border rounded-md hover:border-[#38BDF8]/50 transition-colors" title="Editar">
                             <Edit className="w-3.5 h-3.5" />
                           </button>
                         </td>
@@ -658,7 +618,7 @@ export default function CimasurInventoryManager() {
                 </tbody>
               </table>
             </div>
-            <div className="bg-[#f8fafc] p-3 border-t text-[10px] uppercase font-black tracking-widest text-[#001736] flex justify-between">
+            <div className="bg-[#111A2E] p-3 border-t text-[10px] uppercase font-black tracking-widest text-white flex justify-between">
               <span>Base: {activeTab} {isBaseModule && `> ${activeCategory}`}</span>
               <span>{filtered.length} registros</span>
             </div>
@@ -668,9 +628,9 @@ export default function CimasurInventoryManager() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-[#001736] text-white">
+        <div className="fixed inset-0 bg-[#0D1527]/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-[#152035] rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div className="p-6 border-b border-[#1E293B] flex justify-between items-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] ">
               <h3 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
                 <Box className="w-5 h-5" />
                 {editingId ? 'Editar Registro' : 'Agregar Nuevo'}
@@ -682,7 +642,7 @@ export default function CimasurInventoryManager() {
               {activeTab === 'MATRIZ COMPLETA' && (
                 <FormField label="Base Master">
                   <select 
-                    className="w-full border-b border-slate-200 p-2 text-sm font-bold outline-none"
+                    className="w-full border-b border-[#1E293B] p-2 text-sm font-bold outline-none"
                     value={form.base_master || 'SALINA CS'}
                     onChange={e => setForm({...form, base_master: e.target.value})}
                   >
@@ -694,7 +654,7 @@ export default function CimasurInventoryManager() {
               {(isBaseModule || activeTab === 'MATRIZ COMPLETA') && (
                 <FormField label="Categoría">
                   <select 
-                    className="w-full border-b border-slate-200 p-2 text-sm font-bold outline-none"
+                    className="w-full border-b border-[#1E293B] p-2 text-sm font-bold outline-none"
                     value={form.categoria_tipo}
                     onChange={e => setForm({...form, categoria_tipo: e.target.value})}
                   >
@@ -710,13 +670,13 @@ export default function CimasurInventoryManager() {
                     required
                     className={cn(
                         "w-full border-b p-2 text-sm font-mono font-bold outline-none",
-                        isGeneric && !editingId ? "border-amber-200 focus:border-amber-500 bg-amber-50 text-amber-900" : "border-slate-200 focus:border-[#001736] text-[#002b5b]"
+                        isGeneric && !editingId ? "border-amber-200 focus:border-amber-500 bg-amber-50 text-amber-900" : "border-[#1E293B] focus:border-[#001736] text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]"
                     )}
                     value={form.codigo_barras || ''}
                     onChange={e => setForm({...form, codigo_barras: e.target.value})}
                   />
                   {isGeneric && !editingId && <span className="text-[9px] text-amber-700 font-black uppercase mt-1">CÓDIGO COMPARTIDO (SE PUEDE MODIFICAR)</span>}
-                  {!isGeneric && !editingId && <span className="text-[9px] text-blue-500 font-black uppercase mt-1">CÓDIGO ÚNICO CORRELATIVO</span>}
+                  {!isGeneric && !editingId && <span className="text-[9px] text-[#38BDF8] font-black uppercase mt-1">CÓDIGO ÚNICO CORRELATIVO</span>}
                 </FormField>
               </div>
 
@@ -724,7 +684,7 @@ export default function CimasurInventoryManager() {
                 <input
                   type="text"
                   required
-                  className="w-full border-b border-slate-200 focus:border-[#001736] p-2 text-sm font-bold text-slate-800 outline-none uppercase"
+                  className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm font-bold text-white outline-none uppercase"
                   placeholder="Ej. Echinacea, Tumor Paladar, C-100"
                   value={form.nombre_producto || ''}
                   onChange={e => setForm({...form, nombre_producto: e.target.value})}
@@ -736,7 +696,7 @@ export default function CimasurInventoryManager() {
                    <FormField label={getHeadersForTab(activeTab)[2] || "FECHA"}>
                      <input
                        type="date"
-                       className="w-full border-b border-slate-200 focus:border-[#001736] p-2 text-sm text-slate-700 outline-none uppercase"
+                       className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
                        value={form.fecha || ''}
                        onChange={e => setForm({...form, fecha: e.target.value})}
                      />
@@ -744,7 +704,7 @@ export default function CimasurInventoryManager() {
                    <FormField label={getHeadersForTab(activeTab)[3] || "DOCTOR(A)"}>
                      <input
                        type="text"
-                       className="w-full border-b border-slate-200 focus:border-[#001736] p-2 text-sm text-slate-700 outline-none uppercase"
+                       className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
                        placeholder="Ej. Dra. Marcela Farias"
                        value={form.doctor || ''}
                        onChange={e => setForm({...form, doctor: e.target.value})}
@@ -755,7 +715,7 @@ export default function CimasurInventoryManager() {
                 <FormField label={getHeadersForTab(activeTab)[2] || "SOLUCIÓN"}>
                   <input
                     type="text"
-                    className="w-full border-b border-slate-200 focus:border-[#001736] p-2 text-sm text-slate-700 outline-none uppercase"
+                    className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
                     placeholder="Ej. R3 1:3, 200CH, C30"
                     value={form.solucion || ''}
                     onChange={e => setForm({...form, solucion: e.target.value})}
@@ -764,10 +724,10 @@ export default function CimasurInventoryManager() {
               ) : null}
 
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-black uppercase tracking-widest transition-colors">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors">
                   Cancelar
                 </button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-[#001736] hover:bg-[#001736]/90 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-md">
+                <button type="submit" className="flex-1 px-4 py-3 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] hover:bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]/90  rounded-2xl text-xs font-black uppercase tracking-widest transition-colors shadow-md">
                   {editingId ? 'Actualizar' : 'Guardar Datos'}
                 </button>
               </div>

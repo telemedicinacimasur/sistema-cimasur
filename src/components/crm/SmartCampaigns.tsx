@@ -247,8 +247,8 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
   };
 
   return (
-    <div className="p-4 lg:p-10 space-y-10 bg-slate-50/50 min-h-screen animate-fade-in pb-20">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+    <div className="p-4 lg:p-10 space-y-10 bg-[#0D1527]/50 min-h-screen animate-fade-in pb-20">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-[#152035] p-8 rounded-3xl shadow-sm border border-[#1E293B]">
         <div className="flex items-center gap-4">
           <div className="p-4 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl shadow-lg shadow-indigo-200">
             <Lightbulb className="w-6 h-6 animate-pulse" />
@@ -259,8 +259,8 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
           </div>
         </div>
         <div className="flex gap-2">
-            <div className="px-5 py-2 bg-indigo-50 rounded-full flex items-center gap-2 border border-indigo-200">
-               <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping" />
+            <div className="px-5 py-2 bg-[#111A2E] rounded-full flex items-center gap-2 border border-indigo-200">
+               <div className="w-2 h-2 bg-[#111A2E]0 rounded-full animate-ping" />
                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Algoritmo Escuela Activo</span>
             </div>
         </div>
@@ -302,7 +302,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
               </div>
               <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar-white pr-2">
                  {aiPlans.length > 0 ? aiPlans.map((plan, i) => (
-                   <div key={i} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-indigo-500/50 transition-colors">
+                   <div key={i} className="p-4 bg-[#1E293B]/30 rounded-xl border border-[#1E293B]/50 hover:border-indigo-500/50 transition-colors">
                      <p className="text-[10px] text-indigo-400 uppercase font-black mb-1">{plan.title} ({plan.channel})</p>
                      <p className="text-sm text-slate-200 font-medium leading-relaxed mb-3">{plan.description}</p>
                      
@@ -347,7 +347,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
 
       {!isSchool && (
         <div className="bg-amber-100/50 border border-amber-200 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 shadow-sm">
-           <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-inner">
+           <div className="w-16 h-16 bg-[#152035] rounded-2xl flex items-center justify-center shadow-inner">
               <TrendingUp className="w-8 h-8 text-amber-600" />
            </div>
            <div className="flex-1">
@@ -355,14 +355,14 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
               <p className="text-xs text-amber-800/70 leading-relaxed mt-1">Este motor analiza el <b>Expediente de cada Cliente</b>, su <b>Categoría Anual</b> (actualizada según volumen de ventas/pagos) y sus <b>Beneficios Específicos</b>. Detecta automáticamente quién sube o baja de nivel para sugerir acciones de retención o fidelización exclusiva.</p>
            </div>
            <div className="text-right">
-              <span className="text-[10px] font-black text-amber-600 uppercase bg-white px-3 py-1 rounded-full border border-amber-200">Actualización: Junio 2026</span>
+              <span className="text-[10px] font-black text-amber-600 uppercase bg-[#152035] px-3 py-1 rounded-full border border-amber-200">Actualización: Junio 2026</span>
            </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {campaigns.map((camp, i) => (
-          <div key={i} className={cn("group relative bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col hover:-translate-y-1 overflow-hidden")}>
+          <div key={i} className={cn("group relative bg-[#152035] p-8 rounded-[2.5rem] border border-[#1E293B] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col hover:-translate-y-1 overflow-hidden")}>
             <div className={cn("absolute top-0 right-0 p-12 opacity-[0.03] translate-x-6 -translate-y-6 group-hover:scale-110 transition-transform", 
               camp.color === 'blue' ? "text-blue-600" : camp.color === 'emerald' ? "text-emerald-600" : "text-amber-600")}>
               {camp.icon}
@@ -377,8 +377,8 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                 <h3 className="font-black text-slate-800 uppercase tracking-tight">{camp.title}</h3>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-2xl mb-6 relative">
-                 <div className="absolute left-0 top-4 w-1 h-8 bg-indigo-500 rounded-r" />
+              <div className="bg-[#0D1527] p-4 rounded-2xl mb-6 relative">
+                 <div className="absolute left-0 top-4 w-1 h-8 bg-[#111A2E]0 rounded-r" />
                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 italic">Razonamiento IA:</p>
                  <p className="text-sm font-medium text-slate-600 leading-relaxed italic">"{camp.reasoning}"</p>
               </div>
@@ -388,7 +388,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                   <span className="text-slate-400 font-bold uppercase">Audiencia Sugerida:</span>
                   <span className="bg-slate-900 text-white px-3 py-1 rounded-full font-black">{camp.audience.length} Clientes</span>
                 </div>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div className="bg-[#0D1527] p-3 rounded-xl border border-[#1E293B]">
                    <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Impacto Estimado:</p>
                    <div className="flex items-center gap-1">
                       {[1,2,3,4,5].map(star => <div key={star} className={cn("h-1.5 flex-1 rounded-full", star <= (i === 0 ? 4 : 3) ? "bg-amber-400" : "bg-slate-200")} />)}
@@ -412,9 +412,9 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
       </div>
 
       {selectedCampaign && (
-        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-[#152035] rounded-[3rem] border border-[#1E293B] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
            <div className="grid grid-cols-1 lg:grid-cols-2">
-              <div className="p-8 lg:p-12 border-b lg:border-b-0 lg:border-r border-slate-100 space-y-8">
+              <div className="p-8 lg:p-12 border-b lg:border-b-0 lg:border-r border-[#1E293B] space-y-8">
                  <div>
                     <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-2">Configurador de Campaña</h4>
                     <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Personalizar Mensaje Masivo</h3>
@@ -431,7 +431,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                             tabIndex={0}
                             onKeyDown={(e) => e.key === 'Enter' && setActiveTemplate(temp)}
                             className={cn("flex items-center justify-between p-5 rounded-2xl border-2 transition-all text-left cursor-pointer",
-                              activeTemplate?.id === temp.id ? "bg-indigo-50 border-indigo-500 shadow-md" : "bg-white border-slate-100 hover:border-slate-200")}
+                              activeTemplate?.id === temp.id ? "bg-[#111A2E] border-indigo-500 shadow-md" : "bg-[#152035] border-[#1E293B] hover:border-[#1E293B]")}
                           >
                              <div className="flex items-center gap-4 flex-1">
                                 <div className={cn("p-3 rounded-xl", temp.type === 'email' ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600")}>
@@ -444,7 +444,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                                 {activeTemplate?.id === temp.id && (
                                    <button 
                                      onClick={(e) => { e.stopPropagation(); setVariationIndex(v => v + 1); }}
-                                     className="p-2 hover:bg-white rounded-full text-indigo-400 hover:text-indigo-600 transition-colors mr-1 group/refresh"
+                                     className="p-2 hover:bg-[#152035] rounded-full text-indigo-400 hover:text-indigo-600 transition-colors mr-1 group/refresh"
                                      title="Sugerir otra variación"
                                    >
                                      <RefreshCw className="w-4 h-4 group-hover/refresh:rotate-180 transition-transform duration-500" />
@@ -468,14 +468,14 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                    }}
                    disabled={!activeTemplate}
                    className={cn("w-full py-5 rounded-2xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all",
-                     activeTemplate ? "bg-[#001736] text-white hover:bg-slate-800 shadow-xl" : "bg-slate-100 text-slate-400 cursor-not-allowed")}
+                     activeTemplate ? "bg-[#001736] text-white hover:bg-slate-800 shadow-xl" : "bg-[#111A2E] text-slate-400 cursor-not-allowed")}
                  >
                     {activeTemplate?.type === 'whatsapp' ? <MessageSquare className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
                     Ejecutar Campaña Masiva
                  </button>
               </div>
 
-                  <div className="p-8 lg:p-12 bg-slate-50/50 flex flex-col">
+                  <div className="p-8 lg:p-12 bg-[#0D1527]/50 flex flex-col">
                      <div className="flex items-center justify-between mb-8">
                         <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                            <FileText className="w-4 h-4" /> Vista Previa del Mensaje
@@ -483,7 +483,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                         {activeTemplate && (
                            <button 
                              onClick={() => setVariationIndex(v => v + 1)}
-                             className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-100 text-indigo-500 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border border-slate-100 shadow-sm"
+                             className="flex items-center gap-1.5 px-3 py-1 bg-[#152035] hover:bg-[#111A2E] text-indigo-500 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border border-[#1E293B] shadow-sm"
                            >
                              <RefreshCw className="w-3 h-3" /> Otra Opción AI
                            </button>
@@ -491,7 +491,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                      </div>
 
                  {activeTemplate ? (
-                    <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200 flex-grow flex flex-col max-w-md mx-auto w-full">
+                    <div className="bg-[#152035] rounded-3xl shadow-xl overflow-hidden border border-[#1E293B] flex-grow flex flex-col max-w-md mx-auto w-full">
                        <div className="bg-slate-900 p-4 flex items-center gap-3">
                           <div className="w-3 h-3 rounded-full bg-red-400" />
                           <div className="w-3 h-3 rounded-full bg-amber-400" />
@@ -499,7 +499,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                        </div>
                        <div className="p-6 lg:p-8 space-y-6">
                           {activeTemplate.type === 'email' && (
-                             <div className="space-y-1 border-b border-slate-100 pb-4">
+                             <div className="space-y-1 border-b border-[#1E293B] pb-4">
                                 <p className="text-[10px] text-slate-400 font-black uppercase">Asunto:</p>
                                 <p className="text-sm font-bold text-slate-800">{activeTemplate.subject}</p>
                              </div>
@@ -509,19 +509,19 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                              <div className={cn("p-6 rounded-2xl text-sm leading-relaxed relative", activeTemplate.type === 'email' ? "bg-blue-50 text-slate-700 shadow-inner" : "bg-emerald-50 text-slate-700 font-medium shadow-md border-l-4 border-emerald-400")}>
                                 {currentBody}
                                 {activeTemplate.type === 'whatsapp' && (
-                                   <div className="mt-4 flex justify-between items-center bg-white/40 p-2 rounded-lg">
+                                   <div className="mt-4 flex justify-between items-center bg-[#1E293B] p-2 rounded-lg">
                                       <div className="flex gap-1">
                                          <div className="w-1 h-1 bg-slate-300 rounded-full" />
                                          <div className="w-1 h-1 bg-slate-300 rounded-full" />
                                          <div className="w-1 h-1 bg-slate-300 rounded-full" />
                                       </div>
-                                      <div className="px-3 py-1 bg-white/50 rounded-lg text-[10px] text-slate-400">12:45 PM ✓✓</div>
+                                      <div className="px-3 py-1 bg-[#152035]/50 rounded-lg text-[10px] text-slate-400">12:45 PM ✓✓</div>
                                    </div>
                                 )}
                              </div>
                           </div>
-                          <div className="pt-6 border-t border-slate-100 flex items-center gap-4">
-                             <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                          <div className="pt-6 border-t border-[#1E293B] flex items-center gap-4">
+                             <div className="w-10 h-10 bg-[#111A2E] rounded-full flex items-center justify-center text-slate-400">
                                 <FileText className="w-5 h-5" />
                              </div>
                              <div>
@@ -544,7 +544,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
         </div>
       )}
 
-      <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+      <div className="bg-[#152035] border-2 border-[#1E293B] rounded-[2.5rem] overflow-hidden shadow-2xl relative">
          <div className="absolute top-0 right-0 p-8">
             <TrendingUp className="w-32 h-32 text-indigo-50 opacity-[0.05]" />
          </div>
@@ -553,38 +553,38 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
               <h3 className="text-xl font-black text-[#001736] uppercase tracking-tighter italic">Oportunidades Sugeridas (Insights)</h3>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Actualizado cada 5 minutos por el motor comercial</p>
            </div>
-           <button className="p-3 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
+           <button className="p-3 bg-[#0D1527] rounded-2xl hover:bg-[#111A2E] transition-colors">
               <ExternalLink className="w-5 h-5 text-slate-400" />
            </button>
          </div>
          <div className="p-0 overflow-x-auto relative z-10">
            <table className="w-full text-left text-sm">
-             <thead className="bg-slate-50 text-slate-400">
+             <thead className="bg-[#0D1527] text-slate-400">
                <tr>
                   <th className="p-6 text-[10px] font-black uppercase tracking-[0.2em] w-[25%] opacity-70">Cliente / Entidad</th>
-                  <th className="p-6 text-[10px] font-black uppercase tracking-[0.2em] w-[15%] opacity-70 border-l border-slate-100">{isSchool ? 'Estado Pago' : 'Categoría'}</th>
-                  <th className="p-6 text-[10px] font-black uppercase tracking-[0.2em] w-[30%] border-l border-slate-100">{isSchool ? 'Análisis Académico' : 'Motivo de Acción AI'}</th>
-                  <th className="p-6 text-[10px] font-black uppercase tracking-[0.2em] w-[30%] border-l border-slate-100">Acción Recomendada</th>
+                  <th className="p-6 text-[10px] font-black uppercase tracking-[0.2em] w-[15%] opacity-70 border-l border-[#1E293B]">{isSchool ? 'Estado Pago' : 'Categoría'}</th>
+                  <th className="p-6 text-[10px] font-black uppercase tracking-[0.2em] w-[30%] border-l border-[#1E293B]">{isSchool ? 'Análisis Académico' : 'Motivo de Acción AI'}</th>
+                  <th className="p-6 text-[10px] font-black uppercase tracking-[0.2em] w-[30%] border-l border-[#1E293B]">Acción Recomendada</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-100">
                {clients.slice(0, 10).map((client, i) => (
-                 <tr className="group hover:bg-slate-50 transition-all" key={client.id || i}>
+                 <tr className="group hover:bg-[#0D1527] transition-all" key={client.id || i}>
                     <td className="p-6">
                        <div className="flex flex-col">
                           <span className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{client.name || 'Sin nombre'}</span>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{client.rut || 'RUT Pendiente'}</span>
                        </div>
                     </td>
-                    <td className="p-6 border-l border-slate-100">
+                    <td className="p-6 border-l border-[#1E293B]">
                        <span className={cn("px-4 py-1.5 rounded-full text-[10px] uppercase font-black tracking-widest",
                          client.categoria === 'Gold' ? "bg-amber-100 text-amber-600 shadow-sm shadow-amber-50" : 
                          client.categoria === 'Bronce' ? "bg-orange-100 text-orange-600 shadow-sm shadow-orange-50" : 
-                         "bg-slate-100 text-slate-500")}>
+                         "bg-[#111A2E] text-slate-500")}>
                          {client.categoria || 'Prospecto'}
                        </span>
                     </td>
-                    <td className="p-6 border-l border-slate-100">
+                    <td className="p-6 border-l border-[#1E293B]">
                        <div className="flex items-start gap-2">
                           <div className="w-1.5 h-6 bg-slate-200 rounded-full group-hover:bg-amber-400 transition-colors" />
                           <p className="text-xs font-bold text-slate-500 leading-relaxed uppercase tracking-tighter opacity-80 group-hover:opacity-100 italic">
@@ -594,13 +594,13 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                           </p>
                        </div>
                     </td>
-                    <td className="p-6 border-l border-slate-100 relative">
+                    <td className="p-6 border-l border-[#1E293B] relative">
                         <button 
                             onClick={() => executeCampaign(templates[0], [client.email], [client.phone])}
-                            className="w-full flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl group/btn hover:border-indigo-500 hover:shadow-lg transition-all"
+                            className="w-full flex items-center justify-between p-4 bg-[#152035] border border-[#1E293B] rounded-2xl group/btn hover:border-indigo-500 hover:shadow-lg transition-all"
                         >
                             <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest group-hover/btn:text-indigo-600">Lanzar Reactivación</span>
-                            <div className="p-2 bg-slate-50 rounded-xl group-hover/btn:bg-indigo-50 group-hover/btn:text-indigo-600 transition-colors text-slate-400">
+                            <div className="p-2 bg-[#0D1527] rounded-xl group-hover/btn:bg-[#111A2E] group-hover/btn:text-indigo-600 transition-colors text-slate-400">
                                <ArrowUpRight className="w-4 h-4" />
                             </div>
                         </button>

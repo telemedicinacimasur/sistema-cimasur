@@ -82,15 +82,15 @@ export default function GestionView() {
     <div className="space-y-6">
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-[#001736]">Módulo de Gestión</h2>
-          <p className="text-slate-500 text-sm">Control y seguimiento especializado de clientes estratégicos.</p>
+          <h2 className="text-3xl font-bold text-white">Módulo de Gestión</h2>
+          <p className="text-slate-400 text-sm">Control y seguimiento especializado de clientes estratégicos.</p>
         </div>
-        <div className="flex gap-4 border-b border-slate-200">
+        <div className="flex gap-4 border-b border-[#1E293B]">
           <button 
             onClick={() => setActiveTab('register')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'register' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'register' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
             )}
           >
             Ingreso de Cliente
@@ -99,7 +99,7 @@ export default function GestionView() {
             onClick={() => setActiveTab('list')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'list' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'list' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
             )}
           >
             Gestión de Clientes
@@ -220,11 +220,11 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
 
   return (
     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[1000] flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-7xl h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+      <div className="bg-[#152035] rounded-3xl w-full max-w-7xl h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="bg-[#001736] p-6 text-white flex justify-between items-center shrink-0 border-b border-white/10 shadow-lg">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  flex justify-between items-center shrink-0 border-b border-[#1E293B] shadow-lg">
           <div className="flex items-center gap-4">
-             <div className="p-2 bg-blue-500/20 rounded-xl">
+             <div className="p-2 bg-[#152035]/20 rounded-2xl">
                <FileText className="w-6 h-6 text-blue-400" />
              </div>
              <div>
@@ -234,7 +234,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
           </div>
           <button 
             onClick={onClose} 
-            className="text-white bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white font-black text-xs uppercase tracking-widest px-6 py-2.5 rounded-xl transition-all"
+            className="text-white bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white font-black text-xs uppercase tracking-widest px-6 py-2.5 rounded-2xl transition-all"
           >
             Cerrar Expediente
           </button>
@@ -242,7 +242,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
 
         <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
           {/* Main Workspace (Left) - Detailed & Larger */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-slate-50/50">
+          <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-[#152035]/50">
             {/* Info Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                {[
@@ -251,9 +251,9 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                  { label: 'Tipo Empresa', val: client.tipoEmpresa || 'Otros' },
                  { label: 'Fecha Ingreso', val: formatDate(client.fechaIngreso) }
                ].map((item, i) => (
-                 <div key={i} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm">
+                 <div key={i} className="bg-[#152035] border border-[#1E293B] p-5 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
                     <div className="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-widest">{item.label}</div>
-                    <div className="text-slate-700 font-bold text-sm truncate">{item.val}</div>
+                    <div className="text-slate-200 font-bold text-sm truncate">{item.val}</div>
                  </div>
                ))}
             </div>
@@ -262,7 +262,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-[11px] font-black uppercase text-blue-900 tracking-[0.2em] flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-[#152035] rounded-full animate-pulse" />
                   Historial Detallado de Actividades
                 </h4>
                 <div className="text-[10px] text-slate-400 font-bold">{activities.length} registros encontrados</div>
@@ -270,13 +270,13 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
               
               <div className="space-y-4">
                 {activities.map((act) => (
-                  <div key={act.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group relative">
+                  <div key={act.id} className="bg-[#152035] border border-[#1E293B] rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-md transition-all group relative">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex gap-4">
-                        <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-blue-100">
+                        <div className="px-3 py-1 bg-[#152035] text-[#38BDF8] rounded-2xl text-[10px] font-black uppercase tracking-widest border border-blue-100">
                           {formatDate(act.fecha)}
                         </div>
-                        <div className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                        <div className="px-3 py-1 bg-[#111A2E] text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[#1E293B]">
                           {act.actividad}
                         </div>
                         <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold italic">
@@ -286,20 +286,20 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                       </div>
                       <button 
                         onClick={() => handleDeleteActivity(act.id, act.detalle)}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:bg-red-50 rounded-2xl transition-all"
                         title="Eliminar este regitro"
                       >
                          <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-slate-100">
+                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-[#1E293B]">
                       {act.detalle}
                     </p>
                   </div>
                 ))}
 
                 {activities.length === 0 && (
-                  <div className="bg-white/50 border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
+                  <div className="bg-[#152035]/50 border-2 border-dashed border-[#1E293B] rounded-2xl p-12 text-center">
                     <History className="w-8 h-8 text-slate-200 mx-auto mb-3" />
                     <p className="text-slate-400 text-xs italic tracking-wide">No se han registrado actividades para este expediente aún.</p>
                   </div>
@@ -309,10 +309,10 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
           </div>
 
           {/* Action Sidebar (Right) */}
-          <div className="w-full lg:w-96 border-l border-slate-200 p-8 space-y-8 bg-white shrink-0 overflow-y-auto">
+          <div className="w-full lg:w-96 border-l border-[#1E293B] p-8 space-y-8 bg-[#152035] shrink-0 overflow-y-auto">
             <div className="space-y-6">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-600 tracking-widest border-b pb-4">
-                 <Save className="w-4 h-4 text-blue-600" />
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 tracking-widest border-b pb-4">
+                 <Save className="w-4 h-4 text-[#38BDF8]" />
                  Nueva Gestión / Seguimiento
               </div>
 
@@ -320,7 +320,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Actividad</label>
                     <select 
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                      className="w-full p-4 bg-[#152035] border border-[#1E293B] rounded-2xl text-xs font-bold text-slate-200 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
                       value={newActivityType}
                       onChange={e => setNewActivityType(e.target.value)}
                     >
@@ -339,7 +339,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalle de la Actividad</label>
                     <textarea 
-                      className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all resize-none"
+                      className="w-full h-40 p-4 bg-[#152035] border border-[#1E293B] rounded-2xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all resize-none"
                       placeholder="Escriba los pormenores de la gestión realizada..."
                       value={newNote}
                       onChange={e => setNewNote(e.target.value)}
@@ -350,7 +350,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoría</label>
                       <select 
-                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                        className="w-full p-4 bg-[#152035] border border-[#1E293B] rounded-2xl text-xs font-bold text-slate-200 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
                         value={newCategory}
                         onChange={e => setNewCategory(e.target.value)}
                       >
@@ -360,7 +360,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado Actual</label>
                       <select 
-                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                        className="w-full p-4 bg-[#152035] border border-[#1E293B] rounded-2xl text-xs font-bold text-slate-200 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
                         value={newState}
                         onChange={e => setNewState(e.target.value)}
                       >
@@ -372,7 +372,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                   <button 
                     onClick={handleAddActivity}
                     disabled={loading}
-                    className="w-full bg-[#001736] text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:translate-y-[-2px] hover:shadow-blue-900/20 active:translate-y-0 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
+                    className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:translate-y-[-2px] hover:shadow-blue-900/20 active:translate-y-0 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
                   >
                     {loading ? (
                       <RefreshCw className="w-5 h-5 animate-spin" />
@@ -568,8 +568,8 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+    <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden animate-in fade-in duration-500">
+      <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
         <div className="flex items-center gap-2">
           <UserPlus className="w-5 h-5" /> Registro de Nuevo Cliente en Gestión
         </div>
@@ -577,7 +577,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
           <input type="file" ref={fileInputRef} onChange={handleImportExcel} className="hidden" accept=".xlsx, .xls" />
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-2xl text-xs flex items-center gap-2 shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-colors"
           >
             <FileSpreadsheet className="w-4 h-4" /> Importar Excel
           </button>
@@ -589,7 +589,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
               XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
               XLSX.writeFile(wb, "plantilla_importacion_gestion.xlsx");
             }}
-            className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-colors"
+            className="bg-slate-700 hover:bg-[#152035] text-white px-4 py-1.5 rounded-2xl text-xs flex items-center gap-2 shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-colors"
           >
             <Download className="w-4 h-4" /> Plantilla
           </button>
@@ -632,7 +632,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
             <input className="w-full border-b p-2 text-sm" value={form.especialidadCliente} onChange={e => setForm({...form, especialidadCliente: e.target.value})} placeholder="Ej: Traumatología" />
           </GestionField>
           <GestionField label="Medio de Contacto">
-             <select className="w-full border-b p-2 text-sm font-bold text-blue-600" value={form.medioContacto} onChange={e => setForm({...form, medioContacto: e.target.value})}>
+             <select className="w-full border-b p-2 text-sm font-bold text-[#38BDF8]" value={form.medioContacto} onChange={e => setForm({...form, medioContacto: e.target.value})}>
                 <option value="Google Form">Google Form</option>
                 <option value="RSS">RSS</option>
                 <option value="Pagina web">Página Web</option>
@@ -642,7 +642,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
           </GestionField>
           {form.medioContacto === 'Otros' && (
             <GestionField label="Detalle Medio">
-              <input className="w-full border-b p-2 text-sm bg-blue-50" placeholder="¿Cuál medio?" value={form.medioContactoDetalle} onChange={e => setForm({...form, medioContactoDetalle: e.target.value})}/>
+              <input className="w-full border-b p-2 text-sm bg-[#152035]" placeholder="¿Cuál medio?" value={form.medioContactoDetalle} onChange={e => setForm({...form, medioContactoDetalle: e.target.value})}/>
             </GestionField>
           )}
           <GestionField label="Categoría">
@@ -651,14 +651,14 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
              </select>
           </GestionField>
           <GestionField label="Estado">
-             <select className="w-full border-b p-2 text-sm font-bold text-blue-600" value={form.estado} onChange={e => setForm({...form, estado: e.target.value})}>
+             <select className="w-full border-b p-2 text-sm font-bold text-[#38BDF8]" value={form.estado} onChange={e => setForm({...form, estado: e.target.value})}>
                 {ESTADOS.filter(e => e !== 'Todos').map(e => <option key={e} value={e}>{e}</option>)}
              </select>
           </GestionField>
         </div>
         <GestionField label="Observaciones">
            <textarea 
-             className="w-full h-32 p-4 border rounded-xl bg-slate-50 outline-none focus:bg-white" 
+             className="w-full h-32 p-4 border rounded-2xl bg-[#152035] outline-none focus:bg-[#152035]" 
              value={form.observaciones}
              onChange={e => setForm({...form, observaciones: e.target.value})}
              placeholder="Primeras notas sobre el cliente..."
@@ -666,16 +666,16 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
         </GestionField>
         
         {!initialData && (
-          <div className="flex items-center gap-2 p-4 bg-[#f0f4f8] rounded-xl border border-blue-100">
+          <div className="flex items-center gap-2 p-4 bg-[#f0f4f8] rounded-2xl border border-blue-100">
             <input 
               type="checkbox" 
               id="duplicateCRM" 
               checked={duplicateToCRM}
               onChange={e => setDuplicateToCRM(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded bg-white border-blue-300 focus:ring-blue-500"
+              className="w-4 h-4 text-[#38BDF8] rounded bg-[#152035] border-blue-300 focus:ring-blue-500"
             />
-            <label htmlFor="duplicateCRM" className="text-sm font-bold text-slate-700 select-none">
-              Duplicar automáticamente este registro en <span className="text-blue-600">CRM Comercial</span>
+            <label htmlFor="duplicateCRM" className="text-sm font-bold text-slate-200 select-none">
+              Duplicar automáticamente este registro en <span className="text-[#38BDF8]">CRM Comercial</span>
             </label>
           </div>
         )}
@@ -685,12 +685,12 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
              <button 
                type="button"
                onClick={onCancel}
-               className="bg-slate-200 text-slate-700 px-10 py-3 rounded-xl font-bold hover:bg-slate-300 transition-all"
+               className="bg-[#1E293B] text-slate-200 px-10 py-3 rounded-2xl font-bold hover:bg-slate-300 transition-all"
              >
                CANCELAR
              </button>
            )}
-           <button type="submit" className="bg-[#001736] text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
+           <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-10 py-3 rounded-2xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
              <Save className="w-5 h-5" /> {initialData ? 'ACTUALIZAR' : 'GUARDAR'} EN GESTIÓN
            </button>
         </div>
@@ -758,7 +758,7 @@ function GestionList({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+      <div className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
          <div className="relative md:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
@@ -798,7 +798,7 @@ function GestionList({
                  ]);
                  exportTableToExcel('Clientes Gestión Completo', headers, data, 'listado_gestion_todo');
               }}
-              className="bg-emerald-600 text-white p-2 rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2 text-[10px] font-bold"
+              className="bg-emerald-600 text-white p-2 rounded-2xl hover:bg-emerald-700 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-2 text-[10px] font-bold"
               title="Exportar Todo a Excel"
             >
                <FileSpreadsheet className="w-5 h-5" /> EXPORTAR TODO
@@ -806,64 +806,64 @@ function GestionList({
          </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
               <thead>
-                 <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
-                    <th className="p-4 bg-[#001736]">F. Registro</th>
-                    <th className="p-4 bg-[#001736]">Cliente / Info Contacto</th>
-                    <th className="p-4 border-l border-white/10 bg-[#001736]">Ubicación / Tipo</th>
-                    <th className="p-4 border-l border-white/10 bg-[#001736]">Gestión / Categoría</th>
-                    <th className="p-4 text-right bg-[#001736]">Acciones</th>
+                 <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  border-b text-left text-[10px] font-black uppercase tracking-widest">
+                    <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">F. Registro</th>
+                    <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cliente / Info Contacto</th>
+                    <th className="p-4 border-l border-[#1E293B] bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Ubicación / Tipo</th>
+                    <th className="p-4 border-l border-[#1E293B] bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Gestión / Categoría</th>
+                    <th className="p-4 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
                  </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                  {filtered.map(r => (
-                   <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                   <tr key={r.id} className="hover:bg-[#152035] transition-colors">
                       <td className="p-4 align-top">
-                         <div className="text-slate-500 font-mono font-bold whitespace-nowrap">{formatDate(r.fechaIngreso)}</div>
+                         <div className="text-slate-400 font-mono font-bold whitespace-nowrap">{formatDate(r.fechaIngreso)}</div>
                          <div className="text-[9px] text-slate-400 mt-1 uppercase tracking-tight">Vía: {r.medioContacto || '---'}</div>
                       </td>
                       <td className="p-4 align-top">
-                         <div className="font-bold text-[#001736] text-sm uppercase">{r.nombre || r.cliente}</div>
+                         <div className="font-bold text-white text-sm uppercase">{r.nombre || r.cliente}</div>
                          <div className="text-[10px] text-slate-400 font-mono mb-2">{r.rut}</div>
                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-slate-500">
+                            <div className="flex items-center gap-2 text-slate-400">
                                <Phone className="w-3 h-3" /> {r.celular || '---'}
                             </div>
-                            <div className="flex items-center gap-2 text-slate-500">
+                            <div className="flex items-center gap-2 text-slate-400">
                                <Mail className="w-3 h-3" /> {r.email || '---'}
                             </div>
                          </div>
                       </td>
                       <td className="p-4 border-l align-top">
-                         <div className="flex items-center gap-1.5 text-slate-700 font-bold mb-1 uppercase tracking-tighter">
+                         <div className="flex items-center gap-1.5 text-slate-200 font-bold mb-1 uppercase tracking-tighter">
                             <MapPin className="w-3 h-3 text-red-400" /> {r.comuna || '---'}
                          </div>
                          <div className="text-[10px] text-slate-400 mb-2">{r.region || '---'}</div>
-                         <div className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded inline-block text-[9px] font-bold uppercase">
+                         <div className="px-2 py-0.5 bg-[#111A2E] text-slate-300 rounded inline-block text-[9px] font-bold uppercase">
                             {r.tipoEmpresa || 'Otros'}
                          </div>
                       </td>
                       <td className="p-4 border-l align-top">
                          <div className="mb-2">
                            <span className={cn(
-                             "px-3 py-1 rounded-full text-[9px] font-black uppercase shadow-sm border",
+                             "px-3 py-1 rounded-full text-[9px] font-black uppercase shadow-[0_4px_20px_rgba(0,0,0,0.4)] border",
                              r.categoria === 'Platinum' ? "bg-purple-50 text-purple-700 border-purple-200" :
                              r.categoria === 'Oro' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                             r.categoria === 'Plata' ? "bg-slate-50 text-slate-700 border-slate-300" :
-                             "bg-slate-50 text-slate-500 border-slate-200"
+                             r.categoria === 'Plata' ? "bg-[#152035] text-slate-200 border-[#1E293B]" :
+                             "bg-[#152035] text-slate-400 border-[#1E293B]"
                            )}>{r.categoria || 'Sin categoría'}</span>
                          </div>
                          <div className="mb-2">
                            <span className={cn(
-                             "px-3 py-1 rounded-full text-[9px] font-black uppercase shadow-sm border",
+                             "px-3 py-1 rounded-full text-[9px] font-black uppercase shadow-[0_4px_20px_rgba(0,0,0,0.4)] border",
                              r.estado === 'Finalizado' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                             r.estado === 'En proceso' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                             r.estado === 'En proceso' ? "bg-[#152035] text-[#38BDF8] border-blue-200" :
                              r.estado === 'Sin compra' ? "bg-red-50 text-red-700 border-red-200" :
-                             r.estado === 'Con compra' ? "bg-blue-50 text-blue-800 border-blue-300" :
-                             "bg-slate-50 text-slate-500 border-slate-200"
+                             r.estado === 'Con compra' ? "bg-[#152035] text-white border-blue-300" :
+                             "bg-[#152035] text-slate-400 border-[#1E293B]"
                            )}>{r.estado || 'En proceso'}</span>
                          </div>
                          <div className="text-[9px] text-slate-400 italic">Resp: {r.consultora}</div>
@@ -872,7 +872,7 @@ function GestionList({
                          <div className="flex justify-end gap-2 text-white">
                             <button 
                               onClick={() => onOpenExpediente(r.id)}
-                              className="bg-[#001736] p-2 rounded-lg hover:bg-blue-900 transition-all shadow-sm"
+                              className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-2 rounded-2xl hover:bg-blue-900 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
                               title="Gestionar Expediente"
                             >
                                <History className="w-4 h-4" />
@@ -912,14 +912,14 @@ function GestionList({
                                   pdf.viewExpedienteInNewTab(`Expediente Gestión: ${r.nombre || r.cliente}`, data, `gestion_${r.rut}`, tables);
                                 });
                               }}
-                              className="bg-blue-500 p-2 rounded-lg hover:bg-blue-600 transition-all shadow-sm"
+                              className="bg-[#152035] p-2 rounded-2xl hover:bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
                               title="Ver Expediente (Pestaña)"
                             >
                                <ExternalLink className="w-4 h-4" />
                             </button>
                             <button 
                               onClick={() => onEdit(r)}
-                              className="bg-emerald-500 p-2 rounded-lg hover:bg-emerald-600 transition-all shadow-sm"
+                              className="bg-emerald-500 p-2 rounded-2xl hover:bg-emerald-600 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
                               title="Editar Información"
                             >
                                <Pencil className="w-4 h-4" />
@@ -929,7 +929,7 @@ function GestionList({
                                 e.stopPropagation();
                                 handleDelete(r.id, r.nombre || r.cliente);
                               }}
-                              className="bg-red-500 p-2 rounded-lg hover:bg-red-600 transition-all shadow-sm"
+                              className="bg-red-500 p-2 rounded-2xl hover:bg-red-600 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
                               title="Eliminar de Gestión"
                             >
                                <Trash2 className="w-4 h-4" />

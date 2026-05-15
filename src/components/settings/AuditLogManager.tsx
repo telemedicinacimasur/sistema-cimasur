@@ -19,14 +19,14 @@ export function AuditLogManager() {
   if (!isAdmin) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
+    <div className="bg-[#152035] rounded-xl border border-[#1E293B] shadow-sm overflow-hidden animate-in fade-in duration-500">
       <div className="bg-[#001736] p-4 text-white font-bold flex items-center gap-2">
         <FileText className="w-5 h-5" /> Registro de Auditoría Global
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-50 text-left border-b font-black text-slate-500 uppercase">
+            <tr className="bg-[#0D1527] text-left border-b font-black text-slate-500 uppercase">
               <th className="p-4">Timestamp</th>
               <th className="p-4">Usuario</th>
               <th className="p-4">Email</th>
@@ -36,7 +36,7 @@ export function AuditLogManager() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {records.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map(r => (
-              <tr key={r.id || r.timestamp} className="hover:bg-slate-50 transition-colors italic">
+              <tr key={r.id || r.timestamp} className="hover:bg-[#0D1527] transition-colors italic">
                 <td className="p-4">{formatDateTimeChile(r.timestamp)}</td>
                 <td className="p-4 font-bold">{r.displayName}</td>
                 <td className="p-4 text-slate-500">{r.email}</td>

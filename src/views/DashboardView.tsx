@@ -67,7 +67,7 @@ export default function DashboardView() {
       description: 'Gestión técnica, registros de elaboración y protocolos.',
       icon: FlaskConical,
       path: '/laboratorio',
-      color: 'bg-emerald-500 text-white',
+      color: 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
       roles: ['admin', 'lab']
     },
     {
@@ -75,7 +75,7 @@ export default function DashboardView() {
       description: 'Seguimiento de cotizaciones, ingreso de documentos y registro de unidades.',
       icon: ShieldCheck,
       path: '/administracion',
-      color: 'bg-[#001736] text-white',
+      color: 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 shadow-[0_0_15px_rgba(56,189,248,0.2)]',
       roles: ['admin', 'manager']
     },
     {
@@ -83,7 +83,7 @@ export default function DashboardView() {
       description: 'Gestión de clientes, registros de interacción y seguimiento.',
       icon: TrendingUp,
       path: '/crm',
-      color: 'bg-orange-500 text-white',
+      color: 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]',
       roles: ['admin', 'crm']
     },
     {
@@ -91,7 +91,7 @@ export default function DashboardView() {
       description: 'Módulo de gestión y seguimiento de clientes estratégicos.',
       icon: TrendingUp,
       path: '/gestion',
-      color: 'bg-purple-600 text-white',
+      color: 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]',
       roles: ['admin', 'gestion']
     },
     {
@@ -99,7 +99,7 @@ export default function DashboardView() {
       description: 'Gestión Integral del Alumno (Matrícula, Seguimiento y Control Académico).',
       icon: GraduationCap,
       path: '/escuela',
-      color: 'bg-indigo-600 text-white',
+      color: 'bg-[#8B5CF6]/20 text-[#8B5CF6] border border-[#8B5CF6]/50 shadow-[0_0_15px_rgba(139,92,246,0.2)]',
       roles: ['admin', 'school']
     }
   ];
@@ -117,50 +117,49 @@ export default function DashboardView() {
           <Link
             key={module.path}
             to={module.path}
-            className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 hover:border-[#60a5fa] hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col text-left relative overflow-hidden"
+            className="group bg-[#152035] p-6 rounded-[2.5rem] border border-[#1E293B] hover:border-[#38BDF8]/50 hover:shadow-[0_0_40px_rgba(56,189,248,0.15)] hover:-translate-y-2 transition-all duration-300 flex flex-col text-left relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity">
-               <module.icon className="w-24 h-24 text-[#001736]" />
+               <module.icon className="w-24 h-24 text-white" />
             </div>
-            <div className={`w-14 h-14 rounded-2xl ${module.color} flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 shadow-xl`}>
+            <div className={`w-14 h-14 rounded-2xl ${module.color} flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
               <module.icon className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-black text-[#001736] mb-2 uppercase tracking-tighter">{module.name}</h3>
-            <p className="text-slate-500 text-xs font-bold leading-relaxed mb-6">
+            <h3 className="text-lg font-black text-white mb-2 uppercase tracking-tighter">{module.name}</h3>
+            <p className="text-slate-400 text-xs font-bold leading-relaxed mb-6">
               {module.description}
             </p>
-            <div className="mt-auto flex items-center text-[#60a5fa] font-black text-[10px] uppercase tracking-widest gap-2">
+            <div className="mt-auto flex items-center text-[#38BDF8] font-black text-[10px] uppercase tracking-widest gap-2">
               Ingresar al Módulo <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
             </div>
           </Link>
         ))}
       </div>
 
-      <div className="relative rounded-[3rem] overflow-hidden h-[400px] shadow-2xl group border border-slate-100">
+      <div className="relative rounded-[3rem] overflow-hidden h-[400px] shadow-2xl group border border-[#1E293B]">
         <img 
           src="https://cimasur.cl/wp-content/uploads/2023/12/Portada-web-1.jpg" 
           alt="Lab Banner" 
           className="w-full h-full object-cover transition-transform duration-[20s] group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#001736]/90 via-[#001736]/60 to-transparent flex flex-col justify-center px-16">
-          <div className="w-16 h-1 bg-blue-500 mb-8 rounded-full" />
-          <h2 className="text-4xl lg:text-6xl font-black text-white mb-4 tracking-tighter uppercase italic drop-shadow-lg leading-tight text-white">SISTEMA<br/>CIMASUR</h2>
+        <div className="absolute inset-0 bg-gradient-to-r from-[#1E3A5F]/90 via-[#1E3A5F]/60 to-transparent flex flex-col justify-center px-16">
+          <div className="w-16 h-1 bg-[#152035] mb-8 rounded-full" />
+          <h2 className="text-4xl lg:text-6xl font-black text-white mb-4 tracking-tighter uppercase italic drop-shadow-lg leading-tight">SISTEMA<br/>CIMASUR</h2>
         </div>
       </div>
-      
-      {/* Parte de abajo (Footer contextual) */}
-      <div className="flex justify-between items-center bg-slate-900 p-6 rounded-3xl shadow-2xl text-white">
+            {/* Parte de abajo (Footer contextual) */}
+      <div className="flex justify-between items-center bg-[#1E3A5F] p-6 rounded-3xl shadow-2xl text-white">
         <div className="flex gap-8">
            <div className="flex items-center gap-3">
              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ring-4 ring-emerald-400/20" />
-             <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">System Online</span>
+             <span className="text-[10px] font-black uppercase tracking-widest text-white">System Online</span>
            </div>
            <div className="flex items-center gap-3">
              <div className="w-2 h-2 rounded-full bg-blue-400 ring-4 ring-blue-400/20" />
-             <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Modules Synchronized</span>
+             <span className="text-[10px] font-black uppercase tracking-widest text-white">Modules Synchronized</span>
            </div>
         </div>
-        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+        <div className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
            <Activity className="w-3 h-3" /> v4.5.0 © 2026 CIMASUR BIOTECHNOLOGY
         </div>
       </div>

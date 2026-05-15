@@ -65,10 +65,10 @@ export default function SchoolView() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black text-[#001736] tracking-tight">Centro Académico CIMASUR</h2>
-          <p className="text-slate-500 text-sm">Ecosistema integrado de captación, formación y seguimiento.</p>
+          <h2 className="text-3xl font-black text-white tracking-tight">Centro Académico CIMASUR</h2>
+          <p className="text-slate-400 text-sm">Ecosistema integrado de captación, formación y seguimiento.</p>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <div className="flex bg-[#111A2E] p-1 rounded-2xl border border-[#1E293B]">
            <TabButton active={activeView === 'register'} onClick={() => setActiveView('register')} icon={UserPlus}>Captación</TabButton>
            <TabButton active={activeView === 'students'} onClick={() => setActiveView('students')} icon={GraduationCap}>Alumnos</TabButton>
            <TabButton active={activeView === 'tracking'} onClick={() => setActiveView('tracking')} icon={LineChart}>Vista 360°</TabButton>
@@ -93,8 +93,8 @@ function TabButton({ active, onClick, icon: Icon, children }: any) {
     <button 
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
-        active ? "bg-white text-[#001736] shadow-sm" : "text-slate-400 hover:text-slate-600"
+        "flex items-center gap-2 px-6 py-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all",
+        active ? "bg-[#152035] text-white shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "text-slate-400 hover:text-slate-300"
       )}
     >
       <Icon className="w-4 h-4" />
@@ -337,8 +337,8 @@ function ContactRegister({ records }: { records: any[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-6">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-          <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+        <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-x-auto">
+          <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
                <span className="flex items-center gap-2">Registro de Potenciales Alumnos</span>
                <div className="flex gap-2">
                  <input 
@@ -359,13 +359,13 @@ function ContactRegister({ records }: { records: any[] }) {
                  <button 
                    type="button"
                    onClick={() => fileInputRef.current?.click()}
-                   className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+                   className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
                  >
                    <Upload className="w-3.5 h-3.5" /> Importar
                  </button>
                </div>
             </div>
-            <div className="bg-white p-6 border-b flex justify-between items-center">
+            <div className="bg-[#152035] p-6 border-b flex justify-between items-center">
               <input 
                 className="w-64 border rounded-full px-4 py-2 text-xs" 
                 placeholder="Buscar por nombre, RUT o email..."
@@ -381,7 +381,7 @@ function ContactRegister({ records }: { records: any[] }) {
                <FormGroup label="Teléfono / WhatsApp"><input className="w-full border-b p-2" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} /></FormGroup>
                
                <FormGroup label="CLASIFICACIÓN PROFESIONAL">
-                  <select className="w-full border-b p-2 text-sm font-bold text-blue-700" value={form.clasificacion || ''} onChange={e => setForm({...form, clasificacion: e.target.value})}>
+                  <select className="w-full border-b p-2 text-sm font-bold text-[#38BDF8]" value={form.clasificacion || ''} onChange={e => setForm({...form, clasificacion: e.target.value})}>
                     {CLASIFICACIONES.map(c => <option key={c}>{c}</option>)}
                   </select>
                </FormGroup>
@@ -394,12 +394,12 @@ function ContactRegister({ records }: { records: any[] }) {
 
                <div className="col-span-full">
                   <FormGroup label="Observaciones de seguimiento">
-                    <textarea className="w-full border rounded-xl p-4 h-24 bg-slate-50 outline-none focus:bg-white" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} />
+                    <textarea className="w-full border rounded-2xl p-4 h-24 bg-[#152035] outline-none focus:bg-[#152035]" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} />
                   </FormGroup>
                </div>
                
-               <div className="col-span-full border-t border-slate-200 mt-4 pt-6">
-                  <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Datos de Matrícula / Pago</h4>
+               <div className="col-span-full border-t border-[#1E293B] mt-4 pt-6">
+                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Datos de Matrícula / Pago</h4>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                      <FormGroup label="Total de Venta (Opcional)"><input type="number" className="w-full border-b p-2" value={form.montoTotalPagado ?? ''} onChange={e => setForm({...form, montoTotalPagado: e.target.value})} /></FormGroup>
                      <FormGroup label="Monto Recibido"><input type="number" className="w-full border-b p-2 font-black text-emerald-600 bg-emerald-50 rounded" value={form.montoTotalRecibido ?? ''} onChange={e => setForm({...form, montoTotalRecibido: e.target.value})} /></FormGroup>
@@ -412,14 +412,14 @@ function ContactRegister({ records }: { records: any[] }) {
                </div>
                
                <div className="col-span-full flex gap-3">
-                 <button type="submit" className="flex-1 bg-[#001736] text-white py-4 rounded-xl font-bold shadow-xl flex items-center justify-center gap-3">
+                 <button type="submit" className="flex-1 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3">
                     <Save className="w-5 h-5" /> {editingId ? 'ACTUALIZAR LEAD ACADÉMICO' : 'GUARDAR LEAD ACADÉMICO'}
                  </button>
                  {editingId && (
                    <button type="button" onClick={() => {
                      setEditingId(null);
                      setForm({ ...form, name: '', rut: '', email: '', phone: '', observaciones: '', montoTotalPagado: 0, montoTotalRecibido: 0, nroFactura: '', fechaFactura: '', observacionesPago: '' });
-                   }} className="px-6 bg-slate-200 text-slate-700 py-4 rounded-xl font-bold shadow-xl flex items-center justify-center">
+                   }} className="px-6 bg-[#1E293B] text-slate-200 py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center">
                       CANCELAR
                    </button>
                  )}
@@ -494,28 +494,28 @@ function ContactRegister({ records }: { records: any[] }) {
               await confirmTransfer(new Event('submit') as any, selectedLead);
             }}
             extraTransferFields={(
-              <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 mt-4 space-y-4">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-2">Datos de Matrícula (Opcional)</h4>
+              <div className="bg-[#111A2E] p-4 rounded-2xl border border-[#1E293B] mt-4 space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-[#1E293B] pb-2">Datos de Matrícula (Opcional)</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Monto Total de Venta</label>
-                    <input type="number" className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.montoTotalPagado ?? 0} onChange={e => setTransferPaymentForm({...transferPaymentForm, montoTotalPagado: Number(e.target.value)})} />
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Monto Total de Venta</label>
+                    <input type="number" className="w-full border-b bg-[#152035] border-[#1E293B] p-2 text-sm outline-none" value={transferPaymentForm.montoTotalPagado ?? 0} onChange={e => setTransferPaymentForm({...transferPaymentForm, montoTotalPagado: Number(e.target.value)})} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase text-emerald-600 tracking-wider">Monto Recibido</label>
                     <input type="number" className="w-full border-b bg-emerald-50 border-emerald-300 p-2 text-sm font-bold text-emerald-700 outline-none" value={transferPaymentForm.montoTotalRecibido ?? 0} onChange={e => setTransferPaymentForm({...transferPaymentForm, montoTotalRecibido: Number(e.target.value)})} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">N° Factura</label>
-                    <input className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.nroFactura || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, nroFactura: e.target.value})} />
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">N° Factura</label>
+                    <input className="w-full border-b bg-[#152035] border-[#1E293B] p-2 text-sm outline-none" value={transferPaymentForm.nroFactura || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, nroFactura: e.target.value})} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Fecha Factura</label>
-                    <input type="date" className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.fechaFactura || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, fechaFactura: e.target.value})} />
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Fecha Factura</label>
+                    <input type="date" className="w-full border-b bg-[#152035] border-[#1E293B] p-2 text-sm outline-none" value={transferPaymentForm.fechaFactura || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, fechaFactura: e.target.value})} />
                   </div>
                   <div className="col-span-2 space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Estado Pago</label>
-                    <select className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none" value={transferPaymentForm.estadoPago} onChange={e => setTransferPaymentForm({...transferPaymentForm, estadoPago: e.target.value})}>
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Estado Pago</label>
+                    <select className="w-full border-b bg-[#152035] border-[#1E293B] p-2 text-sm outline-none" value={transferPaymentForm.estadoPago} onChange={e => setTransferPaymentForm({...transferPaymentForm, estadoPago: e.target.value})}>
                       <option value="Pendiente">Pendiente</option>
                       <option value="Pagado">Pagado</option>
                       <option value="En cuotas">En cuotas</option>
@@ -523,8 +523,8 @@ function ContactRegister({ records }: { records: any[] }) {
                     </select>
                   </div>
                   <div className="col-span-2 space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Observación Pago</label>
-                    <input className="w-full border-b bg-white border-slate-300 p-2 text-sm outline-none italic" value={transferPaymentForm.observaciones || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, observaciones: e.target.value})} placeholder={`Matrícula: ${selectedLead.interes}`} />
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Observación Pago</label>
+                    <input className="w-full border-b bg-[#152035] border-[#1E293B] p-2 text-sm outline-none italic" value={transferPaymentForm.observaciones || ''} onChange={e => setTransferPaymentForm({...transferPaymentForm, observaciones: e.target.value})} placeholder={`Matrícula: ${selectedLead.interes}`} />
                   </div>
                 </div>
               </div>
@@ -543,38 +543,38 @@ function ContactRegister({ records }: { records: any[] }) {
       </div>
 
       <div className="space-y-6">
-         <div className="bg-[#001736] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
+         <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] rounded-2xl p-6  shadow-xl relative overflow-hidden group">
             <TrendingUp className="absolute top-[-10px] right-[-10px] w-24 h-24 text-white/5 group-hover:scale-110 transition-transform" />
             <h4 className="text-[10px] font-black uppercase opacity-70 tracking-widest mb-1">Potenciales Alumnos Registrados</h4>
             <p className="text-4xl font-black">{records.length}</p>
          </div>
-         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-hidden">
-                <h4 className="font-black text-[#001736] text-[10px] uppercase mb-4 tracking-widest border-b pb-2 flex justify-between items-center">
+         <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] p-6 overflow-hidden">
+                <h4 className="font-black text-white text-[10px] uppercase mb-4 tracking-widest border-b pb-2 flex justify-between items-center">
                 <span>Gestionar Captaciones</span>
                 <button
                   onClick={() => {
                     const data = records.map(r => [r.name, r.rut, r.interes, r.estado]);
                     exportTableToPDF('Reporte: Captaciones Académicas', ['Nombre', 'RUT', 'Interés', 'Estado'], data, 'captaciones_academicas');
                   }}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-[#38BDF8] hover:text-white"
                 >
                   <Download className="w-3 h-3" />
                 </button>
             </h4>
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                {filteredRecords.map(r => (
-                 <div key={r.id} className="border-b border-slate-50 pb-4 group">
+                 <div key={r.id} className="border-b border-[#1E293B] pb-4 group">
                     <div className="flex justify-between items-start">
                        <div>
-                          <p className="font-bold text-sm text-slate-700">{r.name}</p>
-                          <p className="text-[9px] font-black uppercase text-blue-500 italic mt-0.5">{r.clasificacion || 'Sin clasificación'}</p>
+                          <p className="font-bold text-sm text-slate-200">{r.name}</p>
+                          <p className="text-[9px] font-black uppercase text-[#38BDF8] italic mt-0.5">{r.clasificacion || 'Sin clasificación'}</p>
                        </div>
                        <div className="flex gap-2">
                         <button 
                           onClick={() => {
                             setSelectedLead(r);
                           }}
-                          className="text-[#002b5b] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-slate-100 p-1.5 rounded hover:bg-blue-100"
+                          className="text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-[#111A2E] p-1.5 rounded hover:bg-[#111A2E]"
                           title="Ver Expediente"
                         >
                           <FileText className="w-3 h-3" /> Expediente
@@ -592,7 +592,7 @@ function ContactRegister({ records }: { records: any[] }) {
                               fechaPago: new Date().toISOString().split('T')[0]
                             });
                           }}
-                          className="bg-slate-100 p-1.5 rounded hover:bg-amber-100 hover:text-amber-700 transition-colors"
+                          className="bg-[#111A2E] p-1.5 rounded hover:bg-amber-100 hover:text-amber-700 transition-colors"
                           title="Mover a Estudiante"
                         >
                           <ArrowRight className="w-3 h-3" />
@@ -613,7 +613,7 @@ function ContactRegister({ records }: { records: any[] }) {
                         />
                        </div>
                     </div>
-                    <div className="mt-2 text-[10px] text-slate-400 bg-slate-50 p-2 rounded italic">
+                    <div className="mt-2 text-[10px] text-slate-400 bg-[#152035] p-2 rounded italic">
                        {r.interes} - {r.canal}
                     </div>
                  </div>
@@ -809,9 +809,9 @@ function StudentManager({ records }: { records: any[] }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-        <div className="p-6 bg-slate-50 border-b flex justify-between items-center">
-           <h3 className="text-xl font-black text-[#001736] uppercase tracking-tighter italic">Base General Alumnos</h3>
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-x-auto">
+        <div className="p-6 bg-[#152035] border-b flex justify-between items-center">
+           <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">Base General Alumnos</h3>
            <div className="flex flex-col md:flex-row items-center gap-4">
               <button 
                 onClick={() => {
@@ -829,7 +829,7 @@ function StudentManager({ records }: { records: any[] }) {
                     'lista_alumnos'
                   );
                 }}
-                className="bg-white border p-2 rounded-lg hover:bg-slate-100 transition-colors" 
+                className="bg-[#152035] border p-2 rounded-2xl hover:bg-[#111A2E] transition-colors" 
                 title="Exportar Excel"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -849,21 +849,21 @@ function StudentManager({ records }: { records: any[] }) {
                     'lista_alumnos'
                   );
                 }}
-                className="bg-white border p-2 rounded-lg hover:bg-slate-100 transition-colors" 
+                className="bg-[#152035] border p-2 rounded-2xl hover:bg-[#111A2E] transition-colors" 
                 title="Exportar PDF"
               >
-                <Download className="w-4 h-4 text-blue-600" />
+                <Download className="w-4 h-4 text-[#38BDF8]" />
               </button>
               {selectedIds.length > 0 && (
                 <button 
                   onClick={handleBulkDelete}
-                  className="bg-red-50 text-red-700 px-4 py-2 rounded-lg border border-red-200 font-bold text-xs hover:bg-red-100 flex items-center gap-2"
+                  className="bg-red-50 text-red-700 px-4 py-2 rounded-2xl border border-red-200 font-bold text-xs hover:bg-red-100 flex items-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" /> Eliminar ({selectedIds.length})
                 </button>
               )}
               <select 
-                className="px-4 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 text-sm font-bold text-slate-700"
+                className="px-4 py-2 rounded-2xl border bg-[#152035] focus:outline-none focus:ring-2 focus:ring-blue-100 text-sm font-bold text-slate-200"
                 value={filterDiplomado}
                 onChange={e => setFilterDiplomado(e.target.value)}
               >
@@ -872,7 +872,7 @@ function StudentManager({ records }: { records: any[] }) {
               <div className="relative w-full md:w-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
                 <input 
-                  className="pl-10 pr-4 py-2 border rounded-full text-xs w-full md:w-64 bg-white outline-none focus:ring-2 focus:ring-blue-100" 
+                  className="pl-10 pr-4 py-2 border rounded-full text-xs w-full md:w-64 bg-[#152035] outline-none focus:ring-2 focus:ring-blue-100" 
                   placeholder="Buscar por Nombre o RUT..." 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
@@ -882,7 +882,7 @@ function StudentManager({ records }: { records: any[] }) {
         </div>
         <table className="w-full text-sm">
            <thead>
-              <tr className="bg-slate-50/50 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
+              <tr className="bg-[#152035]/50 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
                  <th className="p-5 w-10">
                    <input 
                      type="checkbox"
@@ -898,9 +898,9 @@ function StudentManager({ records }: { records: any[] }) {
                  <th className="p-5 text-right">Acciones</th>
               </tr>
            </thead>
-           <tbody className="divide-y divide-slate-100">
+           <tbody className="divide-y divide-slate-200">
               {filteredRecords.map(s => (
-                <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
+                <tr key={s.id} className="hover:bg-[#1E293B]/50 transition-colors">
                    <td className="p-5">
                      <input 
                        type="checkbox"
@@ -910,7 +910,7 @@ function StudentManager({ records }: { records: any[] }) {
                      />
                    </td>
                    <td className="p-5">
-                      <div className="font-bold text-[#001736]">{safe(s.name)}</div>
+                      <div className="font-bold text-white">{safe(s.name)}</div>
                       <div className="text-[10px] text-slate-400 font-mono italic">{safe(s.clasificacion)}</div>
                    </td>
                    <td className="p-5 font-medium">{safe(s.diplomado) || 'Diplomado Homeopatía'}</td>
@@ -922,10 +922,10 @@ function StudentManager({ records }: { records: any[] }) {
                    </td>
                    <td className="p-5">
                       <div className="flex flex-col items-center gap-1">
-                         <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${s.avance || 0}%` }} />
+                         <div className="w-24 h-1.5 bg-[#111A2E] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#152035] rounded-full" style={{ width: `${s.avance || 0}%` }} />
                          </div>
-                         <span className="text-[9px] font-bold text-slate-500">{s.avance || 0}%</span>
+                         <span className="text-[9px] font-bold text-slate-400">{s.avance || 0}%</span>
                       </div>
                    </td>
                    <td className="p-5 text-right">
@@ -958,14 +958,14 @@ function StudentManager({ records }: { records: any[] }) {
                                ];
                                exportExpedienteToPDF('Ficha: Alumno', studentData, `alumno_${s.name.replace(/\s+/g, '_')}`);
                              }}
-                             className="text-blue-600 hover:text-blue-800" 
+                             className="text-[#38BDF8] hover:text-white" 
                              title="PDF"
                           >
                             <Download className="w-3.5 h-3.5" />
                           </button>
                           <button 
                             onClick={() => setSelectedStudent(s)}
-                            className="text-[#002b5b] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1"
+                            className="text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1"
                           >
                              <FileText className="w-3 h-3" /> Ver Expediente
                           </button>
@@ -1017,19 +1017,19 @@ function TrackingView() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-         <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+      <div className="bg-[#152035] p-6 rounded-2xl border shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col md:flex-row justify-between items-center gap-4">
+         <div className="flex gap-2 p-1 bg-[#111A2E] rounded-2xl">
             <button 
               onClick={() => setFilter('all')}
-              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'all' ? "bg-white text-blue-900 shadow-sm" : "text-slate-400")}
+              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'all' ? "bg-[#152035] text-blue-900 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "text-slate-400")}
             >Detalle de clientes</button>
             <button 
               onClick={() => setFilter('leads')}
-              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'leads' ? "bg-[#001736] text-white shadow-sm" : "text-slate-400")}
+              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'leads' ? "bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "text-slate-400")}
             >Leads</button>
             <button 
               onClick={() => setFilter('students')}
-              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'students' ? "bg-green-600 text-white shadow-sm" : "text-slate-400")}
+              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'students' ? "bg-green-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "text-slate-400")}
             >Alumnos</button>
          </div>
          <div className="flex items-center gap-4 w-full md:w-auto">
@@ -1051,7 +1051,7 @@ function TrackingView() {
                  `reporte_360`
                );
              }}
-             className="bg-white border p-2 rounded-lg hover:bg-slate-100 transition-colors"
+             className="bg-[#152035] border p-2 rounded-2xl hover:bg-[#111A2E] transition-colors"
              title="Exportar Reporte 360 a Excel"
            >
              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -1074,15 +1074,15 @@ function TrackingView() {
                  `reporte_360_${filter}`
                );
              }}
-             className="bg-white border p-2 rounded-lg hover:bg-slate-100 transition-colors"
+             className="bg-[#152035] border p-2 rounded-2xl hover:bg-[#111A2E] transition-colors"
              title="Exportar Reporte 360 a PDF"
            >
-             <Download className="w-4 h-4 text-blue-600" />
+             <Download className="w-4 h-4 text-[#38BDF8]" />
            </button>
            <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
               <input 
-                className="pl-10 pr-4 py-2 border rounded-full text-xs w-full bg-white outline-none focus:ring-2 focus:ring-blue-100" 
+                className="pl-10 pr-4 py-2 border rounded-full text-xs w-full bg-[#152035] outline-none focus:ring-2 focus:ring-blue-100" 
                 placeholder="Buscar en el Ecosistema..." 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -1091,33 +1091,33 @@ function TrackingView() {
          </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden min-h-[400px]">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] overflow-hidden min-h-[400px]">
         <table className="w-full text-xs">
            <thead>
-              <tr className="bg-slate-50 border-b text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
+              <tr className="bg-[#152035] border-b text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
                  <th className="p-5">Entidad / Nombre</th>
                  <th className="p-5">Tipo / Estado</th>
                  <th className="p-5">Clasificación / Programa</th>
                  <th className="p-5 text-right">Contacto</th>
               </tr>
            </thead>
-           <tbody className="divide-y divide-slate-100">
+           <tbody className="divide-y divide-slate-200">
               {combined.map((item: any) => (
-                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={item.id} className="hover:bg-[#152035] transition-colors">
                    <td className="p-5 font-bold text-blue-900">{safe(item.name)} <span className="block text-[9px] text-slate-400 font-mono mt-1">{safe(item.rut)}</span></td>
                    <td className="p-5">
                       <span className={cn(
                         "px-2 py-0.5 rounded text-[9px] font-black uppercase",
-                        item.type === 'Lead' ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
+                        item.type === 'Lead' ? "bg-[#111A2E] text-[#38BDF8]" : "bg-green-100 text-green-700"
                       )}>{item.type}</span>
                    </td>
                    <td className="p-5">
-                      <p className="font-bold text-slate-600">{item.clasificacion || 'Sin clasif.'}</p>
+                      <p className="font-bold text-slate-300">{item.clasificacion || 'Sin clasif.'}</p>
                       <p className="text-[10px] text-slate-400">{item.interes || item.diplomado}</p>
                    </td>
                    <td className="p-5 text-right space-y-1">
-                      <p className="flex items-center justify-end gap-2 text-slate-500 font-medium">{item.email} <Mail className="w-3 h-3" /></p>
-                      <p className="flex items-center justify-end gap-2 text-slate-500 font-medium">{item.phone} <Smartphone className="w-3 h-3" /></p>
+                      <p className="flex items-center justify-end gap-2 text-slate-400 font-medium">{item.email} <Mail className="w-3 h-3" /></p>
+                      <p className="flex items-center justify-end gap-2 text-slate-400 font-medium">{item.phone} <Smartphone className="w-3 h-3" /></p>
                       <button 
                         onClick={() => setSelectedClient(item)}
                         className="flex items-center justify-end gap-1 text-[10px] font-black text-amber-700 hover:text-amber-900 uppercase"
@@ -1299,8 +1299,8 @@ function SchoolActivities() {
     <div className="space-y-6 animate-in fade-in duration-500">
       {detailView && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-[#001736] p-6 text-white flex justify-between items-center">
+          <div className="bg-[#152035] rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  flex justify-between items-center">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <FileText className="w-6 h-6" /> Detalle Actividad Académica
               </h3>
@@ -1312,31 +1312,31 @@ function SchoolActivities() {
               <div className="grid grid-cols-2 gap-8 border-b pb-6">
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Actividad / Campaña</span>
-                  <span className="text-lg font-bold text-[#002b5b]">{detailView.actividad}</span>
+                  <span className="text-lg font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">{detailView.actividad}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Fecha</span>
-                  <span className="text-lg font-bold text-[#002b5b]">{formatDate(detailView.fecha)}</span>
+                  <span className="text-lg font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">{formatDate(detailView.fecha)}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Tipo</span>
-                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold text-xs">{detailView.tipo}</span>
+                  <span className="bg-[#152035] text-[#38BDF8] px-3 py-1 rounded-full font-bold text-xs">{detailView.tipo}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Responsable</span>
-                  <span className="text-[#002b5b] font-medium">{detailView.responsable}</span>
+                  <span className="text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)] font-medium">{detailView.responsable}</span>
                 </div>
               </div>
               <div>
                 <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Observaciones</span>
-                <div className="bg-slate-50 p-6 rounded-xl text-slate-700 italic leading-relaxed border border-slate-100 whitespace-pre-wrap">
+                <div className="bg-[#152035] p-6 rounded-2xl text-slate-200 italic leading-relaxed border border-[#1E293B] whitespace-pre-wrap">
                   {detailView.observaciones || "Sin observaciones registradas."}
                 </div>
               </div>
               <div className="flex justify-end">
                 <button 
                   onClick={() => setDetailView(null)}
-                  className="bg-slate-100 text-slate-600 px-8 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                  className="bg-[#111A2E] text-slate-300 px-8 py-3 rounded-2xl font-bold hover:bg-[#1E293B] transition-colors"
                 >
                   CERRAR
                 </button>
@@ -1346,7 +1346,7 @@ function SchoolActivities() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="bg-[#002b5b] p-4 text-white font-bold flex items-center justify-between">
            <span className="flex items-center gap-2">
              <History className="w-5 h-5" /> 
@@ -1364,7 +1364,7 @@ function SchoolActivities() {
                      responsable: user?.displayName || user?.email || ''
                    });
                  }}
-                 className="text-[10px] bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded uppercase font-black transition-colors"
+                 className="text-[10px] bg-[#152035]/20 hover:bg-[#1E293B]/50 px-3 py-1.5 rounded uppercase font-black transition-colors"
                >
                  Cancelar Edición
                </button>
@@ -1409,23 +1409,23 @@ function SchoolActivities() {
             </div>
             <FormGroup label="Observaciones">
               <textarea 
-                className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
+                className="w-full h-24 p-4 border rounded-2xl bg-[#152035] focus:bg-[#152035] outline-none"
                 placeholder="Detalle de la actividad..."
                 value={form.observaciones || ''}
                 onChange={e => setForm({...form, observaciones: e.target.value})}
               />
             </FormGroup>
             <div className="flex justify-end">
-              <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
+              <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-8 py-3 rounded-2xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
                 <Save className="w-4 h-4" /> {editingId ? 'ACTUALIZAR CAMBIOS' : 'GUARDAR ACTIVIDAD'}
               </button>
             </div>
           </form>
         </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-          <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-[#001736]">Historial Académico</h3>
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="p-4 bg-[#152035] border-b flex justify-between items-center">
+          <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-white">Historial Académico</h3>
           <div className="flex gap-2">
             <button 
               onClick={() => {
@@ -1437,7 +1437,7 @@ function SchoolActivities() {
                 ]);
                 exportTableToPDF('Historial Académico Escuela', ['Fecha', 'Actividad', 'Tipo', 'Responsable'], data, 'historial_escuela', 'l');
               }}
-              className="p-2 hover:bg-slate-200 rounded transition-colors text-blue-600"
+              className="p-2 hover:bg-[#1E293B] rounded transition-colors text-[#38BDF8]"
               title="Exportar PDF"
             >
               <Download className="w-4 h-4" />
@@ -1452,7 +1452,7 @@ function SchoolActivities() {
                 ]);
                 exportTableToExcel('Historial Académico Escuela', ['Fecha', 'Actividad', 'Tipo', 'Responsable'], data, 'historial_escuela');
               }}
-              className="p-2 hover:bg-slate-200 rounded transition-colors text-emerald-600"
+              className="p-2 hover:bg-[#1E293B] rounded transition-colors text-emerald-600"
               title="Exportar Excel"
             >
               <FileSpreadsheet className="w-4 h-4" />
@@ -1462,7 +1462,7 @@ function SchoolActivities() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <tr className="bg-[#152035]/50 text-left border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="p-4">Fecha</th>
                 <th className="p-4">Actividad</th>
                 <th className="p-4">Tipo</th>
@@ -1470,13 +1470,13 @@ function SchoolActivities() {
                 <th className="p-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
-                <tr key={act.id} className="hover:bg-blue-50/30 transition-colors">
+                <tr key={act.id} className="hover:bg-[#1E293B]/50 transition-colors">
                   <td className="p-4">{formatDate(act.fecha)}</td>
-                  <td className="p-4 font-bold text-[#001736]">{act.actividad}</td>
-                  <td className="p-4"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">{act.tipo}</span></td>
-                  <td className="p-4 text-slate-500">{act.responsable}</td>
+                  <td className="p-4 font-bold text-white">{act.actividad}</td>
+                  <td className="p-4"><span className="bg-[#152035] text-[#38BDF8] px-2 py-0.5 rounded text-[10px] font-bold">{act.tipo}</span></td>
+                  <td className="p-4 text-slate-400">{act.responsable}</td>
                   <td className="p-4 text-right">
                     <RecordActions 
                       module="school"
@@ -1505,9 +1505,9 @@ function SchoolActivities() {
 
 function DetailStep({ num, title, desc }: any) {
   return (
-    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center">
-       <span className="w-8 h-8 rounded-full bg-[#001736] text-white flex items-center justify-center text-xs font-black mb-4">{num}</span>
-       <h5 className="font-bold text-[#001736] text-sm mb-1">{title}</h5>
+    <div className="p-6 bg-[#152035] rounded-2xl border border-[#1E293B] flex flex-col items-center">
+       <span className="w-8 h-8 rounded-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  flex items-center justify-center text-xs font-black mb-4">{num}</span>
+       <h5 className="font-bold text-white text-sm mb-1">{title}</h5>
        <p className="text-xs text-slate-400">{desc}</p>
     </div>
   );
@@ -1515,14 +1515,14 @@ function DetailStep({ num, title, desc }: any) {
 
 function StatsBox({ label, value, icon: Icon, color }: any) {
   const colors: any = {
-    blue: "bg-blue-50 text-blue-600 border-blue-100",
+    blue: "bg-[#152035] text-[#38BDF8] border-blue-100",
     amber: "bg-amber-50 text-amber-600 border-amber-100",
     green: "bg-green-50 text-green-600 border-green-100"
   };
 
   return (
-    <div className={cn("p-6 rounded-2xl border shadow-sm flex items-center gap-6", colors[color] || colors.blue)}>
-       <div className="w-14 h-14 rounded-xl bg-white shadow-sm flex items-center justify-center">
+    <div className={cn("p-6 rounded-2xl border shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-6", colors[color] || colors.blue)}>
+       <div className="w-14 h-14 rounded-2xl bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center justify-center">
           <Icon className="w-7 h-7" />
        </div>
        <div>

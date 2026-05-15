@@ -34,7 +34,7 @@ export const UserSettingsDialog: React.FC<UserSettingsDialogProps> = ({ user, is
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl w-full shadow-2xl overflow-hidden transition-all max-w-sm">
+      <div className="bg-[#152035] rounded-2xl w-full shadow-2xl overflow-hidden transition-all max-w-sm">
         <div className="bg-[#001736] p-4 flex justify-between items-center text-white">
           <h2 className="font-bold text-lg flex items-center gap-2 uppercase tracking-tighter italic">
             <User className="w-5 h-5 text-blue-400" /> Mi Perfil
@@ -60,7 +60,7 @@ export const UserSettingsDialog: React.FC<UserSettingsDialogProps> = ({ user, is
               <input 
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
-                className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold focus:border-blue-500 outline-none transition-all"
+                className="w-full border-2 border-[#1E293B] rounded-xl p-3 text-sm font-bold focus:border-blue-500 outline-none transition-all"
                 placeholder="Tu nombre real..."
               />
             </div>
@@ -69,7 +69,7 @@ export const UserSettingsDialog: React.FC<UserSettingsDialogProps> = ({ user, is
               <input 
                 value={user?.email}
                 disabled
-                className="w-full border-2 border-slate-50 rounded-xl p-3 text-sm bg-slate-50 text-slate-500 font-medium cursor-not-allowed"
+                className="w-full border-2 border-slate-50 rounded-xl p-3 text-sm bg-[#0D1527] text-slate-500 font-medium cursor-not-allowed"
               />
             </div>
           </div>

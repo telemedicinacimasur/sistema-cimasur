@@ -40,7 +40,7 @@ export const RecordActions = ({ onView, onDownload, onEdit, onDelete, onHistory,
           
           {showConfirm && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-               <div className="bg-white border-2 border-slate-100 text-center shadow-2xl rounded-3xl p-8 w-full max-w-sm scale-in-center animate-in zoom-in-95 duration-200">
+               <div className="bg-[#152035] border-2 border-[#1E293B] text-center shadow-2xl rounded-3xl p-8 w-full max-w-sm scale-in-center animate-in zoom-in-95 duration-200">
                   <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
                      <AlertCircle className="w-8 h-8" />
                   </div>
@@ -48,7 +48,7 @@ export const RecordActions = ({ onView, onDownload, onEdit, onDelete, onHistory,
                   <p className="text-sm font-medium text-slate-500 mb-8 px-4">¿Está seguro de que desea eliminar este registro permanentemente? Esta acción es irreversible.</p>
                   <div className="flex flex-col gap-3">
                     <button type="button" onClick={async () => { setShowConfirm(false); await onDelete!(); }} className="w-full bg-red-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-100">Sí, Eliminar Permanentemente</button>
-                    <button type="button" onClick={() => setShowConfirm(false)} className="w-full bg-slate-100 text-slate-500 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all">No, Mantener Registro</button>
+                    <button type="button" onClick={() => setShowConfirm(false)} className="w-full bg-[#111A2E] text-slate-500 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all">No, Mantener Registro</button>
                   </div>
                </div>
             </div>

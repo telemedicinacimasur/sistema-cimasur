@@ -126,7 +126,7 @@ export function UsersManager() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+      <div className="bg-[#152035] rounded-xl border border-[#1E293B] p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <div>
             <h3 className="text-lg font-bold text-[#001736] flex items-center gap-2">
@@ -164,7 +164,7 @@ export function UsersManager() {
                    {availableRoles.map(r => (
                      <label key={r.id} className={cn(
                        "flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all",
-                       newUser.roles.includes(r.id) ? "border-blue-500 bg-blue-100 shadow-sm" : "border-slate-200 bg-white hover:bg-slate-50"
+                       newUser.roles.includes(r.id) ? "border-blue-500 bg-blue-100 shadow-sm" : "border-[#1E293B] bg-[#152035] hover:bg-[#0D1527]"
                      )}>
                         <input 
                           type="checkbox" 
@@ -193,7 +193,7 @@ export function UsersManager() {
             return (
               <div key={u.uid} className={cn(
                 "border rounded-xl p-5 transition-all",
-                isEditing ? "bg-white border-blue-300 shadow-lg ring-2 ring-blue-100" : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                isEditing ? "bg-[#152035] border-blue-300 shadow-lg ring-2 ring-blue-100" : "bg-[#0D1527] border-[#1E293B] hover:border-[#1E293B]"
               )}>
                 {isEditing ? (
                   <form onSubmit={handleUpdate} className="space-y-4">
@@ -215,7 +215,7 @@ export function UsersManager() {
                         {availableRoles.map(r => (
                            <label key={r.id} className={cn(
                              "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all",
-                             (editingUser.roles || []).includes(r.id) ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white"
+                             (editingUser.roles || []).includes(r.id) ? "border-blue-500 bg-blue-50" : "border-[#1E293B] bg-[#152035]"
                            )}>
                               <input 
                                 type="checkbox" 
@@ -253,7 +253,7 @@ export function UsersManager() {
                                </span>
                              )
                            })}
-                           {currentRolesArray.length === 0 && <span className="px-2 py-0.5 border border-slate-200 text-slate-400 rounded text-[9px] font-black uppercase">Sin roles</span>}
+                           {currentRolesArray.length === 0 && <span className="px-2 py-0.5 border border-[#1E293B] text-slate-400 rounded text-[9px] font-black uppercase">Sin roles</span>}
                          </div>
                       </div>
                     </div>

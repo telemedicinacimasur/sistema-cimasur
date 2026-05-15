@@ -63,15 +63,15 @@ export default function CRMView() {
     <div className="space-y-6">
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-[#001736]">CRM Comercial</h2>
-          <p className="text-slate-500 text-sm">Fidelización y seguimiento de la cartera corporativa.</p>
+          <h2 className="text-3xl font-bold text-white">CRM Comercial</h2>
+          <p className="text-slate-400 text-sm">Fidelización y seguimiento de la cartera corporativa.</p>
         </div>
-        <div className="flex gap-4 border-b border-slate-200">
+        <div className="flex gap-4 border-b border-[#1E293B]">
           <button 
             onClick={() => setActiveTab('register')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'register' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'register' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
             )}
           >
             Ficha Registro
@@ -80,7 +80,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('list')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'list' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'list' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
             )}
           >
             Cartera de Clientes
@@ -89,7 +89,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('activities')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'activities' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'activities' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
             )}
           >
             Registro de Actividades
@@ -98,7 +98,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('intranet')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'intranet' ? "border-b-2 border-[#001736] text-[#001736]" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'intranet' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
             )}
           >
             Clientes Intranet
@@ -107,7 +107,7 @@ export default function CRMView() {
             onClick={() => setActiveTab('smart')}
             className={cn(
               "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'smart' ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+              activeTab === 'smart' ? "border-b-2 border-blue-600 text-[#38BDF8]" : "text-slate-400 hover:text-slate-300"
             )}
           >
             Motor Comercial
@@ -353,8 +353,8 @@ function CRMRegister() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+    <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden animate-in fade-in duration-500">
+      <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
          <span className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Ficha de Registro de Cliente</span>
          <div className="flex gap-2">
            <input 
@@ -380,7 +380,7 @@ function CRMRegister() {
            </button>
            <button 
              onClick={() => fileInputRef.current?.click()}
-             className="text-[10px] bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
            >
              <Upload className="w-3.5 h-3.5" /> Importar Datos
            </button>
@@ -407,18 +407,18 @@ function CRMRegister() {
               </select>
            </CRMField>
            <CRMField label="Categoría de Cliente">
-              <select className="w-full border-b p-2 text-sm font-black text-blue-600" value={form.categoria || ''} onChange={e => setForm({...form, categoria: e.target.value})}>
+              <select className="w-full border-b p-2 text-sm font-black text-[#38BDF8]" value={form.categoria || ''} onChange={e => setForm({...form, categoria: e.target.value})}>
                 {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
               </select>
            </CRMField>
            <CRMField label="Inscrito en Intranet">
-              <select className="w-full border-b p-2 text-sm font-bold text-slate-700" value={form.intranet || ''} onChange={e => setForm({...form, intranet: e.target.value})}>
+              <select className="w-full border-b p-2 text-sm font-bold text-slate-200" value={form.intranet || ''} onChange={e => setForm({...form, intranet: e.target.value})}>
                 <option value="No">No</option>
                 <option value="Si">Si</option>
               </select>
            </CRMField>
            <CRMField label="Opciones">
-              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-6">
+              <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer pt-6">
                 <input 
                   type="checkbox" 
                   className="rounded"
@@ -436,15 +436,15 @@ function CRMRegister() {
            </label>
            <p className="text-[10px] text-slate-400 mb-2 italic">Registre aquí beneficios usados, gestiones, avances y observaciones vitales del ciclo de vida.</p>
            <textarea 
-             className="w-full h-48 p-4 border rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none text-sm leading-relaxed"
+             className="w-full h-48 p-4 border rounded-2xl bg-[#152035] focus:bg-[#152035] focus:ring-2 focus:ring-blue-100 outline-none text-sm leading-relaxed"
              placeholder="Narrequí todo el proceso con el cliente..."
              value={form.historialUnificado || ''}
              onChange={e => setForm({...form, historialUnificado: e.target.value})}
            ></textarea>
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-slate-100">
-           <button type="submit" className="bg-[#001736] text-white px-12 py-4 rounded-xl font-bold shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2">
+        <div className="flex justify-end pt-4 border-t border-[#1E293B]">
+           <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-12 py-4 rounded-2xl font-bold shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2">
               <Save className="w-5 h-5" /> GUARDAR FICHA CRM
            </button>
         </div>
@@ -587,10 +587,10 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
   if (selectedClient) {
     return (
-      <div className="bg-slate-50 min-h-[600px] rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-right-4 duration-500 border border-slate-200">
-        <div className="bg-[#001736] p-6 text-white flex justify-between items-center">
+      <div className="bg-[#152035] min-h-[600px] rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-right-4 duration-500 border border-[#1E293B]">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  flex justify-between items-center">
            <div className="flex items-center gap-3">
-             <div className="p-2 bg-white/10 rounded-lg">
+             <div className="p-2 bg-[#1E293B]/80 rounded-2xl">
                 <FileText className="w-6 h-6 text-blue-400" />
              </div>
              <div>
@@ -598,30 +598,30 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                <p className="text-xs uppercase tracking-widest font-black text-blue-300 opacity-80">{selectedClient.name}</p>
              </div>
            </div>
-           <button onClick={() => setSelectedClient(null)} className="bg-red-900/40 border border-red-500/30 text-red-200 px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-800 transition-all active:scale-95">Cerrar Expediente</button>
+           <button onClick={() => setSelectedClient(null)} className="bg-red-900/40 border border-red-500/30 text-red-200 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider hover:bg-red-800 transition-all active:scale-95">Cerrar Expediente</button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12">
            <div className="lg:col-span-8 p-6 lg:p-8 space-y-8">
               {/* Top Info Cards */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                 <div className="bg-[#152035] p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]">
                     <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">RUT</span>
-                    <span className="text-sm font-bold text-[#001736]">{selectedClient.rut}</span>
+                    <span className="text-sm font-bold text-white">{selectedClient.rut}</span>
                  </div>
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                 <div className="bg-[#152035] p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]">
                     <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Comuna</span>
-                    <span className="text-sm font-bold text-[#001736]">{selectedClient.region}</span>
+                    <span className="text-sm font-bold text-white">{selectedClient.region}</span>
                  </div>
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                 <div className="bg-[#152035] p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]">
                     <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Tipo Empresa</span>
-                    <span className="text-sm font-bold text-[#001736]">{selectedClient.type}</span>
+                    <span className="text-sm font-bold text-white">{selectedClient.type}</span>
                  </div>
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                 <div className="bg-[#152035] p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]">
                     <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Fecha Ingreso</span>
-                    <span className="text-sm font-bold text-[#001736]">{formatDate(selectedClient.fechaIngreso)}</span>
+                    <span className="text-sm font-bold text-white">{formatDate(selectedClient.fechaIngreso)}</span>
                  </div>
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex items-center justify-between">
+                 <div className="bg-[#152035] p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-blue-100 flex items-center justify-between">
                     <div>
                        <span className="block text-[9px] font-black uppercase text-blue-400 tracking-widest mb-1">Inscrito Intranet</span>
                        <span className={cn(
@@ -631,7 +631,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                     </div>
                     <button 
                       onClick={handleUpdate}
-                      className="bg-[#FF7F50] hover:bg-[#FF6347] text-white p-2 rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                      className="bg-[#FF7F50] hover:bg-[#FF6347] text-white p-2 rounded-2xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
                       title="Registrar Cambios en Expediente"
                     >
                       <Save className="w-3.5 h-3.5" />
@@ -643,16 +643,16 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
               <div className="space-y-4">
                  <div className="flex items-center justify-between">
                     <h4 className="text-[10px] font-black uppercase text-blue-900 tracking-tighter flex items-center gap-2">
-                       <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" />
+                       <div className="w-1.5 h-1.5 bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 rounded-full animate-pulse" />
                        Historial detallado de actividades
                     </h4>
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                       {(selectedClient.historialUnificado || '').split('---').length - 1} registros encontrados
                     </span>
                  </div>
-                 <div className="bg-white border rounded-2xl p-8 shadow-inner min-h-[300px] flex flex-col items-center justify-center relative bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5">
+                 <div className="bg-[#152035] border rounded-2xl p-8 shadow-inner min-h-[300px] flex flex-col items-center justify-center relative bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5">
                     {selectedClient.historialUnificado ? (
-                      <div className="w-full text-sm leading-relaxed text-slate-600 italic whitespace-pre-wrap font-medium">
+                      <div className="w-full text-sm leading-relaxed text-slate-300 italic whitespace-pre-wrap font-medium">
                          {selectedClient.historialUnificado}
                       </div>
                     ) : (
@@ -666,25 +666,25 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
            </div>
 
            {/* Sidebar: Management */}
-           <div className="lg:col-span-4 bg-white border-l border-slate-200 p-8 space-y-8">
+           <div className="lg:col-span-4 bg-[#152035] border-l border-[#1E293B] p-8 space-y-8">
               <div className="space-y-6">
                 <div>
-                   <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                   <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
                       <Save className="w-4 h-4" /> Nueva Gestión / Seguimiento
                    </h4>
-                   <div className="h-px bg-slate-200 mb-8" />
+                   <div className="h-px bg-[#1E293B] mb-8" />
                 </div>
 
                 <CRMField label="Nombre / Razón Social">
                   <input 
-                    className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-bold outline-none" 
+                    className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-bold outline-none" 
                     value={newName || selectedClient.name}
                     onChange={e => setNewName(e.target.value)}
                   />
                 </CRMField>
                 <CRMField label="RUT / ID">
                   <input 
-                    className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm outline-none" 
+                    className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm outline-none" 
                     value={newRut || selectedClient.rut}
                     onChange={e => setNewRut(e.target.value)}
                   />
@@ -692,7 +692,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
                 <CRMField label="Tipo de Actividad">
                   <select 
-                    className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm focus:bg-white transition-all outline-none" 
+                    className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm focus:bg-[#152035] transition-all outline-none" 
                     value={activityType}
                     onChange={e => setActivityType(e.target.value)}
                   >
@@ -707,7 +707,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
                 <CRMField label="Detalle de la Actividad">
                   <textarea 
-                    className="w-full h-40 p-4 border rounded-xl bg-slate-50 focus:bg-white text-sm transition-all outline-none resize-none" 
+                    className="w-full h-40 p-4 border rounded-2xl bg-[#152035] focus:bg-[#152035] text-sm transition-all outline-none resize-none" 
                     value={newHistory}
                     onChange={e => setNewHistory(e.target.value)}
                     placeholder="Escriba los pormenores de la gestión realizada..."
@@ -717,7 +717,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                 <div className="grid grid-cols-2 gap-4">
                   <CRMField label="Categoría">
                     <select 
-                      className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-bold text-blue-600 outline-none" 
+                      className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-bold text-[#38BDF8] outline-none" 
                       value={newCategory || selectedClient.categoria}
                       onChange={e => setNewCategory(e.target.value)}
                     >
@@ -726,7 +726,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                   </CRMField>
                   <CRMField label="Estado Actual">
                      <select 
-                       className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-bold text-slate-700 outline-none"
+                       className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-bold text-slate-200 outline-none"
                        value={currentStatus}
                        onChange={e => setCurrentStatus(e.target.value)}
                      >
@@ -740,7 +740,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
                 <CRMField label="Inscrito en Intranet">
                     <select 
-                      className="w-full border-b bg-slate-50 border-slate-200 p-3 text-sm font-black text-blue-800 outline-none" 
+                      className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-black text-white outline-none" 
                       value={newIntranet || selectedClient.intranet || 'No'}
                       onChange={e => setNewIntranet(e.target.value)}
                     >
@@ -750,18 +750,18 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                 </CRMField>
 
                 <CRMField label="Opciones">
-                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-2 group">
+                  <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer pt-2 group">
                     <input 
                       type="checkbox" 
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      className="rounded border-[#1E293B] text-[#38BDF8] focus:ring-blue-500 w-4 h-4"
                       checked={newIsGestionCustomer !== null ? newIsGestionCustomer : !!selectedClient.isGestionCustomer}
                       onChange={e => setNewIsGestionCustomer(e.target.checked)}
                     />
-                    <span className="font-bold group-hover:text-blue-600 transition-colors">Es Cliente de Gestión</span>
+                    <span className="font-bold group-hover:text-[#38BDF8] transition-colors">Es Cliente de Gestión</span>
                   </label>
                 </CRMField>
 
-                <div className="pt-4 border-t border-slate-100">
+                <div className="pt-4 border-t border-[#1E293B]">
                   <p className="text-[10px] text-slate-400 text-center italic">Utilice el botón "Registrar" junto a los datos para guardar los cambios.</p>
                 </div>
               </div>
@@ -773,7 +773,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+      <div className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
@@ -837,7 +837,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                   'cartera_clientes_crm'
                 );
               }}
-              className="w-full bg-blue-50 border border-blue-200 text-blue-700 py-2 rounded-full font-bold text-xs hover:bg-blue-100 flex items-center justify-center gap-2"
+              className="w-full bg-[#152035] border border-blue-200 text-[#38BDF8] py-2 rounded-full font-bold text-xs hover:bg-[#111A2E] flex items-center justify-center gap-2"
               title="Exportar a PDF"
             >
               <Download className="w-4 h-4" /> Exportar Filtrados
@@ -853,12 +853,12 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
           </div>
        </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
               <thead>
-                 <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
-                    <th className="p-5 bg-[#001736]">
+                 <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  border-b text-left text-[10px] font-black uppercase tracking-widest">
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">
                        <input 
                          type="checkbox" 
                          className="rounded"
@@ -866,18 +866,18 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                          onChange={toggleSelectAll}
                        />
                      </th>
-                    <th className="p-5 bg-[#001736]">Razón Social / Cliente</th>
-                    <th className="p-5 bg-[#001736]">Comuna</th>
-                    <th className="p-5 bg-[#001736]">Email</th>
-                    <th className="p-5 bg-[#001736]">Fecha Ingreso</th>
-                    <th className="p-5 bg-[#001736]">Categoría</th>
-                    <th className="p-5 bg-[#001736]">Tipo</th>
-                    <th className="p-5 text-right px-8 bg-[#001736]">Acciones</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Razón Social / Cliente</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Comuna</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Email</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Ingreso</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Categoría</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Tipo</th>
+                    <th className="p-5 text-right px-8 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
                  </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                  {filtered.map(r => (
-                   <tr key={r.id} className="hover:bg-blue-50/30 transition-colors">
+                   <tr key={r.id} className="hover:bg-[#1E293B]/50 transition-colors">
                       <td className="p-5">
                         <input 
                           type="checkbox" 
@@ -888,20 +888,20 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                       </td>
                       <td className="p-5">
                          <div className="flex items-center gap-2">
-                             <div className="font-bold text-[#001736]">{r.name}</div>
-                             <span className="text-[10px] bg-slate-100 text-slate-600 font-black px-1.5 rounded" title="Cantidad de registros de actividad">{ (r.historialUnificado || '').split('---').length - 1 }</span>
+                             <div className="font-bold text-white">{r.name}</div>
+                             <span className="text-[10px] bg-[#111A2E] text-slate-300 font-black px-1.5 rounded" title="Cantidad de registros de actividad">{ (r.historialUnificado || '').split('---').length - 1 }</span>
                           </div>
                          <div className="text-[10px] text-slate-400 font-mono">{r.rut}</div>
                       </td>
-                      <td className="p-5 text-slate-500 italic">{r.region}</td>
-                      <td className="p-5 text-slate-600">{r.email || '---'}</td>
-                      <td className="p-5 text-slate-600">{formatDate(r.fechaIngreso) || '---'}</td>
+                      <td className="p-5 text-slate-400 italic">{r.region}</td>
+                      <td className="p-5 text-slate-300">{r.email || '---'}</td>
+                      <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || '---'}</td>
                       <td className="p-5">
                          <span className={cn(
                            "px-3 py-1 rounded-full font-black text-[9px] uppercase",
                            r.categoria === 'Platinum' ? "bg-purple-100 text-purple-700" :
                            r.categoria === 'Oro' ? "bg-amber-100 text-amber-700" :
-                           "bg-slate-100 text-slate-700"
+                           "bg-[#111A2E] text-slate-200"
                          )}>{r.categoria}</span>
                       </td>
                       <td className="p-5 font-medium text-blue-900">{r.type}</td>
@@ -954,8 +954,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
 function CRMIntranetTable({ clients }: { clients: any[] }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#001736] p-4 text-white font-bold">
+    <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden animate-in fade-in duration-500">
+      <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold">
          <span className="flex items-center gap-2">
            <UserCheck className="w-5 h-5" /> Clientes Importados de Intranet
          </span>
@@ -963,19 +963,19 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
-              <th className="p-5 bg-[#001736]">Nombre / Razón Social</th>
-              <th className="p-5 bg-[#001736]">RUT / ID</th>
-              <th className="p-5 bg-[#001736]">Email</th>
-              <th className="p-5 bg-[#001736]">Categoría</th>
-              <th className="p-5 bg-[#001736]">Fecha Importación</th>
+            <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  border-b text-left text-[10px] font-black uppercase tracking-widest">
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Nombre / Razón Social</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">RUT / ID</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Email</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Categoría</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Importación</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-200">
             {clients.sort((a, b) => b.fechaIngreso.localeCompare(a.fechaIngreso)).map(client => (
-              <tr key={client.id} className="hover:bg-blue-50/30 transition-colors">
-                <td className="p-5 font-bold text-[#001736]">{ client.name }</td>
-                <td className="p-5 font-mono text-slate-500">{ client.rut }</td>
+              <tr key={client.id} className="hover:bg-[#1E293B]/50 transition-colors">
+                <td className="p-5 font-bold text-white">{ client.name }</td>
+                <td className="p-5 font-mono text-slate-400">{ client.rut }</td>
                 <td className="p-5">{ client.email || '---' }</td>
                 <td className="p-5">{ client.categoria }</td>
                 <td className="p-5">{ formatDate(client.fechaIngreso) }</td>
@@ -1004,8 +1004,8 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
 
 function CRMImportsTable({ imports }: { imports: any[] }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#001736] p-4 text-white font-bold">
+    <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden animate-in fade-in duration-500">
+      <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold">
          <span className="flex items-center gap-2">
            <FileSpreadsheet className="w-5 h-5" /> Historial de Importaciones de Intranet
          </span>
@@ -1013,17 +1013,17 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
-              <th className="p-5 bg-[#001736]">Fecha Importación</th>
-              <th className="p-5 bg-[#001736]">Archivo</th>
-              <th className="p-5 bg-[#001736]">Cantidad</th>
-              <th className="p-5 bg-[#001736]">Responsable</th>
-              <th className="p-5 text-right bg-[#001736]">Acciones</th>
+            <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  border-b text-left text-[10px] font-black uppercase tracking-widest">
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Importación</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Archivo</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cantidad</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Responsable</th>
+              <th className="p-5 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-200">
             {imports.sort((a, b) => b.fechaImportacion.localeCompare(a.fechaImportacion)).map(imp => (
-              <tr key={imp.fechaImportacion + imp.archivoNombre} className="hover:bg-blue-50/30 transition-colors">
+              <tr key={imp.fechaImportacion + imp.archivoNombre} className="hover:bg-[#1E293B]/50 transition-colors">
                 <td className="p-5">{ formatDate(imp.fechaImportacion) }</td>
                 <td className="p-5 font-medium">{ imp.archivoNombre }</td>
                 <td className="p-5 font-bold text-emerald-600">{ imp.cantidadImportada }</td>
@@ -1150,8 +1150,8 @@ function CRMActivities() {
     <div className="space-y-6 animate-in fade-in duration-500">
       {detailView && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-[#001736] p-6 text-white flex justify-between items-center">
+          <div className="bg-[#152035] rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  flex justify-between items-center">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <FileText className="w-6 h-6" /> Detalle de Actividad
               </h3>
@@ -1163,31 +1163,31 @@ function CRMActivities() {
               <div className="grid grid-cols-2 gap-8 border-b pb-6">
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Campaña / Actividad</span>
-                  <span className="text-lg font-bold text-[#002b5b]">{detailView.campania}</span>
+                  <span className="text-lg font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">{detailView.campania}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Fecha</span>
-                  <span className="text-lg font-bold text-[#002b5b]">{formatDate(detailView.fecha)}</span>
+                  <span className="text-lg font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">{formatDate(detailView.fecha)}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Tipo</span>
-                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold text-xs">{detailView.tipo}</span>
+                  <span className="bg-[#152035] text-[#38BDF8] px-3 py-1 rounded-full font-bold text-xs">{detailView.tipo}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Responsable</span>
-                  <span className="text-[#002b5b] font-medium">{detailView.responsable}</span>
+                  <span className="text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)] font-medium">{detailView.responsable}</span>
                 </div>
               </div>
               <div>
                 <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Observaciones y Resultados</span>
-                <div className="bg-slate-50 p-6 rounded-xl text-slate-700 italic leading-relaxed border border-slate-100 whitespace-pre-wrap">
+                <div className="bg-[#152035] p-6 rounded-2xl text-slate-200 italic leading-relaxed border border-[#1E293B] whitespace-pre-wrap">
                   {detailView.observaciones || "Sin observaciones registradas."}
                 </div>
               </div>
               <div className="flex justify-end">
                 <button 
                   onClick={() => setDetailView(null)}
-                  className="bg-slate-100 text-slate-600 px-8 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                  className="bg-[#111A2E] text-slate-300 px-8 py-3 rounded-2xl font-bold hover:bg-[#1E293B] transition-colors"
                 >
                   CERRAR
                 </button>
@@ -1197,8 +1197,8 @@ function CRMActivities() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
            <span className="flex items-center gap-2">
              <TrendingUp className="w-5 h-5" /> 
              {editingId ? 'Editando Actividad / Campaña' : 'Registro de Actividades / Campañas'}
@@ -1215,7 +1215,7 @@ function CRMActivities() {
                    responsable: user?.displayName || user?.email || ''
                  });
                }}
-               className="text-[10px] bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded uppercase font-black transition-colors"
+               className="text-[10px] bg-[#152035]/20 hover:bg-[#1E293B]/50 px-3 py-1.5 rounded uppercase font-black transition-colors"
              >
                Cancelar Edición
              </button>
@@ -1247,9 +1247,9 @@ function CRMActivities() {
             </CRMField>
           </div>
           <CRMField label="Categorías Objetivo (Opcional)">
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 bg-slate-50 p-3 rounded">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 bg-[#152035] p-3 rounded">
                {CATEGORIAS.map(cat => (
-                 <label key={cat} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                 <label key={cat} className="flex items-center gap-2 text-xs font-bold text-slate-200 cursor-pointer">
                    <input 
                      type="checkbox"
                      checked={form.targetCategories.includes(cat)}
@@ -1265,23 +1265,23 @@ function CRMActivities() {
           </CRMField>
           <CRMField label="Observaciones y Resultados">
             <textarea 
-              className="w-full h-24 p-4 border rounded-xl bg-slate-50 focus:bg-white outline-none"
+              className="w-full h-24 p-4 border rounded-2xl bg-[#152035] focus:bg-[#152035] outline-none"
               placeholder="Detalle los objetivos y resultados de esta actividad..."
               value={form.observaciones || ''}
               onChange={e => setForm({...form, observaciones: e.target.value})}
             />
           </CRMField>
           <div className="flex justify-end">
-            <button type="submit" className="bg-[#001736] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
+            <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-8 py-3 rounded-2xl font-bold shadow-lg hover:translate-y-[-2px] transition-all flex items-center gap-2">
               <Save className="w-4 h-4" /> {editingId ? 'ACTUALIZAR CAMBIOS' : 'REGISTRAR ACTIVIDAD'}
             </button>
           </div>
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-          <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Historial de Actividades Recientes</h3>
+      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="p-4 bg-[#152035] border-b flex justify-between items-center">
+          <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Historial de Actividades Recientes</h3>
           <div className="relative">
             <Search className="absolute left-2 top-2 w-4 h-4 text-slate-400" />
             <input 
@@ -1295,7 +1295,7 @@ function CRMActivities() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <tr className="bg-[#152035]/50 text-left border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="p-4">Fecha</th>
                 <th className="p-4">Campaña / Actividad</th>
                 <th className="p-4">Tipo</th>
@@ -1303,13 +1303,13 @@ function CRMActivities() {
                 <th className="p-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {filteredActivities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
-                <tr key={act.id} className="hover:bg-blue-50/30 transition-colors">
+                <tr key={act.id} className="hover:bg-[#1E293B]/50 transition-colors">
                   <td className="p-4">{formatDate(act.fecha)}</td>
-                  <td className="p-4 font-bold text-[#001736]">{act.campania}</td>
-                  <td className="p-4"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">{act.tipo}</span></td>
-                  <td className="p-4 text-slate-500">{act.responsable}</td>
+                  <td className="p-4 font-bold text-white">{act.campania}</td>
+                  <td className="p-4"><span className="bg-[#152035] text-[#38BDF8] px-2 py-0.5 rounded text-[10px] font-bold">{act.tipo}</span></td>
+                  <td className="p-4 text-slate-400">{act.responsable}</td>
                   <td className="p-4 text-right">
                     <RecordActions 
                       module="crm"
