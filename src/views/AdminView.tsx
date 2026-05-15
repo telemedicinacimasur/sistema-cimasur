@@ -902,17 +902,6 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
           </FormField>
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm font-bold" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           
-          <div className="md:col-span-4">
-             <FormField label="Observaciones">
-               <textarea 
-                 className="w-full border p-3 text-sm font-bold italic bg-[#152035] rounded-2xl focus:ring-1 focus:ring-blue-100 outline-none" 
-                 rows={2}
-                 value={form.observaciones || ''} 
-                 onChange={e => setForm({...form, observaciones: e.target.value})} 
-               />
-             </FormField>
-          </div>
-
           <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-6">
             <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-3 text-lg font-black text-[#38BDF8] bg-[#152035] rounded-t" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
             <FormField label="Und a hacer"><input type="number" className="w-full border-b p-3 text-lg font-bold text-amber-700 bg-amber-50 rounded-t" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
@@ -981,9 +970,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                     r.vendedor || '',
                     r.estado || '',
                     r.undTotal || 0,
-                    r.observaciones || ''
                   ]);
-                  exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_cotizaciones', 'l');
+                  exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND'], data, 'reporte_cotizaciones', 'l');
                 }}
                 className="bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition-colors hover:bg-[#38BDF8]/30 flex items-center gap-1" 
                 title="Descargar PDF Filtrado"
@@ -1044,8 +1032,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                           { label: 'Vendedor', value: r.vendedor || '' },
                           { label: 'Estado', value: r.estado || '' },
                           { label: 'UND Total', value: (r.undTotal || 0).toString() },
-                          { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` },
-                          { label: 'Observaciones', value: r.observaciones || '' }
+                          { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` }
                         ];
                         viewExpedienteInNewTab('Ficha: Pedido', data, `cotizacion_${r.nroCotiz}`);
                       }}
@@ -1057,8 +1044,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                           { label: 'Vendedor', value: r.vendedor || '' },
                           { label: 'Estado', value: r.estado || '' },
                           { label: 'UND Total', value: (r.undTotal || 0).toString() },
-                          { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` },
-                          { label: 'Observaciones', value: r.observaciones || '' }
+                          { label: 'Inv / Producir', value: `${r.invUnits || 0} / ${r.todoUnits || 0}` }
                         ];
                         exportExpedienteToPDF('Ficha: Pedido', data, `cotizacion_${r.nroCotiz}`);
                       }}
@@ -1075,8 +1061,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                           fechaAprob: r.fechaAprob || '',
                           invUnits: r.invUnits || 0,
                           todoUnits: r.todoUnits || 0,
-                          undTotal: r.undTotal || 0,
-                          observaciones: r.observaciones || ''
+                          undTotal: r.undTotal || 0
                         });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
@@ -1306,9 +1291,8 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
           </div>
         </div>
         <form className="p-6 space-y-4" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <FormField label="Año"><input className="w-full border-b p-2 text-sm" value={form.anio || ''} onChange={e => setForm({...form, anio: e.target.value})} /></FormField>
-            <FormField label="Mes"><input className="w-full border-b p-2 text-sm" value={form.mes || ''} onChange={e => setForm({...form, mes: e.target.value})} /></FormField>
           </div>
           <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
           <FormField label="Fact / Boleta"><input className="w-full border-b p-2 text-sm" value={form.documento || ''} onChange={e => setForm({...form, documento: e.target.value})} required /></FormField>
@@ -1335,24 +1319,13 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
             <div className="flex items-center gap-4">
                <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas GESTIÓN</h3>
                <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
-                  <span className="text-[9px] font-black uppercase text-emerald-400">Total Cotiz:</span>
+                  <span className="text-[9px] font-black uppercase text-emerald-400">Total Frascos:</span>
+                  <span className="text-[11px] font-black">{totalFrascos}</span>
+                  <span className="text-[9px] font-black uppercase text-emerald-400 ml-2">Total Cotiz:</span>
                   <span className="text-[11px] font-black">{totalCotizacion.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
                </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Mes:</span>
-                <select 
-                  className="text-xs border rounded p-1 w-28 text-slate-300"
-                  value={filterMonth}
-                  onChange={e => setFilterMonth(e.target.value)}
-                >
-                  <option value="Todos">Todos</option>
-                  {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
                 <input 

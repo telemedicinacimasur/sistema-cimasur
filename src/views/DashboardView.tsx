@@ -125,8 +125,8 @@ export default function DashboardView() {
             <div className={`w-14 h-14 rounded-2xl ${module.color.replace('bg-', 'bg-white/10 ').split(' ').filter(c => !c.startsWith('bg-')).join(' ')} flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
               <module.icon className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-lg font-black text-white mb-2 uppercase tracking-tighter">{module.name}</h3>
-            <p className="text-slate-300 text-xs font-bold leading-relaxed mb-6">
+            <h3 className="text-lg font-black text-[#1E293B] mb-2 uppercase tracking-tighter">{module.name}</h3>
+            <p className="text-slate-600 text-xs font-bold leading-relaxed mb-6">
               {module.description}
             </p>
             <div className="mt-auto flex items-center text-[#38bdf8] font-black text-[10px] uppercase tracking-widest gap-2">

@@ -174,13 +174,16 @@ export default function LabView() {
 
   return (
     <div className="space-y-6 font-bold">
-      <button 
-        onClick={handleBack}
-        className="flex items-center gap-2 text-white font-bold hover:text-[#38BDF8] transition-colors mb-4"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span className="text-sm uppercase tracking-widest">Volver al Menú Principal de Laboratorio</span>
-      </button>
+      {/* Back Button */}
+      <div className="mb-6">
+        <button 
+          onClick={handleBack}
+          className="flex items-center gap-3 bg-[#152035] text-white font-black hover:text-[#38BDF8] border border-[#1E293B] shadow-lg px-5 py-2.5 rounded-xl transition-all"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-[11px] uppercase tracking-widest">Volver al Menú Principal</span>
+        </button>
+      </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {activeForm === 'gotas-puras' && <GotasPurasForm records={records} setRecords={setRecords} />}
@@ -191,18 +194,7 @@ export default function LabView() {
         {activeForm === 'insumos' && <InsumosForm records={records} setRecords={setRecords} />}
         {activeForm === 'vademecum' && <VademecumForm records={records} setRecords={setRecords} />}
         {activeForm === 'mantenimiento' && <MantenimientoForm records={records} setRecords={setRecords} />}
-        {activeForm !== 'main' && (
-          <div className="fixed bottom-24 right-6 z-50 flex flex-col gap-2">
-            <button 
-              onClick={() => setActiveForm('main')}
-              className="bg-[#152035] text-white p-3 rounded-full shadow-2xl hover:scale-110 transition-all border border-[#1E293B] font-bold flex items-center gap-2 group"
-            >
-              <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-              <span className="text-[10px] pr-2 uppercase">Menu</span>
-            </button>
-          </div>
-        )}
-
+        
         {activeForm === 'stock' && <StockManager records={records} setRecords={setRecords} />}
         {activeForm === 'tracking' && <OrderTrackingForm records={records} setRecords={setRecords} />}
         {activeForm === 'magistrales' && <MagistralesForm records={records} setRecords={setRecords} />}

@@ -76,7 +76,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <aside className="w-64 flex-shrink-0 bg-[#0D1527] border-r border-[#1E293B] flex flex-col py-6 px-4 z-40 relative shadow-xl">
         <div className="px-2 mb-8 flex flex-col items-center flex-shrink-0">
           <div className="flex flex-col items-center justify-center w-full relative">
-            <div className="w-16 h-16 bg-[#152035] rounded-2xl flex items-center justify-center mb-3 border border-[#334155] shadow-lg group hover:border-[#38BDF8] transition-colors">
+            <div className="w-16 h-16 bg-[#1a2e59] rounded-2xl flex items-center justify-center mb-3 border border-[#334155] shadow-lg group hover:border-[#38BDF8] transition-colors">
               <span className="text-white font-sans text-3xl font-black italic">C</span>
             </div>
             <div className="text-white font-sans text-xl tracking-widest z-10 font-black uppercase">
@@ -91,7 +91,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group text-sm font-black uppercase",
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group text-[12px] font-black uppercase",
                 location.pathname === item.path 
                   ? "bg-[#38BDF8] text-black shadow-[0_4px_20px_rgba(56,189,248,0.2)]" 
                   : "text-slate-400 hover:text-white hover:bg-[#1E293B]"
@@ -104,13 +104,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </nav>
 
         <div className="mt-auto pt-6 border-t border-[#1E293B] flex flex-col gap-2 flex-shrink-0">
-          <a href="mailto:formacion@cimasur.cl" className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-sm font-black border border-transparent">
+          <a href="mailto:formacion@cimasur.cl" className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-[12px] font-black border border-transparent">
             <HelpCircle className="w-5 h-5" />
             <span>Soporte</span>
           </a>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-sm font-black border border-transparent"
+            className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-[12px] font-black border border-transparent"
           >
             <LogOut className="w-5 h-5" />
             <span>Cerrar Sesión</span>

@@ -18,7 +18,7 @@ const BASE_CATEGORIES = [
   'Nosodes Simples',
   'Complejos C100/C200',
   'Packs Especiales',
-  'Producto Base'
+  'Productos CS CIMASUR'
 ];
 
 const GENERIC_CATEGORIES = [
@@ -87,8 +87,8 @@ export default function CimasurInventoryManager() {
     if (activeTab !== 'MATRIZ COMPLETA') {
       filtered = filtered.filter(r => r.base_master === activeTab);
     } else {
-      // In matrix view, we show all base masters
-      filtered = filtered.filter(r => ['SALINA CS', 'ETANOL CS', 'ADE CS', 'DILUCIONES CIMASUR', 'GOTAS PURAS', 'ALTAS DILUCIONES', 'NOSODES CLIENTES'].includes(r.base_master));
+      // In matrix view, we show only SALINA CS, ETANOL CS, ADE CS
+      filtered = filtered.filter(r => ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(r.base_master));
     }
 
     // Fixed logic for category filtering: if it's "TODOS", don't filter.
