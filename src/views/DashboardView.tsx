@@ -114,52 +114,52 @@ export default function DashboardView() {
     <div className="space-y-10 py-6 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {modules.map((module) => (
-            <Link
-              key={module.path}
-              to={module.path}
-              className="group bg-white p-6 rounded-[2.5rem] border border-slate-200 hover:border-slate-300 hover:shadow-lg hover:-translate-y-2 transition-all duration-300 flex flex-col text-left relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity">
-                 <module.icon className="w-24 h-24 text-[#1E293B]" />
-              </div>
-              <div className={`w-14 h-14 rounded-2xl ${module.color.replace('/20', '/10')} flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
-                <module.icon className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-black text-[#1E293B] mb-2 uppercase tracking-tighter">{module.name}</h3>
-              <p className="text-slate-500 text-xs font-bold leading-relaxed mb-6">
-                {module.description}
-              </p>
-              <div className="mt-auto flex items-center text-[#1E293B] font-black text-[10px] uppercase tracking-widest gap-2">
-                Ingresar al Módulo <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
-              </div>
-            </Link>
+          <Link
+            key={module.path}
+            to={module.path}
+            className="group bg-[#152a42] p-6 rounded-3xl border border-[#1e3a5f] hover:border-[#38bdf8]/50 hover:shadow-lg hover:-translate-y-2 transition-all duration-300 flex flex-col text-left relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity">
+               <module.icon className="w-24 h-24 text-white" />
+            </div>
+            <div className={`w-14 h-14 rounded-2xl ${module.color.replace('bg-', 'bg-white/10 ').split(' ').filter(c => !c.startsWith('bg-')).join(' ')} flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
+              <module.icon className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-lg font-black text-white mb-2 uppercase tracking-tighter">{module.name}</h3>
+            <p className="text-slate-300 text-xs font-bold leading-relaxed mb-6">
+              {module.description}
+            </p>
+            <div className="mt-auto flex items-center text-[#38bdf8] font-black text-[10px] uppercase tracking-widest gap-2">
+              Ingresar al Módulo <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+            </div>
+          </Link>
         ))}
       </div>
 
-      <div className="relative rounded-[3rem] overflow-hidden h-[400px] shadow-sm group border border-slate-200">
+      <div className="relative rounded-3xl overflow-hidden h-[400px] shadow-sm group border border-[#1e3a5f]">
         <img 
           src="https://cimasur.cl/wp-content/uploads/2023/12/Portada-web-1.jpg" 
           alt="Lab Banner" 
           className="w-full h-full object-cover transition-transform duration-[20s] group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/60 to-transparent flex flex-col justify-center px-16">
-          <div className="w-16 h-1 bg-[#1E293B] mb-8 rounded-full" />
-          <h2 className="text-4xl lg:text-6xl font-black text-[#1E293B] mb-4 tracking-tighter uppercase italic drop-shadow-sm leading-tight">SISTEMA<br/>CIMASUR</h2>
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0D1527]/90 via-[#0D1527]/60 to-transparent flex flex-col justify-center px-16">
+          <div className="w-16 h-1 bg-white mb-8 rounded-full" />
+          <h2 className="text-4xl lg:text-6xl font-black text-white mb-4 tracking-tighter uppercase italic drop-shadow-sm leading-tight">SISTEMA<br/>CIMASUR</h2>
         </div>
       </div>
             {/* Parte de abajo (Footer contextual) */}
-      <div className="flex justify-between items-center bg-white border border-slate-200 p-6 rounded-3xl shadow-sm text-[#1E293B]">
+      <div className="flex justify-between items-center bg-[#152a42] border border-[#1e3a5f] p-6 rounded-3xl shadow-sm text-white">
         <div className="flex gap-8">
            <div className="flex items-center gap-3">
              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ring-4 ring-emerald-500/10" />
-             <span className="text-[10px] font-black uppercase tracking-widest text-[#1E293B]">System Online</span>
+             <span className="text-[10px] font-black uppercase tracking-widest text-white">System Online</span>
            </div>
            <div className="flex items-center gap-3">
              <div className="w-2 h-2 rounded-full bg-blue-500 ring-4 ring-blue-500/10" />
-             <span className="text-[10px] font-black uppercase tracking-widest text-[#1E293B]">Modules Synchronized</span>
+             <span className="text-[10px] font-black uppercase tracking-widest text-white">Modules Synchronized</span>
            </div>
         </div>
-        <div className="text-[10px] font-black text-[#1E293B] uppercase tracking-widest flex items-center gap-2">
+        <div className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
            <Activity className="w-3 h-3" /> v4.5.0 © 2026 CIMASUR BIOTECHNOLOGY
         </div>
       </div>
