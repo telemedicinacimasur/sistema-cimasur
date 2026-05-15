@@ -119,46 +119,46 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-[#0D1527]">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-white">
         {/* Header */}
-        <header className="bg-[#152035]/90 backdrop-blur-md border-b border-[#1E293B] h-20 flex-shrink-0 z-50 flex justify-between items-center px-8 sticky top-0 shadow-lg">
+        <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 h-20 flex-shrink-0 z-50 flex justify-between items-center px-8 sticky top-0 shadow-sm">
           <div className="flex items-center gap-6">
             <Link
               to="/"
-              className="flex items-center gap-2 p-2 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-xl transition-all"
+              className="flex items-center gap-2 p-2 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all"
             >
               <Home className="w-5 h-5" />
             </Link>
-            <div className="h-8 w-px bg-[#1E293B] mx-1" />
-            <h2 className="text-xl font-bold tracking-wider text-white uppercase">{getPageTitle()}</h2>
+            <div className="h-8 w-px bg-slate-200 mx-1" />
+            <h2 className="text-xl font-bold tracking-wider text-[#1E293B] uppercase">{getPageTitle()}</h2>
           </div>
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-xl transition-all relative">
+              <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all relative">
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center rounded-full shadow-sm">
                     {unreadCount}
                   </span>
                 )}
               </button>
-              <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-xl transition-all group relative">
+              <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all group relative">
                 <Settings className="w-5 h-5" />
               </button>
               
-              <div className="flex items-center gap-4 pl-6 border-l border-[#1E293B]">
+              <div className="flex items-center gap-4 pl-6 border-l border-slate-200">
                 <div className="text-right hidden sm:block overflow-hidden max-w-[150px]">
-                  <p className="text-sm font-bold text-white leading-tight truncate">{user?.displayName || user?.email}</p>
-                  <p className="text-[10px] text-[#38BDF8] leading-tight uppercase font-black tracking-widest truncate mt-0.5">
+                  <p className="text-sm font-bold text-[#1E293B] leading-tight truncate">{user?.displayName || user?.email}</p>
+                  <p className="text-[10px] text-[#1E293B] leading-tight uppercase font-black tracking-widest truncate mt-0.5">
                     {(user?.roles || [user?.role]).join(' / ')}
                   </p>
                 </div>
-                <div className="h-10 w-10 rounded-xl bg-[#152035] border border-[#1E293B] overflow-hidden shadow-sm flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shadow-sm flex items-center justify-center">
                   {user?.photoURL ? (
                     <img alt="User" className="w-full h-full object-cover" src={user.photoURL} />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center font-bold text-[#38BDF8] text-sm">
+                    <div className="w-full h-full flex items-center justify-center font-bold text-[#1E293B] text-sm">
                       {user?.displayName?.charAt(0)}
                     </div>
                   )}
