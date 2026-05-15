@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Lightbulb, Target, TrendingUp, AlertCircle, ArrowUpRight, Mail, Phone, Clock, FileText, CheckCircle2, ChevronRight, MessageSquare, ExternalLink, UserPlus, BadgeCheck, Activity } from 'lucide-react';
+import { RefreshCw, Lightbulb, Target, TrendingUp, AlertCircle, ArrowUpRight, Mail, Phone, Clock, FileText, CheckCircle2, ChevronRight, MessageSquare, ExternalLink, UserPlus, BadgeCheck, Activity, Loader2 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { cn } from '../../lib/utils';
+import { GoogleGenAI, Type } from "@google/genai";
 
 interface CampaignTemplate {
   id: string;
@@ -16,6 +17,9 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
   const [selectedCampaign, setSelectedCampaign] = useState<any | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<CampaignTemplate | null>(null);
   const [variationIndex, setVariationIndex] = useState(0);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPlans, setAiPlans] = useState<{title: string, description: string, segment: string, channel: string, messageTemplate: string}[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -67,6 +71,19 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
       type: 'whatsapp'
     }
   ];
+
+  if (selectedCampaign?.type === 'ai_suggested' && selectedCampaign.messageTemplate) {
+    const aiTemplateExists = templates.some(t => t.id === 'ai-generated-template');
+    if (!aiTemplateExists) {
+      templates.unshift({
+        id: 'ai-generated-template',
+        name: `Sugerencia IA: ${selectedCampaign.title}`,
+        subject: `Notificación de CIMASUR - ${selectedCampaign.title}`,
+        body: selectedCampaign.messageTemplate,
+        type: selectedCampaign.channel?.toLowerCase().includes('mail') ? 'email' : 'whatsapp'
+      });
+    }
+  }
 
   const getVariations = (templateId: string) => {
     const base = templates.find(t => t.id === templateId);
@@ -175,6 +192,60 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
     }
   };
 
+  const generateAIPlan = async () => {
+    if (!aiPrompt) {
+      alert("Por favor, ingresa instrucciones para el Motor Estratégico.");
+      return;
+    }
+    setAiGenerating(true);
+    try {
+      if (!process.env.GEMINI_API_KEY) {
+        alert("Falta configurar la GEMINI_API_KEY en las variables de entorno.");
+        setAiGenerating(false);
+        return;
+      }
+      
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // summarize clients to lower token usage
+      const clientSummary = clients.map(c => ({
+        name: c.name || c.nombre || c.nombreAlumno,
+        type: c._isStudent ? 'Student' : c._isLead ? 'Lead' : 'Client',
+        status: isSchool ? c.pago : c.categoria
+      }));
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: `Eres el motor de inteligencia de CIMASUR. Aquí tienes los datos resumidos de la base: ${JSON.stringify(clientSummary)}.
+        El usuario requiere este plan estratégico: "${aiPrompt}".
+        Genera 3 acciones sugeridas.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING, description: "Título breve de la acción sugerida." },
+                description: { type: Type.STRING, description: "Descripción detallada de la acción, mencionando la cantidad de personas afectadas." },
+                segment: { type: Type.STRING, description: "El segmento o filtro que se va a aplicar." },
+                channel: { type: Type.STRING, description: "Canal sugerido: WhatsApp o Email." },
+                messageTemplate: { type: Type.STRING, description: "La plantilla del mensaje sugerida para enviar." }
+              },
+              required: ["title", "description", "segment", "channel", "messageTemplate"]
+            }
+          }
+        }
+      });
+      const parsed = JSON.parse(response.text || "[]");
+      setAiPlans(parsed);
+    } catch (err) {
+      console.error(err);
+      alert("Error al comunicarse con la Inteligencia Artificial. Intenta nuevamente.");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   return (
     <div className="p-4 lg:p-10 space-y-10 bg-slate-50/50 min-h-screen animate-fade-in pb-20">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
@@ -212,13 +283,15 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
               <textarea 
                 className="w-full h-40 bg-slate-800/50 border border-slate-700 rounded-2xl p-6 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none resize-none font-medium placeholder-slate-500"
                 placeholder="Ej: Analiza los clientes Bronce y ofréceles un 10% de descuento si compran esta semana. Para los VIP, ofréceles un taller gratuito."
-                defaultValue="Identifica a los clientes Plata y dales acceso anticipado al nuevo diplomado. A los morosos, envíales una propuesta de pago en 3 cuotas con descuento del 5% si pagan hoy."
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
               />
               <button 
-                onClick={() => alert("Generando Plan Estratégico desde Motor de Inteligencia (Simulado)")}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black uppercase tracking-widest text-xs py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                onClick={generateAIPlan}
+                disabled={aiGenerating}
+                className="w-full disabled:opacity-50 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black uppercase tracking-widest text-xs py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                 <RefreshCw className="w-4 h-4" /> Generar Plan Estratégico Global
+                 {aiGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} {aiGenerating ? 'Generando...' : 'Generar Plan Estratégico Global'}
               </button>
            </div>
            
@@ -228,14 +301,45 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                  <div className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase rounded">V.4 IA Outputs</div>
               </div>
               <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar-white pr-2">
-                 <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                    <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Acción Sugerida #1</p>
-                    <p className="text-sm text-slate-200 font-medium leading-relaxed">Ejecutar campaña cruzada para 45 clientes nivel "Plata" con enlace VIP exclusivo.</p>
-                 </div>
-                 <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                    <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Acción Sugerida #2</p>
-                    <p className="text-sm text-slate-200 font-medium leading-relaxed">Configurar secuencia automatizada en WhatsApp para 12 alumnos morosos con el plan de 3 cuotas.</p>
-                 </div>
+                 {aiPlans.length > 0 ? aiPlans.map((plan, i) => (
+                   <div key={i} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-indigo-500/50 transition-colors">
+                     <p className="text-[10px] text-indigo-400 uppercase font-black mb-1">{plan.title} ({plan.channel})</p>
+                     <p className="text-sm text-slate-200 font-medium leading-relaxed mb-3">{plan.description}</p>
+                     
+                     <div className="bg-black/30 p-3 rounded-lg mt-2 font-mono text-xs text-slate-400">
+                        <span className="text-indigo-400 font-bold block mb-1">Segmento Objetivo:</span>
+                        {plan.segment}
+                     </div>
+
+                     <div className="mt-4 flex justify-end">
+                       <button
+                         onClick={() => {
+                           setSelectedCampaign({
+                             title: plan.title,
+                             reasoning: plan.description,
+                             color: 'indigo',
+                             icon: <Target className="w-5 h-5 text-indigo-500" />,
+                             audience: clients.filter(c => plan.segment.toLowerCase().includes(isSchool ? c.pago?.toLowerCase() || '' : c.categoria?.toLowerCase() || '')).slice(0, 50),
+                             type: 'ai_suggested',
+                             messageTemplate: plan.messageTemplate,
+                             channel: plan.channel
+                           });
+                           setTimeout(() => {
+                              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                           }, 100);
+                         }}
+                         className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-indigo-400 hover:text-indigo-300"
+                       >
+                         Ver y Ejecutar <ArrowUpRight className="w-3 h-3" />
+                       </button>
+                     </div>
+                   </div>
+                 )) : (
+                   <div className="flex flex-col items-center justify-center text-center h-full text-slate-500 space-y-3">
+                     <Lightbulb className="w-10 h-10 opacity-20" />
+                     <p className="text-sm font-medium">Escribe tus instrucciones y presiona Generar para visualizar el plan de la IA.</p>
+                   </div>
+                 )}
               </div>
            </div>
         </div>

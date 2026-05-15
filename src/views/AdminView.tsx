@@ -1848,6 +1848,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   // Individual visibility states for metrics
   const [showMeta, setShowMeta] = useState(false);
   const [showAcumulado, setShowAcumulado] = useState(false);
+  const [showGastos, setShowGastos] = useState(false);
   const [showFaltante, setShowFaltante] = useState(false);
 
   const downloadExcelTemplate = () => {
@@ -2019,7 +2020,12 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                   <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400">
                      <Target className="w-5 h-5" />
                   </div>
-                  <button onClick={() => setIsEditingMeta(!isEditingMeta)} className="text-[10px] font-black uppercase text-indigo-400 hover:text-white transition-colors">Ajustar Meta</button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setIsEditingMeta(!isEditingMeta)} className="text-[10px] font-black uppercase text-indigo-400 hover:text-white transition-colors">Ajustar Meta</button>
+                    <button onClick={() => setShowMeta(!showMeta)} className="text-white/50 hover:text-white transition-colors">
+                       {showMeta ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                </div>
                <div>
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Meta Anual Establecida</p>
@@ -2033,7 +2039,9 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       autoFocus
                     />
                   ) : (
-                    <p className="text-2xl font-black text-white mt-1 leading-none italic">{formatCurrency(meta)}</p>
+                    <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showMeta ? 'blur-sm select-none opacity-50' : ''}`}>
+                      {showMeta ? formatCurrency(meta) : '$ *.*.*'}
+                    </p>
                   )}
                </div>
             </div>
@@ -2042,12 +2050,19 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
          <div className="bg-emerald-600 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
             <div className="relative z-10">
-               <div className="p-2 bg-white/20 w-max rounded-xl text-white mb-4">
-                  <TrendingUp className="w-5 h-5" />
+               <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-white/20 w-max rounded-xl text-white">
+                     <TrendingUp className="w-5 h-5" />
+                  </div>
+                  <button onClick={() => setShowAcumulado(!showAcumulado)} className="text-white/50 hover:text-white transition-colors">
+                     {showAcumulado ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                </div>
                <p className="text-[10px] font-black uppercase text-emerald-100 tracking-widest">Ingresos Netos Reales</p>
-               <p className="text-2xl font-black text-white mt-1 leading-none italic">{formatCurrency(totalNeto)}</p>
-               <div className="mt-3 flex items-center gap-2">
+               <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showAcumulado ? 'blur-sm select-none opacity-50' : ''}`}>
+                 {showAcumulado ? formatCurrency(totalNeto) : '$ *.*.*'}
+               </p>
+               <div className={`mt-3 flex items-center gap-2 ${!showAcumulado ? 'blur-sm opacity-50' : ''}`}>
                   <div className="h-1.5 flex-1 bg-white/20 rounded-full overflow-hidden">
                      <div className="h-full bg-emerald-300" style={{ width: `${Math.min(100, (totalNeto/meta)*100)}%` }} />
                   </div>
@@ -2059,21 +2074,35 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
          <div className="bg-orange-500 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
             <div className="relative z-10">
-               <div className="p-2 bg-white/20 w-max rounded-xl text-white mb-4">
-                  <DollarSign className="w-5 h-5" />
+               <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-white/20 w-max rounded-xl text-white">
+                     <DollarSign className="w-5 h-5" />
+                  </div>
+                  <button onClick={() => setShowGastos(!showGastos)} className="text-white/50 hover:text-white transition-colors">
+                     {showGastos ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                </div>
                <p className="text-[10px] font-black uppercase text-orange-50 tracking-widest">Gastos / Inversión</p>
-               <p className="text-2xl font-black text-white mt-1 leading-none italic">{formatCurrency(totalPagosProfesores + totalGastosMensuales)}</p>
+               <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showGastos ? 'blur-sm select-none opacity-50' : ''}`}>
+                 {showGastos ? formatCurrency(totalPagosProfesores + totalGastosMensuales) : '$ *.*.*'}
+               </p>
             </div>
          </div>
 
          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl relative overflow-hidden group">
             <div className="relative z-10">
-               <div className="p-2 bg-slate-100 w-max rounded-xl text-slate-400 mb-4 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
-                  <AlertCircle className="w-5 h-5" />
+               <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-slate-100 w-max rounded-xl text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
+                     <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <button onClick={() => setShowFaltante(!showFaltante)} className="text-slate-400 hover:text-slate-800 transition-colors">
+                     {showFaltante ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                </div>
                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Diferencia para Meta</p>
-               <p className="text-2xl font-black text-slate-800 mt-1 leading-none italic">{faltante > 0 ? formatCurrency(faltante) : 'META CUMPLIDA! ✨'}</p>
+               <p className={`text-2xl font-black text-slate-800 mt-1 leading-none italic ${!showFaltante ? 'blur-sm select-none opacity-50' : ''}`}>
+                 {showFaltante ? (faltante > 0 ? formatCurrency(faltante) : 'META CUMPLIDA! ✨') : '$ *.*.*'}
+               </p>
             </div>
          </div>
       </div>

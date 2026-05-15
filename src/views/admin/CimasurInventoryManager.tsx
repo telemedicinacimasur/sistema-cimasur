@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, Plus, Search, FileSpreadsheet, Upload, Download, ArrowLeft, Filter, Hexagon, Droplet, Activity, FlaskConical, TestTube, Layers, Edit, Box, Hash } from 'lucide-react';
+import { Database, Plus, Search, FileSpreadsheet, Upload, Download, ArrowLeft, Filter, Hexagon, Droplet, Activity, FlaskConical, TestTube, Layers, Edit, Box, Hash, AlertCircle } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn, safe } from '../../lib/utils';
 import * as XLSX from 'xlsx';
 import { exportTableToPDF } from '../../lib/pdfUtils';
 
-type MainTab = 'SALINA CS' | 'ETANOL CS' | 'ADE CS' | 'DILUCIONES CIMASUR' | 'GOTAS PURAS' | 'ALTAS DILUCIONES' | 'NOSODES CLIENTES' | 'MATRIZ COMPLETA';
-type SubModule = 'dashboard' | 'codigos' | 'DILUCIONES CIMASUR' | 'GOTAS PURAS' | 'ALTAS DILUCIONES' | 'NOSODES CLIENTES';
+type MainTab = 'SALINA CS' | 'ETANOL CS' | 'ADE CS' | 'DILUCIONES CIMASUR' | 'GOTAS PURAS' | 'ALTAS DILUCIONES' | 'NOSODES CLIENTES' | 'FÓRMULAS MAGISTRALES' | 'EC DR. CONEJEROS' | 'MATRIZ COMPLETA';
+type SubModule = 'dashboard' | 'codigos' | 'DILUCIONES CIMASUR' | 'GOTAS PURAS' | 'ALTAS DILUCIONES' | 'NOSODES CLIENTES' | 'FÓRMULAS MAGISTRALES' | 'EC DR. CONEJEROS';
 
 const BASE_CATEGORIES = [
   'TODOS',
@@ -37,7 +37,9 @@ const PREFIX_MAP: Record<string, string> = {
   'NOSODES CLIENTES': 'NC',
   'GOTAS PURAS': 'GP',
   'ALTAS DILUCIONES': 'AD',
-  'DILUCIONES CIMASUR': 'D'
+  'DILUCIONES CIMASUR': 'D',
+  'FÓRMULAS MAGISTRALES': 'FM',
+  'EC DR. CONEJEROS': 'EC'
 };
 
 const FormField = ({ label, children }: { label: string, children: React.ReactNode }) => (
@@ -53,6 +55,7 @@ export default function CimasurInventoryManager() {
   const [activeTab, setActiveTab] = useState<MainTab>('SALINA CS');
   const [activeCategory, setActiveCategory] = useState<string>('Oftálmicos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState<string>('menor_mayor');
   
   const [records, setRecords] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -105,6 +108,8 @@ export default function CimasurInventoryManager() {
     return filtered.sort((a, b) => {
       const codeA = String(a.codigo_barras || '');
       const codeB = String(b.codigo_barras || '');
+      const nameA = String(a.nombre_producto || '');
+      const nameB = String(b.nombre_producto || '');
       
       const extractNum = (s: string) => {
         const match = s.match(/\d+/);
@@ -114,18 +119,35 @@ export default function CimasurInventoryManager() {
       const numA = extractNum(codeA);
       const numB = extractNum(codeB);
 
-      if (numA !== numB) return numA - numB;
-      return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+      if (sortOrder === 'menor_mayor') {
+        if (numA !== numB) return numA - numB;
+        return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+      } else if (sortOrder === 'mayor_menor') {
+        if (numA !== numB) return numB - numA;
+        return codeB.localeCompare(codeA, undefined, { numeric: true, sensitivity: 'base' });
+      } else if (sortOrder === 'a_z') {
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+      } else if (sortOrder === 'z_a') {
+        return nameB.localeCompare(nameA, undefined, { sensitivity: 'base' });
+      } else if (sortOrder === 'mas_reciente') {
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      } else if (sortOrder === 'mas_antiguo') {
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      }
+      return 0;
     });
   };
 
   const generateCodeForCurrentForm = () => {
     let prefix = PREFIX_MAP[activeTab] || '';
     
-    if (isBaseModule && GENERIC_CATEGORIES.includes(form.categoria_tipo)) {
-      const existing = records.find(r => r.base_master === activeTab && r.categoria_tipo === form.categoria_tipo && r.codigo_barras);
-      if (existing) {
-        return existing.codigo_barras;
+    if (isBaseModule || activeTab === 'MATRIZ COMPLETA') {
+      if (GENERIC_CATEGORIES.includes(form.categoria_tipo)) {
+        const existing = records.find(r => r.base_master === activeTab && r.categoria_tipo === form.categoria_tipo && r.codigo_barras);
+        if (existing) {
+          return existing.codigo_barras;
+        }
+        return 'CÓDIGO ÚNICO';
       }
     }
 
@@ -133,7 +155,7 @@ export default function CimasurInventoryManager() {
     const nums: number[] = [];
     
     for (const r of baseRecords) {
-        if (!r.codigo_barras) continue;
+        if (!r.codigo_barras || r.codigo_barras === 'CÓDIGO ÚNICO') continue;
         const codeStr = String(r.codigo_barras);
         const match = codeStr.match(/\d+/);
         if (match) {
@@ -141,16 +163,17 @@ export default function CimasurInventoryManager() {
         }
     }
     
-    nums.sort((a,b) => a - b);
-    
     let nextNum = 1;
-    // Find first gap or last + 1
     if (nums.length > 0) {
       nextNum = Math.max(...nums) + 1;
     }
     
     if (activeTab === 'ALTAS DILUCIONES') {
-        return `AD-${nextNum}`;
+        return `AD${nextNum.toString().padStart(2, '0')}`;
+    }
+    
+    if (activeTab === 'GOTAS PURAS') {
+        return nextNum.toString();
     }
     
     return prefix ? `${prefix}-${nextNum.toString().padStart(3, '0')}` : nextNum.toString();
@@ -233,9 +256,11 @@ export default function CimasurInventoryManager() {
     switch(tab) {
       case 'MATRIZ COMPLETA': return ['CÓDIGO', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA', 'BASE MASTER'];
       case 'DILUCIONES CIMASUR': return ['CÓDIGO', 'IDENTIFICACIÓN', 'DILUCIONES / ACTUALIZACIÓN'];
-      case 'GOTAS PURAS': return ['CÓDIGO GP', 'PRODUCTO', 'SOLUCIÓN'];
+      case 'GOTAS PURAS': return ['CÓDIGO', 'PRODUCTO']; // Removed SOLUCIÓN
       case 'ALTAS DILUCIONES': return ['CÓDIGO', 'PRODUCTO', 'DILUCIÓN'];
       case 'NOSODES CLIENTES': return ['CÓDIGO NC', 'MUESTRA Y POTENCIA', 'FECHA', 'DOCTOR(A)'];
+      case 'FÓRMULAS MAGISTRALES': return ['CÓDIGO FM', 'FÓRMULA', 'OBSERVACIÓN'];
+      case 'EC DR. CONEJEROS': return ['CÓDIGO EC', 'PRODUCTO', 'DILUCIÓN'];
       default: return ['CÓDIGO BARRA', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA'];
     }
   };
@@ -247,11 +272,15 @@ export default function CimasurInventoryManager() {
       case 'DILUCIONES CIMASUR': 
         return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
       case 'GOTAS PURAS': 
-        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
+        return [safe(r.codigo_barras), safe(r.nombre_producto)]; // Removed SOLUCIÓN
       case 'ALTAS DILUCIONES': 
         return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
       case 'NOSODES CLIENTES': 
         return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.fecha), safe(r.doctor)];
+      case 'FÓRMULAS MAGISTRALES':
+        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
+      case 'EC DR. CONEJEROS':
+        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
       default: 
          return [
           safe(r.codigo_barras),
@@ -303,28 +332,69 @@ export default function CimasurInventoryManager() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
         
-        let count = 0;
+        let validRows: any[] = [];
+        let duplicates = 0;
+        let emptyMissing = 0;
+
         for (const row of data as any[]) {
-          const cd = safe(row['CÓDIGO'] || row['CÓDIGO BARRA'] || row['CODIGO GP'] || row['CÓDIGO NC'] || row['CODIGO'] || row['codigo'] || row['Código']);
-          const nm = safe(row['IDENTIFICACIÓN'] || row['PRODUCTO'] || row['MUESTRA Y POTENCIA'] || row['NOMBRE'] || row['producto'] || row['Producto']);
+          const cd = safe(row['CÓDIGO'] || row['CÓDIGO BARRA'] || row['CODIGO GP'] || row['CÓDIGO NC'] || row['CODIGO FM'] || row['CÓDIGO EC'] || row['CODIGO'] || row['codigo'] || row['Código']);
+          const nm = safe(row['IDENTIFICACIÓN'] || row['PRODUCTO'] || row['MUESTRA Y POTENCIA'] || row['NOMBRE'] || row['FÓRMULA'] || row['producto'] || row['Producto']);
           
-          if (cd || nm) {
-             await localDB.saveToCollection('inventory_master', {
-               codigo_barras: cd,
-               nombre_producto: nm,
-               solucion: safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || ''),
-               categoria_tipo: safe(row['CATEGORÍA'] || row['CATEGORIA'] || activeCategory),
-               fecha: safe(row['FECHA']),
-               doctor: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR']),
-               base_master: activeTab,
-               type: 'inventory',
-               createdAt: new Date().toISOString(),
-               creadoPor: user?.displayName || 'Admin'
-             });
-             count++;
+          if (!cd || !nm) {
+            emptyMissing++;
+            continue;
           }
+
+          const isGeneric = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(activeTab) && GENERIC_CATEGORIES.includes(safe(row['CATEGORÍA'] || activeCategory));
+
+          if (!isGeneric) {
+            const hasDuplicateInRecords = records.some(r => r.codigo_barras === cd.trim());
+            const hasDuplicateInCurrentImport = validRows.some(r => r.cd === cd.trim());
+            
+            if (hasDuplicateInRecords || hasDuplicateInCurrentImport) {
+               duplicates++;
+               continue;
+            }
+          }
+
+          validRows.push({
+            cd: cd.trim(),
+            nm: nm.trim(),
+            sol: safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['OBSERVACIÓN'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || ''),
+            cat: safe(row['CATEGORÍA'] || row['CATEGORIA'] || activeCategory),
+            fec: safe(row['FECHA']),
+            doc: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR'])
+          });
         }
-        alert(`Se importaron ${count} registros con éxito.`);
+
+        validRows.sort((a,b) => {
+          const matchA = a.cd.match(/\d+/);
+          const matchB = b.cd.match(/\d+/);
+          const numA = matchA ? parseInt(matchA[0], 10) : 0;
+          const numB = matchB ? parseInt(matchB[0], 10) : 0;
+          return numA - numB;
+        });
+
+        for (const r of validRows) {
+           await localDB.saveToCollection('inventory_master', {
+             codigo_barras: r.cd,
+             nombre_producto: r.nm,
+             solucion: r.sol,
+             categoria_tipo: r.cat,
+             fecha: r.fec,
+             doctor: r.doc,
+             base_master: activeTab,
+             type: 'inventory',
+             createdAt: new Date().toISOString(),
+             creadoPor: user?.displayName || 'Admin'
+           });
+        }
+        
+        let msg = `Se importaron ${validRows.length} registros (ordenados de menor a mayor).`;
+        if (duplicates > 0) msg += `\nSe omitieron ${duplicates} duplicados.`;
+        if (emptyMissing > 0) msg += `\nSe detectaron ${emptyMissing} filas inválidas o con datos vacíos.`;
+        
+        alert(msg);
         loadData();
       } catch (err) {
         console.error(err);
@@ -437,15 +507,31 @@ export default function CimasurInventoryManager() {
           )}
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Buscar por código, producto o solución..."
-                className="w-full pl-10 pr-4 py-2 border-b border-slate-200 text-sm bg-transparent focus:outline-none focus:border-blue-500"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+            <div className="flex gap-4 w-full md:w-auto flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar por código, producto o solución..."
+                  className="w-full pl-10 pr-4 py-2 border-b border-slate-200 text-sm bg-transparent focus:outline-none focus:border-blue-500"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="relative">
+                <select
+                  value={sortOrder}
+                  onChange={e => setSortOrder(e.target.value)}
+                  className="pl-4 pr-8 py-2 text-sm border-b border-slate-200 outline-none text-slate-600 font-medium"
+                >
+                  <option value="menor_mayor">N° Menor a Mayor</option>
+                  <option value="mayor_menor">N° Mayor a Menor</option>
+                  <option value="a_z">A - Z (Producto)</option>
+                  <option value="z_a">Z - A (Producto)</option>
+                  <option value="mas_reciente">Más reciente</option>
+                  <option value="mas_antiguo">Más antiguo</option>
+                </select>
+              </div>
             </div>
             
             <div className="flex gap-2 w-full md:w-auto flex-wrap">
@@ -483,8 +569,53 @@ export default function CimasurInventoryManager() {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
-            <div className="overflow-x-auto">
+          <div className="flex flex-col flex-1 min-h-0">
+            {(() => {
+              if (activeTab === 'MATRIZ COMPLETA') return null;
+              
+              const baseRecords = records.filter(r => r.base_master === activeTab);
+              const emptyRecords = baseRecords.filter(r => r.codigo_barras && r.codigo_barras !== 'CÓDIGO ÚNICO' && !safe(r.nombre_producto).trim());
+              
+              const nums: number[] = [];
+              for (const r of baseRecords) {
+                if (!r.codigo_barras || r.codigo_barras === 'CÓDIGO ÚNICO') continue;
+                const match = String(r.codigo_barras).match(/\d+/);
+                if (match) nums.push(parseInt(match[0], 10));
+              }
+              nums.sort((a,b) => a - b);
+              
+              const gaps: number[] = [];
+              for (let i = 0; i < nums.length - 1; i++) {
+                if (nums[i + 1] - nums[i] > 1) {
+                  for (let j = nums[i] + 1; j < nums[i + 1]; j++) {
+                    gaps.push(j);
+                  }
+                }
+              }
+              
+              if (emptyRecords.length > 0 || gaps.length > 0) {
+                return (
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-4 shadow-sm">
+                    <div className="flex gap-2 text-amber-800 font-bold items-center mb-1">
+                       <AlertCircle className="w-5 h-5" />
+                       Aviso de Correlativos Vacíos Disponibles
+                    </div>
+                    <ul className="list-disc pl-8 text-xs text-amber-700">
+                      {emptyRecords.map(r => (
+                        <li key={r.id}>Correlativo creado sin producto: <strong>{r.codigo_barras}</strong></li>
+                      ))}
+                      {gaps.length > 0 && (
+                        <li>Existen gaps numéricos sin usar: <strong>{gaps.join(', ')}</strong></li>
+                      )}
+                    </ul>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-[#f8fafc] border-b border-slate-200">
                   <tr className="text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -531,6 +662,7 @@ export default function CimasurInventoryManager() {
               <span>Base: {activeTab} {isBaseModule && `> ${activeCategory}`}</span>
               <span>{filtered.length} registros</span>
             </div>
+          </div>
           </div>
         </>
       )}
@@ -619,7 +751,7 @@ export default function CimasurInventoryManager() {
                      />
                    </FormField>
                  </div>
-              ) : (
+              ) : activeTab !== 'GOTAS PURAS' ? (
                 <FormField label={getHeadersForTab(activeTab)[2] || "SOLUCIÓN"}>
                   <input
                     type="text"
@@ -629,7 +761,7 @@ export default function CimasurInventoryManager() {
                     onChange={e => setForm({...form, solucion: e.target.value})}
                   />
                 </FormField>
-              )}
+              ) : null}
 
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-black uppercase tracking-widest transition-colors">
