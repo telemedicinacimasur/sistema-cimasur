@@ -810,12 +810,12 @@ function GestionList({
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
               <thead>
-                 <tr className="bg-slate-50 border-b text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="p-4">F. Registro</th>
-                    <th className="p-4">Cliente / Info Contacto</th>
-                    <th className="p-4 border-l">Ubicación / Tipo</th>
-                    <th className="p-4 border-l">Gestión / Categoría</th>
-                    <th className="p-4 text-right">Acciones</th>
+                 <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
+                    <th className="p-4 bg-[#001736]">F. Registro</th>
+                    <th className="p-4 bg-[#001736]">Cliente / Info Contacto</th>
+                    <th className="p-4 border-l border-white/10 bg-[#001736]">Ubicación / Tipo</th>
+                    <th className="p-4 border-l border-white/10 bg-[#001736]">Gestión / Categoría</th>
+                    <th className="p-4 text-right bg-[#001736]">Acciones</th>
                  </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

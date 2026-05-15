@@ -857,8 +857,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
               <thead>
-                 <tr className="bg-slate-50 border-b text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <th className="p-5">
+                 <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
+                    <th className="p-5 bg-[#001736]">
                        <input 
                          type="checkbox" 
                          className="rounded"
@@ -866,13 +866,13 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                          onChange={toggleSelectAll}
                        />
                      </th>
-                    <th className="p-5">Razón Social / Cliente</th>
-                    <th className="p-5">Comuna</th>
-                    <th className="p-5">Email</th>
-                    <th className="p-5">Fecha Ingreso</th>
-                    <th className="p-5">Categoría</th>
-                    <th className="p-5">Tipo</th>
-                    <th className="p-5 text-right px-8">Acciones</th>
+                    <th className="p-5 bg-[#001736]">Razón Social / Cliente</th>
+                    <th className="p-5 bg-[#001736]">Comuna</th>
+                    <th className="p-5 bg-[#001736]">Email</th>
+                    <th className="p-5 bg-[#001736]">Fecha Ingreso</th>
+                    <th className="p-5 bg-[#001736]">Categoría</th>
+                    <th className="p-5 bg-[#001736]">Tipo</th>
+                    <th className="p-5 text-right px-8 bg-[#001736]">Acciones</th>
                  </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -963,12 +963,12 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-50 border-b text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              <th className="p-5">Nombre / Razón Social</th>
-              <th className="p-5">RUT / ID</th>
-              <th className="p-5">Email</th>
-              <th className="p-5">Categoría</th>
-              <th className="p-5">Fecha Importación</th>
+            <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
+              <th className="p-5 bg-[#001736]">Nombre / Razón Social</th>
+              <th className="p-5 bg-[#001736]">RUT / ID</th>
+              <th className="p-5 bg-[#001736]">Email</th>
+              <th className="p-5 bg-[#001736]">Categoría</th>
+              <th className="p-5 bg-[#001736]">Fecha Importación</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1013,12 +1013,12 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-50 border-b text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              <th className="p-5">Fecha Importación</th>
-              <th className="p-5">Archivo</th>
-              <th className="p-5">Cantidad</th>
-              <th className="p-5">Responsable</th>
-              <th className="p-5 text-right">Acciones</th>
+            <tr className="bg-[#001736] text-white border-b text-left text-[10px] font-black uppercase tracking-widest">
+              <th className="p-5 bg-[#001736]">Fecha Importación</th>
+              <th className="p-5 bg-[#001736]">Archivo</th>
+              <th className="p-5 bg-[#001736]">Cantidad</th>
+              <th className="p-5 bg-[#001736]">Responsable</th>
+              <th className="p-5 text-right bg-[#001736]">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

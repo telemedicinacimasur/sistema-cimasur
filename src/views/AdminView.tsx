@@ -43,6 +43,7 @@ import {
   RefreshCw,
   GraduationCap,
   Eye,
+  Target,
   EyeOff,
   Settings,
   Lock,
@@ -112,42 +113,49 @@ export default function AdminView() {
             desc="Control de presupuestos, vendedores y estados de aprobación."
             icon={TrendingUp}
             onClick={() => setView('quotes')}
+            color="indigo"
           />
           <ModuleCard 
             title="Detalle de Ventas"
             desc="Registro diario de facturas y boletas emitidas por cliente."
             icon={ShoppingCart}
             onClick={() => setView('sales')}
+            color="emerald"
           />
           <ModuleCard 
             title="Detalle de Ventas GESTIÓN"
             desc="Registro diario de ventas con detalle de productos y cotización."
             icon={ShoppingCart}
             onClick={() => setView('sales_gestion')}
+            color="amber"
           />
           <ModuleCard 
             title="Detalle de DTE"
             desc="Control administrativo de documentos tributarios electrónicos."
             icon={Receipt}
             onClick={() => setView('dte')}
+            color="rose"
           />
           <ModuleCard 
             title="Control de Pagos Veterinarios"
             desc="Registro de pagos tutor, mail, fono y honorarios veterinarios."
             icon={DollarSign}
             onClick={() => setView('pet_payments')}
+            color="indigo"
           />
           <ModuleCard 
             title="Saldos Escuela Cimasur"
             desc="Control de pagos de alumnos, meta anual y gastos académicos."
             icon={GraduationCap}
             onClick={() => setView('school_payments')}
+            color="emerald"
           />
           <ModuleCard 
             title="Gestión de Códigos y Diluciones"
             desc="Submódulo maestro para administración de Excel, correlativos y catálogos."
             icon={Database}
             onClick={() => setView('codigos_y_diluciones')}
+            color="orange"
           />
         </div>
       </div>
@@ -155,7 +163,23 @@ export default function AdminView() {
   }
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative font-bold">
+      <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-2">
+         <button 
+           className="p-4 bg-[#001736] text-white rounded-full shadow-2xl hover:bg-slate-800 transition-all hover:-translate-y-1 flex items-center justify-center opacity-80 hover:opacity-100 border-2 border-white/20"
+           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+           title="Volver Arriba"
+         >
+            <TrendingUp className="w-5 h-5 -rotate-90" />
+         </button>
+         <button 
+           onClick={() => setView('menu')}
+           className="bg-white text-[#001736] p-4 rounded-full shadow-2xl hover:scale-110 transition-all border-2 border-[#001736]/10 font-bold flex items-center group"
+         >
+           <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+         </button>
+      </div>
+
       <button 
         onClick={() => setView('menu')}
         className="flex items-center gap-2 text-[#001736] font-bold hover:text-blue-600 transition-colors mb-2"
@@ -412,6 +436,24 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 bg-[#001736] text-white border-b flex flex-col xl:flex-row justify-between items-center gap-6">
+          <div className="flex flex-wrap items-center gap-6 text-white grow">
+             <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-2xl border border-white/20 shadow-inner group">
+                <Search className="w-4 h-4 text-white/40 group-focus-within:text-blue-400 transition-colors" />
+                <input 
+                  type="text" 
+                  placeholder="Buscador rápido..." 
+                  className="bg-transparent border-none outline-none text-[10px] w-32 placeholder:text-white/20"
+                  value={searchTutor}
+                  onChange={e => setSearchTutor(e.target.value)}
+                />
+             </div>
+             <div className="flex items-center gap-3 bg-white/10 px-4 py-1.5 rounded-2xl border border-white/20">
+                <div className="flex flex-col">
+                   <span className="text-[8px] font-black uppercase text-blue-400 tracking-widest">Suma Honorarios</span>
+                   <span className="text-[13px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
+                </div>
+             </div>
+          </div>
           <div className="flex flex-wrap items-center gap-4 text-white">
             <div className="flex flex-col gap-1">
                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">Mes / Año</span>
@@ -571,18 +613,45 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   );
 }
 
-function ModuleCard({ title, desc, icon: Icon, onClick }: any) {
+function ModuleCard({ title, desc, icon: Icon, onClick, color = 'blue' }: any) {
+  const colorMap: any = {
+    indigo: 'from-indigo-600 to-indigo-700 shadow-indigo-100 text-indigo-600',
+    emerald: 'from-emerald-600 to-emerald-700 shadow-emerald-100 text-emerald-600',
+    rose: 'from-rose-600 to-rose-700 shadow-rose-100 text-rose-600',
+    amber: 'from-amber-600 to-amber-700 shadow-amber-100 text-amber-600',
+    blue: 'from-blue-600 to-blue-700 shadow-blue-100 text-blue-600',
+    purple: 'from-purple-600 to-purple-700 shadow-purple-100 text-purple-600',
+    teal: 'from-teal-600 to-teal-700 shadow-teal-100 text-teal-600',
+    orange: 'from-orange-600 to-orange-700 shadow-orange-100 text-orange-600',
+    slate: 'from-slate-600 to-slate-700 shadow-slate-100 text-slate-600'
+  };
+
+  const selectedColor = colorMap[color] || colorMap.blue;
+  const bgColor = selectedColor.split(' ')[0];
+  const textColor = selectedColor.split(' ')[selectedColor.split(' ').length - 1];
+
   return (
-    <button 
+    <div 
       onClick={onClick}
-      className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-400 transition-all text-left group"
+      className="group relative bg-white rounded-[2rem] p-8 border border-slate-100 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[220px]"
     >
-      <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-50 transition-colors">
-        <Icon className="w-7 h-7 text-[#001736] group-hover:text-blue-600" />
+      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${bgColor} opacity-0 group-hover:opacity-5 transition-all duration-700 rounded-bl-[5rem]`} />
+      
+      <div className="relative z-10">
+        <div className={`w-16 h-16 bg-gradient-to-br ${bgColor} rounded-2xl flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
+          <Icon className="w-8 h-8 text-white" />
+        </div>
+        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic leading-tight group-hover:text-blue-600 transition-colors">{title}</h3>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-3 opacity-60 leading-relaxed">{desc}</p>
       </div>
-      <h3 className="text-lg font-bold text-[#001736] mb-2">{title}</h3>
-      <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
-    </button>
+
+      <div className="relative z-10 flex items-center justify-between mt-6">
+        <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${textColor}`}>Explorar Módulo</span>
+        <div className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+          <ArrowLeft className="w-4 h-4 text-slate-300 group-hover:text-blue-500 rotate-180" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -811,7 +880,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#001736] p-4 text-white font-bold flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" /> Seguimiento de Pedidos
+            <TrendingUp className="w-5 h-5" /> Seguimiento de Cotizaciones
           </div>
           <div className="flex items-center gap-2">
             <input 
@@ -855,26 +924,47 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
               {statuses.map(s => <option key={s}>{s}</option>)}
             </select>
           </FormField>
-          <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
-          <FormField label="Observaciones"><input className="w-full border-b p-2 text-sm" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
-          <div className="grid grid-cols-3 gap-2">
-            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-2 text-sm font-black text-blue-700 bg-blue-50" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
-            <FormField label="Und a hacer"><input type="number" className="w-full border-b p-2 text-sm font-bold text-amber-700 bg-amber-50" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
-            <FormField label="UND Inventario (Auto)"><input type="number" className="w-full border-b p-2 text-sm font-bold text-slate-500 bg-slate-50" value={form.invUnits || 0} readOnly /></FormField>
+          <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm font-bold" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
+          
+          <div className="md:col-span-4">
+             <FormField label="Observaciones">
+               <textarea 
+                 className="w-full border p-3 text-sm font-bold italic bg-white rounded-lg focus:ring-1 focus:ring-blue-100 outline-none" 
+                 rows={2}
+                 value={form.observaciones || ''} 
+                 onChange={e => setForm({...form, observaciones: e.target.value})} 
+               />
+             </FormField>
           </div>
-          <div className="flex items-end">
-              <button type="submit" className="w-full bg-[#001736] text-white py-3 rounded font-bold shadow-lg hover:opacity-90 flex items-center justify-center gap-2 uppercase tracking-widest">
-                <Save className="w-4 h-4" /> GUARDAR PEDIDO
-              </button>
+
+          <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-6">
+            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-3 text-lg font-black text-blue-700 bg-blue-50 rounded-t" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
+            <FormField label="Und a hacer"><input type="number" className="w-full border-b p-3 text-lg font-bold text-amber-700 bg-amber-50 rounded-t" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
+            <FormField label="UND Inventario (Auto)"><input type="number" className="w-full border-b p-3 text-lg font-bold text-slate-500 bg-slate-50 rounded-t" value={form.invUnits || 0} readOnly /></FormField>
+            <div className="flex items-end">
+                <button type="submit" className="w-full bg-[#001736] text-white py-4 rounded-xl font-black shadow-xl hover:bg-slate-800 flex items-center justify-center gap-2 uppercase tracking-widest transition-all active:scale-95 text-xs">
+                  <Save className="w-5 h-5 text-emerald-400" /> GUARDAR COTIZACIÓN
+                </button>
+            </div>
           </div>
         </form>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 bg-[#001736] border-b flex flex-wrap gap-4 items-center justify-between text-white">
-          <h3 className="text-[10px] font-black uppercase text-white tracking-widest">Histórico de Pedidos</h3>
+          <div className="flex items-center gap-4">
+             <h3 className="text-[10px] font-black uppercase text-white tracking-widest">Histórico de Cotizaciones</h3>
+             <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                <span className="text-[9px] font-black uppercase text-emerald-400">Total Aprobadas:</span>
+                <span className="text-[11px] font-black">{filteredRecords.filter(r => r.estado === 'Aprobada').reduce((s, r) => s + (Number(r.undTotal) || 0), 0)} UNDs</span>
+             </div>
+          </div>
           
           <div className="flex flex-wrap items-center gap-3">
+             <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Suma en Pantalla:</span>
+                <span className="text-sm font-black text-white">{filteredRecords.filter(r => r.estado === 'Aprobada').reduce((s, r) => s + (Number(r.undTotal) || 0), 0)} UNDs</span>
+             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-slate-500 uppercase">Filtros:</span>
               <input 
@@ -917,7 +1007,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                     r.undTotal || 0,
                     r.observaciones || ''
                   ]);
-                  exportTableToPDF('Reporte: Pedidos', ['Año/Mes', 'N° Pedido', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_pedidos', 'l');
+                  exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND', 'Obs'], data, 'reporte_cotizaciones', 'l');
                 }}
                 className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition-colors hover:bg-blue-700 flex items-center gap-1" 
                 title="Descargar PDF Filtrado"
@@ -931,12 +1021,12 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[#001736] text-left border-b font-black text-white uppercase">
-                <th className="p-4 text-center bg-[#001736]">Año/Mes</th>
-                <th className="p-4 bg-[#001736]">N° Pedido</th>
+                <th className="p-4 text-center bg-indigo-900 border-r border-white/5">Año/Mes</th>
+                <th className="p-4 bg-blue-900 border-r border-white/5 tracking-tighter">N° Cotiz</th>
                 <th className="p-4 bg-[#001736]">Cliente</th>
-                <th className="p-4 bg-[#001736]">Vendedor</th>
-                <th className="p-4 text-center bg-[#001736]">Estado (Editable)</th>
-                <th className="p-4 text-center bg-[#001736]">UND Total</th>
+                <th className="p-4 bg-slate-800 border-r border-white/5">Vendedor</th>
+                <th className="p-4 text-center bg-amber-700 border-r border-white/5">Estado (Editable)</th>
+                <th className="p-4 text-center bg-emerald-800 border-r border-white/5">UND Total</th>
                 <th className="p-4 text-center bg-[#001736]">Acción</th>
               </tr>
             </thead>
@@ -945,8 +1035,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors italic">
                   <td className="p-4 text-center text-slate-400">{r.anio || ''} / {r.mes || ''}</td>
                   <td className="p-4 font-bold text-[#001736]">{r.nroCotiz || ''}</td>
-                  <td className="p-4 font-medium">{r.cliente || ''}</td>
-                  <td className="p-4">{r.vendedor || ''}</td>
+                  <td className="p-4 font-black">{r.cliente || ''}</td>
+                  <td className="p-4 font-bold">{r.vendedor || ''}</td>
                   <td className="p-4 text-center">
                     <select 
                       className={cn(
@@ -1021,6 +1111,15 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                 </tr>
               ))}
             </tbody>
+            <tfoot className="bg-[#001736] text-white font-black text-sm uppercase italic">
+              <tr>
+                <td colSpan={5} className="p-4 text-right tracking-widest">Suma Total de Cotizaciones Aprobadas:</td>
+                <td className="p-4 text-center text-emerald-400 text-lg underline decoration-2 underline-offset-4">
+                  {filteredRecords.filter(r => r.estado === 'Aprobada').reduce((s, r) => s + (Number(r.undTotal) || 0), 0)} UNDs
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -1257,7 +1356,13 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
       <div className="lg:col-span-8 space-y-4">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 bg-[#001736] border-b flex justify-between items-center text-white">
-            <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas GESTIÓN</h3>
+            <div className="flex items-center gap-4">
+               <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas GESTIÓN</h3>
+               <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                  <span className="text-[9px] font-black uppercase text-emerald-400">Total Cotiz:</span>
+                  <span className="text-[11px] font-black">{totalCotizacion.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
+               </div>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase">Mes:</span>
@@ -1617,7 +1722,13 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
       <div className="lg:col-span-8 space-y-4">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 bg-[#001736] border-b flex justify-between items-center text-white">
-            <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas</h3>
+            <div className="flex items-center gap-4">
+               <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas</h3>
+               <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                  <span className="text-[9px] font-black uppercase text-blue-400">Total Fcos:</span>
+                  <span className="text-[11px] font-black">{totalFrascos} UNDS</span>
+               </div>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
@@ -1853,12 +1964,6 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
     return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
 
-  const totalIngresos = filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
-  const totalPagosProfesores = filteredRecords.filter(r => r.tipo === 'Pago Profesor').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
-  const totalGastosMensuales = filteredRecords.filter(r => r.tipo === 'Gasto Mensual').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
-  const totalNeto = totalIngresos - totalPagosProfesores - totalGastosMensuales;
-  const faltante = meta - totalNeto;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
@@ -1897,8 +2002,82 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
     }
   };
 
+  const totalIngresos = filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
+  const totalPagosProfesores = filteredRecords.filter(r => r.tipo === 'Pago Profesor').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
+  const totalGastosMensuales = filteredRecords.filter(r => r.tipo === 'Gasto Mensual').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
+  const totalNeto = totalIngresos - totalPagosProfesores - totalGastosMensuales;
+  const faltante = meta - totalNeto;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Dashboard de Métricas Escuela */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+         <div className="bg-[#001736] p-6 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden relative group">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-all" />
+            <div className="relative z-10 flex flex-col justify-between h-full">
+               <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400">
+                     <Target className="w-5 h-5" />
+                  </div>
+                  <button onClick={() => setIsEditingMeta(!isEditingMeta)} className="text-[10px] font-black uppercase text-indigo-400 hover:text-white transition-colors">Ajustar Meta</button>
+               </div>
+               <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Meta Anual Establecida</p>
+                  {isEditingMeta ? (
+                    <input 
+                      type="number" 
+                      className="text-2xl font-black bg-transparent border-b border-indigo-500 outline-none w-full text-white mt-1" 
+                      value={meta} 
+                      onChange={e => setMeta(Number(e.target.value))}
+                      onBlur={() => setIsEditingMeta(false)}
+                      autoFocus
+                    />
+                  ) : (
+                    <p className="text-2xl font-black text-white mt-1 leading-none italic">{formatCurrency(meta)}</p>
+                  )}
+               </div>
+            </div>
+         </div>
+
+         <div className="bg-emerald-600 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
+            <div className="relative z-10">
+               <div className="p-2 bg-white/20 w-max rounded-xl text-white mb-4">
+                  <TrendingUp className="w-5 h-5" />
+               </div>
+               <p className="text-[10px] font-black uppercase text-emerald-100 tracking-widest">Ingresos Netos Reales</p>
+               <p className="text-2xl font-black text-white mt-1 leading-none italic">{formatCurrency(totalNeto)}</p>
+               <div className="mt-3 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 bg-white/20 rounded-full overflow-hidden">
+                     <div className="h-full bg-emerald-300" style={{ width: `${Math.min(100, (totalNeto/meta)*100)}%` }} />
+                  </div>
+                  <span className="text-[10px] font-black text-emerald-100 italic">{Math.round((totalNeto/meta)*100)}%</span>
+               </div>
+            </div>
+         </div>
+
+         <div className="bg-orange-500 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
+            <div className="relative z-10">
+               <div className="p-2 bg-white/20 w-max rounded-xl text-white mb-4">
+                  <DollarSign className="w-5 h-5" />
+               </div>
+               <p className="text-[10px] font-black uppercase text-orange-50 tracking-widest">Gastos / Inversión</p>
+               <p className="text-2xl font-black text-white mt-1 leading-none italic">{formatCurrency(totalPagosProfesores + totalGastosMensuales)}</p>
+            </div>
+         </div>
+
+         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl relative overflow-hidden group">
+            <div className="relative z-10">
+               <div className="p-2 bg-slate-100 w-max rounded-xl text-slate-400 mb-4 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
+                  <AlertCircle className="w-5 h-5" />
+               </div>
+               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Diferencia para Meta</p>
+               <p className="text-2xl font-black text-slate-800 mt-1 leading-none italic">{faltante > 0 ? formatCurrency(faltante) : 'META CUMPLIDA! ✨'}</p>
+            </div>
+         </div>
+      </div>
+
       {/* Search & Date Filters Row */}
       <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px] space-y-1">
@@ -2030,11 +2209,11 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       <td></td>
                     </tr>
                     <tr className="bg-[#001736] border-b text-[10px] font-black text-white uppercase tracking-widest text-left">
-                      <th className="p-3">Fecha</th>
-                      <th className="p-3">Alumno</th>
-                      <th className="p-3 text-right">Monto Total</th>
-                      <th className="p-3 text-right">Recibido (Neto)</th>
-                      <th className="p-3 text-center">Acciones</th>
+                      <th className="p-3 bg-[#001736]">Fecha</th>
+                      <th className="p-3 bg-[#001736]">Alumno</th>
+                      <th className="p-3 text-right bg-[#001736]">Monto Total</th>
+                      <th className="p-3 text-right bg-[#001736]">Recibido (Neto)</th>
+                      <th className="p-3 text-center bg-[#001736]">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 italic">
@@ -2447,9 +2626,15 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
     <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-[#001736] p-4 text-white font-bold flex flex-wrap gap-4 items-center justify-between">
-          <span className="flex items-center gap-2">
-            <Receipt className="w-5 h-5" /> {editingId ? 'Editando Registro DTE' : 'Registro Administrativo de DTE'}
-          </span>
+          <div className="flex items-center gap-4">
+             <span className="flex items-center gap-2">
+               <Receipt className="w-5 h-5" /> {editingId ? 'Editando Registro DTE' : 'Registro Administrativo de DTE'}
+             </span>
+             <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                <span className="text-[9px] font-black uppercase text-blue-400">Total DTE:</span>
+                <span className="text-[11px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.total) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
+             </div>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <input 
               type="file" 
@@ -2548,7 +2733,13 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 bg-[#001736] border-b flex flex-wrap justify-between items-center font-black text-[10px] text-white uppercase tracking-widest gap-4">
-          <span>Consulta de Registros DTE</span>
+          <div className="flex items-center gap-4">
+             <span>Consulta de Registros DTE</span>
+             <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                <span className="text-[9px] font-black uppercase text-emerald-400">Total Neto:</span>
+                <span className="text-[11px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.montoNeto) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
+             </div>
+          </div>
           <div className="flex items-center gap-2 flex-wrap text-normal normal-case">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>

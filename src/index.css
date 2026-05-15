@@ -12,7 +12,7 @@
   }
   
   thead th {
-    @apply sticky top-0 z-10 backdrop-blur-md bg-white/90;
+    @apply sticky top-0 z-10;
   }
 }
 

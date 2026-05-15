@@ -103,16 +103,24 @@ export default function CimasurInventoryManager() {
     }
 
     return filtered.sort((a, b) => {
-      // Sort by category first, then by code
-      const catA = safe(a.categoria_tipo).toLowerCase();
-      const catB = safe(b.categoria_tipo).toLowerCase();
-      if (catA !== catB) return catA.localeCompare(catB);
-      return safe(a.codigo_barras).localeCompare(safe(b.codigo_barras));
+      const codeA = String(a.codigo_barras || '');
+      const codeB = String(b.codigo_barras || '');
+      
+      const extractNum = (s: string) => {
+        const match = s.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+      
+      const numA = extractNum(codeA);
+      const numB = extractNum(codeB);
+
+      if (numA !== numB) return numA - numB;
+      return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
     });
   };
 
   const generateCodeForCurrentForm = () => {
-    const prefix = PREFIX_MAP[activeTab] || '';
+    let prefix = PREFIX_MAP[activeTab] || '';
     
     if (isBaseModule && GENERIC_CATEGORIES.includes(form.categoria_tipo)) {
       const existing = records.find(r => r.base_master === activeTab && r.categoria_tipo === form.categoria_tipo && r.codigo_barras);
@@ -136,12 +144,13 @@ export default function CimasurInventoryManager() {
     nums.sort((a,b) => a - b);
     
     let nextNum = 1;
-    for (const n of nums) {
-        if (n === nextNum) {
-            nextNum++;
-        } else if (n > nextNum) {
-            break;
-        }
+    // Find first gap or last + 1
+    if (nums.length > 0) {
+      nextNum = Math.max(...nums) + 1;
+    }
+    
+    if (activeTab === 'ALTAS DILUCIONES') {
+        return `AD-${nextNum}`;
     }
     
     return prefix ? `${prefix}-${nextNum.toString().padStart(3, '0')}` : nextNum.toString();

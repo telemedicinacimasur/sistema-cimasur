@@ -27,6 +27,7 @@ import {
   ExternalLink,
   FileText,
   Clock,
+  ArrowUp,
   Upload,
   FileSpreadsheet
 } from 'lucide-react';
@@ -91,48 +92,56 @@ export default function LabView() {
             desc="Control de estado para elaboración."
             icon={Beaker}
             onClick={() => setActiveForm('gotas-puras')}
+            color="indigo"
           />
           <ModuleCard 
             title="Elaboración Gotas y Diluciones"
             desc="Registro de gotas puras y diluciones"
             icon={FlaskConical}
             onClick={() => setActiveForm('elaboracion')}
+            color="emerald"
           />
           <ModuleCard 
             title="Ingreso Nosodes"
             desc="Registro de muestras médicas- nosodes clientes."
             icon={Microscope}
             onClick={() => setActiveForm('nosodes')}
+            color="purple"
           />
           <ModuleCard 
             title="Ficha Tinturas Madres"
             desc="Preparación de tintura madre"
             icon={Droplets}
             onClick={() => setActiveForm('tinturas')}
+            color="blue"
           />
           <ModuleCard 
             title="Preparación Gotas Puras"
             desc="Composición y formulación comparativa."
             icon={Table}
             onClick={() => setActiveForm('preparacion')}
+            color="teal"
           />
           <ModuleCard 
             title="Registro de Insumos laboratorio T.M. y otros"
             desc="Detalle Ingreso Productos para Tinturas"
             icon={Package}
             onClick={() => setActiveForm('insumos')}
+            color="orange"
           />
           <ModuleCard 
             title="Vademécum"
             desc="Productos requeridos para productos de vademécum"
             icon={BookOpen}
             onClick={() => setActiveForm('vademecum')}
+            color="amber"
           />
           <ModuleCard 
             title="Mantención"
             desc="Registro de limpieza y calibración de equipos de laboratorio."
             icon={Settings}
             onClick={() => setActiveForm('mantenimiento')}
+            color="slate"
           />
           <ModuleCard 
             title="Stock de Insumo Diario"
@@ -140,6 +149,7 @@ export default function LabView() {
             icon={ClipboardList}
             onClick={() => setActiveForm('stock')}
             featured
+            color="emerald"
           />
           <ModuleCard 
             title="Seguimiento de Pedidos"
@@ -147,6 +157,7 @@ export default function LabView() {
             icon={ClipboardCheck}
             onClick={() => setActiveForm('tracking')}
             featured
+            color="indigo"
           />
           <ModuleCard 
             title="Formulación Magistral"
@@ -154,6 +165,7 @@ export default function LabView() {
             icon={FileText}
             onClick={() => setActiveForm('magistrales')}
             featured
+            color="amber"
           />
         </div>
       </div>
@@ -161,7 +173,7 @@ export default function LabView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-bold">
       <button 
         onClick={handleBack}
         className="flex items-center gap-2 text-[#001736] font-bold hover:text-blue-600 transition-colors mb-4"
@@ -179,31 +191,76 @@ export default function LabView() {
         {activeForm === 'insumos' && <InsumosForm records={records} setRecords={setRecords} />}
         {activeForm === 'vademecum' && <VademecumForm records={records} setRecords={setRecords} />}
         {activeForm === 'mantenimiento' && <MantenimientoForm records={records} setRecords={setRecords} />}
+        {activeForm !== 'main' && (
+          <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-2">
+            <button 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="bg-[#001736] text-white p-3 rounded-full shadow-2xl hover:scale-110 transition-all border-2 border-white/20 group"
+              title="Volver Arriba"
+            >
+              <ArrowUp className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
+            </button>
+            <button 
+              onClick={() => setActiveForm('main')}
+              className="bg-white text-[#001736] p-3 rounded-full shadow-2xl hover:scale-110 transition-all border-2 border-[#001736]/10 font-bold flex items-center gap-2 group"
+            >
+              <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+              <span className="text-[10px] pr-2 uppercase">Menu</span>
+            </button>
+          </div>
+        )}
+
         {activeForm === 'stock' && <StockManager records={records} setRecords={setRecords} />}
         {activeForm === 'tracking' && <OrderTrackingForm records={records} setRecords={setRecords} />}
         {activeForm === 'magistrales' && <MagistralesForm records={records} setRecords={setRecords} />}
+        {activeForm === 'conejero' && <div className="bg-white p-10 rounded-3xl border border-slate-200 text-center"><h2 className="text-2xl font-black text-slate-800">Módulo EC Dr. Conejero</h2><p className="text-slate-500 mt-2">Próximamente disponible.</p><button onClick={() => setActiveForm('main')} className="mt-6 bg-[#001736] text-white px-8 py-2 rounded-full font-bold uppercase text-xs">Volver</button></div>}
       </div>
     </div>
   );
 }
 
-function ModuleCard({ title, desc, icon: Icon, onClick, featured }: any) {
+function ModuleCard({ title, desc, icon: Icon, onClick, featured, color = 'blue' }: any) {
+  const colorMap: any = {
+    indigo: 'from-indigo-600 to-indigo-700 shadow-indigo-100 text-indigo-600',
+    emerald: 'from-emerald-600 to-emerald-700 shadow-emerald-100 text-emerald-600',
+    rose: 'from-rose-600 to-rose-700 shadow-rose-100 text-rose-600',
+    amber: 'from-amber-600 to-amber-700 shadow-amber-100 text-amber-600',
+    blue: 'from-blue-600 to-blue-700 shadow-blue-100 text-blue-600',
+    purple: 'from-purple-600 to-purple-700 shadow-purple-100 text-purple-600',
+    teal: 'from-teal-600 to-teal-700 shadow-teal-100 text-teal-600',
+    orange: 'from-orange-600 to-orange-700 shadow-orange-100 text-orange-600',
+    slate: 'from-slate-600 to-slate-700 shadow-slate-100 text-slate-600',
+    indigo_alt: 'from-indigo-500 to-indigo-600 shadow-indigo-50 text-indigo-500'
+  };
+
+  const selectedColor = colorMap[color] || colorMap.blue;
+  const bgColor = selectedColor.split(' ')[0];
+  const textColor = selectedColor.split(' ')[selectedColor.split(' ').length - 1];
+
   return (
     <div 
       onClick={onClick}
       className={cn(
-        "bg-white border border-slate-200 p-6 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer group",
-        featured && "border-l-4 border-blue-500"
+        "group relative bg-white rounded-[2rem] p-8 border border-slate-100 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[220px]",
+        featured && "ring-2 ring-blue-500/20"
       )}
     >
-      <div className={cn(
-        "p-3 rounded-lg inline-block mb-4 transition-colors",
-        featured ? "bg-[#001736] text-white" : "bg-slate-100 text-[#001736] group-hover:bg-[#00658d] group-hover:text-white"
-      )}>
-        <Icon className="w-8 h-8" />
+      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${bgColor} opacity-0 group-hover:opacity-5 transition-all duration-700 rounded-bl-[5rem]`} />
+      
+      <div className="relative z-10">
+        <div className={`w-16 h-16 bg-gradient-to-br ${bgColor} rounded-2xl flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
+          <Icon className="w-8 h-8 text-white" />
+        </div>
+        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic leading-tight group-hover:text-blue-600 transition-colors">{title}</h3>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-3 opacity-60 leading-relaxed">{desc}</p>
       </div>
-      <h3 className="text-lg font-bold">{title}</h3>
-      <p className="text-sm text-slate-500 mt-1">{desc}</p>
+
+      <div className="relative z-10 flex items-center justify-between mt-6">
+        <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${textColor}`}>Abrir Módulo</span>
+        <div className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+          <ArrowLeft className="w-4 h-4 text-slate-300 group-hover:text-blue-500 rotate-180" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -488,13 +545,13 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b border-slate-100">
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Fecha</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Producto</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Estado</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Estado Final</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Observaciones</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500 text-center">Acción</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10">
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Fecha</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Producto</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Estado</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Estado Final</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Observaciones</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black text-center bg-[#001736]">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -834,12 +891,12 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4">Fecha</th>
-                <th className="p-4">N° Cimasur</th>
-                <th className="p-4">Producto</th>
-                <th className="p-4">Responsable</th>
-                <th className="p-4 text-center">Status</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10 font-black uppercase">
+                <th className="p-4 bg-[#001736]">Fecha</th>
+                <th className="p-4 bg-[#001736]">N° Cimasur</th>
+                <th className="p-4 bg-[#001736]">Producto</th>
+                <th className="p-4 bg-[#001736]">Responsable</th>
+                <th className="p-4 text-center bg-[#001736]">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1252,12 +1309,12 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4">Fecha</th>
-                <th className="p-4">N° Muestra</th>
-                <th className="p-4">Paciente</th>
-                <th className="p-4">Producto</th>
-                <th className="p-4 text-center">Acciones</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10 font-black uppercase">
+                <th className="p-4 bg-[#001736]">Fecha</th>
+                <th className="p-4 bg-[#001736]">N° Muestra</th>
+                <th className="p-4 bg-[#001736]">Paciente</th>
+                <th className="p-4 bg-[#001736]">Producto</th>
+                <th className="p-4 text-center bg-[#001736]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
@@ -1644,13 +1701,13 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
           <div className="border border-slate-100 rounded-lg overflow-hidden mb-8">
             <table className="w-full text-xs">
                <thead>
-                  <tr className="bg-[#001736] text-white text-[10px] uppercase font-black">
-                     <th className="p-3 text-center border-r border-white/10 w-12">#</th>
-                     <th className="p-3 text-left border-r border-white/10">Composición / Terapia</th>
-                     <th className="p-3 text-center border-r border-white/10">N° Cimasur</th>
-                     <th className="p-3 text-center border-r border-white/10">Dilución</th>
-                     <th className="p-3 text-center border-r border-white/10 text-emerald-400">Lambdas</th>
-                     <th className="p-3 text-center"></th>
+                  <tr className="bg-[#001736] text-white text-[10px] uppercase font-black italic">
+                     <th className="p-3 text-center border-r border-white/10 w-12 bg-[#001736]">#</th>
+                     <th className="p-3 text-left border-r border-white/5 bg-blue-900 shadow-inner">Composición / Terapia</th>
+                     <th className="p-3 text-center border-r border-white/5 bg-indigo-900">N° Cimasur</th>
+                     <th className="p-3 text-center border-r border-white/5 bg-slate-800">Dilución</th>
+                     <th className="p-3 text-center border-r border-white/5 text-emerald-400 bg-emerald-950">Lambdas</th>
+                     <th className="p-3 text-center bg-[#001736]"></th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
@@ -1791,13 +1848,13 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4">Fecha</th>
-                <th className="p-4">Producto</th>
-                <th className="p-4">Preparador</th>
-                <th className="p-4">Responsable</th>
-                <th className="p-4 text-center">Total Lambdas</th>
-                <th className="p-4 text-center">Acción</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10 font-black uppercase">
+                <th className="p-4 bg-[#001736]">Fecha</th>
+                <th className="p-4 bg-[#001736]">Producto</th>
+                <th className="p-4 bg-[#001736]">Preparador</th>
+                <th className="p-4 bg-[#001736]">Responsable</th>
+                <th className="p-4 text-center bg-[#001736]">Total Lambdas</th>
+                <th className="p-4 text-center bg-[#001736]">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -2177,13 +2234,13 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b border-slate-100">
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Fecha</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Insumo</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">N° Asignado</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Elaborador</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Responsable</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500 text-center">Acciones</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10">
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Fecha</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Insumo</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">N° Asignado</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Elaborador</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Responsable</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black text-center bg-[#001736]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
@@ -2570,13 +2627,13 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b border-slate-100">
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Fecha Ingreso</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Nombre Insumo</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Código</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Lote</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Cantidad</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500 text-center">Acciones</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10">
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Fecha Ingreso</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Nombre Insumo</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Código</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Lote</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Cantidad</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black text-center bg-[#001736]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
@@ -2937,12 +2994,12 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b border-slate-100">
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Fecha</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Producto</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Proveedor</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500">Estado</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-slate-500 text-center">Acciones</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10">
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Fecha</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Producto</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Proveedor</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#001736]">Estado</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black text-center bg-[#001736]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
@@ -3394,12 +3451,12 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50/50 text-left border-b font-black text-slate-500 uppercase">
-                <th className="p-4 text-center">Código</th>
-                <th className="p-4">Equipo</th>
-                <th className="p-4">Área</th>
-                <th className="p-4 text-center">Estado</th>
-                <th className="p-4 text-center">Acción</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10 font-black uppercase">
+                <th className="p-4 bg-[#001736] text-center">Código</th>
+                <th className="p-4 bg-[#001736]">Equipo</th>
+                <th className="p-4 bg-[#001736]">Área</th>
+                <th className="p-4 bg-[#001736] text-center">Estado</th>
+                <th className="p-4 bg-[#001736] text-center">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic">
@@ -3498,6 +3555,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   const [selectedArea, setSelectedArea] = useState<string>('Etiquetas salina');
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [kardexSearchTerm, setKardexSearchTerm] = useState('');
 
   const areas = useMemo(() => {
     const defaults = [
@@ -4006,57 +4064,57 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
            <div className="bg-slate-50 p-4 border-b flex justify-between items-center text-[#002b5b]">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-[#001736]">Seguimiento de Movimientos (Kardex)</h3>
-              <button 
-                onClick={() => {
-                  const data = followups.slice().reverse().map(f => [
-                    formatDate(f.fecha),
-                    f.item,
-                    f.cantidadDescontada ? `-${f.cantidadDescontada}` : `+${f.cantidadSumada}`,
-                    f.stockFinal,
-                    f.motivo || '---'
-                  ]);
-                  exportTableToPDF(
-                    'Historial de Movimientos de Stock (Kardex)',
-                    ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'],
-                    data,
-                    'historial_movimientos_stock',
-                    'l'
-                  );
-                }}
-                className="text-blue-600 hover:text-blue-800 flex items-center gap-1" 
-                title="Descargar PDF"
-              >
-                <Download className="w-3 h-3" />
-                <span className="text-[9px] font-black uppercase tracking-tighter">Descargar Historial</span>
-              </button>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar..." 
-                  className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none focus:ring-1 focus:ring-blue-500"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
+              <div className="flex items-center gap-4">
+                 <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Buscador Kardex..." 
+                      className="pl-7 pr-3 py-1.5 text-[10px] border rounded-full w-48 outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                      value={kardexSearchTerm}
+                      onChange={e => setKardexSearchTerm(e.target.value)}
+                    />
+                 </div>
+                 <button 
                   onClick={() => {
-                    const data = followups.slice().reverse().map(f => [
-                      formatDateForExcel(f.fecha),
-                      f.item || '',
-                      f.cantidadDescontada ? '-' + String(f.cantidadDescontada) : '+' + String(f.cantidadSumada),
-                      f.stockFinal || '0',
+                    const data = followups.slice().reverse().filter(f => f.area === selectedArea).map(f => [
+                      formatDate(f.fecha),
+                      f.item,
+                      f.cantidadDescontada ? `-${f.cantidadDescontada}` : `+${f.cantidadSumada}`,
+                      f.stockFinal,
                       f.motivo || '---'
                     ]);
-                    exportTableToExcel('Historial de Movimientos de Stock', ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'], data, 'historial_movimientos_stock');
+                    exportTableToPDF(
+                      'Historial de Movimientos de Stock (Kardex)',
+                      ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'],
+                      data,
+                      'historial_movimientos_stock',
+                      'l'
+                    );
                   }}
-                  className="text-emerald-600 hover:text-emerald-800 flex items-center gap-1 ml-2" 
-                  title="Descargar Excel"
+                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-white px-2 py-1 rounded shadow-sm border border-slate-100" 
+                  title="Descargar PDF"
                 >
-                  <FileSpreadsheet className="w-3 h-3" />
-                  <span className="text-[9px] font-black uppercase tracking-tighter">Excel</span>
+                  <Download className="w-3 h-3" />
+                  <span className="text-[9px] font-black uppercase tracking-tighter">PDF</span>
                 </button>
+                <button 
+                    onClick={() => {
+                      const data = followups.slice().reverse().filter(f => f.area === selectedArea).map(f => [
+                        formatDateForExcel(f.fecha),
+                        f.item || '',
+                        f.cantidadDescontada ? '-' + String(f.cantidadDescontada) : '+' + String(f.cantidadSumada),
+                        f.stockFinal || '0',
+                        f.motivo || '---'
+                      ]);
+                      exportTableToExcel('Historial de Movimientos de Stock', ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'], data, 'historial_movimientos_stock');
+                    }}
+                    className="text-emerald-600 hover:text-emerald-800 flex items-center gap-1 bg-white px-2 py-1 rounded shadow-sm border border-slate-100" 
+                    title="Descargar Excel"
+                  >
+                    <FileSpreadsheet className="w-3 h-3" />
+                    <span className="text-[9px] font-black uppercase tracking-tighter">Excel</span>
+                  </button>
               </div>
            </div>
            <div className="overflow-x-auto max-h-64 scrollbar-thin">
@@ -4072,7 +4130,15 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-100">
-                    {followups.slice().reverse().filter(f => f.area === selectedArea).map((f: any, i: number) => (
+                    {followups.slice().reverse().filter(f => {
+                       let match = f.area === selectedArea;
+                       if (kardexSearchTerm) {
+                          const s = kardexSearchTerm.toLowerCase();
+                          const text = `${f.item || ''} ${f.motivo || ''} ${formatDate(f.fecha)}`.toLowerCase();
+                          if (!text.includes(s)) match = false;
+                       }
+                       return match;
+                    }).map((f: any, i: number) => (
                       <tr key={i} className="hover:bg-slate-50 italic">
                         <td className="p-3">{formatDate(f.fecha)}</td>
                         <td className="p-3 font-bold text-[#002b5b]">{f.item}</td>
@@ -4630,44 +4696,52 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
           </div>
         </div>
         
-        <form className="p-6 bg-slate-50 border-b border-slate-200" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-4 mb-2">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{editingId ? 'Editar Registro' : 'Registrar Nuevo Envío'}</h4>
+        <form className="p-8 bg-slate-50 border-b border-slate-200" onSubmit={handleSubmit}>
+          <div className="max-w-none mx-auto space-y-6">
+            <div className="mb-2">
+              <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">{editingId ? 'Editar Detalle de Seguimiento' : 'Registro de Nuevo Seguimiento Logístico'}</h4>
             </div>
-            
-            <FormField label="Pedido / N° Cotiz."><input required className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white" value={safe(form.nroCotiz)} onChange={e => setForm({...form, nroCotiz: e.target.value})} placeholder="Ej: 2024-001" /></FormField>
-            <FormField label="Orden de Transporte (OT)"><input className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white" value={safe(form.ot)} onChange={e => setForm({...form, ot: e.target.value})} placeholder="Ej: 12345678" /></FormField>
-            <FormField label="Nombre Cliente"><input required className="w-full border-b border-slate-300 p-2 text-sm font-bold bg-white uppercase" value={safe(form.cliente)} onChange={e => setForm({...form, cliente: e.target.value})} placeholder="CLIENTE S.A." /></FormField>
-            <FormField label="Fecha Cotización"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaCotiz)} onChange={e => setForm({...form, fechaCotiz: e.target.value})} /></FormField>
-            
-            <FormField label="Fecha Envío"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaEnvio)} onChange={e => setForm({...form, fechaEnvio: e.target.value})} /></FormField>
-            <FormField label="Fecha Cierre"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaCierre)} onChange={e => setForm({...form, fechaCierre: e.target.value})} /></FormField>
-            <FormField label="Fecha Recepción"><input type="date" className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.fechaRecepcion)} onChange={e => setForm({...form, fechaRecepcion: e.target.value})} /></FormField>
-            
-            <FormField label="Courier">
-              <select className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.courier) || 'Retiro en Oficina'} onChange={e => setForm({...form, courier: e.target.value})}>
-                {couriers.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </FormField>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              <FormField label="Pedido / N° Cotiz."><input required className="w-full border-b border-blue-200 p-3 text-sm font-black bg-white focus:border-blue-500 outline-none rounded-t" value={safe(form.nroCotiz)} onChange={e => setForm({...form, nroCotiz: e.target.value})} placeholder="Ej: 2024-001" /></FormField>
+              <FormField label="Orden de Transporte (OT)"><input className="w-full border-b border-blue-200 p-3 text-sm font-bold bg-white focus:border-blue-500 outline-none rounded-t" value={safe(form.ot)} onChange={e => setForm({...form, ot: e.target.value})} placeholder="Ej: 12345678" /></FormField>
+              <FormField label="Nombre Cliente"><input required className="w-full border-b border-blue-200 p-3 text-sm font-black bg-white uppercase focus:border-blue-500 outline-none rounded-t" value={safe(form.cliente)} onChange={e => setForm({...form, cliente: e.target.value})} placeholder="CLIENTE S.A." /></FormField>
+              
+              <FormField label="Courier">
+                <select className="w-full border-b border-blue-200 p-3 text-sm bg-white font-bold outline-none focus:border-blue-500 rounded-t" value={safe(form.courier) || 'Retiro en Oficina'} onChange={e => setForm({...form, courier: e.target.value})}>
+                  {couriers.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FormField>
+              <FormField label="Reclamo / Situación">
+                <select className="w-full border-b border-blue-200 p-3 text-sm font-black bg-white outline-none focus:border-blue-500 rounded-t" value={safe(form.situacion) || 'PENDIENTE'} onChange={e => setForm({...form, situacion: e.target.value})}>
+                  {situaciones.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </FormField>
 
-            <div className="md:col-span-2">
-              <FormField label="Detalle de Seguimiento"><input className="w-full border-b border-slate-300 p-2 text-sm bg-white" value={safe(form.detalleSeguimiento)} onChange={e => setForm({...form, detalleSeguimiento: e.target.value})} placeholder="Ej: Entregado en conserjería..." /></FormField>
-            </div>
-            
-            <FormField label="Reclamo / Situación">
-              <select className="w-full border-b border-slate-300 p-2 text-sm font-black bg-white" value={safe(form.situacion) || 'PENDIENTE'} onChange={e => setForm({...form, situacion: e.target.value})}>
-                {situaciones.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </FormField>
+              <FormField label="Fecha Cotización"><input type="date" className="w-full border-b border-slate-300 p-3 text-sm bg-white font-bold rounded-t" value={safe(form.fechaCotiz)} onChange={e => setForm({...form, fechaCotiz: e.target.value})} /></FormField>
+              <FormField label="Fecha Envío"><input type="date" className="w-full border-b border-slate-300 p-3 text-sm bg-white font-bold rounded-t" value={safe(form.fechaEnvio)} onChange={e => setForm({...form, fechaEnvio: e.target.value})} /></FormField>
+              <FormField label="Fecha Cierre"><input type="date" className="w-full border-b border-slate-300 p-3 text-sm bg-white font-bold rounded-t" value={safe(form.fechaCierre)} onChange={e => setForm({...form, fechaCierre: e.target.value})} /></FormField>
+              <FormField label="Fecha Recepción"><input type="date" className="w-full border-b border-slate-300 p-3 text-sm bg-white font-bold rounded-t" value={safe(form.fechaRecepcion)} onChange={e => setForm({...form, fechaRecepcion: e.target.value})} /></FormField>
+              
+              <div className="flex items-end">
+                <button type="submit" className={cn(
+                  "w-full text-white px-6 py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl active:scale-95",
+                  editingId ? "bg-orange-500 hover:bg-orange-600" : "bg-[#001736] hover:bg-slate-800"
+                )}>
+                  {editingId ? <><Save className="w-5 h-5 text-amber-200" /> Actualizar</> : <><PlusCircle className="w-5 h-5 text-emerald-400" /> Registrar</>}
+                </button>
+              </div>
 
-            <div className="md:col-span-1 flex items-end">
-              <button type="submit" className={cn(
-                "w-full text-white px-4 py-2.5 rounded font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all",
-                editingId ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-600 hover:bg-blue-700"
-              )}>
-                {editingId ? <><Save className="w-3.5 h-3.5" /> Actualizar</> : <><PlusCircle className="w-3.5 h-3.5" /> Registrar</>}
-              </button>
+              <div className="md:col-span-12 lg:col-span-5">
+                <FormField label="Detalle de Seguimiento / Observaciones del Envío">
+                  <textarea 
+                    className="w-full border border-blue-200 p-4 text-sm bg-white font-bold rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 italic" 
+                    rows={2} 
+                    value={safe(form.detalleSeguimiento)} 
+                    onChange={e => setForm({...form, detalleSeguimiento: e.target.value})} 
+                    placeholder="Ingrese aquí detalles de entrega, retrasos, motivos de reclamo o cualquier observación relevante..." 
+                  />
+                </FormField>
+              </div>
             </div>
           </div>
         </form>
@@ -4675,16 +4749,16 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         <div className="overflow-x-auto">
           <table className="w-full text-[9px] table-fixed">
             <thead>
-              <tr className="bg-slate-100 text-left border-b font-black text-slate-600 uppercase tracking-tighter">
-                <th className="p-2 w-20">Pedido</th>
-                <th className="p-2 w-28 text-center">OT / Enlace</th>
-                <th className="p-2 w-32">Cliente</th>
-                <th className="p-2 w-16 text-center">Cotiz.</th>
-                <th className="p-2 w-16 text-center">Envío</th>
-                <th className="p-2 w-32">Detalle / Notas</th>
-                <th className="p-2 w-20 text-center">Courier</th>
-                <th className="p-2 w-16 text-center">Situación</th>
-                <th className="p-2 w-16 text-center">Acción</th>
+              <tr className="bg-[#001736] text-white text-left border-b border-white/10 font-black uppercase tracking-tighter">
+                <th className="p-2 w-20 bg-[#001736]">Pedido</th>
+                <th className="p-2 w-28 text-center bg-[#001736]">OT / Enlace</th>
+                <th className="p-2 w-32 bg-[#001736]">Cliente</th>
+                <th className="p-2 w-16 text-center bg-[#001736]">Cotiz.</th>
+                <th className="p-2 w-16 text-center bg-[#001736]">Envío</th>
+                <th className="p-2 w-32 bg-[#001736]">Detalle / Notas</th>
+                <th className="p-2 w-20 text-center bg-[#001736]">Courier</th>
+                <th className="p-2 w-16 text-center bg-[#001736]">Situación</th>
+                <th className="p-2 w-16 text-center bg-[#001736]">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
