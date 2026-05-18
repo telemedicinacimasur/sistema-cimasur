@@ -62,8 +62,9 @@ import { useLocation } from 'react-router-dom';
 import { addNotification } from '../lib/notifications';
 
 import CimasurInventoryManager from './admin/CimasurInventoryManager';
+import ResumenVentasManager from './admin/ResumenVentasManager';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas';
 
 export default function AdminView() {
   const { user } = useAuth();
@@ -157,6 +158,13 @@ export default function AdminView() {
             onClick={() => setView('codigos_y_diluciones')}
             color="orange"
           />
+          <ModuleCard 
+            title="Resumen de ventas Frascos y Pesos"
+            desc="Análisis dinámico de volumen de frascos y recaudación por documentos."
+            icon={Activity}
+            onClick={() => setView('resumen_ventas')}
+            color="indigo"
+          />
         </div>
       </div>
     );
@@ -177,6 +185,7 @@ export default function AdminView() {
       {view === 'sales' && <SalesManager records={records} setRecords={setRecords} />}
       {view === 'sales_gestion' && <SalesGestionManager records={records} setRecords={setRecords} />}
       {view === 'dte' && <DTEManager records={records} setRecords={setRecords} />}
+      {view === 'resumen_ventas' && <ResumenVentasManager />}
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'school_payments' && <SchoolPaymentsManager records={records} setRecords={setRecords} />}
       

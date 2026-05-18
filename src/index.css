@@ -12,6 +12,19 @@
     @apply bg-[#0D1527] text-white font-sans antialiased;
   }
   
+  /* Global high-contrast styling for focused form elements */
+  input:focus, select:focus, textarea:focus, input:active, select:active, textarea:active {
+    color: #0F172A !important;
+    background-color: #FFFFFF !important;
+    font-weight: 600 !important;
+  }
+  
+  option {
+    color: #0F172A !important;
+    background-color: #FFFFFF !important;
+    font-weight: 600 !important;
+  }
+  
   thead th {
     @apply sticky top-0 z-10 bg-[#152035] text-white uppercase tracking-[0.15em] font-black border-none;
   }

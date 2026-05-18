@@ -13,7 +13,16 @@ const addWatermark = (doc: jsPDF, pageWidth: number, pageHeight: number) => {
   doc.text('CIMASUR', pageWidth / 2, pageHeight / 2 + 20, { align: 'center', angle: 45 });
 };
 
-const setupPremiumPage = (doc: jsPDF, orientation: 'p' | 'l' = 'l', title: string, subtitle?: string) => {
+const setupPremiumPage = (
+  doc: jsPDF, 
+  orientation: 'p' | 'l' = 'l', 
+  title: string, 
+  subtitle?: string, 
+  subtitleFontSize: number = 9,
+  cimasurFontSize: number = 18,
+  titleFontSize: number = 12,
+  dateFontSize: number = 9
+) => {
   const pageWidth = orientation === 'p' ? 210 : 297;
   const pageHeight = orientation === 'p' ? 297 : 210;
   
@@ -22,25 +31,25 @@ const setupPremiumPage = (doc: jsPDF, orientation: 'p' | 'l' = 'l', title: strin
   // Left Side: Brand & Subtitle
   doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
+  doc.setFontSize(cimasurFontSize);
   doc.text('CIMASUR', 14, 20);
   
   if (subtitle) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 113, 128); // Slate 500
-    doc.text(subtitle, 14, 25);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(subtitleFontSize);
+    doc.setTextColor(30, 41, 59); // Slate 800
+    doc.text(subtitle, 14, 27);
   }
 
   // Right Side: Report Title & Date
   const cleanTitle = title.replace(/Sistema |CIMASUR|Dashboard|Gestión de|Panel Administrativo/gi, '').trim();
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(titleFontSize);
   doc.setTextColor(30, 41, 59); // Slate 800
   doc.text(cleanTitle.toUpperCase(), pageWidth - 14, 20, { align: 'right' });
   
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(dateFontSize);
   doc.setTextColor(100, 113, 128);
   doc.text(`Fecha Emisión: ${new Date().toLocaleString('es-CL')}`, pageWidth - 14, 25, { align: 'right' });
   
@@ -117,13 +126,17 @@ export const exportExpedienteToPDF = (
   data: { label: string, value: string }[], 
   fileName: string, 
   tables?: { title: string, headers: string[], rows: any[][] }[],
-  orientation: 'p' | 'l' = 'p'
+  orientation: 'p' | 'l' = 'p',
+  subtitleFontSize: number = 9,
+  cimasurFontSize: number = 18,
+  titleFontSize: number = 12,
+  dateFontSize: number = 9
 ) => {
   const doc = new jsPDF({ orientation });
   const productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
   
-  const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle);
+  const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
   let currentY = 40;
 
@@ -176,15 +189,21 @@ export const exportExpedienteToPDF = (
         styles: { fontSize: 8, cellPadding: 4, textColor: [51, 65, 85] },
         alternateRowStyles: { fillColor: [255, 255, 255] },
         didDrawCell: (data) => {
-           if (data.row.section === 'head' || data.row.section === 'body') {
-              doc.setDrawColor(226, 232, 240);
-              doc.setLineWidth(0.1);
-              doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-           }
-           if (data.row.section === 'head' && data.row.index === 0) {
-              doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
-              doc.setLineWidth(0.5);
-              doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+           if (table.title === 'Registro de Elaboración') {
+               doc.setDrawColor(0, 0, 0); // Black
+               doc.setLineWidth(0.2);
+               doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+           } else {
+               if (data.row.section === 'head' || data.row.section === 'body') {
+                  doc.setDrawColor(226, 232, 240);
+                  doc.setLineWidth(0.1);
+                  doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+               }
+               if (data.row.section === 'head' && data.row.index === 0) {
+                  doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+                  doc.setLineWidth(0.5);
+                  doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+               }
            }
         }
       });
@@ -200,13 +219,17 @@ export const viewExpedienteInNewTab = (
   data: { label: string, value: string }[], 
   fileName: string, 
   tables?: { title: string, headers: string[], rows: any[][] }[],
-  orientation: 'p' | 'l' = 'p'
+  orientation: 'p' | 'l' = 'p',
+  subtitleFontSize: number = 9,
+  cimasurFontSize: number = 18,
+  titleFontSize: number = 12,
+  dateFontSize: number = 9
 ) => {
   const doc = new jsPDF({ orientation });
   const productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
   
-  const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle);
+  const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
   let currentY = 40;
 
@@ -257,15 +280,21 @@ export const viewExpedienteInNewTab = (
         styles: { fontSize: 8, cellPadding: 4, textColor: [51, 65, 85] },
         alternateRowStyles: { fillColor: [255, 255, 255] },
         didDrawCell: (data) => {
-           if (data.row.section === 'head' || data.row.section === 'body') {
-              doc.setDrawColor(226, 232, 240);
-              doc.setLineWidth(0.1);
-              doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-           }
-           if (data.row.section === 'head' && data.row.index === 0) {
-              doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
-              doc.setLineWidth(0.5);
-              doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+           if (table.title === 'Registro de Elaboración') {
+               doc.setDrawColor(0, 0, 0); // Black
+               doc.setLineWidth(0.2);
+               doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+           } else {
+               if (data.row.section === 'head' || data.row.section === 'body') {
+                  doc.setDrawColor(226, 232, 240);
+                  doc.setLineWidth(0.1);
+                  doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+               }
+               if (data.row.section === 'head' && data.row.index === 0) {
+                  doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+                  doc.setLineWidth(0.5);
+                  doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+               }
            }
         }
       });

@@ -80,7 +80,7 @@ export default function GestionView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end mb-8">
+      <div className="flex justify-between items-end mb-8 sticky top-0 z-40 bg-[#0D1527] border-b border-slate-700/50 pb-4 pt-4 -mx-6 px-6">
         <div>
           <h2 className="text-3xl font-bold text-white">Módulo de Gestión</h2>
           <p className="text-slate-400 text-sm">Control y seguimiento especializado de clientes estratégicos.</p>

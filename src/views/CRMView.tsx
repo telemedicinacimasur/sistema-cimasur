@@ -61,7 +61,7 @@ export default function CRMView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end mb-8">
+      <div className="flex justify-between items-end mb-8 sticky top-0 z-40 bg-[#0D1527] border-b border-slate-700/50 pb-4 pt-4 -mx-6 px-6">
         <div>
           <h2 className="text-3xl font-bold text-white">CRM Comercial</h2>
           <p className="text-slate-400 text-sm">Fidelización y seguimiento de la cartera corporativa.</p>
@@ -373,20 +373,20 @@ function CRMRegister() {
            />
            <button 
              onClick={downloadExcelTemplate}
-             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
              title="Descargar Plantilla Excel"
            >
              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla Excel
            </button>
            <button 
              onClick={() => fileInputRef.current?.click()}
-             className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border-2 border-[#1C2541] hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
            >
              <Upload className="w-3.5 h-3.5" /> Importar Datos
            </button>
            <button 
              onClick={() => intranetFileInputRef.current?.click()}
-             className="text-[10px] bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             className="text-[10px] bg-purple-600 hover:bg-purple-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
            >
              <Upload className="w-3.5 h-3.5" /> Importar Intranet
            </button>
@@ -444,7 +444,7 @@ function CRMRegister() {
         </div>
 
         <div className="flex justify-end pt-4 border-t border-[#1E293B]">
-           <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-12 py-4 rounded-2xl font-bold shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2">
+           <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-2 border-[#1C2541] px-12 py-4 rounded-2xl font-bold shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2">
               <Save className="w-5 h-5" /> GUARDAR FICHA CRM
            </button>
         </div>

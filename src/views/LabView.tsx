@@ -24,6 +24,7 @@ import {
   PlusCircle,
   Plus,
   History,
+  X,
   ExternalLink,
   FileText,
   Clock,
@@ -267,6 +268,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
     responsable: '',
     creadoPor: '',
     ultimaModificacionPor: '',
+    historialElaboracion: [],
     createdAt: '',
     updatedAt: ''
   });
@@ -466,25 +468,28 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
       </form>
     </div>
 
+
+    {/* Removed elabModal, it belongs in PreparacionForm */}
+
     <div className="bg-[#152035] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B] overflow-hidden lg:col-span-2">
         <div className="p-6 border-b border-[#1E293B] flex justify-between items-center bg-[#152035]">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 filter-input-container">
             <h3 className="text-[10px] font-black uppercase text-white tracking-widest">Historial Evaluación</h3>
             <select 
-              className="text-[10px] border rounded-full px-3 py-1 outline-none"
+              className="text-[10px] border rounded-full px-3 py-1 outline-none text-[#1E293B]"
               value={filterEstado}
               onChange={e => setFilterEstado(e.target.value)}
             >
               <option value="Todos">Todos</option>
-              <option value="Ok">Ok</option>
-              <option value="Pendiente">Pendiente</option>
+              <option value="OK">OK</option>
+              <option value="PENDIENTE">PENDIENTE</option>
             </select>
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
               <input 
                 type="text" 
                 placeholder="Buscar..." 
-                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none focus:ring-1 focus:ring-blue-500"
+                className="pl-7 pr-3 py-1 text-[10px] border rounded-full w-40 outline-none focus:ring-1 focus:ring-blue-500 text-[#1E293B]"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -499,7 +504,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 r.observaciones
               ]);
               exportTableToPDF(
-                'Reporte: Evaluación Gotas Puras',
+                'Reporte: Evaluacion Gotas Puras', // Removed accent
                 ['Fecha', 'Producto', 'Estado', 'Observaciones'],
                 data,
                 'evaluacion_gotas_puras',
@@ -520,7 +525,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 r.observaciones || '',
                 r.creadoPor || r.responsable || 'Administrador Cimasur'
               ]);
-              exportTableToExcel('Evaluación Gotas Puras', ['Fecha', 'Producto', 'Estado', 'Estado Final', 'Observaciones', 'Responsable'], data, 'evaluacion_gotas_puras');
+              exportTableToExcel('Evaluacion Gotas Puras', ['Fecha', 'Producto', 'Estado', 'Estado Final', 'Observaciones', 'Responsable'], data, 'evaluacion_gotas_puras');
             }}
             className="flex items-center gap-2 px-3 py-1.5 border border-[#1E293B] rounded text-[10px] font-bold uppercase hover:bg-[#152035] transition-colors text-emerald-600"
           >
@@ -536,14 +541,18 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Estado</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Estado Final</th>
                 <th className="px-6 py-3 text-[10px] uppercase font-black bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Observaciones</th>
-                <th className="px-6 py-3 text-[10px] uppercase font-black text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acción</th>
+                <th className="px-6 py-3 text-[10px] uppercase font-black text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Accion</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {records.filter(r => r.type === 'gotas-puras').filter(r => {
                 const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.estadoFinal || ''} ${r.observaciones || ''} ${formatDate(r.fecha)}`.toLowerCase();
                 const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
-                const matchesEstado = filterEstado === 'Todos' || (filterEstado === 'Ok' ? (r.estadoFinal === 'OK' || r.estado === 'OK') : (r.estadoFinal === filterEstado || r.estado === filterEstado));
+                
+                // Normalizing to handle potential accent/case discrepancies, though data seems to use OK/PENDIENTE
+                const estadoActual = (r.estadoFinal || r.estado || '').toUpperCase();
+                const matchesEstado = filterEstado === 'Todos' || estadoActual === filterEstado;
+                
                 return matchesSearch && matchesEstado;
               })
               .sort((a,b) => (b.fecha || '').localeCompare(a.fecha || ''))
@@ -572,7 +581,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                     {record.creadoPor || record.responsable || 'Administrador Cimasur'}
                     {record.ultimaModificacionPor && <span className="block text-[9px] text-slate-400">Editado: {record.ultimaModificacionPor}</span>}
                   </td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-6 py-4 text-center flex gap-1 justify-center items-center">
                     <RecordActions
                       module="lab"
                       onView={() => {
@@ -583,7 +592,12 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                           { label: 'Responsable', value: record.creadoPor || record.responsable || 'Administrador Cimasur' },
                           { label: 'Observaciones', value: record.observaciones || '' }
                         ];
-                        viewExpedienteInNewTab('Ficha Técnica: Evaluación Gotas Puras', recordData, `evaluacion_${record.id}`);
+                        const elabTable = {
+                          title: 'Historial de Elaboración',
+                          headers: ['Fecha', 'Elaborador', 'Observación'],
+                          rows: (record.historialElaboracion || []).map((e: any) => [e.fecha, e.nombre, e.observacion])
+                        };
+                        viewExpedienteInNewTab('Ficha Técnica: Evaluación Gotas Puras', recordData, `evaluacion_${record.id}`, [elabTable]);
                       }}
                       onDownload={() => {
                         const recordData = [
@@ -593,7 +607,12 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                           { label: 'Responsable', value: record.creadoPor || record.responsable || 'Administrador Cimasur' },
                           { label: 'Observaciones', value: record.observaciones || '' }
                         ];
-                        exportExpedienteToPDF('Ficha Técnica: Evaluación Gotas Puras', recordData, `evaluacion_${record.id}`);
+                        const elabTable = {
+                          title: 'Historial de Elaboración',
+                          headers: ['Fecha', 'Elaborador', 'Observación'],
+                          rows: (record.historialElaboracion || []).map((e: any) => [e.fecha, e.nombre, e.observacion])
+                        };
+                        exportExpedienteToPDF('Ficha Técnica: Evaluación Gotas Puras', recordData, `evaluacion_${record.id}`, [elabTable]);
                       }}
                       onExcel={() => exportRecordToExcel(record)}
                       onEdit={() => {
@@ -1401,8 +1420,13 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [frascoSize, setFrascoSize] = useState<30 | 100>(30);
   const [searchTerm, setSearchTerm] = useState('');
+  const [frascoSize, setFrascoSize] = useState<30 | 100>(30);
+  
+  // Logic for Elaboration Registration Modal
+  const [elabModal, setElabModal] = useState<{ isOpen: boolean, recordId: string | null }>({ isOpen: false, recordId: null });
+  const [elabForm, setElabForm] = useState({ fecha: new Date().toISOString().split('T')[0], nombre: '', observacion: '' });
+  
   const [form, setForm] = useState({
     producto: '',
     fecha: new Date().toISOString().split('T')[0],
@@ -1410,7 +1434,8 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     filas: Array(15).fill({ composicion: '', nroCimasur: '', dilucion: '', lambdas: '' }),
     formulaTotal: '',
     observaciones: '',
-    responsable: ''
+    responsable: '',
+    historialElaboracion: []
   });
 
   const exportRecordToExcel = (record: any) => {
@@ -1619,6 +1644,51 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {elabModal.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl relative">
+            <button onClick={() => setElabModal({ isOpen: false, recordId: null })} className="absolute top-4 right-4 text-slate-500 hover:text-black">
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-black mb-6 text-[#1E293B]">Registrar Elaboración</h2>
+            
+            {records.find(r => r.id === elabModal.recordId)?.historialElaboracion && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-xl max-h-40 overflow-y-auto">
+                <h3 className="font-bold mb-2 text-sm">Historial:</h3>
+                {records.find(r => r.id === elabModal.recordId)?.historialElaboracion.map((entry: any, i: number) => (
+                    <div key={i} className="text-xs border-b pb-1 mb-1">
+                        <span className="font-bold">{entry.fecha}</span> - {entry.nombre}: {entry.observacion}
+                    </div>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const record = records.find(r => r.id === elabModal.recordId);
+              if (!record) return;
+              const updatedRecord = {
+                ...record,
+                historialElaboracion: [...(record.historialElaboracion || []), elabForm]
+              };
+              await localDB.updateInCollection('lab_records', record.id, updatedRecord);
+              const updated = await localDB.getCollection('lab_records');
+              setRecords(updated);
+              setElabForm({ fecha: new Date().toISOString().split('T')[0], nombre: '', observacion: '' });
+              setElabModal({ isOpen: false, recordId: null });
+              alert('Elaboración registrada');
+            }} className="space-y-4">
+              <input type="date" required className="w-full border rounded-xl p-3 text-[#1E293B] font-semibold" value={elabForm.fecha} onChange={e => setElabForm({...elabForm, fecha: e.target.value})} />
+              <input placeholder="Nombre Elaborador" required className="w-full border rounded-xl p-3 text-[#1E293B] font-semibold" value={elabForm.nombre} onChange={e => setElabForm({...elabForm, nombre: e.target.value})} />
+              <textarea placeholder="Observación" className="w-full border rounded-xl p-3 text-[#1E293B] font-semibold" rows={3} value={elabForm.observacion} onChange={e => setElabForm({...elabForm, observacion: e.target.value})} />
+              <div className="flex gap-4 mt-6">
+                <button type="button" onClick={() => setElabModal({ isOpen: false, recordId: null })} className="flex-1 p-3 rounded-xl border font-bold">Cancelar</button>
+                <button type="submit" className="flex-1 p-3 rounded-xl bg-[#1E293B] text-white font-black">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
            <span className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Preparación Gotas Puras</span>
@@ -1647,17 +1717,21 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
            </button>
            <button 
              onClick={() => {
-              const data = records.filter(r => r.type === 'preparacion').map(r => [
-                formatDate(r.fecha),
-                r.producto,
-                r.preparador,
-                r.totalLambdas || '---'
-              ]);
-              exportTableToPDF(
+              const elaborationTable = {
+                title: 'Registro de Elaboración',
+                headers: ['FECHA', 'NOMBRE ELABORADOR', 'OBSERVACIÓN'],
+                rows: Array.from({ length: 10 }).map(() => ['', '', ''])
+              };
+
+              exportExpedienteToPDF(
                 'Reporte: Preparación de Gotas Puras',
-                ['Fecha', 'Producto', 'Preparador', 'Total Lambdas'],
-                data,
-                'preparacion_gotas_puras'
+                [
+                  {label: 'Producto', value: 'Gotas Puras'},
+                  {label: 'Estado', value: 'Reporte'}
+                ],
+                'preparacion_gotas_puras',
+                [elaborationTable],
+                'l'
               );
              }}
              className="text-white/70 hover:text-white" 
@@ -1668,10 +1742,9 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
          </div>
       </div>
       <form className="p-8" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
              <FormField label="Nombre Producto"><input className="w-full border-b p-2 text-sm font-black" value={form.producto || ''} onChange={e => setForm({...form, producto: e.target.value})} required /></FormField>
              <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
-             <FormField label="Nombre Preparador"><input className="w-full border-b p-2 text-sm" value={form.preparador || ''} onChange={e => setForm({...form, preparador: e.target.value})} /></FormField>
              <FormField label="Frasco">
                <div className="flex gap-2">
                  <button type="button" onClick={() => setFrascoSize(30)} className={cn("px-4 py-2 border rounded text-xs font-bold", frascoSize === 30 ? "bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] " : "bg-[#152035]")}>30 mL</button>
@@ -1750,13 +1823,8 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                 <FormField label="Fórmula / Total (Automática)">
                   <p className="border-b p-2 text-xs font-black text-[#38BDF8] bg-[#152035] min-h-[40px]">{formulaDis}</p>
                 </FormField>
-                <FormField label="Observaciones"><textarea className="w-full border p-3 text-xs h-20 bg-[#152035]" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} /></FormField>
              </div>
              <div className="space-y-6">
-                <FormField label="Responsable Firma">
-                  <input className="w-full border-b p-2 text-sm italic bg-[#111A2E]" value={form.responsable || ''} readOnly />
-                  <p className="text-[10px] text-green-700 mt-1">Documento firmado digitalmente por: {user?.displayName || '...'}</p>
-                </FormField>
                 <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2">
                    <Save className="w-4 h-4" /> GUARDAR REGISTRO TÉCNICO COMPLETO
                 </button>
@@ -1856,42 +1924,57 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
                     {r.ultimaModificacionPor && <span className="block text-[9px] text-slate-400">Editado por: {r.ultimaModificacionPor}</span>}
                   </td>
                   <td className="p-4 text-center font-black text-[#38BDF8]">{r.totalLambdas}</td>
-                  <td className="p-4 text-center">
+                  <td className="p-4 text-center flex gap-2 justify-center">
+                      <button 
+                        onClick={() => setElabModal({ isOpen: true, recordId: r.id })}
+                        className="bg-yellow-500 text-black p-1.5 rounded-full hover:bg-yellow-600 shadow-sm"
+                        title="Registro de Elaboración (Sistema)"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
                       <RecordActions
                         module="lab"
                         onView={() => {
                            const prepData = [
                              { label: 'Producto', value: r.producto },
                              { label: 'Fecha', value: formatDate(r.fecha) },
-                             { label: 'Preparador', value: r.preparador },
-                             { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' },
                              { label: 'Total Lambdas', value: String(r.totalLambdas || '0') },
-                             { label: 'Fórmula Total', value: r.formulaTotal || '' },
-                             { label: 'Observaciones', value: r.observaciones || '' }
+                             { label: 'Fórmula Total', value: r.formulaTotal || '' }
                            ];
-                           const tables = [{
-                             title: 'Detalle de Preparación (Composición)',
-                             headers: ['#', 'Composición / Terapia', 'N° Cimasur', 'Dilución', 'Lambdas'],
-                             rows: (r.filas || []).filter((f:any) => f.composicion).map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
-                           }];
-                           viewExpedienteInNewTab('Expediente: Preparación Gotas Puras', prepData, `expediente_preparacion_${r.id}`, tables);
+                           const tables = [
+                             {
+                               title: 'Detalle de Preparación (Composición)',
+                               headers: ['#', 'Composición / Terapia', 'N° Cimasur', 'Dilución', 'Lambdas'],
+                               rows: (r.filas || []).filter((f:any) => f.composicion).map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
+                             },
+                             {
+                               title: 'Registro de Elaboración',
+                               headers: ['FECHA', 'NOMBRE ELABORADOR', 'OBSERVACIÓN'],
+                               rows: Array(10).fill(['', '', ''])
+                             }
+                           ];
+                           viewExpedienteInNewTab('EXPEDIENTE: PREPARACIÓN GOTAS PURAS', prepData, `expediente_preparacion_${r.id}`, tables, 'p', 24, 10, 8, 7);
                         }}
                         onDownload={() => {
                            const prepData = [
                              { label: 'Producto', value: r.producto },
                              { label: 'Fecha', value: formatDate(r.fecha) },
-                             { label: 'Preparador', value: r.preparador },
-                             { label: 'Responsable', value: r.responsable || 'Administrador Cimasur' },
                              { label: 'Total Lambdas', value: String(r.totalLambdas || '0') },
-                             { label: 'Fórmula Total', value: r.formulaTotal || '' },
-                             { label: 'Observaciones', value: r.observaciones || '' }
+                             { label: 'Fórmula Total', value: r.formulaTotal || '' }
                            ];
-                           const tables = [{
-                             title: 'Detalle de Preparación (Composición)',
-                             headers: ['#', 'Composición / Terapia', 'N° Cimasur', 'Dilución', 'Lambdas'],
-                             rows: (r.filas || []).filter((f:any) => f.composicion).map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
-                           }];
-                           exportExpedienteToPDF('Expediente: Preparación Gotas Puras', prepData, `expediente_preparacion_${r.id}`, tables);
+                           const tables = [
+                             {
+                               title: 'Detalle de Preparación (Composición)',
+                               headers: ['#', 'Composición / Terapia', 'N° Cimasur', 'Dilución', 'Lambdas'],
+                               rows: (r.filas || []).filter((f:any) => f.composicion).map((f: any, i: number) => [i + 1, f.composicion, f.nroCimasur, f.dilucion, f.lambdas]) || []
+                             },
+                             {
+                               title: 'Registro de Elaboración',
+                               headers: ['FECHA', 'NOMBRE ELABORADOR', 'OBSERVACIÓN'],
+                               rows: Array(10).fill(['', '', ''])
+                             }
+                           ];
+                           exportExpedienteToPDF('EXPEDIENTE: PREPARACIÓN GOTAS PURAS', prepData, `expediente_preparacion_${r.id}`, tables, 'p', 24, 10, 8, 7);
                         }}
                         onExcel={() => exportRecordToExcel(r)}
                         onEdit={() => {
