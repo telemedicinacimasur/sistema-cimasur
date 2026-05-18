@@ -130,13 +130,14 @@ export const exportExpedienteToPDF = (
   subtitleFontSize: number = 9,
   cimasurFontSize: number = 18,
   titleFontSize: number = 12,
-  dateFontSize: number = 9
+  dateFontSize: number = 9,
+  images?: string[] // Optional base64 images to append at the end
 ) => {
   const doc = new jsPDF({ orientation });
   const productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
   
-  const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
+  const { pageWidth, pageHeight } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
   let currentY = 40;
 
@@ -209,6 +210,23 @@ export const exportExpedienteToPDF = (
       });
       currentY = (doc as any).lastAutoTable.finalY + 15;
     });
+  }
+  
+  if (images && images.length > 0) {
+     images.forEach(imgData => {
+         // Add a new page for each image if desired, or if it doesn't fit
+         if (currentY + 100 > pageHeight) {
+             doc.addPage(orientation);
+             currentY = 20;
+         }
+         // Image width based on page margins
+         const imgWidth = pageWidth - 28;
+         // Typical height for charts in landscape PDF is 100-140
+         const imgHeight = 100;
+         
+         doc.addImage(imgData, 'PNG', 14, currentY, imgWidth, imgHeight);
+         currentY += imgHeight + 15;
+     });
   }
   
   doc.save(`${fileName}.pdf`);

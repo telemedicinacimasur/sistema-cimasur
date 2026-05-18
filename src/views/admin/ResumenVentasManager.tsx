@@ -4,9 +4,10 @@ import { cn } from '../../lib/utils';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { ChevronLeft, ChevronRight, Edit3, Save, X, Search, FileText, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit3, Save, X, Search, FileText, FileSpreadsheet, Download } from 'lucide-react';
 import { exportExpedienteToPDF } from '../../lib/pdfUtils';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const ALL_YEARS = Array.from({ length: 2026 - 2014 + 1 }, (_, i) => 2014 + i);
@@ -39,6 +40,9 @@ export default function ResumenVentasManager() {
   // Pagination global (controls both)
   const [page, setPage] = useState(2); // Defaults to 2022-2025 initially
   
+  // View Filter
+  const [viewFilter, setViewFilter] = useState<'all' | 'frascos' | 'pesos'>('all');
+
   // Chart Windows
   const [frascosWindowIndex, setFrascosWindowIndex] = useState(0);
   const [pesosWindowIndex, setPesosWindowIndex] = useState(0);
@@ -200,112 +204,147 @@ export default function ResumenVentasManager() {
       setShowModal(true);
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
         const headers = ['MES', ...currentYears.map(String)];
         
-        // Frascos Table rows
-        const frascosRows = [];
-        MONTHS.forEach((m, idx) => {
-            frascosRows.push([
-                m.toUpperCase(),
-                ...currentYears.map(y => getFrascos(y, idx) || '-')
-            ]);
-        });
-        const arrTotalsFrascos = currentYears.map(y => {
-            let t = 0; for(let i=0; i<12; i++) t += getFrascos(y, i); return t || '-';
-        });
-        frascosRows.push(['TOTAL ANUAL', ...arrTotalsFrascos]);
-        
-        const arrMetaFrascos = currentYears.map(y => {
-            let m = 0; for(let i=0; i<12; i++) m += getMetaFrascos(y, i); return (m*12) || '-';
-        });
-        frascosRows.push(['META ANUAL', ...arrMetaFrascos]);
-        
-        const arrDiffFrascos = currentYears.map(y => {
-            let t = 0; let m = 0; for(let i=0; i<12; i++) { t += getFrascos(y, i); m += getMetaFrascos(y, i); }
-            const ma = m*12; if(t===0 || ma===0) return '-'; return String(t - ma);
-        });
-        frascosRows.push(['DIFERENCIA', ...arrDiffFrascos]);
+        const tables = [];
+        const images: string[] = [];
 
-        // Pesos Table rows
-        const pesosRows = [];
-        MONTHS.forEach((m, idx) => {
-            pesosRows.push([
-                m.toUpperCase(),
-                ...currentYears.map(y => {
-                    const v = getPesos(y, idx); return v > 0 ? `$${v.toLocaleString('es-CL')}` : '-';
-                })
-            ]);
-        });
-        const arrTotalsPesos = currentYears.map(y => {
-            let t = 0; for(let i=0; i<12; i++) t += getPesos(y, i); return t > 0 ? `$${t.toLocaleString('es-CL')}` : '-';
-        });
-        pesosRows.push(['TOTAL ANUAL $', ...arrTotalsPesos]);
-        
-        const arrMetaPesos = currentYears.map(y => {
-            let m = 0; for(let i=0; i<12; i++) m += getMetaPesos(y, i); return m > 0 ? `$${(m*12).toLocaleString('es-CL')}` : '-';
-        });
-        pesosRows.push(['META ANUAL $', ...arrMetaPesos]);
-        
-        const arrDiffPesos = currentYears.map(y => {
-            let t = 0; let m = 0; for(let i=0; i<12; i++) { t += getPesos(y, i); m += getMetaPesos(y, i); }
-            const ma = m*12; if(t===0 || ma===0) return '-'; return `$${(t - ma).toLocaleString('es-CL')}`;
-        });
-        pesosRows.push(['DIFERENCIA $', ...arrDiffPesos]);
+        // Capture frascos chart
+        if (viewFilter === 'all' || viewFilter === 'frascos') {
+             const chartF = document.getElementById('chart-frascos');
+             if (chartF) {
+                 const canvas = await html2canvas(chartF, { backgroundColor: '#0D1527', scale: 2 });
+                 images.push(canvas.toDataURL('image/png'));
+             }
 
-        const tables = [
-            {
-                title: `Unidades: Frascos (${currentYears[0]} - ${currentYears[currentYears.length-1]})`,
-                headers,
-                rows: frascosRows
-            },
-            {
-                title: `Recaudación: Pesos (${currentYears[0]} - ${currentYears[currentYears.length-1]})`,
-                headers,
-                rows: pesosRows
-            },
-            {
-                title: 'Registro de Elaboración - Control Gotas Puras',
-                headers: ['FECHA', 'NOMBRE ELABORADOR', 'OBSERVACIÓN'],
-                rows: Array(10).fill(['', '', ''])
-            }
-        ];
+             // Frascos Table rows
+             const frascosRows = [];
+             MONTHS.forEach((m, idx) => {
+                 frascosRows.push([
+                     m.toUpperCase(),
+                     ...currentYears.map(y => getFrascos(y, idx) || '-')
+                 ]);
+             });
+             const arrTotalsFrascos = currentYears.map(y => {
+                 let t = 0; for(let i=0; i<12; i++) t += getFrascos(y, i); return t || '-';
+             });
+             frascosRows.push(['TOTAL ANUAL', ...arrTotalsFrascos]);
+             
+             const arrMetaFrascos = currentYears.map(y => {
+                 let m = 0; for(let i=0; i<12; i++) m += getMetaFrascos(y, i); return (m*12) || '-';
+             });
+             frascosRows.push(['META ANUAL', ...arrMetaFrascos]);
+             
+             const arrDiffFrascos = currentYears.map(y => {
+                 let t = 0; let m = 0; for(let i=0; i<12; i++) { t += getFrascos(y, i); m += getMetaFrascos(y, i); }
+                 const ma = m*12; if(t===0 || ma===0) return '-'; return String(t - ma);
+             });
+             frascosRows.push(['DIFERENCIA', ...arrDiffFrascos]);
+
+             tables.push({
+                 title: `Unidades: Frascos (${currentYears[0]} - ${currentYears[currentYears.length-1]})`,
+                 headers,
+                 rows: frascosRows
+             });
+        }
+        
+        // Capture pesos chart
+        if (viewFilter === 'all' || viewFilter === 'pesos') {
+             const chartP = document.getElementById('chart-pesos');
+             if (chartP) {
+                 const canvas = await html2canvas(chartP, { backgroundColor: '#0D1527', scale: 2 });
+                 images.push(canvas.toDataURL('image/png'));
+             }
+
+             // Pesos Table rows
+             const pesosRows = [];
+             MONTHS.forEach((m, idx) => {
+                 pesosRows.push([
+                     m.toUpperCase(),
+                     ...currentYears.map(y => {
+                         const v = getPesos(y, idx); return v > 0 ? `$${v.toLocaleString('es-CL')}` : '-';
+                     })
+                 ]);
+             });
+             const arrTotalsPesos = currentYears.map(y => {
+                 let t = 0; for(let i=0; i<12; i++) t += getPesos(y, i); return t > 0 ? `$${t.toLocaleString('es-CL')}` : '-';
+             });
+             pesosRows.push(['TOTAL ANUAL $', ...arrTotalsPesos]);
+             
+             const arrMetaPesos = currentYears.map(y => {
+                 let m = 0; for(let i=0; i<12; i++) m += getMetaPesos(y, i); return m > 0 ? `$${(m*12).toLocaleString('es-CL')}` : '-';
+             });
+             pesosRows.push(['META ANUAL $', ...arrMetaPesos]);
+             
+             const arrDiffPesos = currentYears.map(y => {
+                 let t = 0; let m = 0; for(let i=0; i<12; i++) { t += getPesos(y, i); m += getMetaPesos(y, i); }
+                 const ma = m*12; if(t===0 || ma===0) return '-'; return `$${(t - ma).toLocaleString('es-CL')}`;
+             });
+             pesosRows.push(['DIFERENCIA $', ...arrDiffPesos]);
+
+             tables.push({
+                 title: `Recaudación: Pesos (${currentYears[0]} - ${currentYears[currentYears.length-1]})`,
+                 headers,
+                 rows: pesosRows
+             });
+        }
+
+        tables.push({
+             title: 'Registro de Elaboración - Control Gotas Puras',
+             headers: ['FECHA', 'NOMBRE ELABORADOR', 'OBSERVACIÓN'],
+             rows: Array(10).fill(['', '', ''])
+        });
 
         exportExpedienteToPDF(
             'REPORTE ANALÍTICO DE VENTAS',
             [
                 { label: 'Documento', value: 'Dashboard Analítico' },
                 { label: 'Rango Visual', value: `${currentYears[0]} a ${currentYears[currentYears.length-1]}` },
+                { label: 'Filtro Activo', value: viewFilter === 'all' ? 'Unidades y Pesos' : viewFilter === 'frascos' ? 'Solo Unidades' : 'Solo Pesos' },
                 { label: 'Fecha de Emisión', value: new Date().toLocaleDateString('es-CL') }
             ],
             `analisis_ventas_${Date.now()}`,
             tables,
-            'p',
-            9, 16, 11, 8
+            'l', // HORIZONTAL
+            9, 16, 11, 8,
+            images
         );
   }
 
   const exportExcel = () => {
-    // Basic Excel export with two sheets
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Frascos
-    const dataFrascos: any[][] = [['MES', ...currentYears.map(String)]];
-    MONTHS.forEach((m, idx) => {
-        dataFrascos.push([m.toUpperCase(), ...currentYears.map(y => getFrascos(y, idx))]);
-    });
-    const wsFrascos = XLSX.utils.aoa_to_sheet(dataFrascos);
-    XLSX.utils.book_append_sheet(wb, wsFrascos, "Frascos");
+    if (viewFilter === 'all' || viewFilter === 'frascos') {
+        const dataFrascos: any[][] = [['MES', ...currentYears.map(String)]];
+        MONTHS.forEach((m, idx) => {
+            dataFrascos.push([m.toUpperCase(), ...currentYears.map(y => getFrascos(y, idx))]);
+        });
+        const wsFrascos = XLSX.utils.aoa_to_sheet(dataFrascos);
+        XLSX.utils.book_append_sheet(wb, wsFrascos, "Frascos");
+    }
 
-    // Sheet 2: Pesos
-    const dataPesos: any[][] = [['MES', ...currentYears.map(String)]];
-    MONTHS.forEach((m, idx) => {
-        dataPesos.push([m.toUpperCase(), ...currentYears.map(y => getPesos(y, idx))]);
-    });
-    const wsPesos = XLSX.utils.aoa_to_sheet(dataPesos);
-    XLSX.utils.book_append_sheet(wb, wsPesos, "Pesos");
+    if (viewFilter === 'all' || viewFilter === 'pesos') {
+        const dataPesos: any[][] = [['MES', ...currentYears.map(String)]];
+        MONTHS.forEach((m, idx) => {
+            dataPesos.push([m.toUpperCase(), ...currentYears.map(y => getPesos(y, idx))]);
+        });
+        const wsPesos = XLSX.utils.aoa_to_sheet(dataPesos);
+        XLSX.utils.book_append_sheet(wb, wsPesos, "Pesos");
+    }
 
     XLSX.writeFile(wb, `analisis_ventas_${Date.now()}.xlsx`);
+  }
+
+  const downloadImportTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+        ['FECHA', 'CANTIDAD_FRASCOS', 'TOTAL_PESOS', 'OBSERVACIONES'],
+        ['2025-01-15', 50, 750000, 'Ejemplo de importación'],
+        ['2025-02-10', 30, 450000, 'Ingreso manual general']
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws, "Importacion");
+    XLSX.writeFile(wb, "plantilla_importacion_general.xlsx");
   }
 
   return (
@@ -329,18 +368,41 @@ export default function ResumenVentasManager() {
 
         {/* BARRA DE HERRAMIENTAS OPERATIVA */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-[#1C2541]/80 px-5 py-4 rounded-xl border border-slate-700 backdrop-blur-md shadow-sm">
-            <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                    type="text" 
-                    placeholder="Filtrar registros..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-[#0D1527] border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-[#38BDF8] focus:border-[#38BDF8] outline-none transition-all placeholder-slate-500"
-                />
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                        type="text" 
+                        placeholder="Filtrar registros..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-[#0D1527] border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-[#38BDF8] focus:border-[#38BDF8] outline-none transition-all placeholder-slate-500"
+                    />
+                </div>
+                
+                <div className="flex bg-[#0D1527] p-1 rounded-lg border border-slate-700 w-full sm:w-auto">
+                    <button 
+                        onClick={() => setViewFilter('all')} 
+                        className={cn("flex-1 sm:flex-none px-3 py-1.5 rounded-md font-bold text-[11px] uppercase tracking-wider transition-all", viewFilter === 'all' ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white")}
+                    >
+                        Ambos
+                    </button>
+                    <button 
+                        onClick={() => setViewFilter('frascos')} 
+                        className={cn("flex-1 sm:flex-none px-3 py-1.5 rounded-md font-bold text-[11px] uppercase tracking-wider transition-all", viewFilter === 'frascos' ? "bg-yellow-400 text-black" : "text-slate-400 hover:text-white")}
+                    >
+                        Unidades
+                    </button>
+                    <button 
+                        onClick={() => setViewFilter('pesos')} 
+                        className={cn("flex-1 sm:flex-none px-3 py-1.5 rounded-md font-bold text-[11px] uppercase tracking-wider transition-all", viewFilter === 'pesos' ? "bg-emerald-500 text-white" : "text-slate-400 hover:text-white")}
+                    >
+                        Pesos
+                    </button>
+                </div>
             </div>
             
-            <div className="flex flex-col md:flex-row items-center w-full md:w-auto justify-between md:justify-end gap-5">
+            <div className="flex flex-col xl:flex-row items-center w-full md:w-auto justify-between md:justify-end gap-3 xl:gap-5">
                 {/* GLOBAL YEAR SELECTOR */}
                 <div className="flex items-center bg-[#0D1527] p-1 rounded-lg border border-slate-700 shadow-inner">
                     <button 
@@ -358,18 +420,22 @@ export default function ResumenVentasManager() {
                     ><ChevronRight className="w-4 h-4" /></button>
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto">
-                    <button onClick={exportPDF} className="flex-1 md:flex-none flex justify-center items-center gap-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 px-4 py-2 rounded-lg text-[13px] font-bold transition-colors border border-rose-500/20 whitespace-nowrap">
-                        <FileText className="w-4 h-4" /> Exportar PDF
+                <div className="flex gap-2 w-full xl:w-auto flex-wrap sm:flex-nowrap">
+                    <button onClick={exportPDF} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-rose-500/20 whitespace-nowrap">
+                        <FileText className="w-4 h-4" /> PDF
                     </button>
-                    <button onClick={exportExcel} className="flex-1 md:flex-none flex justify-center items-center gap-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2 rounded-lg text-[13px] font-bold transition-colors border border-emerald-500/20 whitespace-nowrap">
-                        <FileSpreadsheet className="w-4 h-4" /> Exportar Excel
+                    <button onClick={exportExcel} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-emerald-500/20 whitespace-nowrap">
+                        <FileSpreadsheet className="w-4 h-4" /> Excel
+                    </button>
+                    <button onClick={downloadImportTemplate} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-blue-500/20 whitespace-nowrap">
+                        <Download className="w-4 h-4" /> Plantilla
                     </button>
                 </div>
             </div>
         </div>
 
         {/* SECCIÓN 1: MÓDULO DE UNIDADES (FRASCOS) */}
+        {(viewFilter === 'all' || viewFilter === 'frascos') && (
         <div className="bg-[#1C2541] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-6">
             <h3 className="text-[17px] font-black text-yellow-400 flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> Módulo de Unidades: Frascos
@@ -461,7 +527,7 @@ export default function ResumenVentasManager() {
                         </div>
                     </div>
                 </div>
-                <div className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50">
+                <div id="chart-frascos" className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={getChartData(CHART_WINDOWS[frascosWindowIndex].years, frascosScale, 'frascos')} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
@@ -474,8 +540,10 @@ export default function ResumenVentasManager() {
                 </div>
             </div>
         </div>
+        )}
 
         {/* SECCIÓN 2: MÓDULO MONETARIO (PESOS) */}
+        {(viewFilter === 'all' || viewFilter === 'pesos') && (
         <div className="bg-[#1C2541] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-6">
             <h3 className="text-[17px] font-black text-emerald-400 flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div> Módulo Monetario: Recaudación $
@@ -569,7 +637,7 @@ export default function ResumenVentasManager() {
                         </div>
                     </div>
                 </div>
-                <div className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50">
+                <div id="chart-pesos" className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={getChartData(CHART_WINDOWS[pesosWindowIndex].years, pesosScale, 'pesos')} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
                             <defs>
@@ -588,6 +656,7 @@ export default function ResumenVentasManager() {
                 </div>
             </div>
         </div>
+        )}
 
         {/* MODAL GESTION DATOS */}
         {showModal && (
