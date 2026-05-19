@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { ChevronLeft, ChevronRight, Edit3, Save, X, Search, FileText, FileSpreadsheet, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit3, Save, X, Search, FileText, FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { exportExpedienteToPDF } from '../../lib/pdfUtils';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
@@ -29,7 +29,6 @@ const CHART_WINDOWS = [
 ];
 
 export default function ResumenVentasManager() {
-  const [salesRecords, setSalesRecords] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   
@@ -51,15 +50,14 @@ export default function ResumenVentasManager() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [modalForm, setModalForm] = useState({ year: 2026, month: 0, frascos: '', pesos: '', metaFrascos: '', metaPesos: '' });
+  
+  const [showMetaAnualModal, setShowMetaAnualModal] = useState(false);
+  const [metaAnualForm, setMetaAnualForm] = useState({ year: 2026, metaFrascosAnual: '', metaPesosAnual: '' });
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const [sales, ovrds] = await Promise.all([
-        localDB.getCollection('sales'),
-        localDB.getCollection('ventas_overrides')
-      ]);
-      setSalesRecords(sales);
+      const ovrds = await localDB.getCollection('ventas_overrides');
       
       const ovMap: Record<string, any> = {};
       ovrds.forEach(o => {
@@ -72,60 +70,32 @@ export default function ResumenVentasManager() {
     loadData();
   }, []);
 
-  if (loading) return <div className="p-10 font-bold text-white text-center">Calculando matrices de análisis...</div>;
+  if (loading) return <div className="p-10 font-bold text-white text-center">Cargando matrices de análisis...</div>;
 
-  // Build automatic sums
-  const frascosMatrix: Record<number, Record<number, { auto: number }>> = {};
-  const pesosMatrix: Record<number, Record<number, { auto: number }>> = {};
-  
-  ALL_YEARS.forEach(y => {
-    frascosMatrix[y] = {};
-    pesosMatrix[y] = {};
-    MONTHS.forEach((_, m) => {
-        frascosMatrix[y][m] = { auto: 0 };
-        pesosMatrix[y][m] = { auto: 0 };
-    });
-  });
-
-  salesRecords.forEach(r => {
-    if (!r.fecha) return;
-    const d = new Date(r.fecha);
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    if (y >= 2014 && y <= 2026) {
-        // Pesos
-        let val = Number(r.subtotal);
-        if (isNaN(val) || val === 0) val = Number(r.total);
-        if (isNaN(val)) val = 0;
-        pesosMatrix[y][m].auto += val;
-
-        // Frascos
-        let frascosQty = Number(r.nroFrascos);
-        if (isNaN(frascosQty)) frascosQty = 0;
-        frascosMatrix[y][m].auto += frascosQty;
-    }
-  });
-
-  // Helper getters combining auto + manual overrides
+  // Helper getters using manual overrides
   const getFrascos = (year: number, month: number) => {
       const manual = overrides[`${year}-${month}`]?.frascos;
-      if (manual !== undefined && manual !== null && manual !== '') return Number(manual);
-      return frascosMatrix[year]?.[month]?.auto || 0;
+      return Number(manual) || 0;
   };
   const getPesos = (year: number, month: number) => {
       const manual = overrides[`${year}-${month}`]?.pesos;
-      if (manual !== undefined && manual !== null && manual !== '') return Number(manual);
-      return pesosMatrix[year]?.[month]?.auto || 0;
+      return Number(manual) || 0;
   };
   const getMetaFrascos = (year: number, month: number) => {
       const manual = overrides[`${year}-${month}`]?.metaFrascos;
-      if (manual !== undefined && manual !== null && manual !== '') return Number(manual);
-      return 0;
+      return Number(manual) || 0;
   };
   const getMetaPesos = (year: number, month: number) => {
       const manual = overrides[`${year}-${month}`]?.metaPesos;
-      if (manual !== undefined && manual !== null && manual !== '') return Number(manual);
-      return 0;
+      return Number(manual) || 0;
+  };
+  const getMetaFrascosAnual = (year: number) => {
+      const manual = overrides[`${year}-annual`]?.metaFrascosAnual;
+      return Number(manual) || 0;
+  };
+  const getMetaPesosAnual = (year: number) => {
+      const manual = overrides[`${year}-annual`]?.metaPesosAnual;
+      return Number(manual) || 0;
   };
 
   const currentYears = YEAR_BLOCKS[page];
@@ -182,6 +152,30 @@ export default function ResumenVentasManager() {
       setShowModal(false);
   };
 
+  const handleSaveMetaAnual = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const id = `${metaAnualForm.year}-annual`;
+      const payload = {
+          id,
+          year: metaAnualForm.year,
+          metaFrascosAnual: metaAnualForm.metaFrascosAnual,
+          metaPesosAnual: metaAnualForm.metaPesosAnual
+      };
+      await localDB.saveToCollection('ventas_overrides', payload);
+      setOverrides({...overrides, [id]: payload});
+      setShowMetaAnualModal(false);
+  };
+
+  const openMetaAnualModalFor = (y: number) => {
+      const exist = overrides[`${y}-annual`] || {};
+      setMetaAnualForm({
+          year: y,
+          metaFrascosAnual: exist.metaFrascosAnual || '',
+          metaPesosAnual: exist.metaPesosAnual || ''
+      });
+      setShowMetaAnualModal(true);
+  };
+
   const openModalFor = (y: number, m: number) => {
       const exist = overrides[`${y}-${m}`] || {};
       setModalForm({
@@ -223,13 +217,13 @@ export default function ResumenVentasManager() {
              frascosRows.push(['TOTAL ANUAL', ...arrTotalsFrascos]);
              
              const arrMetaFrascos = currentYears.map(y => {
-                 let m = 0; for(let i=0; i<12; i++) m += getMetaFrascos(y, i); return (m*12) || '-';
+                 return getMetaFrascosAnual(y) || '-';
              });
              frascosRows.push(['META ANUAL', ...arrMetaFrascos]);
              
              const arrDiffFrascos = currentYears.map(y => {
-                 let t = 0; let m = 0; for(let i=0; i<12; i++) { t += getFrascos(y, i); m += getMetaFrascos(y, i); }
-                 const ma = m*12; if(t===0 || ma===0) return '-'; return String(t - ma);
+                 let t = 0; for(let i=0; i<12; i++) { t += getFrascos(y, i); }
+                 const ma = getMetaFrascosAnual(y); if(t===0 || ma===0) return '-'; return String(t - ma);
              });
              frascosRows.push(['DIFERENCIA', ...arrDiffFrascos]);
 
@@ -264,13 +258,13 @@ export default function ResumenVentasManager() {
              pesosRows.push(['TOTAL ANUAL $', ...arrTotalsPesos]);
              
              const arrMetaPesos = currentYears.map(y => {
-                 let m = 0; for(let i=0; i<12; i++) m += getMetaPesos(y, i); return m > 0 ? `$${(m*12).toLocaleString('es-CL')}` : '-';
+                 const m = getMetaPesosAnual(y); return m > 0 ? `$${m.toLocaleString('es-CL')}` : '-';
              });
              pesosRows.push(['META ANUAL $', ...arrMetaPesos]);
              
              const arrDiffPesos = currentYears.map(y => {
-                 let t = 0; let m = 0; for(let i=0; i<12; i++) { t += getPesos(y, i); m += getMetaPesos(y, i); }
-                 const ma = m*12; if(t===0 || ma===0) return '-'; return `$${(t - ma).toLocaleString('es-CL')}`;
+                 let t = 0; for(let i=0; i<12; i++) { t += getPesos(y, i); }
+                 const ma = getMetaPesosAnual(y); if(t===0 || ma===0) return '-'; return `$${(t - ma).toLocaleString('es-CL')}`;
              });
              pesosRows.push(['DIFERENCIA $', ...arrDiffPesos]);
 
@@ -330,12 +324,85 @@ export default function ResumenVentasManager() {
   const downloadImportTemplate = () => {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
-        ['FECHA', 'CANTIDAD_FRASCOS', 'TOTAL_PESOS', 'OBSERVACIONES'],
-        ['2025-01-15', 50, 750000, 'Ejemplo de importación'],
-        ['2025-02-10', 30, 450000, 'Ingreso manual general']
+        ['AÑO', 'MES', 'FRASCOS', 'PESOS', 'META_FRASCOS_ANUAL', 'META_PESOS_ANUAL'],
+        [2024, 'Ene', 150, 2500000, 2400, 36000000],
+        [2024, 'Feb', 180, 2800000, 2400, 36000000]
     ]);
     XLSX.utils.book_append_sheet(wb, ws, "Importacion");
     XLSX.writeFile(wb, "plantilla_importacion_general.xlsx");
+  }
+
+  const importExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        try {
+            const bstr = evt.target?.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+            let updatesCount = 0;
+
+            for (const row of data) {
+                const y = Number(row['AÑO']);
+                const mesStr = String(row['MES'] || '').toLowerCase().trim();
+                const m = MONTHS.findIndex(mon => mon.toLowerCase() === mesStr);
+                
+                if (isNaN(y) || y < 2014 || y > 2026 || m < 0 || m > 11) continue;
+
+                const key = `${y}-${m}`;
+                const f = row['FRASCOS'] !== undefined ? Number(row['FRASCOS']) : undefined;
+                const p = row['PESOS'] !== undefined ? Number(row['PESOS']) : undefined;
+                const mfAnual = row['META_FRASCOS_ANUAL'] !== undefined ? Number(row['META_FRASCOS_ANUAL']) : undefined;
+                const mpAnual = row['META_PESOS_ANUAL'] !== undefined ? Number(row['META_PESOS_ANUAL']) : undefined;
+
+                const current = overrides[key] || {};
+                
+                const newData = {
+                    id: key,
+                    year: y,
+                    month: m,
+                    frascos: f !== undefined ? f : (current.frascos || ''),
+                    pesos: p !== undefined ? p : (current.pesos || ''),
+                };
+                await localDB.saveToCollection('ventas_overrides', newData);
+
+                // Save annual metas if present
+                if (mfAnual !== undefined || mpAnual !== undefined) {
+                    const annualKey = `${y}-annual`;
+                    const currentAnnual = overrides[annualKey] || {};
+                    const annualData = {
+                        id: annualKey,
+                        year: y,
+                        metaFrascosAnual: mfAnual !== undefined ? mfAnual : (currentAnnual.metaFrascosAnual || ''),
+                        metaPesosAnual: mpAnual !== undefined ? mpAnual : (currentAnnual.metaPesosAnual || '')
+                    };
+                    await localDB.saveToCollection('ventas_overrides', annualData);
+                }
+                
+                updatesCount++;
+            }
+
+            alert(`Éxito: Se importaron/actualizaron ${updatesCount} registros.`);
+            
+            // Reload
+            const ovrds = await localDB.getCollection('ventas_overrides');
+            const ovMap: Record<string, any> = {};
+            ovrds.forEach(o => { ovMap[o.id] = o; });
+            setOverrides(ovMap);
+
+        } catch (error) {
+            console.error(error);
+            alert('Error al importar Excel');
+        }
+    };
+    reader.readAsBinaryString(file);
+    // reset input
+    if (e.target) e.target.value = '';
   }
 
   return (
@@ -421,6 +488,15 @@ export default function ResumenVentasManager() {
                     <button onClick={downloadImportTemplate} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-blue-500/20 whitespace-nowrap">
                         <Download className="w-4 h-4" /> Plantilla
                     </button>
+                    <button className="flex-1 sm:flex-none relative flex justify-center items-center gap-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-indigo-500/20 whitespace-nowrap overflow-hidden">
+                        <Upload className="w-4 h-4" /> Importar
+                        <input 
+                            type="file" 
+                            accept=".xlsx, .xls" 
+                            onChange={importExcel}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                    </button>
                 </div>
             </div>
         </div>
@@ -469,18 +545,21 @@ export default function ResumenVentasManager() {
                         <tr className="bg-[#0D1527] text-slate-300 font-bold border-b border-slate-800/50">
                             <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide">Meta Anual</td>
                             {currentYears.map(y => {
-                                let metaYear = 0;
-                                for(let m=0; m<12; m++) metaYear += getMetaFrascos(y, m);
-                                return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{metaYear > 0 ? (metaYear * 12).toLocaleString('es-CL') : '-'}</td>;
+                                const metaAnual = getMetaFrascosAnual(y);
+                                const hasOverride = overrides[`${y}-annual`]?.metaFrascosAnual !== undefined && overrides[`${y}-annual`]?.metaFrascosAnual !== '';
+                                return <td key={y} onDoubleClick={() => openMetaAnualModalFor(y)} className="py-2.5 px-4 text-center border-r border-slate-800/50 cursor-pointer hover:bg-yellow-400/10 transition-colors">
+                                    <span className={hasOverride ? "text-yellow-400 underline decoration-dotted" : ""}>
+                                        {metaAnual > 0 ? metaAnual.toLocaleString('es-CL') : '-'}
+                                    </span>
+                                </td>;
                             })}
                         </tr>
                         <tr className="bg-[#1C2541] text-white font-black border-t border-slate-600">
                             <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide bg-slate-800/50">Diferencia</td>
                             {currentYears.map(y => {
                                 let totalYear = 0;
-                                let metaYear = 0;
-                                for(let m=0; m<12; m++) { totalYear += getFrascos(y, m); metaYear += getMetaFrascos(y, m); }
-                                const metaAnual = metaYear * 12;
+                                for(let m=0; m<12; m++) { totalYear += getFrascos(y, m); }
+                                const metaAnual = getMetaFrascosAnual(y);
                                 if(totalYear === 0 || metaAnual === 0) return <td key={y} className="py-2.5 px-4 border-r border-slate-800 text-center bg-slate-800/30">-</td>;
                                 const diff = totalYear - metaAnual;
                                 return <td key={y} className={cn("py-2.5 px-4 text-center border-r border-slate-800", diff < 0 ? "text-rose-400 bg-rose-500/5" : "text-green-400 bg-green-500/5")}>{diff > 0 ? '+' : ''}{diff.toLocaleString('es-CL')}</td>;
@@ -579,18 +658,21 @@ export default function ResumenVentasManager() {
                         <tr className="bg-[#0D1527] text-slate-300 font-bold border-b border-slate-800/50">
                             <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide">Meta Anual $</td>
                             {currentYears.map(y => {
-                                let metaYear = 0;
-                                for(let m=0; m<12; m++) metaYear += getMetaPesos(y, m);
-                                return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{metaYear > 0 ? `$${(metaYear * 12).toLocaleString('es-CL')}` : '-'}</td>;
+                                const metaAnual = getMetaPesosAnual(y);
+                                const hasOverride = overrides[`${y}-annual`]?.metaPesosAnual !== undefined && overrides[`${y}-annual`]?.metaPesosAnual !== '';
+                                return <td key={y} onDoubleClick={() => openMetaAnualModalFor(y)} className="py-2.5 px-4 text-center border-r border-slate-800/50 cursor-pointer hover:bg-emerald-400/10 transition-colors">
+                                    <span className={hasOverride ? "text-emerald-400 underline decoration-dotted" : ""}>
+                                        {metaAnual > 0 ? `$${metaAnual.toLocaleString('es-CL')}` : '-'}
+                                    </span>
+                                </td>;
                             })}
                         </tr>
                         <tr className="bg-[#1C2541] text-white font-black border-t border-slate-600">
                             <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide bg-slate-800/50">Diferencia $</td>
                             {currentYears.map(y => {
                                 let totalYear = 0;
-                                let metaYear = 0;
-                                for(let m=0; m<12; m++) { totalYear += getPesos(y, m); metaYear += getMetaPesos(y, m); }
-                                const metaAnual = metaYear * 12;
+                                for(let m=0; m<12; m++) { totalYear += getPesos(y, m); }
+                                const metaAnual = getMetaPesosAnual(y);
                                 if(totalYear === 0 || metaAnual === 0) return <td key={y} className="py-2.5 px-4 border-r border-slate-800 text-center bg-slate-800/30">-</td>;
                                 const diff = totalYear - metaAnual;
                                 return <td key={y} className={cn("py-2.5 px-4 text-center border-r border-slate-800", diff < 0 ? "text-rose-400 bg-rose-500/5" : "text-green-400 bg-green-500/5")}>{diff > 0 ? '+' : ''}${diff.toLocaleString('es-CL')}</td>;
@@ -736,6 +818,55 @@ export default function ResumenVentasManager() {
                             className="w-full p-3.5 mt-2 bg-[#38BDF8] text-[#0F172A] font-black tracking-wide rounded-xl hover:bg-[#7DDBFF] transition-all active:scale-95 flex justify-center items-center gap-2 shadow-lg shadow-[#38BDF8]/20"
                         >
                             <Save className="w-5 h-5"/> Guardar Modificaciones
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL META ANUAL */}
+        {showMetaAnualModal && (
+            <div className="fixed inset-0 z-[100] bg-[#0D1527]/80 backdrop-blur-md flex items-center justify-center p-4">
+                <div className="bg-[#1C2541] rounded-3xl p-8 max-w-md w-full border border-slate-700 shadow-2xl relative">
+                    <button onClick={() => setShowMetaAnualModal(false)} className="absolute top-5 right-5 text-slate-400 hover:text-white transition-colors bg-[#0D1527] p-2 rounded-full border border-slate-700">
+                        <X className="w-5 h-5" />
+                    </button>
+                    
+                    <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Metas Anuales {metaAnualForm.year}</h2>
+                    <p className="text-sm text-slate-400 mb-6 border-b border-slate-700 pb-4">Define los objetivos globales para el año.</p>
+                    
+                    <form onSubmit={handleSaveMetaAnual} className="space-y-6">
+                        <div>
+                            <h4 className="font-bold text-yellow-400 mb-3 text-sm flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> Frascos (Unidades)</h4>
+                            <div>
+                                <label className="block text-xs text-slate-400 mb-1">Meta Anual Unidades</label>
+                                <input 
+                                    type="number"
+                                    placeholder="Ej: 2400"
+                                    className="w-full bg-[#0D1527] border border-slate-700 rounded-lg p-2.5 text-white font-medium focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-all outline-none"
+                                    value={metaAnualForm.metaFrascosAnual} onChange={e => setMetaAnualForm({...metaAnualForm, metaFrascosAnual: e.target.value})}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <h4 className="font-bold text-emerald-400 mb-3 text-sm flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div> Pesos (Recaudación)</h4>
+                            <div>
+                                <label className="block text-xs text-slate-400 mb-1">Meta Anual ($)</label>
+                                <input 
+                                    type="number"
+                                    placeholder="Ej: 30000000"
+                                    className="w-full bg-[#0D1527] border border-slate-700 rounded-lg p-2.5 text-white font-medium focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all outline-none"
+                                    value={metaAnualForm.metaPesosAnual} onChange={e => setMetaAnualForm({...metaAnualForm, metaPesosAnual: e.target.value})}
+                                />
+                            </div>
+                        </div>
+
+                        <button 
+                            type="submit"
+                            className="w-full p-3.5 mt-2 bg-indigo-500 text-white font-black tracking-wide rounded-xl hover:bg-indigo-400 transition-all active:scale-95 flex justify-center items-center gap-2 shadow-lg shadow-indigo-500/20"
+                        >
+                            <Save className="w-5 h-5"/> Guardar Metas Anuales
                         </button>
                     </form>
                 </div>
