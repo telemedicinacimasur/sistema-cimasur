@@ -405,25 +405,53 @@ export default function ResumenVentasManager() {
 
             for (const row of data) {
                 const y = Number(row['AÑO']);
-                const mesStr = String(row['MES'] || '').toLowerCase().trim();
-                const m = MONTHS.findIndex(mon => mon.toLowerCase() === mesStr);
+                const mesRaw = row['MES'];
+                let m = -1;
+
+                if (typeof mesRaw === 'number') {
+                    if (mesRaw >= 1 && mesRaw <= 12) m = mesRaw - 1;
+                    else if (mesRaw >= 0 && mesRaw <= 11) m = mesRaw;
+                } else if (mesRaw instanceof Date) {
+                    m = mesRaw.getMonth();
+                } else {
+                    const mesStr = String(mesRaw || '').toLowerCase().trim();
+                    m = MONTHS.findIndex(mon => mon.toLowerCase() === mesStr);
+                    if (m === -1) m = FULL_MONTHS.findIndex(mon => mon.toLowerCase() === mesStr);
+                    // Variaciones comunes para septiembre y otros meses si fuera necesario
+                    if (m === -1) {
+                        if (['set', 'sept', 'setiembre', 'sep.'].includes(mesStr)) m = 8;
+                        if (['ene.', 'enero'].includes(mesStr)) m = 0;
+                        if (['feb.', 'febrero'].includes(mesStr)) m = 1;
+                        if (['mar.', 'marzo'].includes(mesStr)) m = 2;
+                        if (['abr.', 'abril'].includes(mesStr)) m = 3;
+                        if (['may.', 'mayo'].includes(mesStr)) m = 4;
+                        if (['jun.', 'junio'].includes(mesStr)) m = 5;
+                        if (['jul.', 'julio'].includes(mesStr)) m = 6;
+                        if (['ago.', 'agosto'].includes(mesStr)) m = 7;
+                        if (['oct.', 'octubre'].includes(mesStr)) m = 9;
+                        if (['nov.', 'noviembre'].includes(mesStr)) m = 10;
+                        if (['dic.', 'diciembre'].includes(mesStr)) m = 11;
+                    }
+                }
                 
                 if (isNaN(y) || y < 2014 || y > 2026 || m < 0 || m > 11) continue;
 
                 const key = `${y}-${m}`;
-                const f = row['FRASCOS'] !== undefined ? Number(row['FRASCOS']) : undefined;
-                const p = row['PESOS'] !== undefined ? Number(row['PESOS']) : undefined;
+                const f = row['FRASCOS'] !== undefined ? row['FRASCOS'] : undefined;
+                const p = row['PESOS'] !== undefined ? row['PESOS'] : undefined;
                 const mfAnual = row['META_FRASCOS_ANUAL'] !== undefined ? Number(row['META_FRASCOS_ANUAL']) : undefined;
                 const mpAnual = row['META_PESOS_ANUAL'] !== undefined ? Number(row['META_PESOS_ANUAL']) : undefined;
 
                 const current = overrides[key] || {};
                 
                 const newData = {
+                    ...current,
                     id: key,
+                    overrideKey: key,
                     year: y,
                     month: m,
-                    frascos: f !== undefined ? f : (current.frascos || ''),
-                    pesos: p !== undefined ? p : (current.pesos || ''),
+                    frascos: f !== undefined ? String(f) : (current.frascos || ''),
+                    pesos: p !== undefined ? String(p) : (current.pesos || ''),
                 };
                 await localDB.saveToCollection('ventas_overrides', newData);
 
