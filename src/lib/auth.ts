@@ -1,6 +1,6 @@
 import { auth, db, isFirebaseReady } from './firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface UserProfile {
   uid: string;
@@ -135,7 +135,10 @@ export const localDB = {
   getCollection: async (name: string): Promise<any[]> => {
     if (isFirebaseReady && db) {
       const snapshot = await getDocs(collection(db, name));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return { ...data, id: doc.id };
+      });
     } else {
       const res = await fetch(`/api/records/${name}`);
       return await res.json();
@@ -143,6 +146,14 @@ export const localDB = {
   },
   saveToCollection: async (name: string, item: any) => {
     if (isFirebaseReady && db) {
+      if (item.id) {
+        await setDoc(doc(db, name, item.id), {
+          ...item,
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        return { ...item };
+      }
       const docRef = await addDoc(collection(db, name), {
         ...item,
         createdAt: new Date().toISOString()

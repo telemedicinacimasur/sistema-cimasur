@@ -171,6 +171,7 @@ export default function ResumenVentasManager() {
       try {
           const overrideKey = `${modalForm.year}-${modalForm.month}`;
           const payload = {
+              id: overrideKey, // Use deterministic ID for Firestore
               overrideKey,
               frascos: evalNumeric(modalForm.frascos),
               pesos: evalNumeric(modalForm.pesos),
@@ -178,15 +179,10 @@ export default function ResumenVentasManager() {
               metaPesos: evalNumeric(modalForm.metaPesos)
           };
 
-          const existingRecord: any = Object.values(overrides).find((o: any) => o.overrideKey === overrideKey || o.id === overrideKey);
+          // saveToCollection now handles upserts if payload has an id
+          const savedDoc = await localDB.saveToCollection('ventas_overrides', payload);
           
-          if (existingRecord && existingRecord.id) {
-              await localDB.updateInCollection('ventas_overrides', existingRecord.id, payload);
-              setOverrides(prev => ({...prev, [overrideKey]: { ...payload, id: existingRecord.id }}));
-          } else {
-              const newDoc = await localDB.saveToCollection('ventas_overrides', { ...payload, id: overrideKey });
-              setOverrides(prev => ({...prev, [overrideKey]: newDoc}));
-          }
+          setOverrides(prev => ({...prev, [overrideKey]: savedDoc}));
           setShowModal(false);
       } catch (err) {
           console.error(err);
@@ -196,24 +192,23 @@ export default function ResumenVentasManager() {
 
   const handleSaveMetaAnual = async (e: React.FormEvent) => {
       e.preventDefault();
-      const overrideKey = `${metaAnualForm.year}-annual`;
-      const payload = {
-          overrideKey,
-          year: metaAnualForm.year,
-          metaFrascosAnual: metaAnualForm.metaFrascosAnual,
-          metaPesosAnual: metaAnualForm.metaPesosAnual
-      };
+      try {
+          const overrideKey = `${metaAnualForm.year}-annual`;
+          const payload = {
+              id: overrideKey,
+              overrideKey,
+              year: metaAnualForm.year,
+              metaFrascosAnual: metaAnualForm.metaFrascosAnual,
+              metaPesosAnual: metaAnualForm.metaPesosAnual
+          };
 
-      const existingRecord: any = Object.values(overrides).find((o: any) => o.overrideKey === overrideKey || o.id === overrideKey);
-      
-      if (existingRecord && existingRecord.id) {
-          await localDB.updateInCollection('ventas_overrides', existingRecord.id, payload);
-          setOverrides({...overrides, [overrideKey]: { ...payload, id: existingRecord.id }});
-      } else {
-          const newDoc = await localDB.saveToCollection('ventas_overrides', { ...payload, id: overrideKey });
-          setOverrides({...overrides, [overrideKey]: newDoc});
+          const savedDoc = await localDB.saveToCollection('ventas_overrides', payload);
+          setOverrides(prev => ({...prev, [overrideKey]: savedDoc}));
+          setShowMetaAnualModal(false);
+      } catch (err) {
+          console.error(err);
+          alert('Error al guardar: ' + (err instanceof Error ? err.message : 'Error desconocido'));
       }
-      setShowMetaAnualModal(false);
   };
 
   const openMetaAnualModalFor = (y: number) => {
