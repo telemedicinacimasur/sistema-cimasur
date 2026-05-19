@@ -442,18 +442,42 @@ export default function ResumenVentasManager() {
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6 pb-20">
         
         {/* CABECERA ÚNICA DE CONTROL */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#1C2541] p-6 rounded-2xl border border-slate-700 shadow-xl">
-            <div>
-                <h1 className="text-white font-bold text-2xl tracking-tight">Dashboard Analítico</h1>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-[#1C2541] p-6 rounded-2xl border border-slate-700 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#38BDF8]/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none"></div>
+            
+            <div className="relative z-10">
+                <h1 className="text-white font-bold text-3xl tracking-tight">Dashboard Analítico</h1>
                 <p className="text-slate-400 text-sm mt-1">Control integral de unidades productivas y recaudación</p>
             </div>
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            
+            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto relative z-10">
                 <button 
                     onClick={() => openModalFor(2026, new Date().getMonth())}
-                    className="w-full md:w-auto bg-[#38BDF8] text-[#0F172A] font-bold text-sm px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-[#7DDBFF] shadow-lg border border-[#38BDF8] transition-all active:scale-95"
+                    className="flex-1 md:flex-none bg-[#38BDF8] text-[#0F172A] font-black text-xs px-5 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-[#7DDBFF] shadow-lg border border-[#38BDF8] transition-all active:scale-95 uppercase tracking-wider"
                 >
                     <Edit3 className="w-4 h-4" /> Gestión de Datos
                 </button>
+
+                <div className="flex gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:flex-none">
+                        <button className="w-full bg-[#1e293b] text-white font-bold text-xs px-4 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-[#334155] border border-slate-700 transition-all uppercase tracking-wider">
+                            <Upload className="w-4 h-4 text-[#38BDF8]" /> Importar
+                        </button>
+                        <input 
+                            type="file" 
+                            accept=".xlsx, .xls" 
+                            onChange={importExcel}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                    </div>
+                    <button 
+                        onClick={downloadImportTemplate}
+                        className="flex-1 md:flex-none bg-[#1e293b] text-slate-300 font-bold text-xs px-4 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-[#334155] border border-slate-700 transition-all uppercase tracking-wider"
+                        title="Descargar Plantilla Excel"
+                    >
+                        <Download className="w-4 h-4" /> Plantilla
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -523,18 +547,6 @@ export default function ResumenVentasManager() {
                     </button>
                     <button onClick={exportExcel} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-emerald-500/20 whitespace-nowrap">
                         <FileSpreadsheet className="w-4 h-4" /> Excel
-                    </button>
-                    <button onClick={downloadImportTemplate} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-blue-500/20 whitespace-nowrap">
-                        <Download className="w-4 h-4" /> Plantilla
-                    </button>
-                    <button className="flex-1 sm:flex-none relative flex justify-center items-center gap-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors border border-indigo-500/20 whitespace-nowrap overflow-hidden">
-                        <Upload className="w-4 h-4" /> Importar
-                        <input 
-                            type="file" 
-                            accept=".xlsx, .xls" 
-                            onChange={importExcel}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
                     </button>
                 </div>
             </div>
