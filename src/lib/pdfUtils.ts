@@ -156,7 +156,7 @@ export const exportExpedienteToPDF = (
         0: { fontStyle: 'bold', cellWidth: 50, textColor: PRIMARY_COLOR },
         1: { textColor: [51, 65, 85] }
       },
-      styles: { fontSize: 9, cellPadding: {top: 5, bottom: 5, left: 2, right: 2} },
+      styles: { fontSize: 8, cellPadding: {top: 3, bottom: 3, left: 2, right: 2} },
       didDrawCell: (data) => {
          doc.setDrawColor(226, 232, 240);
          doc.setLineWidth(0.1);
@@ -265,7 +265,7 @@ export const viewExpedienteInNewTab = (
         0: { fontStyle: 'bold', cellWidth: 50, textColor: PRIMARY_COLOR },
         1: { textColor: [51, 65, 85] }
       },
-      styles: { fontSize: 9, cellPadding: {top: 5, bottom: 5, left: 2, right: 2} },
+      styles: { fontSize: 8, cellPadding: {top: 3, bottom: 3, left: 2, right: 2} },
       didDrawCell: (data) => {
          doc.setDrawColor(226, 232, 240);
          doc.setLineWidth(0.1);

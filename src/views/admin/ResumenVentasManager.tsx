@@ -7,7 +7,7 @@ import {
 import { ChevronLeft, ChevronRight, Edit3, Save, X, Search, FileText, FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { exportExpedienteToPDF } from '../../lib/pdfUtils';
 import * as XLSX from 'xlsx';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const ALL_YEARS = Array.from({ length: 2026 - 2014 + 1 }, (_, i) => 2014 + i);
@@ -199,8 +199,8 @@ export default function ResumenVentasManager() {
         if (viewFilter === 'all' || viewFilter === 'frascos') {
              const chartF = document.getElementById('chart-frascos');
              if (chartF) {
-                 const canvas = await html2canvas(chartF, { backgroundColor: '#0D1527', scale: 2 });
-                 images.push(canvas.toDataURL('image/png'));
+                 const dataUrl = await toPng(chartF, { backgroundColor: '#0D1527', pixelRatio: 2 });
+                 images.push(dataUrl);
              }
 
              // Frascos Table rows
@@ -238,8 +238,8 @@ export default function ResumenVentasManager() {
         if (viewFilter === 'all' || viewFilter === 'pesos') {
              const chartP = document.getElementById('chart-pesos');
              if (chartP) {
-                 const canvas = await html2canvas(chartP, { backgroundColor: '#0D1527', scale: 2 });
-                 images.push(canvas.toDataURL('image/png'));
+                 const dataUrl = await toPng(chartP, { backgroundColor: '#0D1527', pixelRatio: 2 });
+                 images.push(dataUrl);
              }
 
              // Pesos Table rows
@@ -275,16 +275,9 @@ export default function ResumenVentasManager() {
              });
         }
 
-        tables.push({
-             title: 'Registro de Elaboración - Control Gotas Puras',
-             headers: ['FECHA', 'NOMBRE ELABORADOR', 'OBSERVACIÓN'],
-             rows: Array(10).fill(['', '', ''])
-        });
-
         exportExpedienteToPDF(
             'REPORTE ANALÍTICO DE VENTAS',
             [
-                { label: 'Documento', value: 'Dashboard Analítico' },
                 { label: 'Rango Visual', value: `${currentYears[0]} a ${currentYears[currentYears.length-1]}` },
                 { label: 'Filtro Activo', value: viewFilter === 'all' ? 'Unidades y Pesos' : viewFilter === 'frascos' ? 'Solo Unidades' : 'Solo Pesos' },
                 { label: 'Fecha de Emisión', value: new Date().toLocaleDateString('es-CL') }
