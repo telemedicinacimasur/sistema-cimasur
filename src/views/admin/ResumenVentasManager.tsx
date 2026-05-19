@@ -29,7 +29,6 @@ const CHART_WINDOWS = [
 ];
 
 export default function ResumenVentasManager() {
-  const [labRecords, setLabRecords] = useState<any[]>([]);
   const [salesRecords, setSalesRecords] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -56,12 +55,10 @@ export default function ResumenVentasManager() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const [lab, sales, ovrds] = await Promise.all([
-        localDB.getCollection('lab_records'),
+      const [sales, ovrds] = await Promise.all([
         localDB.getCollection('sales'),
         localDB.getCollection('ventas_overrides')
       ]);
-      setLabRecords(lab);
       setSalesRecords(sales);
       
       const ovMap: Record<string, any> = {};
@@ -90,28 +87,22 @@ export default function ResumenVentasManager() {
     });
   });
 
-  labRecords.forEach(r => {
-    if (!r.fecha) return;
-    const d = new Date(r.fecha);
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    if (y >= 2014 && y <= 2026) {
-        const rawQty = r.cantidad !== undefined ? Number(r.cantidad) : 1;
-        const qty = isNaN(rawQty) ? 1 : rawQty;
-        frascosMatrix[y][m].auto += qty;
-    }
-  });
-
   salesRecords.forEach(r => {
     if (!r.fecha) return;
     const d = new Date(r.fecha);
     const y = d.getFullYear();
     const m = d.getMonth();
     if (y >= 2014 && y <= 2026) {
+        // Pesos
         let val = Number(r.subtotal);
         if (isNaN(val) || val === 0) val = Number(r.total);
         if (isNaN(val)) val = 0;
         pesosMatrix[y][m].auto += val;
+
+        // Frascos
+        let frascosQty = Number(r.nroFrascos);
+        if (isNaN(frascosQty)) frascosQty = 0;
+        frascosMatrix[y][m].auto += frascosQty;
     }
   });
 
