@@ -127,30 +127,48 @@ export default function ResumenVentasManager() {
   // Chart Data Generator
   const getChartData = (years: number[], scale: string, type: 'frascos' | 'pesos') => {
       let data: any[] = [];
-      years.forEach(y => {
-          if (scale === 'year') {
-              let val = 0;
-              for(let m=0; m<12; m++) if (isDateInRange(y, m)) val += type === 'frascos' ? getFrascos(y, m) : getPesos(y, m);
-              if (val > 0 || isDateInRange(y, 0)) data.push({ name: String(y), valor: val });
-          } else if (scale === 'quarter') {
+      
+      if (scale === 'year') {
+          years.forEach(y => {
+              let val = 0; let active = false;
+              filteredMonths.forEach(({ idx: m }) => {
+                  if (isDateInRange(y, m)) {
+                      active = true;
+                      val += type === 'frascos' ? getFrascos(y, m) : getPesos(y, m);
+                  }
+              });
+              if (active) data.push({ name: String(y), valor: val });
+          });
+      } else if (scale === 'quarter') {
+          years.forEach(y => {
               for(let q=0; q<4; q++){
                   let val = 0; let active = false;
                   for(let m=0; m<3; m++) {
-                     if (isDateInRange(y, q*3+m)) {
+                     const mIdx = q*3+m;
+                     if (isDateInRange(y, mIdx) && filteredMonths.some(fm => fm.idx === mIdx)) {
                          active = true;
-                         val += type === 'frascos' ? getFrascos(y, q*3+m) : getPesos(y, q*3+m);
+                         val += type === 'frascos' ? getFrascos(y, mIdx) : getPesos(y, mIdx);
                      }
                   }
                   if (active) data.push({ name: `${y} Q${q+1}`, valor: val });
               }
-          } else {
-              MONTHS.forEach((mon, m) => {
-                  if (isDateInRange(y, m)) {
-                      data.push({ name: `${mon} \`${y.toString().slice(2)}`, valor: type === 'frascos' ? getFrascos(y, m) : getPesos(y, m) });
+          });
+      } else {
+          // Agrupamos por mes real (Categoría: Nombre del Mes)
+          // Cada objeto tendrá claves para cada año seleccionado: { name: 'Enero', '2014': val, '2015': val }
+          filteredMonths.forEach(({ m, idx }) => {
+              let monthEntry: any = { name: m };
+              let hasData = false;
+              years.forEach(y => {
+                  if (isDateInRange(y, idx)) {
+                      const val = type === 'frascos' ? getFrascos(y, idx) : getPesos(y, idx);
+                      monthEntry[String(y)] = val;
+                      if (val > 0) hasData = true;
                   }
               });
-          }
-      });
+              if (hasData || !searchTerm) data.push(monthEntry);
+          });
+      }
       return data;
   };
 
@@ -684,8 +702,14 @@ export default function ResumenVentasManager() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                             <XAxis dataKey="name" stroke="#64748B" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
                             <YAxis stroke="#64748B" fontSize={10} tickCount={5} axisLine={false} tickLine={false} />
-                            <RechartsTooltip contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', borderRadius: '10px', color: '#fff', fontSize: '12px', padding: '10px' }} itemStyle={{ color: '#FBBF24', fontWeight: 700 }} cursor={{ fill: '#1E293B', opacity: 0.4 }} />
-                            <Bar dataKey="valor" name="Frascos" fill="#FBBF24" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                            <RechartsTooltip contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', borderRadius: '10px', color: '#fff', fontSize: '12px', padding: '10px' }} itemStyle={{ fontWeight: 700 }} cursor={{ fill: '#1E293B', opacity: 0.4 }} />
+                            {frascosScale === 'month' ? (
+                                currentYears.map((y, i) => (
+                                    <Bar key={y} dataKey={String(y)} name={String(y)} fill={['#FBBF24', '#38BDF8', '#818CF8', '#FB7185', '#34D399'][i % 5]} radius={[4, 4, 0, 0]} maxBarSize={30} />
+                                ))
+                            ) : (
+                                <Bar dataKey="valor" name="Frascos" fill="#FBBF24" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                            )}
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -818,19 +842,19 @@ export default function ResumenVentasManager() {
                 </div>
                 <div id="chart-pesos" className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={getChartData(currentYears, pesosScale, 'pesos')} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
-                            <defs>
-                                <linearGradient id="colorPesos" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
+                        <BarChart data={getChartData(currentYears, pesosScale, 'pesos')} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} opacity={0.5} />
                             <XAxis dataKey="name" stroke="#64748B" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
                             <YAxis stroke="#64748B" fontSize={10} tickFormatter={(v) => `$${(v/1000)}k`} width={50} axisLine={false} tickLine={false} />
-                            <RechartsTooltip contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', borderRadius: '10px', color: '#fff', fontSize: '12px', padding: '10px' }} itemStyle={{ color: '#10B981', fontWeight: 700 }} formatter={(val: number) => `$${val.toLocaleString('es-CL')}`} cursor={{ stroke: '#1E293B', strokeWidth: 2 }} />
-                            <Area type="monotone" dataKey="valor" name="Pesos" stroke="#10B981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorPesos)" activeDot={{ r: 5, fill: '#10B981', stroke: '#fff', strokeWidth: 2 }} />
-                        </AreaChart>
+                            <RechartsTooltip contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', borderRadius: '10px', color: '#fff', fontSize: '12px', padding: '10px' }} itemStyle={{ fontWeight: 700 }} formatter={(val: number) => `$${val.toLocaleString('es-CL')}`} cursor={{ fill: '#1E293B', opacity: 0.4 }} />
+                            {pesosScale === 'month' ? (
+                                currentYears.map((y, i) => (
+                                    <Bar key={y} dataKey={String(y)} name={String(y)} fill={['#10B981', '#38BDF8', '#6366F1', '#EC4899', '#F59E0B'][i % 5]} radius={[4, 4, 0, 0]} maxBarSize={30} />
+                                ))
+                            ) : (
+                                <Bar dataKey="valor" name="Pesos" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                            )}
+                        </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
