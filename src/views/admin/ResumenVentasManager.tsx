@@ -107,11 +107,14 @@ export default function ResumenVentasManager() {
       return d >= start && d <= end;
   };
 
+  const FULL_MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
   // Filtro de meses para no mostrar los que no coinciden con search si se usa
-  const filteredMonths = MONTHS.map((m, idx) => ({ m, idx })).filter(({ m, idx }) => {
+  const filteredMonths = MONTHS.map((m, idx) => ({ m, idx, full: FULL_MONTHS[idx] })).filter(({ m, idx, full }) => {
      if (!searchTerm) return true;
      const term = searchTerm.toLowerCase();
      if (m.toLowerCase().includes(term)) return true;
+     if (full.toLowerCase().includes(term)) return true;
      // Check if any value in current block matches
      for (const y of currentYears) {
          if (String(y).includes(term)) return true;
@@ -151,11 +154,13 @@ export default function ResumenVentasManager() {
       return data;
   };
 
-  const parsePesos = (val: string | number) => {
-      if (!val) return "";
+  const evalNumeric = (val: string | number) => {
+      if (val === undefined || val === null || val === "") return "";
       try {
           const clean = String(val).replace(/[^\d+*/().-]/g, '');
-          return String(new Function(`return ${clean || 0}`)());
+          if (!clean) return "";
+          const result = new Function(`return ${clean}`)();
+          return String(result);
       } catch {
           return String(val);
       }
@@ -163,25 +168,30 @@ export default function ResumenVentasManager() {
 
   const handleSaveModal = async (e: React.FormEvent) => {
       e.preventDefault();
-      const overrideKey = `${modalForm.year}-${modalForm.month}`;
-      const payload = {
-          overrideKey,
-          frascos: modalForm.frascos,
-          pesos: parsePesos(modalForm.pesos),
-          metaFrascos: modalForm.metaFrascos,
-          metaPesos: parsePesos(modalForm.metaPesos)
-      };
+      try {
+          const overrideKey = `${modalForm.year}-${modalForm.month}`;
+          const payload = {
+              overrideKey,
+              frascos: evalNumeric(modalForm.frascos),
+              pesos: evalNumeric(modalForm.pesos),
+              metaFrascos: evalNumeric(modalForm.metaFrascos),
+              metaPesos: evalNumeric(modalForm.metaPesos)
+          };
 
-      const existingRecord: any = Object.values(overrides).find((o: any) => o.overrideKey === overrideKey || o.id === overrideKey);
-      
-      if (existingRecord && existingRecord.id) {
-          await localDB.updateInCollection('ventas_overrides', existingRecord.id, payload);
-          setOverrides({...overrides, [overrideKey]: { ...payload, id: existingRecord.id }});
-      } else {
-          const newDoc = await localDB.saveToCollection('ventas_overrides', { ...payload, id: overrideKey });
-          setOverrides({...overrides, [overrideKey]: newDoc});
+          const existingRecord: any = Object.values(overrides).find((o: any) => o.overrideKey === overrideKey || o.id === overrideKey);
+          
+          if (existingRecord && existingRecord.id) {
+              await localDB.updateInCollection('ventas_overrides', existingRecord.id, payload);
+              setOverrides(prev => ({...prev, [overrideKey]: { ...payload, id: existingRecord.id }}));
+          } else {
+              const newDoc = await localDB.saveToCollection('ventas_overrides', { ...payload, id: overrideKey });
+              setOverrides(prev => ({...prev, [overrideKey]: newDoc}));
+          }
+          setShowModal(false);
+      } catch (err) {
+          console.error(err);
+          alert('Error al guardar los cambios: ' + (err instanceof Error ? err.message : 'Error desconocido'));
       }
-      setShowModal(false);
   };
 
   const handleSaveMetaAnual = async (e: React.FormEvent) => {
@@ -562,13 +572,13 @@ export default function ResumenVentasManager() {
                 
                 {(() => {
                     let sum = 0; let count = 0;
-                    currentYears.forEach(y => {
-                        for(let m=0; m<12; m++) {
+                    filteredMonths.forEach(({ idx: m }) => {
+                        currentYears.forEach(y => {
                             if (isDateInRange(y, m)) {
                                 sum += getFrascos(y, m);
                                 count++;
                             }
-                        }
+                        });
                     });
                     const avg = count > 0 ? (sum / count).toFixed(1) : 0;
                     return (
@@ -614,10 +624,12 @@ export default function ResumenVentasManager() {
                         
                         {/* TOTAL / META / DIFERENCIA FRASCOS */}
                         <tr className="bg-yellow-400/10 text-yellow-500 font-bold border-b border-slate-800/50">
-                            <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide">Total Anual</td>
+                            <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide">Total Filtrado</td>
                             {currentYears.map(y => {
                                 let totalYear = 0;
-                                for(let m=0; m<12; m++) totalYear += getFrascos(y, m);
+                                filteredMonths.forEach(({ idx: m }) => {
+                                    if (isDateInRange(y, m)) totalYear += getFrascos(y, m);
+                                });
                                 return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{totalYear > 0 ? totalYear.toLocaleString('es-CL') : '-'}</td>;
                             })}
                         </tr>
@@ -637,7 +649,9 @@ export default function ResumenVentasManager() {
                             <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide bg-slate-800/50">Diferencia</td>
                             {currentYears.map(y => {
                                 let totalYear = 0;
-                                for(let m=0; m<12; m++) { totalYear += getFrascos(y, m); }
+                                filteredMonths.forEach(({ idx: m }) => {
+                                    if (isDateInRange(y, m)) totalYear += getFrascos(y, m);
+                                });
                                 const metaAnual = getMetaFrascosAnual(y);
                                 if(totalYear === 0 || metaAnual === 0) return <td key={y} className="py-2.5 px-4 border-r border-slate-800 text-center bg-slate-800/30">-</td>;
                                 const diff = totalYear - metaAnual;
@@ -694,13 +708,13 @@ export default function ResumenVentasManager() {
                 
                 {(() => {
                     let sum = 0; let count = 0;
-                    currentYears.forEach(y => {
-                        for(let m=0; m<12; m++) {
+                    filteredMonths.forEach(({ idx: m }) => {
+                        currentYears.forEach(y => {
                             if (isDateInRange(y, m)) {
                                 sum += getPesos(y, m);
                                 count++;
                             }
-                        }
+                        });
                     });
                     const avg = count > 0 ? (sum / count) : 0;
                     return (
@@ -748,10 +762,12 @@ export default function ResumenVentasManager() {
                         
                         {/* TOTAL / META / DIFERENCIA PESOS */}
                         <tr className="bg-emerald-500/10 text-emerald-400 font-bold border-b border-slate-800/50">
-                            <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide">Total Anual $</td>
+                            <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide">Total Filtrado $</td>
                             {currentYears.map(y => {
                                 let totalYear = 0;
-                                for(let m=0; m<12; m++) totalYear += getPesos(y, m);
+                                filteredMonths.forEach(({ idx: m }) => {
+                                    if (isDateInRange(y, m)) totalYear += getPesos(y, m);
+                                });
                                 return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{totalYear > 0 ? `$${totalYear.toLocaleString('es-CL')}` : '-'}</td>;
                             })}
                         </tr>
@@ -771,7 +787,9 @@ export default function ResumenVentasManager() {
                             <td className="py-2.5 px-4 border-r border-slate-700 text-[11px] uppercase tracking-wide bg-slate-800/50">Diferencia $</td>
                             {currentYears.map(y => {
                                 let totalYear = 0;
-                                for(let m=0; m<12; m++) { totalYear += getPesos(y, m); }
+                                filteredMonths.forEach(({ idx: m }) => {
+                                    if (isDateInRange(y, m)) totalYear += getPesos(y, m);
+                                });
                                 const metaAnual = getMetaPesosAnual(y);
                                 if(totalYear === 0 || metaAnual === 0) return <td key={y} className="py-2.5 px-4 border-r border-slate-800 text-center bg-slate-800/30">-</td>;
                                 const diff = totalYear - metaAnual;
@@ -862,10 +880,10 @@ export default function ResumenVentasManager() {
                             <h4 className="font-bold text-yellow-400 mb-3 text-sm flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> Frascos (Unidades)</h4>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs text-slate-400 mb-1">Volumen Real</label>
+                                    <label className="block text-xs text-slate-400 mb-1">Volumen Real <span className="text-[9px] italic">(fórmula/número)</span></label>
                                     <input 
-                                        type="number"
-                                        placeholder="Auto"
+                                        type="text"
+                                        placeholder="Valor o fórmula"
                                         className="w-full bg-[#0D1527] border border-slate-700 rounded-lg p-2.5 text-white font-medium focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-all outline-none"
                                         value={modalForm.frascos} onChange={e => setModalForm({...modalForm, frascos: e.target.value})}
                                     />
@@ -873,7 +891,7 @@ export default function ResumenVentasManager() {
                                 <div>
                                     <label className="block text-xs text-slate-400 mb-1">Meta Mensual</label>
                                     <input 
-                                        type="number"
+                                        type="text"
                                         placeholder="Ej: 700"
                                         className="w-full bg-[#0D1527] border border-slate-700 rounded-lg p-2.5 text-white font-medium focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-all outline-none"
                                         value={modalForm.metaFrascos} onChange={e => setModalForm({...modalForm, metaFrascos: e.target.value})}
