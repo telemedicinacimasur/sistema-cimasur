@@ -35,15 +35,14 @@ export default function ResumenVentasManager() {
   // Search
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Pagination global (controls both)
-  const [page, setPage] = useState(2); // Defaults to 2022-2025 initially
-  
   // View Filter
   const [viewFilter, setViewFilter] = useState<'all' | 'frascos' | 'pesos'>('all');
 
+  // Date Range Filters
+  const [desde, setDesde] = useState({ year: 2026, month: 0 });
+  const [hasta, setHasta] = useState({ year: 2026, month: 11 });
+
   // Chart Windows
-  const [frascosWindowIndex, setFrascosWindowIndex] = useState(0);
-  const [pesosWindowIndex, setPesosWindowIndex] = useState(0);
   const [frascosScale, setFrascosScale] = useState<'month' | 'quarter' | 'year'>('month');
   const [pesosScale, setPesosScale] = useState<'month' | 'quarter' | 'year'>('month');
 
@@ -98,7 +97,15 @@ export default function ResumenVentasManager() {
       return Number(manual) || 0;
   };
 
-  const currentYears = YEAR_BLOCKS[page];
+  const currentYears = Array.from({ length: hasta.year - desde.year + 1 }, (_, i) => desde.year + i);
+
+  // Filtro Date Range verification function
+  const isDateInRange = (y: number, m: number) => {
+      const d = y * 12 + m;
+      const start = desde.year * 12 + desde.month;
+      const end = hasta.year * 12 + hasta.month;
+      return d >= start && d <= end;
+  };
 
   // Filtro de meses para no mostrar los que no coinciden con search si se usa
   const filteredMonths = MONTHS.map((m, idx) => ({ m, idx })).filter(({ m, idx }) => {
@@ -120,54 +127,87 @@ export default function ResumenVentasManager() {
       years.forEach(y => {
           if (scale === 'year') {
               let val = 0;
-              for(let m=0; m<12; m++) val += type === 'frascos' ? getFrascos(y, m) : getPesos(y, m);
-              data.push({ name: String(y), valor: val });
+              for(let m=0; m<12; m++) if (isDateInRange(y, m)) val += type === 'frascos' ? getFrascos(y, m) : getPesos(y, m);
+              if (val > 0 || isDateInRange(y, 0)) data.push({ name: String(y), valor: val });
           } else if (scale === 'quarter') {
               for(let q=0; q<4; q++){
-                  let val = 0;
-                  for(let m=0; m<3; m++) val += type === 'frascos' ? getFrascos(y, q*3+m) : getPesos(y, q*3+m);
-                  data.push({ name: `${y} Q${q+1}`, valor: val });
+                  let val = 0; let active = false;
+                  for(let m=0; m<3; m++) {
+                     if (isDateInRange(y, q*3+m)) {
+                         active = true;
+                         val += type === 'frascos' ? getFrascos(y, q*3+m) : getPesos(y, q*3+m);
+                     }
+                  }
+                  if (active) data.push({ name: `${y} Q${q+1}`, valor: val });
               }
           } else {
               MONTHS.forEach((mon, m) => {
-                  data.push({ name: `${mon} \`${y.toString().slice(2)}`, valor: type === 'frascos' ? getFrascos(y, m) : getPesos(y, m) });
+                  if (isDateInRange(y, m)) {
+                      data.push({ name: `${mon} \`${y.toString().slice(2)}`, valor: type === 'frascos' ? getFrascos(y, m) : getPesos(y, m) });
+                  }
               });
           }
       });
       return data;
   };
 
+  const parsePesos = (val: string | number) => {
+      if (!val) return "";
+      try {
+          const clean = String(val).replace(/[^\d+*/().-]/g, '');
+          return String(new Function(`return ${clean || 0}`)());
+      } catch {
+          return String(val);
+      }
+  };
+
   const handleSaveModal = async (e: React.FormEvent) => {
       e.preventDefault();
-      const id = `${modalForm.year}-${modalForm.month}`;
+      const overrideKey = `${modalForm.year}-${modalForm.month}`;
       const payload = {
-          id,
+          overrideKey,
           frascos: modalForm.frascos,
-          pesos: modalForm.pesos,
+          pesos: parsePesos(modalForm.pesos),
           metaFrascos: modalForm.metaFrascos,
-          metaPesos: modalForm.metaPesos
+          metaPesos: parsePesos(modalForm.metaPesos)
       };
-      await localDB.saveToCollection('ventas_overrides', payload);
-      setOverrides({...overrides, [id]: payload});
+
+      const existingRecord: any = Object.values(overrides).find((o: any) => o.overrideKey === overrideKey || o.id === overrideKey);
+      
+      if (existingRecord && existingRecord.id) {
+          await localDB.updateInCollection('ventas_overrides', existingRecord.id, payload);
+          setOverrides({...overrides, [overrideKey]: { ...payload, id: existingRecord.id }});
+      } else {
+          const newDoc = await localDB.saveToCollection('ventas_overrides', { ...payload, id: overrideKey });
+          setOverrides({...overrides, [overrideKey]: newDoc});
+      }
       setShowModal(false);
   };
 
   const handleSaveMetaAnual = async (e: React.FormEvent) => {
       e.preventDefault();
-      const id = `${metaAnualForm.year}-annual`;
+      const overrideKey = `${metaAnualForm.year}-annual`;
       const payload = {
-          id,
+          overrideKey,
           year: metaAnualForm.year,
           metaFrascosAnual: metaAnualForm.metaFrascosAnual,
           metaPesosAnual: metaAnualForm.metaPesosAnual
       };
-      await localDB.saveToCollection('ventas_overrides', payload);
-      setOverrides({...overrides, [id]: payload});
+
+      const existingRecord: any = Object.values(overrides).find((o: any) => o.overrideKey === overrideKey || o.id === overrideKey);
+      
+      if (existingRecord && existingRecord.id) {
+          await localDB.updateInCollection('ventas_overrides', existingRecord.id, payload);
+          setOverrides({...overrides, [overrideKey]: { ...payload, id: existingRecord.id }});
+      } else {
+          const newDoc = await localDB.saveToCollection('ventas_overrides', { ...payload, id: overrideKey });
+          setOverrides({...overrides, [overrideKey]: newDoc});
+      }
       setShowMetaAnualModal(false);
   };
 
   const openMetaAnualModalFor = (y: number) => {
-      const exist = overrides[`${y}-annual`] || {};
+      const exist: any = Object.values(overrides).find((o: any) => o.overrideKey === `${y}-annual` || o.id === `${y}-annual`) || {};
       setMetaAnualForm({
           year: y,
           metaFrascosAnual: exist.metaFrascosAnual || '',
@@ -177,7 +217,7 @@ export default function ResumenVentasManager() {
   };
 
   const openModalFor = (y: number, m: number) => {
-      const exist = overrides[`${y}-${m}`] || {};
+      const exist: any = Object.values(overrides).find((o: any) => o.overrideKey === `${y}-${m}` || o.id === `${y}-${m}`) || {};
       setModalForm({
           year: y,
           month: m,
@@ -454,21 +494,27 @@ export default function ResumenVentasManager() {
             </div>
             
             <div className="flex flex-col xl:flex-row items-center w-full md:w-auto justify-between md:justify-end gap-3 xl:gap-5">
-                {/* GLOBAL YEAR SELECTOR */}
-                <div className="flex items-center bg-[#0D1527] p-1 rounded-lg border border-slate-700 shadow-inner">
-                    <button 
-                        disabled={page === 0} 
-                        onClick={() => setPage(page-1)}
-                        className="p-1.5 text-slate-400 disabled:opacity-30 hover:text-white transition-colors"
-                    ><ChevronLeft className="w-4 h-4" /></button>
-                    <span className="font-bold text-[13px] text-white px-4 tracking-wider min-w-[120px] text-center">
-                        &lt; {currentYears[0]} - {currentYears[currentYears.length-1]} &gt;
-                    </span>
-                    <button 
-                        disabled={page === YEAR_BLOCKS.length - 1} 
-                        onClick={() => setPage(page+1)}
-                        className="p-1.5 text-slate-400 disabled:opacity-30 hover:text-white transition-colors"
-                    ><ChevronRight className="w-4 h-4" /></button>
+                {/* GLOBAL DATE RANGE SELECTOR */}
+                <div className="flex items-center gap-2 bg-[#0D1527] p-2 rounded-lg border border-slate-700 shadow-inner">
+                    <div className="flex items-center gap-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Desde:</span>
+                        <select className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer" value={desde.month} onChange={e => setDesde({...desde, month: Number(e.target.value)})}>
+                            {MONTHS.map((m, i) => <option key={i} value={i} className="text-black">{m}</option>)}
+                        </select>
+                        <select className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer" value={desde.year} onChange={e => setDesde({...desde, year: Number(e.target.value)})}>
+                            {ALL_YEARS.map(y => <option key={y} value={y} className="text-black">{y}</option>)}
+                        </select>
+                    </div>
+                    <span className="text-slate-600">|</span>
+                    <div className="flex items-center gap-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Hasta:</span>
+                        <select className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer" value={hasta.month} onChange={e => setHasta({...hasta, month: Number(e.target.value)})}>
+                            {MONTHS.map((m, i) => <option key={i} value={i} className="text-black">{m}</option>)}
+                        </select>
+                        <select className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer" value={hasta.year} onChange={e => setHasta({...hasta, year: Number(e.target.value)})}>
+                            {ALL_YEARS.map(y => <option key={y} value={y} className="text-black">{y}</option>)}
+                        </select>
+                    </div>
                 </div>
 
                 <div className="flex gap-2 w-full xl:w-auto flex-wrap sm:flex-nowrap">
@@ -497,9 +543,36 @@ export default function ResumenVentasManager() {
         {/* SECCIÓN 1: MÓDULO DE UNIDADES (FRASCOS) */}
         {(viewFilter === 'all' || viewFilter === 'frascos') && (
         <div className="bg-[#1C2541] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-6">
-            <h3 className="text-[17px] font-black text-yellow-400 flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> Módulo de Unidades: Frascos
-            </h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h3 className="text-[17px] font-black text-yellow-400 flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> Módulo de Unidades: Frascos
+                </h3>
+                
+                {(() => {
+                    let sum = 0; let count = 0;
+                    currentYears.forEach(y => {
+                        for(let m=0; m<12; m++) {
+                            if (isDateInRange(y, m)) {
+                                sum += getFrascos(y, m);
+                                count++;
+                            }
+                        }
+                    });
+                    const avg = count > 0 ? (sum / count).toFixed(1) : 0;
+                    return (
+                        <div className="flex bg-[#0D1527] rounded-xl border border-slate-700 overflow-hidden shadow-inner w-full sm:w-auto">
+                            <div className="px-4 py-2 border-r border-slate-700">
+                                <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Acumulado</span>
+                                <span className="text-sm font-black text-white">{sum.toLocaleString('es-CL')}</span>
+                            </div>
+                            <div className="px-4 py-2">
+                                <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Promedio</span>
+                                <span className="text-sm font-black text-yellow-400">{avg}</span>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
             
             {/* TABLA FRASCOS COMPACTA */}
             <div className="overflow-x-auto custom-scrollbar-white rounded-lg border border-slate-700">
@@ -516,9 +589,10 @@ export default function ResumenVentasManager() {
                                 <td className="py-2 px-4 font-bold border-r border-slate-700 text-slate-400 group-hover:text-white uppercase tracking-wider text-[11px]">{m}</td>
                                 {currentYears.map(y => {
                                     const val = getFrascos(y, idx);
+                                    const inRange = isDateInRange(y, idx);
                                     const hasOverride = overrides[`${y}-${idx}`]?.frascos !== undefined && overrides[`${y}-${idx}`]?.frascos !== '';
                                     return (
-                                        <td key={y} onDoubleClick={() => openModalFor(y, idx)} className="py-2 px-4 text-center cursor-pointer hover:bg-yellow-400/10 border-r border-slate-800/60 transition-colors">
+                                        <td key={y} onDoubleClick={() => openModalFor(y, idx)} className={cn("py-2 px-4 text-center cursor-pointer hover:bg-yellow-400/10 border-r border-slate-800/60 transition-colors", !inRange && "opacity-20")}>
                                             <span className={cn("font-medium", hasOverride && "text-yellow-400 underline decoration-dotted")}>{val || '-'}</span>
                                         </td>
                                     );
@@ -567,13 +641,6 @@ export default function ResumenVentasManager() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                     <h4 className="text-slate-400 font-bold text-[11px] uppercase tracking-widest pl-1">Estacionalidad Unidades</h4>
                     <div className="flex items-center gap-3">
-                        <select 
-                            value={frascosWindowIndex} 
-                            onChange={e => setFrascosWindowIndex(Number(e.target.value))}
-                            className="bg-white text-[#0F172A] p-2 rounded-lg cursor-pointer outline-none font-bold text-[11px] border border-slate-700 shadow-sm"
-                        >
-                            {CHART_WINDOWS.map((win, idx) => <option key={idx} value={idx} className="text-[#0F172A] bg-white">{win.label}</option>)}
-                        </select>
                         <div className="flex bg-[#0D1527] p-1 rounded-lg border border-slate-700 gap-1">
                             {(['month', 'quarter', 'year'] as const).map(p => (
                                 <button 
@@ -592,7 +659,7 @@ export default function ResumenVentasManager() {
                 </div>
                 <div id="chart-frascos" className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={getChartData(CHART_WINDOWS[frascosWindowIndex].years, frascosScale, 'frascos')} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                        <BarChart data={getChartData(currentYears, frascosScale, 'frascos')} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                             <XAxis dataKey="name" stroke="#64748B" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
                             <YAxis stroke="#64748B" fontSize={10} tickCount={5} axisLine={false} tickLine={false} />
@@ -608,9 +675,36 @@ export default function ResumenVentasManager() {
         {/* SECCIÓN 2: MÓDULO MONETARIO (PESOS) */}
         {(viewFilter === 'all' || viewFilter === 'pesos') && (
         <div className="bg-[#1C2541] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-6">
-            <h3 className="text-[17px] font-black text-emerald-400 flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div> Módulo Monetario: Recaudación $
-            </h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h3 className="text-[17px] font-black text-emerald-400 flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div> Módulo Monetario: Recaudación $
+                </h3>
+                
+                {(() => {
+                    let sum = 0; let count = 0;
+                    currentYears.forEach(y => {
+                        for(let m=0; m<12; m++) {
+                            if (isDateInRange(y, m)) {
+                                sum += getPesos(y, m);
+                                count++;
+                            }
+                        }
+                    });
+                    const avg = count > 0 ? (sum / count) : 0;
+                    return (
+                        <div className="flex bg-[#0D1527] rounded-xl border border-slate-700 overflow-hidden shadow-inner w-full sm:w-auto">
+                            <div className="px-4 py-2 border-r border-slate-700">
+                                <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Acumulado</span>
+                                <span className="text-sm font-black text-white">${sum.toLocaleString('es-CL')}</span>
+                            </div>
+                            <div className="px-4 py-2">
+                                <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Promedio</span>
+                                <span className="text-sm font-black text-emerald-400">${Math.round(avg).toLocaleString('es-CL')}</span>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
             
             {/* TABLA PESOS COMPACTA */}
             <div className="overflow-x-auto custom-scrollbar-white rounded-lg border border-slate-700">
@@ -627,9 +721,10 @@ export default function ResumenVentasManager() {
                                 <td className="py-2 px-4 font-bold border-r border-slate-700 text-slate-400 group-hover:text-white uppercase tracking-wider text-[11px]">{m}</td>
                                 {currentYears.map(y => {
                                     const val = getPesos(y, idx);
+                                    const inRange = isDateInRange(y, idx);
                                     const hasOverride = overrides[`${y}-${idx}`]?.pesos !== undefined && overrides[`${y}-${idx}`]?.pesos !== '';
                                     return (
-                                        <td key={y} onDoubleClick={() => openModalFor(y, idx)} className="py-2 px-4 text-center cursor-pointer hover:bg-emerald-400/10 border-r border-slate-800/60 transition-colors">
+                                        <td key={y} onDoubleClick={() => openModalFor(y, idx)} className={cn("py-2 px-4 text-center cursor-pointer hover:bg-emerald-400/10 border-r border-slate-800/60 transition-colors", !inRange && "opacity-20")}>
                                             <span className={cn("font-medium", hasOverride ? "text-yellow-400 border-b border-dashed border-yellow-400" : "text-emerald-300/90")}>
                                                 {val > 0 ? `$${val.toLocaleString('es-CL')}` : '-'}
                                             </span>
@@ -680,13 +775,6 @@ export default function ResumenVentasManager() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                     <h4 className="text-slate-400 font-bold text-[11px] uppercase tracking-widest pl-1">Estacionalidad Recaudación</h4>
                     <div className="flex items-center gap-3">
-                        <select 
-                            value={pesosWindowIndex} 
-                            onChange={e => setPesosWindowIndex(Number(e.target.value))}
-                            className="bg-white text-[#0F172A] p-2 rounded-lg cursor-pointer outline-none font-bold text-[11px] border border-slate-700 shadow-sm"
-                        >
-                            {CHART_WINDOWS.map((win, idx) => <option key={idx} value={idx} className="text-[#0F172A] bg-white">{win.label}</option>)}
-                        </select>
                         <div className="flex bg-[#0D1527] p-1 rounded-lg border border-slate-700 gap-1">
                             {(['month', 'quarter', 'year'] as const).map(p => (
                                 <button 
@@ -705,7 +793,7 @@ export default function ResumenVentasManager() {
                 </div>
                 <div id="chart-pesos" className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={getChartData(CHART_WINDOWS[pesosWindowIndex].years, pesosScale, 'pesos')} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                        <AreaChart data={getChartData(currentYears, pesosScale, 'pesos')} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
                             <defs>
                                 <linearGradient id="colorPesos" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
@@ -786,10 +874,10 @@ export default function ResumenVentasManager() {
                             <h4 className="font-bold text-emerald-400 mb-3 text-sm flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div> Pesos (Recaudación)</h4>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs text-slate-400 mb-1">Monto Real ($)</label>
+                                    <label className="block text-xs text-slate-400 mb-1">Monto Real ($) <span className="text-[9px] font-normal italic">(fórmula/p. ej: 100+20)</span></label>
                                     <input 
-                                        type="number"
-                                        placeholder="Auto"
+                                        type="text"
+                                        placeholder="Monto o fórmula"
                                         className="w-full bg-[#0D1527] border border-slate-700 rounded-lg p-2.5 text-white font-medium focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all outline-none"
                                         value={modalForm.pesos} onChange={e => setModalForm({...modalForm, pesos: e.target.value})}
                                     />
@@ -797,7 +885,7 @@ export default function ResumenVentasManager() {
                                 <div>
                                     <label className="block text-xs text-slate-400 mb-1">Meta Mensual ($)</label>
                                     <input 
-                                        type="number"
+                                        type="text"
                                         placeholder="Ej: 10000000"
                                         className="w-full bg-[#0D1527] border border-slate-700 rounded-lg p-2.5 text-white font-medium focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all outline-none"
                                         value={modalForm.metaPesos} onChange={e => setModalForm({...modalForm, metaPesos: e.target.value})}
