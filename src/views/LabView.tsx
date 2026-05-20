@@ -49,6 +49,7 @@ export const exportTableToExcel = (title: string, headers: string[], data: any[]
 type LabFormType = 'registro' | 'gotas-puras' | 'elaboracion' | 'nosodes' | 'tinturas' | 'preparacion' | 'insumos' | 'vademecum' | 'mantenimiento' | 'stock' | 'tracking' | 'magistrales' | 'diluciones-db' | 'default';
 
 export default function LabView() {
+  const { user } = useAuth();
   const [activeForm, setActiveForm] = useState<LabFormType>('default');
   const [records, setRecords] = useState<any[]>([]);
 

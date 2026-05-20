@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { localDB } from '../../lib/auth';
 import { formatCurrency, cn } from '../../lib/utils';
-import { Save, Plus, Trash2, FileSpreadsheet, RefreshCw, Download, Upload, FileText, X } from 'lucide-react';
+import { Save, Plus, Trash2, FileSpreadsheet, RefreshCw, Download, Upload, FileText, X, ChevronRight, ChevronDown, Pencil, Filter } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { addAuditLog } from '../../lib/auth';
 import * as XLSX from 'xlsx';
@@ -20,6 +20,9 @@ interface BudgetRow {
   saldoInicial: number;
   months: MonthData[]; // 12 elements
   type: 'income' | 'expense';
+  isGroup?: boolean;
+  parentId?: string | null;
+  canAddChildren?: boolean;
 }
 
 const MONTH_NAMES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
@@ -30,13 +33,55 @@ export default function PresupuestoFlujoManager() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [availableYears, setAvailableYears] = useState<number[]>([new Date().getFullYear()]);
+  const [showNewYearModal, setShowNewYearModal] = useState(false);
+  const [newYearValue, setNewYearValue] = useState<string>((new Date().getFullYear() + 1).toString());
   const [rows, setRows] = useState<BudgetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingCell, setEditingCell] = useState<{ rowId: string, field: string, monthIdx?: number } | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [visibleMonths, setVisibleMonths] = useState<number[]>([0,1,2,3,4,5,6,7,8,9,10,11]);
+  const [showMonthFilter, setShowMonthFilter] = useState(false);
+
+  const toggleGroup = (groupId: string) => {
+    const newSet = new Set(collapsedGroups);
+    if (newSet.has(groupId)) newSet.delete(groupId);
+    else newSet.add(groupId);
+    setCollapsedGroups(newSet);
+  };
 
   useEffect(() => {
     loadData();
   }, [selectedYear]);
+
+  const generateExpenseCategories = (y: number): BudgetRow[] => {
+    const cats = [
+        { id: `cat_1_${y}`, glosa: '1 RECURSOS HUMANOS', parentId: null, canAddChildren: true },
+        { id: `cat_1_1_${y}`, glosa: '1.1 ADMINISTRACION', parentId: `cat_1_${y}`, canAddChildren: true },
+        { id: `cat_1_2_${y}`, glosa: '1.2 LABORATORIO', parentId: `cat_1_${y}`, canAddChildren: true },
+        { id: `cat_1_3_${y}`, glosa: '1.3 GESTION COMERCIAL', parentId: `cat_1_${y}`, canAddChildren: true },
+        { id: `cat_1_4_${y}`, glosa: '1.4 DIRECTORIO', parentId: `cat_1_${y}`, canAddChildren: true },
+        { id: `cat_2_${y}`, glosa: '2 GASTOS', parentId: null, canAddChildren: true },
+        { id: `cat_2_1_${y}`, glosa: '2.1 GASTOS DE ADMINISTRACIÓN', parentId: `cat_2_${y}`, canAddChildren: true },
+        { id: `cat_2_2_${y}`, glosa: '2.2 OTROS ADMINISTRACION', parentId: `cat_2_${y}`, canAddChildren: true },
+        { id: `cat_2_3_${y}`, glosa: '2.3 GASTOS DE LABORATORIO', parentId: `cat_2_${y}`, canAddChildren: true },
+        { id: `cat_2_4_${y}`, glosa: '2.4 GASTOS GESTIÓN Y REPRESENTACION COMERCIAL', parentId: `cat_2_${y}`, canAddChildren: true },
+        { id: `cat_2_5_${y}`, glosa: '2.5 GESTION DE MARKETING', parentId: `cat_2_${y}`, canAddChildren: true },
+        { id: `cat_2_6_${y}`, glosa: '2.6 GASTOS DIRECTORIO (INVESTIGACION Y FORMACION)', parentId: `cat_2_${y}`, canAddChildren: true },
+        { id: `cat_3_${y}`, glosa: '3 IMPREVISTOS', parentId: null, canAddChildren: true },
+        { id: `cat_3_1_${y}`, glosa: '3.1 OTROS IMPREVISTOS', parentId: `cat_3_${y}`, canAddChildren: true }
+    ];
+    return cats.map(c => ({
+      id: c.id,
+      year: y,
+      glosa: c.glosa,
+      saldoInicial: 0,
+      months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
+      type: 'expense',
+      isGroup: true,
+      parentId: c.parentId,
+      canAddChildren: c.canAddChildren
+    }));
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -60,29 +105,30 @@ export default function PresupuestoFlujoManager() {
           months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
           type: 'income'
         },
-        {
-          id: crypto.randomUUID(),
-          year: selectedYear,
-          glosa: 'Gastos Operacionales',
-          saldoInicial: 0,
-          months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
-          type: 'expense'
-        }
+        ...generateExpenseCategories(selectedYear)
       ];
       for (const row of initialRows) {
         await localDB.saveToCollection('presupuesto_records', row);
       }
       setRows(initialRows);
     } else {
+      // Inject groups if they don't exist for backward compatibility
+      const hasExpenseGroups = filteredData.some((r: any) => r.type === 'expense' && r.isGroup);
+      if (!hasExpenseGroups) {
+          const newGroups = generateExpenseCategories(selectedYear);
+          for (const g of newGroups) {
+              await localDB.saveToCollection('presupuesto_records', g);
+              filteredData.push(g);
+          }
+      }
       setRows(filteredData);
     }
     setLoading(false);
   };
 
-  const handleCreateNewYear = async () => {
-    const yearStr = prompt('Ingrese el año que desea crear (ej: 2026):');
-    if (!yearStr) return;
-    const year = parseInt(yearStr);
+  const confirmCreateNewYear = async () => {
+    if (!newYearValue) return;
+    const year = parseInt(newYearValue);
     if (isNaN(year) || year < 2000 || year > 2100) {
       alert('Por favor ingrese un año válido.');
       return;
@@ -90,10 +136,12 @@ export default function PresupuestoFlujoManager() {
     if (availableYears.includes(year)) {
       alert('El año ya existe.');
       setSelectedYear(year);
+      setShowNewYearModal(false);
       return;
     }
     
     setLoading(true);
+    setShowNewYearModal(false);
     // Create default rows immediately to ensure DB has data for this year
     const initialRows: BudgetRow[] = [
       {
@@ -104,15 +152,9 @@ export default function PresupuestoFlujoManager() {
         months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
         type: 'income'
       },
-      {
-        id: crypto.randomUUID(),
-        year: year,
-        glosa: 'Gastos Operacionales',
-        saldoInicial: 0,
-        months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
-        type: 'expense'
-      }
+      ...generateExpenseCategories(year)
     ];
+
     for (const r of initialRows) {
       await localDB.saveToCollection('presupuesto_records', r);
     }
@@ -120,7 +162,10 @@ export default function PresupuestoFlujoManager() {
     setAvailableYears(prev => [...prev, year].sort((a, b) => a - b));
     setSelectedYear(year);
     setLoading(false);
-    alert(`Año ${year} creado exitosamente con registros iniciales.`);
+  };
+
+  const handleCreateNewYear = async () => {
+    setShowNewYearModal(true);
   };
 
   const handleDeleteYear = async (year: number) => {
@@ -199,6 +244,29 @@ export default function PresupuestoFlujoManager() {
         updateRow(rowId, { months: newMonths });
       }
     }
+  };
+
+  const getGroupTotals = (groupId: string): { saldoInicial: number, months: MonthData[], totalP: number, totalG: number, saldo: number } => {
+    const self = rows.find(r => r.id === groupId);
+    let saldoInicial = self ? self.saldoInicial : 0;
+    const months = self ? JSON.parse(JSON.stringify(self.months)) : Array.from({ length: 12 }, () => ({ p: 0, g: 0 }));
+    
+    const children = rows.filter(r => r.parentId === groupId);
+    for (const child of children) {
+        let childVals = { saldoInicial: child.saldoInicial, months: child.months };
+        if (child.isGroup) {
+            const grandChildVals = getGroupTotals(child.id);
+            childVals = { saldoInicial: grandChildVals.saldoInicial, months: grandChildVals.months };
+        }
+        saldoInicial += childVals.saldoInicial;
+        for (let i = 0; i < 12; i++) {
+            months[i].p += childVals.months[i].p;
+            months[i].g += childVals.months[i].g;
+        }
+    }
+    const totalP = saldoInicial + months.reduce((sum, m) => sum + m.p, 0);
+    const totalG = months.reduce((sum, m) => sum + m.g, 0);
+    return { saldoInicial, months, totalP, totalG, saldo: totalP - totalG };
   };
 
   const getRowTotals = (row: BudgetRow) => {
@@ -410,45 +478,145 @@ export default function PresupuestoFlujoManager() {
     );
   };
 
-  const renderRow = (row: BudgetRow) => {
-    const { totalP, totalG, saldo } = getRowTotals(row);
-    return (
-      <tr key={row.id} className="hover:bg-slate-800/30 transition-colors group/row">
-        <td className="sticky left-0 z-10 p-0 border border-slate-800 bg-[#0F172A] group-hover/row:bg-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
-          {renderEditableCell(row.id, 'glosa', row.glosa, 'text')}
-        </td>
-        <td className="p-0 border border-slate-800 bg-[#152035]/30">
-          {renderEditableCell(row.id, 'saldoInicial', row.saldoInicial)}
-        </td>
-        {row.months.map((m, idx) => (
-          <React.Fragment key={idx}>
-            <td className="p-0 border border-slate-800 text-blue-400/80">
-              {renderEditableCell(row.id, 'p', m.p, 'number', idx)}
-            </td>
-            <td className="p-0 border border-slate-800 text-emerald-400 font-bold">
-              {renderEditableCell(row.id, 'g', m.g, 'number', idx)}
-            </td>
-          </React.Fragment>
-        ))}
-        <td className="p-2 border border-slate-800 text-center font-mono text-blue-300 font-bold bg-[#1E293B]/50">
-          {formatCurrency(totalP)}
-        </td>
-        <td className="p-2 border border-slate-800 text-center font-mono text-emerald-400 font-bold bg-[#1E293B]/50">
-          {formatCurrency(totalG)}
-        </td>
-        <td className={cn(
-          "p-2 border border-slate-800 text-center font-mono font-black bg-[#1E293B]",
-          saldo >= 0 ? "text-purple-400" : "text-rose-500"
-        )}>
-          {formatCurrency(saldo)}
-        </td>
-        <td className="p-2 border border-slate-800 text-center">
-          <button onClick={() => handleDeleteRow(row.id)} className="text-slate-600 hover:text-red-500 transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </td>
-      </tr>
-    );
+  const renderTree = (type: 'income' | 'expense') => {
+    const parentRows = rows.filter(r => r.type === type && !r.parentId);
+    
+    const renderNode = (row: BudgetRow, level: number = 0): React.ReactNode[] => {
+      const children = rows.filter(r => r.parentId === row.id);
+      const isCollapsed = collapsedGroups.has(row.id);
+      
+      const isGroup = row.isGroup;
+      
+      let vals = { saldoInicial: row.saldoInicial, months: row.months, totalP: 0, totalG: 0, saldo: 0 };
+      if (isGroup) {
+        vals = getGroupTotals(row.id);
+      } else {
+        const rowTotals = getRowTotals(row);
+        vals = { ...vals, ...rowTotals };
+      }
+
+      const paddingLeft = level * 16 + 8;
+      
+      const handleAddChild = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        
+        let newGlosa = 'Nuevo Ítem';
+        const parentPrefixMatch = row.glosa.match(/^(\d+(?:\.\d+)*)/);
+        if (parentPrefixMatch) {
+            const numChildren = children.length;
+            newGlosa = `${parentPrefixMatch[1]}.${numChildren + 1} Nuevo Ítem`;
+        }
+
+        const newRow: BudgetRow = {
+          id: crypto.randomUUID(),
+          year: selectedYear,
+          glosa: newGlosa,
+          saldoInicial: 0,
+          months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
+          type: row.type,
+          parentId: row.id
+        };
+        const saved = await localDB.saveToCollection('presupuesto_records', newRow);
+        setRows(prev => [...prev, saved]);
+        if (user) await addAuditLog(user, `Añadió nueva sub-fila a ${row.glosa} (${selectedYear})`, 'Administración');
+        
+        const newSet = new Set(collapsedGroups);
+        newSet.delete(row.id);
+        setCollapsedGroups(newSet);
+      };
+
+      const rowElement = (
+        <tr key={row.id} className={cn("hover:bg-slate-800/30 transition-colors group/row", isGroup ? "bg-blue-900/10 border-y-2 border-blue-500/30" : "")}>
+          <td className={cn("sticky left-0 z-10 p-0 border border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.1)]", isGroup ? "bg-blue-900/30" : "bg-[#0F172A] group-hover/row:bg-slate-800")}>
+            <div className="flex items-center" style={{ paddingLeft: `${paddingLeft}px` }}>
+              {isGroup && children.length > 0 && (
+                <button 
+                  onClick={() => toggleGroup(row.id)}
+                  className="w-4 h-4 mr-1 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                >
+                  {isCollapsed ? <ChevronRight className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>}
+                </button>
+              )}
+              {(!isGroup || children.length === 0) && <div className="w-5" />}
+              <div className={cn("flex-1", isGroup && "font-black text-blue-300 uppercase")}>
+                {renderEditableCell(row.id, 'glosa', row.glosa, 'text')}
+              </div>
+              {row.canAddChildren && (
+                 <button onClick={handleAddChild} title="Agregar Sub-ítem" className="opacity-0 group-hover/row:opacity-100 p-1 hover:text-emerald-400 text-slate-500 transition-all mr-2">
+                   <Plus className="w-3 h-3"/>
+                 </button>
+              )}
+              {isGroup && (
+                  <div className="mr-2 opacity-50" title="Categoría Editable">
+                     <Pencil className="w-3 h-3 text-blue-400" />
+                  </div>
+              )}
+            </div>
+          </td>
+          <td className="p-0 border border-slate-800 bg-[#152035]/30 relative">
+            {renderEditableCell(row.id, 'saldoInicial', row.saldoInicial)}
+            {isGroup && children.length > 0 && (
+               <div className="absolute right-1 bottom-0.5 text-[8px] text-blue-300 font-mono tracking-widest uppercase pointer-events-none opacity-60">
+                  {vals.saldoInicial.toLocaleString('es-CL')}
+               </div>
+            )}
+          </td>
+          {row.months.map((m, idx) => visibleMonths.includes(idx) ? (
+            <React.Fragment key={idx}>
+              <td className="p-0 border border-slate-800 text-blue-400/80 relative">
+                {renderEditableCell(row.id, 'p', m.p, 'number', idx)}
+                {isGroup && children.length > 0 && (
+                   <div className="absolute right-1 bottom-0.5 text-[8px] text-blue-300 font-mono tracking-widest uppercase pointer-events-none opacity-60">
+                      {vals.months[idx].p.toLocaleString('es-CL')}
+                   </div>
+                )}
+              </td>
+              <td className="p-0 border border-slate-800 text-emerald-400 font-bold relative">
+                {renderEditableCell(row.id, 'g', m.g, 'number', idx)}
+                {isGroup && children.length > 0 && (
+                   <div className="absolute right-1 bottom-0.5 text-[8px] text-emerald-400/80 font-mono tracking-widest uppercase pointer-events-none opacity-60">
+                      {vals.months[idx].g.toLocaleString('es-CL')}
+                   </div>
+                )}
+              </td>
+            </React.Fragment>
+          ) : null)}
+          <td className="p-2 border border-slate-800 text-center font-mono text-blue-300 font-bold bg-[#1E293B]/50">
+            {formatCurrency(vals.totalP)}
+          </td>
+          <td className="p-2 border border-slate-800 text-center font-mono text-emerald-400 font-bold bg-[#1E293B]/50">
+            {formatCurrency(vals.totalG)}
+          </td>
+          <td className={cn(
+            "p-2 border border-slate-800 text-center font-mono font-black bg-[#1E293B]",
+            vals.saldo >= 0 ? "text-purple-400" : "text-rose-500"
+          )}>
+            {formatCurrency(vals.saldo)}
+          </td>
+          <td className="p-2 border border-slate-800 text-center">
+            {(!row.isGroup || children.length === 0) && (
+              <button title="Borrar Fila" onClick={() => handleDeleteRow(row.id)} className="text-slate-600 hover:text-red-500 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </td>
+        </tr>
+      );
+
+      let result = [rowElement];
+      if (!isCollapsed) {
+         for (const child of children) {
+            result = result.concat(renderNode(child, level + 1));
+         }
+      }
+      return result;
+    };
+
+    let result: React.ReactNode[] = [];
+    for (const r of parentRows) {
+        result = result.concat(renderNode(r, 0));
+    }
+    return result;
   };
 
   if (loading) return <div className="p-8 text-center text-slate-400">Cargando matriz...</div>;
@@ -548,6 +716,43 @@ export default function PresupuestoFlujoManager() {
           >
             <FileText className="w-3.5 h-3.5" /> PDF
           </button>
+          
+          <div className="relative">
+             <button 
+               onClick={() => setShowMonthFilter(!showMonthFilter)}
+               className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+               title="Filtrar Meses"
+             >
+               <Filter className="w-3.5 h-3.5" /> MESES
+             </button>
+             {showMonthFilter && (
+               <div className="absolute top-full mt-2 right-0 w-48 bg-[#152035] border border-slate-700 rounded-xl shadow-2xl p-2 z-50">
+                 <div className="flex justify-between items-center mb-2 px-2">
+                   <span className="text-xs font-bold text-slate-300">Mostrar Meses</span>
+                   <div className="flex gap-2">
+                     <button onClick={() => setVisibleMonths([0,1,2,3,4,5,6,7,8,9,10,11])} className="text-[10px] text-blue-400 hover:text-white">Todos</button>
+                     <button onClick={() => setVisibleMonths([])} className="text-[10px] text-blue-400 hover:text-white">Ninguno</button>
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-1 text-xs">
+                   {MONTH_NAMES.map((m, idx) => (
+                     <label key={m} className="flex items-center gap-2 p-1.5 hover:bg-slate-800 rounded cursor-pointer text-slate-300">
+                       <input 
+                         type="checkbox" 
+                         checked={visibleMonths.includes(idx)}
+                         onChange={(e) => {
+                           if (e.target.checked) setVisibleMonths(prev => [...prev, idx].sort((a,b) => a-b));
+                           else setVisibleMonths(prev => prev.filter(v => v !== idx));
+                         }}
+                         className="accent-blue-500"
+                       />
+                       {m}
+                     </label>
+                   ))}
+                 </div>
+               </div>
+             )}
+          </div>
           <button 
             onClick={loadData} 
             className="p-2 hover:bg-[#1E293B] rounded-full transition-colors text-slate-400"
@@ -564,21 +769,21 @@ export default function PresupuestoFlujoManager() {
               <tr className="bg-[#1E3A5F] text-white">
                 <th rowSpan={2} className="sticky left-0 z-20 p-2 border border-slate-700 w-64 bg-[#1E3A5F] text-left font-black uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">PRESUPUESTO / GLOSA</th>
                 <th rowSpan={2} className="p-2 border border-slate-700 w-28 text-center font-black uppercase text-blue-300">SALDO INICIAL</th>
-                {MONTH_NAMES.map(m => (
+                {MONTH_NAMES.map((m, i) => visibleMonths.includes(i) ? (
                   <th key={m} colSpan={2} className="p-2 border-x border-t border-slate-700 text-center font-black uppercase text-[10px]">{m}</th>
-                ))}
+                ) : null)}
                 <th rowSpan={2} className="p-2 border border-slate-700 w-32 text-center font-black uppercase">TOTAL PPTO</th>
                 <th rowSpan={2} className="p-2 border border-slate-700 w-32 text-center font-black uppercase">TOTAL GASTO</th>
                 <th rowSpan={2} className="p-2 border border-slate-700 w-32 text-center font-black uppercase">SALDO</th>
                 <th rowSpan={2} className="p-2 border border-slate-700 w-10"></th>
               </tr>
               <tr className="bg-[#1E3A5F]/80 text-white font-black text-[9px]">
-                {MONTH_NAMES.map((_, i) => (
+                {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
-                    <th className="p-1 border border-slate-700 w-14 text-center text-blue-300">P</th>
-                    <th className="p-1 border border-slate-700 w-14 text-center text-emerald-300">G</th>
+                    <th className="p-1 border border-slate-700 w-14 text-center text-blue-300">Ppto</th>
+                    <th className="p-1 border border-slate-700 w-14 text-center text-emerald-300">Real</th>
                   </React.Fragment>
-                ))}
+                ) : null)}
               </tr>
             </thead>
             <tbody className="bg-[#0F172A] divide-y divide-slate-800">
@@ -586,18 +791,18 @@ export default function PresupuestoFlujoManager() {
               <tr className="bg-[#064E3B]/40 text-emerald-400 font-black text-[10px] uppercase">
                 <td colSpan={2 + 24 + 3 + 1} className="p-1 pl-4 border border-slate-800">INGRESOS</td>
               </tr>
-              {rows.filter(r => r.type === 'income').map(r => renderRow(r))}
+              {renderTree('income')}
               
               {/* TOTAL INGRESOS PIE */}
               <tr className="bg-[#1E293B] text-emerald-400 font-black text-[10px] uppercase">
                 <td className="sticky left-0 z-10 p-2 border border-slate-700 bg-[#1E293B]">TOTAL INGRESOS</td>
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.saldoInicial)}</td>
-                {MONTH_NAMES.map((_, i) => (
+                {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
                     <td className="p-1 border border-slate-700 text-center font-mono">{incomeTotals.months[i].p.toLocaleString('es-CL')}</td>
                     <td className="p-1 border border-slate-700 text-center font-mono">{incomeTotals.months[i].g.toLocaleString('es-CL')}</td>
                   </React.Fragment>
-                ))}
+                ) : null)}
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.sumP)}</td>
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.sumG)}</td>
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.sumP - incomeTotals.sumG)}</td>
@@ -608,18 +813,18 @@ export default function PresupuestoFlujoManager() {
               <tr className="bg-[#450A0A]/40 text-red-400 font-black text-[10px] uppercase">
                 <td colSpan={2 + 24 + 3 + 1} className="p-1 pl-4 border border-slate-800">EGRESOS</td>
               </tr>
-              {rows.filter(r => r.type === 'expense').map(r => renderRow(r))}
+              {renderTree('expense')}
 
               {/* TOTAL EGRESOS PIE */}
               <tr className="bg-[#1E293B] text-red-400 font-black text-[10px] uppercase">
                 <td className="sticky left-0 z-10 p-2 border border-slate-700 bg-[#1E293B]">TOTAL EGRESOS</td>
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.saldoInicial)}</td>
-                {MONTH_NAMES.map((_, i) => (
+                {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
                     <td className="p-1 border border-slate-700 text-center font-mono">{expenseTotals.months[i].p.toLocaleString('es-CL')}</td>
                     <td className="p-1 border border-slate-700 text-center font-mono">{expenseTotals.months[i].g.toLocaleString('es-CL')}</td>
                   </React.Fragment>
-                ))}
+                ) : null)}
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.sumP)}</td>
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.sumG)}</td>
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.sumP - expenseTotals.sumG)}</td>
@@ -630,7 +835,7 @@ export default function PresupuestoFlujoManager() {
               <tr className="bg-slate-900 text-white font-black text-[11px] border-t-2 border-slate-600">
                 <td className="sticky left-0 z-10 p-2 border border-slate-700 bg-slate-900">SALDOS NETOS</td>
                 <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.saldoInicial - expenseTotals.saldoInicial)}</td>
-                {MONTH_NAMES.map((_, i) => (
+                {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
                     <td className={cn("p-1 border border-slate-700 text-center font-mono", (incomeTotals.months[i].p - expenseTotals.months[i].p) >= 0 ? "text-emerald-400" : "text-red-400")}>
                       {(incomeTotals.months[i].p - expenseTotals.months[i].p).toLocaleString('es-CL')}
@@ -639,7 +844,7 @@ export default function PresupuestoFlujoManager() {
                       {(incomeTotals.months[i].g - expenseTotals.months[i].g).toLocaleString('es-CL')}
                     </td>
                   </React.Fragment>
-                ))}
+                ) : null)}
                 <td className="p-2 border border-slate-700 text-center font-mono text-blue-300">{formatCurrency(incomeTotals.sumP - expenseTotals.sumP)}</td>
                 <td className="p-2 border border-slate-700 text-center font-mono text-emerald-300">{formatCurrency(incomeTotals.sumG - expenseTotals.sumG)}</td>
                 <td className="p-2 border border-slate-700 text-center font-mono text-purple-400">{formatCurrency((incomeTotals.sumP - incomeTotals.sumG) - (expenseTotals.sumP - expenseTotals.sumG))}</td>
@@ -649,6 +854,36 @@ export default function PresupuestoFlujoManager() {
           </table>
         </div>
       </div>
+
+      {showNewYearModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-[#152035] p-6 rounded-3xl border border-[#1E293B] shadow-2xl max-w-sm w-full">
+            <h3 className="text-xl font-black text-white mb-4 uppercase tracking-tight">Crear Nuevo Año</h3>
+            <p className="text-sm text-slate-400 mb-4">Ingrese el año que desea crear (ej: {new Date().getFullYear() + 1}).</p>
+            <input
+              type="number"
+              value={newYearValue}
+              onChange={(e) => setNewYearValue(e.target.value)}
+              className="w-full bg-[#0F172A] border border-blue-500/30 rounded-xl p-3 text-white font-mono mb-6 focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder="YYYY"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowNewYearModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={confirmCreateNewYear}
+                className="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 text-white hover:bg-blue-500 transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> CREAR AÑO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
