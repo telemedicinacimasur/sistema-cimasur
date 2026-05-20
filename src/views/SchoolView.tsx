@@ -69,11 +69,11 @@ export default function SchoolView() {
           <p className="text-slate-400 text-sm">Ecosistema integrado de captación, formación y seguimiento.</p>
         </div>
         <div className="flex bg-[#111A2E] p-1 rounded-2xl border border-[#1E293B]">
-           <TabButton active={activeView === 'register'} onClick={() => setActiveView('register')} icon={UserPlus}>Captación</TabButton>
-           <TabButton active={activeView === 'students'} onClick={() => setActiveView('students')} icon={GraduationCap}>Alumnos</TabButton>
-           <TabButton active={activeView === 'tracking'} onClick={() => setActiveView('tracking')} icon={LineChart}>Vista 360°</TabButton>
-           <TabButton active={activeView === 'commercial'} onClick={() => setActiveView('commercial')} icon={Lightbulb}>Motor Escuela</TabButton>
-           <TabButton active={activeView === 'activities'} onClick={() => setActiveView('activities')} icon={History}>Actividades</TabButton>
+           {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('register')) && <TabButton active={activeView === 'register'} onClick={() => setActiveView('register')} icon={UserPlus}>Captación</TabButton>}
+           {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('students')) && <TabButton active={activeView === 'students'} onClick={() => setActiveView('students')} icon={GraduationCap}>Alumnos</TabButton>}
+           {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('tracking')) && <TabButton active={activeView === 'tracking'} onClick={() => setActiveView('tracking')} icon={LineChart}>Vista 360°</TabButton>}
+           {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('commercial')) && <TabButton active={activeView === 'commercial'} onClick={() => setActiveView('commercial')} icon={Lightbulb}>Motor Escuela</TabButton>}
+           {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('activities')) && <TabButton active={activeView === 'activities'} onClick={() => setActiveView('activities')} icon={History}>Actividades</TabButton>}
         </div>
       </div>
 

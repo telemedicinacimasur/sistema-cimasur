@@ -88,86 +88,108 @@ export default function LabView() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <ModuleCard 
-            title="Evaluación Gotas Puras"
-            desc="Control de estado para elaboración."
-            icon={Beaker}
-            onClick={() => setActiveForm('gotas-puras')}
-            color="indigo"
-          />
-          <ModuleCard 
-            title="Elaboración Gotas y Diluciones"
-            desc="Registro de gotas puras y diluciones"
-            icon={FlaskConical}
-            onClick={() => setActiveForm('elaboracion')}
-            color="emerald"
-          />
-          <ModuleCard 
-            title="Ingreso Nosodes"
-            desc="Registro de muestras médicas- nosodes clientes."
-            icon={Microscope}
-            onClick={() => setActiveForm('nosodes')}
-            color="purple"
-          />
-          <ModuleCard 
-            title="Ficha Tinturas Madres"
-            desc="Preparación de tintura madre"
-            icon={Droplets}
-            onClick={() => setActiveForm('tinturas')}
-            color="blue"
-          />
-          <ModuleCard 
-            title="Preparación Gotas Puras"
-            desc="Composición y formulación comparativa."
-            icon={Table}
-            onClick={() => setActiveForm('preparacion')}
-            color="teal"
-          />
-          <ModuleCard 
-            title="Registro de Insumos laboratorio T.M. y otros"
-            desc="Detalle Ingreso Productos para Tinturas"
-            icon={Package}
-            onClick={() => setActiveForm('insumos')}
-            color="orange"
-          />
-          <ModuleCard 
-            title="Vademécum"
-            desc="Productos requeridos para productos de vademécum"
-            icon={BookOpen}
-            onClick={() => setActiveForm('vademecum')}
-            color="amber"
-          />
-          <ModuleCard 
-            title="Mantención"
-            desc="Registro de limpieza y calibración de equipos de laboratorio."
-            icon={Settings}
-            onClick={() => setActiveForm('mantenimiento')}
-            color="slate"
-          />
-          <ModuleCard 
-            title="Stock de Insumo Diario"
-            desc="Control de saldos por área de producción."
-            icon={ClipboardList}
-            onClick={() => setActiveForm('stock')}
-            featured
-            color="emerald"
-          />
-          <ModuleCard 
-            title="Seguimiento de Pedidos"
-            desc="Trazabilidad, Courier y Estados de Envío."
-            icon={ClipboardCheck}
-            onClick={() => setActiveForm('tracking')}
-            featured
-            color="indigo"
-          />
-          <ModuleCard 
-            title="Formulación Magistral"
-            desc="Elaboración y composición de fórmulas magistrales."
-            icon={FileText}
-            onClick={() => setActiveForm('magistrales')}
-            featured
-            color="amber"
-          />
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('gotas-puras')) && (
+            <ModuleCard 
+              title="Evaluación Gotas Puras"
+              desc="Control de estado para elaboración."
+              icon={Beaker}
+              onClick={() => setActiveForm('gotas-puras')}
+              color="indigo"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('elaboracion')) && (
+            <ModuleCard 
+              title="Elaboración Gotas y Diluciones"
+              desc="Registro de gotas puras y diluciones"
+              icon={FlaskConical}
+              onClick={() => setActiveForm('elaboracion')}
+              color="emerald"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('nosodes')) && (
+            <ModuleCard 
+              title="Ingreso Nosodes"
+              desc="Registro de muestras médicas- nosodes clientes."
+              icon={Microscope}
+              onClick={() => setActiveForm('nosodes')}
+              color="purple"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('tinturas')) && (
+            <ModuleCard 
+              title="Ficha Tinturas Madres"
+              desc="Preparación de tintura madre"
+              icon={Droplets}
+              onClick={() => setActiveForm('tinturas')}
+              color="blue"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('preparacion')) && (
+            <ModuleCard 
+              title="Preparación Gotas Puras"
+              desc="Composición y formulación comparativa."
+              icon={Table}
+              onClick={() => setActiveForm('preparacion')}
+              color="teal"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('insumos')) && (
+            <ModuleCard 
+              title="Registro de Insumos laboratorio T.M. y otros"
+              desc="Detalle Ingreso Productos para Tinturas"
+              icon={Package}
+              onClick={() => setActiveForm('insumos')}
+              color="orange"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('vademecum')) && (
+            <ModuleCard 
+              title="Vademécum"
+              desc="Productos requeridos para productos de vademécum"
+              icon={BookOpen}
+              onClick={() => setActiveForm('vademecum')}
+              color="amber"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('mantenimiento')) && (
+            <ModuleCard 
+              title="Mantención"
+              desc="Registro de limpieza y calibración de equipos de laboratorio."
+              icon={Settings}
+              onClick={() => setActiveForm('mantenimiento')}
+              color="slate"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('stock')) && (
+            <ModuleCard 
+              title="Stock de Insumo Diario"
+              desc="Control de saldos por área de producción."
+              icon={ClipboardList}
+              onClick={() => setActiveForm('stock')}
+              featured
+              color="emerald"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('tracking')) && (
+            <ModuleCard 
+              title="Seguimiento de Pedidos"
+              desc="Trazabilidad, Courier y Estados de Envío."
+              icon={ClipboardCheck}
+              onClick={() => setActiveForm('tracking')}
+              featured
+              color="indigo"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('magistrales')) && (
+            <ModuleCard 
+              title="Formulación Magistral"
+              desc="Elaboración y composición de fórmulas magistrales."
+              icon={FileText}
+              onClick={() => setActiveForm('magistrales')}
+              featured
+              color="amber"
+            />
+          )}
         </div>
       </div>
     );
@@ -1206,8 +1228,9 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <FormField label="Fecha Ficha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaFicha || ''} onChange={e => setForm({...form, fechaFicha: e.target.value})} /></FormField>
             <FormField label="Ingreso Lab"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaIngresoLab || ''} onChange={e => setForm({...form, fechaIngresoLab: e.target.value})} /></FormField>
-            <FormField label="N° Muestra"><input className="w-full border-b p-2 text-sm font-mono" value={form.nroMuestra || ''} onChange={e => setForm({...form, nroMuestra: e.target.value})} required /></FormField>
-            <FormField label="Refrigerador"><input className="w-full border-b p-2 text-sm" value={form.refrigerador || ''} onChange={e => setForm({...form, refrigerador: e.target.value})} /></FormField>
+            <div className="md:col-span-2">
+              <FormField label="N° Muestra/Refrigerador"><input className="w-full border-b p-2 text-sm font-mono" value={form.nroMuestra || ''} onChange={e => setForm({...form, nroMuestra: e.target.value})} placeholder="Ej: 147 / Ref A" required /></FormField>
+            </div>
             <FormField label="Tipo Muestra"><input className="w-full border-b p-2 text-sm" value={form.tipoMuestra || ''} onChange={e => setForm({...form, tipoMuestra: e.target.value})} /></FormField>
             <FormField label="Médico Solicitante"><input className="w-full border-b p-2 text-sm" value={form.medico || ''} onChange={e => setForm({...form, medico: e.target.value})} /></FormField>
             <FormField label="Paciente"><input className="w-full border-b p-2 text-sm font-bold" value={form.paciente || ''} onChange={e => setForm({...form, paciente: e.target.value})} /></FormField>
@@ -1316,7 +1339,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
             <thead>
               <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  text-left border-b border-[#1E293B] font-black uppercase">
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
-                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">N° Muestra</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">N° Muestra / Refrigerador</th>
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Paciente</th>
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Producto</th>
                 <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
@@ -1329,7 +1352,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
               }).sort((a,b) => (b.fechaFicha || '').localeCompare(a.fechaFicha || '')).map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-medium">{formatDate(r.fechaFicha)}</td>
-                  <td className="p-4 font-mono text-[#38BDF8]">{r.nroMuestra}</td>
+                  <td className="p-4 font-mono text-[#38BDF8]">{r.nroMuestra + (r.refrigerador ? ` / ${r.refrigerador}` : '')}</td>
                   <td className="p-4 font-bold">{r.paciente}</td>
                   <td className="p-4">{r.producto}</td>
                   <td className="p-4 text-center">
@@ -1339,8 +1362,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
                         const nosodeData = [
                           { label: 'Fecha Ficha', value: formatDate(r.fechaFicha) },
                           { label: 'Ingreso Lab', value: formatDate(r.fechaIngresoLab) },
-                          { label: 'N° Muestra', value: r.nroMuestra },
-                          { label: 'Refrigerador', value: r.refrigerador },
+                          { label: 'N° Muestra / Refrigerador', value: r.nroMuestra + (r.refrigerador ? ` / ${r.refrigerador}` : '') },
                           { label: 'Tipo Muestra', value: r.tipoMuestra },
                           { label: 'Médico', value: r.medico },
                           { label: 'Paciente', value: r.paciente },
@@ -1365,8 +1387,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
                         const nosodeData = [
                           { label: 'Fecha Ficha', value: formatDate(r.fechaFicha) },
                           { label: 'Ingreso Lab', value: formatDate(r.fechaIngresoLab) },
-                          { label: 'N° Muestra', value: r.nroMuestra },
-                          { label: 'Refrigerador', value: r.refrigerador },
+                          { label: 'N° Muestra / Refrigerador', value: r.nroMuestra + (r.refrigerador ? ` / ${r.refrigerador}` : '') },
                           { label: 'Tipo Muestra', value: r.tipoMuestra },
                           { label: 'Médico', value: r.medico },
                           { label: 'Paciente', value: r.paciente },

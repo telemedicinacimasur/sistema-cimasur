@@ -159,6 +159,56 @@ function CPanelManager({ records }: { records: any[] }) {
   );
 }
 
+const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
+  crm: [
+    { id: 'register', label: 'Ficha Registro' },
+    { id: 'list', label: 'Cartera de Clientes' },
+    { id: 'activities', label: 'Registro de Actividades' },
+    { id: 'intranet', label: 'Clientes Intranet' },
+    { id: 'smart', label: 'Motor Comercial' }
+  ],
+  gestion: [
+    { id: 'register', label: 'Ingreso de Cliente' },
+    { id: 'list', label: 'Gestión de Clientes' }
+  ],
+  school: [
+    { id: 'register', label: 'Motor Comercial Lead' },
+    { id: 'students', label: 'Administración Alumnos' },
+    { id: 'tracking', label: 'Tracking 360' },
+    { id: 'activities', label: 'Registro Actividades' },
+    { id: 'commercial', label: 'Motor Escuela' }
+  ],
+  lab: [
+    { id: 'default', label: 'Dashboard Laboratorio' },
+    { id: 'registro', label: 'Ingreso Muestras' },
+    { id: 'gotas-puras', label: 'Gotas Puras' },
+    { id: 'preparacion', label: 'Preparación Gotas Puras' },
+    { id: 'elaboracion', label: 'Elaboración de Gotas' },
+    { id: 'nosodes', label: 'Nosodes' },
+    { id: 'tinturas', label: 'Tinturas Madre' },
+    { id: 'insumos', label: 'Insumos y Materias Primas' },
+    { id: 'vademecum', label: 'Vademécum' },
+    { id: 'stock', label: 'Stock Equipos Lab' },
+    { id: 'mantenimiento', label: 'Mantenimiento Equipos' },
+    { id: 'magistrales', label: 'Fórmulas Magistrales' },
+    { id: 'tracking', label: 'Tracking Laboratorio' },
+    { id: 'diluciones-db', label: 'Códigos y Diluciones' }
+  ],
+  manager: [
+    { id: 'menu', label: 'Dashboard Principal' },
+    { id: 'quotes', label: 'Cotizaciones Generales' },
+    { id: 'sales', label: 'Centro de Ventas CRM' },
+    { id: 'sales_gestion', label: 'Centro Ventas Gestión' },
+    { id: 'dte', label: 'DTE y Documentos' },
+    { id: 'pet_payments', label: 'Pagos Veterinarios' },
+    { id: 'school_payments', label: 'Pagos Escuela' },
+    { id: 'codigos_y_diluciones', label: 'Códigos y Diluciones' },
+    { id: 'resumen_ventas', label: 'Resumen de Ventas' },
+    { id: 'presupuesto_flujo', label: 'Presupuesto y Flujo' },
+    { id: 'inventory', label: 'Inventario Master' }
+  ]
+};
+
 function UsersManager() {
   const { user, refreshUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
@@ -171,6 +221,7 @@ function UsersManager() {
     role: 'viewer',
     roles: ['viewer'] as string[],
     permissions: {} as Record<string, { edit: boolean; delete: boolean }>,
+    allowedSubmodules: {} as Record<string, string[]>,
     pass: ''
   });
 
@@ -210,6 +261,7 @@ function UsersManager() {
           role: validRoles[0],
           roles: validRoles,
           permissions: editingUser.permissions || {},
+          allowedSubmodules: editingUser.allowedSubmodules || {},
           displayName: editingUser.displayName,
           ...(newPass ? { pass: newPass } : {})
         });
@@ -242,7 +294,7 @@ function UsersManager() {
     });
     
     alert('Usuario creado correctamente');
-    setNewUser({ email: '', displayName: '', role: 'viewer', roles: ['viewer'], pass: '' });
+    setNewUser({ email: '', displayName: '', role: 'viewer', roles: ['viewer'], permissions: {}, allowedSubmodules: {}, pass: '' });
     setShowCreate(false);
     refreshUsers();
   };
@@ -315,19 +367,52 @@ function UsersManager() {
                 onChange={e => setNewUser({...newUser, pass: e.target.value})} 
               />
             </FormField>
-            <div className="md:col-span-1">
-               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Accesos / Roles</label>
-               <div className="grid grid-cols-1 gap-2 bg-[#152035]/50 p-2 rounded-2xl border border-blue-100">
+            <div className="md:col-span-4 mt-2">
+               <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Accesos / Roles</label>
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {availableRoles.map(r => (
-                    <label key={r.id} className="flex items-center gap-2 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        className="w-3 h-3 rounded border-blue-200 text-[#38BDF8] focus:ring-blue-500"
-                        checked={newUser.roles.includes(r.id)}
-                        onChange={() => setNewUser({...newUser, roles: toggleRole(newUser.roles, r.id)})}
-                      />
-                      <span className="text-[9px] font-black text-blue-900 group-hover:text-[#38BDF8] transition-colors uppercase tracking-tight">{r.label}</span>
-                    </label>
+                    <div key={r.id} className="bg-[#152035]/50 p-3 rounded-2xl border border-[#1E293B]">
+                      <label className="flex items-center gap-2 cursor-pointer group mb-2">
+                        <input 
+                          type="checkbox" 
+                          className="w-5 h-5 rounded border-[#1E293B] text-[#38BDF8] focus:ring-blue-500"
+                          checked={newUser.roles.includes(r.id)}
+                          onChange={() => setNewUser({...newUser, roles: toggleRole(newUser.roles, r.id)})}
+                        />
+                        <span className="text-xs font-black text-slate-200 group-hover:text-[#38BDF8] transition-colors uppercase tracking-tight">{r.label}</span>
+                      </label>
+                      {newUser.roles.includes(r.id) && SUB_MODULES[r.id] && (
+                        <div className="pl-6 border-l border-[#1E293B] ml-2 flex flex-col gap-1.5 mt-2">
+                          {SUB_MODULES[r.id].map(sub => {
+                            const currentAllowed = newUser.allowedSubmodules?.[r.id];
+                            const isChecked = !currentAllowed || currentAllowed.includes(sub.id);
+                            return (
+                              <label key={sub.id} className="flex items-center gap-2 cursor-pointer mt-1">
+                                <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4 rounded border-[#1E293B] text-[#38BDF8]"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const allowed = { ...(newUser.allowedSubmodules || {}) };
+                                    let currentList = allowed[r.id] || SUB_MODULES[r.id].map(s => s.id);
+                                    
+                                    if (e.target.checked) {
+                                      if (!currentList.includes(sub.id)) currentList.push(sub.id);
+                                    } else {
+                                      currentList = currentList.filter(id => id !== sub.id);
+                                    }
+                                    
+                                    allowed[r.id] = currentList;
+                                    setNewUser({ ...newUser, allowedSubmodules: allowed });
+                                  }}
+                                />
+                                <span className="text-[11px] font-bold text-slate-300 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   ))}
                </div>
             </div>
@@ -387,36 +472,75 @@ function UsersManager() {
                             setEditingUser({...editingUser, roles: newRoles});
                           }}
                         />
-                        <span className="text-[10px] font-black text-slate-200 group-hover:text-[#38BDF8] transition-colors uppercase tracking-widest">{r.label}</span>
+                        <span className="text-[12px] font-black text-slate-200 group-hover:text-[#38BDF8] transition-colors uppercase tracking-widest">{r.label}</span>
                       </label>
                       {(editingUser.roles || [editingUser.role]).includes(r.id) && r.id !== 'admin' && (
-                        <div className="flex items-center gap-4 pl-6 pt-1 border-t border-[#1E293B]">
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="w-3 h-3 rounded border-[#1E293B] text-amber-500"
-                              checked={editingUser.permissions?.[r.id]?.edit ?? true}
-                              onChange={(e) => {
-                                const perms = { ...editingUser.permissions };
-                                perms[r.id] = { ...(perms[r.id] || { edit: true, delete: true }), edit: e.target.checked };
-                                setEditingUser({ ...editingUser, permissions: perms });
-                              }}
-                            />
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">EDITAR</span>
-                          </label>
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="w-3 h-3 rounded border-[#1E293B] text-red-500"
-                              checked={editingUser.permissions?.[r.id]?.delete ?? true}
-                              onChange={(e) => {
-                                const perms = { ...editingUser.permissions };
-                                perms[r.id] = { ...(perms[r.id] || { edit: true, delete: true }), delete: e.target.checked };
-                                setEditingUser({ ...editingUser, permissions: perms });
-                              }}
-                            />
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">BORRAR</span>
-                          </label>
+                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-[#1E293B] mt-2">
+                          <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                className="w-5 h-5 rounded border-[#1E293B] text-amber-500"
+                                checked={editingUser.permissions?.[r.id]?.edit ?? true}
+                                onChange={(e) => {
+                                  const perms = { ...editingUser.permissions };
+                                  perms[r.id] = { ...(perms[r.id] || { edit: true, delete: true }), edit: e.target.checked };
+                                  setEditingUser({ ...editingUser, permissions: perms });
+                                }}
+                              />
+                              <span className="text-[11px] font-bold text-slate-400 uppercase">EDITAR</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                className="w-5 h-5 rounded border-[#1E293B] text-red-500"
+                                checked={editingUser.permissions?.[r.id]?.delete ?? true}
+                                onChange={(e) => {
+                                  const perms = { ...editingUser.permissions };
+                                  perms[r.id] = { ...(perms[r.id] || { edit: true, delete: true }), delete: e.target.checked };
+                                  setEditingUser({ ...editingUser, permissions: perms });
+                                }}
+                              />
+                              <span className="text-[11px] font-bold text-slate-400 uppercase">BORRAR</span>
+                            </label>
+                          </div>
+                          
+                          {SUB_MODULES[r.id] && (
+                            <div className="mt-2">
+                              <span className="text-[11px] font-black text-slate-500 uppercase block mb-2 tracking-widest border-b border-[#2A3F5F] pb-1">Sub-módulos Permitidos</span>
+                              {SUB_MODULES[r.id].map(sub => {
+                                const currentAllowed = editingUser.allowedSubmodules?.[r.id];
+                                // Si no está definido (o es array vacío), asumimos acceso total por defecto, a menos que ya se haya guardado parcialmente. 
+                                // Para simplificar la UX, si currentAllowed es null/undefined, significa acceso total. 
+                                // O si no, requerimos inicializarlo en handleCreate.
+                                // Vamos a asumir que by default se marcan todos.
+                                const isChecked = !currentAllowed || currentAllowed.includes(sub.id);
+                                return (
+                                  <label key={sub.id} className="flex items-center gap-2 cursor-pointer mt-1.5">
+                                    <input 
+                                      type="checkbox" 
+                                      className="w-4 h-4 rounded border-[#1E293B] text-[#38BDF8]"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        const allowed = { ...(editingUser.allowedSubmodules || {}) };
+                                        let currentList = allowed[r.id] || SUB_MODULES[r.id].map(s => s.id);
+                                        
+                                        if (e.target.checked) {
+                                          if (!currentList.includes(sub.id)) currentList.push(sub.id);
+                                        } else {
+                                          currentList = currentList.filter(id => id !== sub.id);
+                                        }
+                                        
+                                        allowed[r.id] = currentList;
+                                        setEditingUser({ ...editingUser, allowedSubmodules: allowed });
+                                      }}
+                                    />
+                                    <span className="text-[11px] font-bold text-slate-300 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

@@ -111,69 +111,87 @@ export default function AdminView() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <ModuleCard 
-            title="Seguimiento de Cotizaciones"
-            desc="Control de presupuestos, vendedores y estados de aprobación."
-            icon={TrendingUp}
-            onClick={() => setView('quotes')}
-            color="indigo"
-          />
-          <ModuleCard 
-            title="Detalle de Ventas"
-            desc="Registro diario de facturas y boletas emitidas por cliente."
-            icon={ShoppingCart}
-            onClick={() => setView('sales')}
-            color="emerald"
-          />
-          <ModuleCard 
-            title="Detalle de Ventas GESTIÓN"
-            desc="Registro diario de ventas con detalle de productos y cotización."
-            icon={ShoppingCart}
-            onClick={() => setView('sales_gestion')}
-            color="amber"
-          />
-          <ModuleCard 
-            title="Detalle de DTE"
-            desc="Control administrativo de documentos tributarios electrónicos."
-            icon={Receipt}
-            onClick={() => setView('dte')}
-            color="rose"
-          />
-          <ModuleCard 
-            title="Control de Pagos Veterinarios"
-            desc="Registro de pagos tutor, mail, fono y honorarios veterinarios."
-            icon={DollarSign}
-            onClick={() => setView('pet_payments')}
-            color="indigo"
-          />
-          <ModuleCard 
-            title="Saldos Escuela Cimasur"
-            desc="Control de pagos de alumnos, meta anual y gastos académicos."
-            icon={GraduationCap}
-            onClick={() => setView('school_payments')}
-            color="emerald"
-          />
-          <ModuleCard 
-            title="Gestión de Códigos y Diluciones"
-            desc="Gestión de Códigos y Diluciones."
-            icon={Database}
-            onClick={() => setView('codigos_y_diluciones')}
-            color="orange"
-          />
-          <ModuleCard 
-            title="Resumen de ventas Frascos y Pesos"
-            desc="Análisis dinámico de volumen de frascos y recaudación por documentos."
-            icon={Activity}
-            onClick={() => setView('resumen_ventas')}
-            color="indigo"
-          />
-          <ModuleCard 
-            title="Matriz de Presupuesto y Flujo"
-            desc="Control detallado de presupuesto anual, proyecciones y gastos mensuales."
-            icon={FileSpreadsheet}
-            onClick={() => setView('presupuesto_flujo')}
-            color="purple"
-          />
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('quotes')) && (
+            <ModuleCard 
+              title="Seguimiento de Cotizaciones"
+              desc="Control de presupuestos, vendedores y estados de aprobación."
+              icon={TrendingUp}
+              onClick={() => setView('quotes')}
+              color="indigo"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales')) && (
+            <ModuleCard 
+              title="Detalle de Ventas"
+              desc="Registro diario de facturas y boletas emitidas por cliente."
+              icon={ShoppingCart}
+              onClick={() => setView('sales')}
+              color="emerald"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_gestion')) && (
+            <ModuleCard 
+              title="Detalle de Ventas GESTIÓN"
+              desc="Registro diario de ventas con detalle de productos y cotización."
+              icon={ShoppingCart}
+              onClick={() => setView('sales_gestion')}
+              color="amber"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('dte')) && (
+            <ModuleCard 
+              title="Detalle de DTE"
+              desc="Control administrativo de documentos tributarios electrónicos."
+              icon={Receipt}
+              onClick={() => setView('dte')}
+              color="rose"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('pet_payments')) && (
+            <ModuleCard 
+              title="Control de Pagos Veterinarios"
+              desc="Registro de pagos tutor, mail, fono y honorarios veterinarios."
+              icon={DollarSign}
+              onClick={() => setView('pet_payments')}
+              color="indigo"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('school_payments')) && (
+            <ModuleCard 
+              title="Saldos Escuela Cimasur"
+              desc="Control de pagos de alumnos, meta anual y gastos académicos."
+              icon={GraduationCap}
+              onClick={() => setView('school_payments')}
+              color="emerald"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('codigos_y_diluciones')) && (
+            <ModuleCard 
+              title="Gestión de Códigos y Diluciones"
+              desc="Gestión de Códigos y Diluciones."
+              icon={Database}
+              onClick={() => setView('codigos_y_diluciones')}
+              color="orange"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('resumen_ventas')) && (
+            <ModuleCard 
+              title="Resumen de ventas Frascos y Pesos"
+              desc="Análisis dinámico de volumen de frascos y recaudación por documentos."
+              icon={Activity}
+              onClick={() => setView('resumen_ventas')}
+              color="indigo"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('presupuesto_flujo')) && (
+            <ModuleCard 
+              title="Matriz de Presupuesto y Flujo"
+              desc="Control detallado de presupuesto anual, proyecciones y gastos mensuales."
+              icon={FileSpreadsheet}
+              onClick={() => setView('presupuesto_flujo')}
+              color="purple"
+            />
+          )}
         </div>
       </div>
     );

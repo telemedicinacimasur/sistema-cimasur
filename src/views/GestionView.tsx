@@ -86,24 +86,28 @@ export default function GestionView() {
           <p className="text-slate-400 text-sm">Control y seguimiento especializado de clientes estratégicos.</p>
         </div>
         <div className="flex gap-4 border-b border-[#1E293B]">
-          <button 
-            onClick={() => setActiveTab('register')}
-            className={cn(
-              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'register' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            Ingreso de Cliente
-          </button>
-          <button 
-            onClick={() => setActiveTab('list')}
-            className={cn(
-              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'list' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            Gestión de Clientes
-          </button>
+          {(!user?.allowedSubmodules?.gestion || user.allowedSubmodules.gestion.includes('register')) && (
+            <button 
+              onClick={() => setActiveTab('register')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'register' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Ingreso de Cliente
+            </button>
+          )}
+          {(!user?.allowedSubmodules?.gestion || user.allowedSubmodules.gestion.includes('list')) && (
+            <button 
+              onClick={() => setActiveTab('list')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'list' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Gestión de Clientes
+            </button>
+          )}
         </div>
       </div>
 

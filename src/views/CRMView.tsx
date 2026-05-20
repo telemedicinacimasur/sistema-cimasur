@@ -67,51 +67,61 @@ export default function CRMView() {
           <p className="text-slate-400 text-sm">Fidelización y seguimiento de la cartera corporativa.</p>
         </div>
         <div className="flex gap-4 border-b border-[#1E293B]">
-          <button 
-            onClick={() => setActiveTab('register')}
-            className={cn(
-              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'register' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            Ficha Registro
-          </button>
-          <button 
-            onClick={() => setActiveTab('list')}
-            className={cn(
-              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'list' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            Cartera de Clientes
-          </button>
-          <button 
-            onClick={() => setActiveTab('activities')}
-            className={cn(
-              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'activities' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            Registro de Actividades
-          </button>
-          <button 
-            onClick={() => setActiveTab('intranet')}
-            className={cn(
-              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'intranet' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            Clientes Intranet
-          </button>
-          <button 
-            onClick={() => setActiveTab('smart')}
-            className={cn(
-              "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'smart' ? "border-b-2 border-blue-600 text-[#38BDF8]" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            Motor Comercial
-          </button>
+          {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('register')) && (
+            <button 
+              onClick={() => setActiveTab('register')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'register' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Ficha Registro
+            </button>
+          )}
+          {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('list')) && (
+            <button 
+              onClick={() => setActiveTab('list')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'list' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Cartera de Clientes
+            </button>
+          )}
+          {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('activities')) && (
+            <button 
+              onClick={() => setActiveTab('activities')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'activities' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Registro de Actividades
+            </button>
+          )}
+          {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('intranet')) && (
+            <button 
+              onClick={() => setActiveTab('intranet')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'intranet' ? "border-b-2 border-[#001736] text-white" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Clientes Intranet
+            </button>
+          )}
+          {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('smart')) && (
+            <button 
+              onClick={() => setActiveTab('smart')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'smart' ? "border-b-2 border-blue-600 text-[#38BDF8]" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Motor Comercial
+            </button>
+          )}
         </div>
       </div>
 

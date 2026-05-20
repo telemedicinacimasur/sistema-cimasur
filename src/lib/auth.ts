@@ -11,6 +11,7 @@ export interface UserProfile {
   roles?: string[];
   password?: string;
   permissions?: any;
+  allowedSubmodules?: Record<string, string[]>;
 }
 
 export const localAuth = {
