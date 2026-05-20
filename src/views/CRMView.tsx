@@ -1282,14 +1282,31 @@ function CRMActivities() {
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="p-4 bg-[#152035] border-b flex justify-between items-center">
           <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Historial de Actividades Recientes</h3>
-          <div className="relative">
-            <Search className="absolute left-2 top-2 w-4 h-4 text-slate-400" />
-            <input 
-              placeholder="Buscar..." 
-              className="pl-8 pr-2 py-1 border rounded text-xs outline-none"
-              value={filterSearch}
-              onChange={e => setFilterSearch(e.target.value)}
-            />
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => {
+                const data = filteredActivities.map(act => [
+                  formatDate(act.fecha),
+                  act.campania || '---',
+                  act.tipo || '---',
+                  act.responsable || '---'
+                ]);
+                exportTableToPDF('Reporte: Historial de Actividades Recientes (CRM)', ['Fecha', 'Campaña / Actividad', 'Tipo', 'Responsable'], data, 'actividades_recientes_crm', 'l');
+              }}
+              className="px-3 py-1 text-[10px] font-bold uppercase tracking-tight bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/35 rounded-xl hover:bg-[#38BDF8]/20 flex items-center gap-1 shadow-[0_0_10px_rgba(56,189,248,0.15)]"
+              title="Descargar PDF"
+            >
+              <Download className="w-3.5 h-3.5" /> PDF
+            </button>
+            <div className="relative">
+              <Search className="absolute left-2 top-2 w-4 h-4 text-slate-400" />
+              <input 
+                placeholder="Buscar..." 
+                className="pl-8 pr-2 py-1 border border-slate-700 bg-slate-800 rounded text-xs text-white outline-none"
+                value={filterSearch}
+                onChange={e => setFilterSearch(e.target.value)}
+              />
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">

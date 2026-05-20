@@ -60,6 +60,7 @@ export default function CimasurInventoryManager() {
   const [records, setRecords] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [filterIncomplete, setFilterIncomplete] = useState(false);
   
   const [form, setForm] = useState<any>({
       codigo_barras: '',
@@ -105,6 +106,14 @@ export default function CimasurInventoryManager() {
       );
     }
 
+    if (filterIncomplete) {
+      filtered = filtered.filter(r => 
+        !safe(r.codigo_barras).trim() || 
+        !safe(r.nombre_producto).trim() ||
+        (r.base_master ? !['GOTAS PURAS'].includes(r.base_master) : true) && !safe(r.solucion).trim()
+      );
+    }
+
     return filtered.sort((a, b) => {
       const codeA = String(a.codigo_barras || '');
       const codeB = String(b.codigo_barras || '');
@@ -139,19 +148,10 @@ export default function CimasurInventoryManager() {
   };
 
   const generateCodeForCurrentForm = () => {
-    let prefix = PREFIX_MAP[activeTab] || '';
+    const currentBase = activeTab === 'MATRIZ COMPLETA' ? form.base_master || 'SALINA CS' : activeTab;
+    let prefix = PREFIX_MAP[currentBase] || '';
     
-    if (isBaseModule || activeTab === 'MATRIZ COMPLETA') {
-      if (GENERIC_CATEGORIES.includes(form.categoria_tipo)) {
-        const existing = records.find(r => r.base_master === activeTab && r.categoria_tipo === form.categoria_tipo && r.codigo_barras);
-        if (existing) {
-          return existing.codigo_barras;
-        }
-        return 'CÓDIGO ÚNICO';
-      }
-    }
-
-    const baseRecords = records.filter(r => r.base_master === activeTab);
+    const baseRecords = records.filter(r => r.base_master === currentBase);
     const nums: number[] = [];
     
     for (const r of baseRecords) {
@@ -168,11 +168,11 @@ export default function CimasurInventoryManager() {
       nextNum = Math.max(...nums) + 1;
     }
     
-    if (activeTab === 'ALTAS DILUCIONES') {
+    if (currentBase === 'ALTAS DILUCIONES') {
         return `AD${nextNum.toString().padStart(2, '0')}`;
     }
     
-    if (activeTab === 'GOTAS PURAS') {
+    if (currentBase === 'GOTAS PURAS') {
         return nextNum.toString();
     }
     
@@ -187,8 +187,12 @@ export default function CimasurInventoryManager() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.codigo_barras || !form.nombre_producto) {
-      alert("Completar campos requeridos");
+    if (!form.codigo_barras || !form.codigo_barras.trim()) {
+      alert("¡Alerta de código vacío! El código de barras no puede estar en blanco. Por favor, asigne o genere uno automáticamente.");
+      return;
+    }
+    if (!form.nombre_producto || !form.nombre_producto.trim()) {
+      alert("¡Alerta de campo vacío! El nombre del producto o fórmula está vacío. Por favor completarlo para guardar.");
       return;
     }
 
@@ -307,7 +311,8 @@ export default function CimasurInventoryManager() {
       `INVENTARIO CIMASUR - ${activeTab}`,
       headers,
       data,
-      `cimasur_inventario_${activeTab}`
+      `cimasur_inventario_${activeTab}`,
+      'p'
     );
   };
 
@@ -419,6 +424,14 @@ export default function CimasurInventoryManager() {
   const filtered = getFilteredRecords();
   const isGeneric = isBaseModule && GENERIC_CATEGORIES.includes(form.categoria_tipo);
 
+  const incompleteCount = useMemo(() => {
+    return records.filter(r => 
+      !safe(r.codigo_barras).trim() || 
+      !safe(r.nombre_producto).trim() ||
+      (r.base_master ? !['GOTAS PURAS'].includes(r.base_master) : true) && !safe(r.solucion).trim()
+    ).length;
+  }, [records]);
+
   const modules = [
     { id: 'codigos' as SubModule, label: 'Códigos de Barra', desc: 'Módulo Maestro (Salina, Etanol, ADE)', icon: Hash, bg: 'bg-[#1E293B]', text: 'text-[#38BDF8]' },
     { id: 'DILUCIONES CIMASUR' as SubModule, label: 'Diluciones Cimasur', desc: 'Catálogo base', icon: Droplet, bg: 'bg-[#1E293B]', text: 'text-emerald-400' },
@@ -445,10 +458,36 @@ export default function CimasurInventoryManager() {
         <div>
           <h2 className="text-xl font-black text-white uppercase tracking-tighter">Gestión de Códigos y Diluciones</h2>
           <p className="text-sm text-slate-400 font-medium">
-            {activeModule === 'dashboard' ? 'Submódulo maestro para administración de Excel, correlativos y catálogos.' : 'Bases correlativas y catálogos de diluciones'}
+            {activeModule === 'dashboard' ? 'Gestión de Códigos y Diluciones.' : 'Bases correlativas y catálogos de diluciones'}
           </p>
         </div>
       </div>
+
+      {incompleteCount > 0 && (
+        <div className="bg-amber-950/20 border border-amber-500/30 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-amber-200">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-bold uppercase tracking-wide text-xs">Atención: Registros con campos vacíos o códigos sin generar</p>
+              <p className="text-[10px] text-slate-400">Se detectaron {incompleteCount} registros con campos vacíos (código, producto o solución). Haz clic en el botón para verlos y corregirlos.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              if (activeModule === 'dashboard') {
+                setActiveModule('codigos');
+              }
+              setFilterIncomplete(!filterIncomplete);
+            }}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+              filterIncomplete ? "bg-amber-500 text-white" : "bg-amber-600/20 hover:bg-amber-600 hover:text-white text-amber-400 border border-amber-600/40"
+            )}
+          >
+            {filterIncomplete ? "Ver todos los registros" : `Ver ${incompleteCount} registros incompletos`}
+          </button>
+        </div>
+      )}
 
       {activeModule === 'dashboard' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -575,14 +614,14 @@ export default function CimasurInventoryManager() {
 
           <div className="flex flex-col flex-1 min-h-0">
             <div className="bg-[#152035] border border-[#1E293B] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex-1 overflow-hidden flex flex-col">
-              <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[#111A2E] border-b border-[#1E293B]">
-                  <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <div className="overflow-y-auto max-h-[550px] scrollbar-thin">
+              <table className="w-full text-left">
+                <thead className="sticky top-0 z-10 bg-[#111A2E] border-b border-[#1E293B]">
+                  <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest bg-[#111A2E]">
                     {getHeadersForTab(activeTab).map((h, i) => (
-                      <th key={i} className={`p-4 border-r border-[#1E293B] ${i === 0 ? 'w-32' : ''}`}>{h}</th>
+                      <th key={i} className={`p-4 border-r border-[#1E293B] bg-[#111A2E] sticky top-0 ${i === 0 ? 'w-32' : ''}`}>{h}</th>
                     ))}
-                    <th className="p-4 w-12 text-center"></th>
+                    <th className="p-5 w-12 text-center bg-[#111A2E] sticky top-0"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">

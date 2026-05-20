@@ -893,7 +893,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
           <FlaskConical className="w-3 h-3 text-slate-300" />
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs kardex-table">
             <thead>
               <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  text-left border-b border-[#1E293B] font-black uppercase">
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
@@ -901,6 +901,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Producto</th>
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Responsable</th>
                 <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Status</th>
+                <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -2729,7 +2730,7 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
                           { label: 'Cantidad', value: String(r.cantidad || '0') },
                           { label: 'Observaciones', value: r.observaciones }
                         ];
-                        viewExpedienteInNewTab('Ficha de Insumo / Materia Prima', recordData, `insumo_${r.id}`);
+                        viewExpedienteInNewTab('Ficha de Insumo / Materia Prima', recordData, `insumo_${r.id}`, undefined, 'l');
                       }}
                       onDownload={() => {
                         const recordData = [
@@ -2745,7 +2746,7 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
                           { label: 'Cantidad', value: String(r.cantidad || '0') },
                           { label: 'Observaciones', value: r.observaciones }
                         ];
-                        exportExpedienteToPDF('Ficha de Insumo / Materia Prima', recordData, `insumo_${r.id}`);
+                        exportExpedienteToPDF('Ficha de Insumo / Materia Prima', recordData, `insumo_${r.id}`, undefined, 'l');
                       }}
                       onExcel={() => exportRecordToExcel(r)}
                       onEdit={() => handleEdit(r)}
@@ -3104,7 +3105,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
                           { label: 'Observaciones', value: r.observaciones || '' },
                           { label: 'Fecha Cotiz', value: formatDate(r.fechaCotiz) }
                         ];
-                        viewExpedienteInNewTab('Ficha: Vademécum', data, `vademecum_${r.id}`);
+                        viewExpedienteInNewTab('Ficha: Vademécum', data, `vademecum_${r.id}`, undefined, 'l');
                       }}
                       onDownload={() => {
                          const data = [
@@ -3119,7 +3120,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
                           { label: 'Observaciones', value: r.observaciones || '' },
                           { label: 'Fecha Cotiz', value: formatDate(r.fechaCotiz) }
                         ];
-                        exportExpedienteToPDF('Ficha: Vademécum', data, `vademecum_${r.id}`);
+                        exportExpedienteToPDF('Ficha: Vademécum', data, `vademecum_${r.id}`, undefined, 'l');
                       }}
                       onEdit={() => handleEdit(r)}
                       onDelete={async () => {
@@ -4084,7 +4085,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                           ) : (
                             <span className={cn(
                               "font-black text-sm",
-                              record.qty <= 5 ? "text-red-500" : "text-blue-900"
+                              record.qty <= 5 ? "text-red-500" : "text-[#38BDF8]"
                             )}>{record.qty}</span>
                           )}
                        </td>
@@ -4102,7 +4103,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                             <div className="flex gap-1 w-full">
                               <button 
                                 onClick={() => handleDeduct(record)}
-                                className="bg-red-50 text-red-600 px-2 py-1.5 rounded-2xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex-1"
+                                className="bg-[#00F0FF]/10 text-[#00F0FF] border border-[#00F0FF]/30 hover:bg-[#00F0FF] hover:text-black px-2 py-1 rounded-2xl text-[8px] font-black uppercase transition-all shadow-[0_0_8px_rgba(0,240,255,0.2)] flex-1 animate-pulse"
                               >
                                 (-) Descontar
                               </button>
@@ -4186,7 +4187,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
               </div>
            </div>
            <div className="overflow-x-auto max-h-64 scrollbar-thin">
-              <table className="w-full text-[10px]">
+              <table className="w-full text-base kardex-table">
                  <thead className="bg-[#111A2E] text-slate-400 uppercase font-black">
                     <tr className="text-left border-b">
                        <th className="p-3">Fecha</th>
@@ -4198,7 +4199,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-200">
-                    {followups.slice().reverse().filter(f => {
+                    {followups.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).filter(f => {
                        let match = f.area === selectedArea;
                        if (kardexSearchTerm) {
                           const s = kardexSearchTerm.toLowerCase();
@@ -4815,24 +4816,24 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         </form>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-[9px] table-fixed">
+          <table className="w-full text-base kardex-table">
             <thead>
               <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  text-left border-b border-[#1E293B] font-black uppercase tracking-tighter">
-                <th className="p-2 w-20 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Pedido</th>
-                <th className="p-2 w-28 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">OT / Enlace</th>
-                <th className="p-2 w-32 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cliente</th>
-                <th className="p-2 w-16 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cotiz.</th>
-                <th className="p-2 w-16 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Envío</th>
-                <th className="p-2 w-32 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Detalle / Notas</th>
-                <th className="p-2 w-20 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Courier</th>
-                <th className="p-2 w-16 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Situación</th>
-                <th className="p-2 w-16 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acción</th>
+                <th className="p-2 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Pedido</th>
+                <th className="p-2 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">OT / Enlace</th>
+                <th className="p-2 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cliente</th>
+                <th className="p-2 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cotiz.</th>
+                <th className="p-2 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Envío</th>
+                <th className="p-2 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Detalle / Notas</th>
+                <th className="p-2 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Courier</th>
+                <th className="p-2 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Situación</th>
+                <th className="p-2 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredRecords.map(r => (
                 <tr key={r.id || Math.random().toString()} className="hover:bg-[#1E293B]/50 transition-colors">
-                   <td className="p-2 font-bold text-blue-900 truncate">{safe(r.nroCotiz)}</td>
+                   <td className="p-2 font-bold text-[#38BDF8] truncate">{safe(r.nroCotiz)}</td>
                    <td className="p-2 font-mono text-slate-400 truncate flex items-center justify-center gap-1">
                       {r.ot ? (
                         <>
@@ -5181,7 +5182,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs kardex-table">
             <thead>
               <tr className="bg-[#152035]/50 text-left border-b font-black text-slate-400 uppercase">
                 <th className="p-4">Cotización</th>
@@ -5221,7 +5222,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
 
                 return filtered.map(r => (
                   <tr key={r.id}>
-                    <td className="p-4 font-bold text-blue-900">{r.nroCotizacion}</td>
+                    <td className="p-4 font-bold text-[#38BDF8]">{r.nroCotizacion}</td>
                     <td className="p-4 uppercase">{r.mvTratante}</td>
                     <td className="p-4 font-black">{r.nroAsignado}</td>
                     <td className="p-4">{formatDate(r.fecha)}</td>

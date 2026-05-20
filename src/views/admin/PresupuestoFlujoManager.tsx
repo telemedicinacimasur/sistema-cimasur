@@ -79,7 +79,7 @@ export default function PresupuestoFlujoManager() {
     setLoading(false);
   };
 
-  const handleCreateNewYear = () => {
+  const handleCreateNewYear = async () => {
     const yearStr = prompt('Ingrese el año que desea crear (ej: 2026):');
     if (!yearStr) return;
     const year = parseInt(yearStr);
@@ -92,7 +92,35 @@ export default function PresupuestoFlujoManager() {
       setSelectedYear(year);
       return;
     }
+    
+    setLoading(true);
+    // Create default rows immediately to ensure DB has data for this year
+    const initialRows: BudgetRow[] = [
+      {
+        id: crypto.randomUUID(),
+        year: year,
+        glosa: 'Ventas Proyectadas',
+        saldoInicial: 0,
+        months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
+        type: 'income'
+      },
+      {
+        id: crypto.randomUUID(),
+        year: year,
+        glosa: 'Gastos Operacionales',
+        saldoInicial: 0,
+        months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
+        type: 'expense'
+      }
+    ];
+    for (const r of initialRows) {
+      await localDB.saveToCollection('presupuesto_records', r);
+    }
+    
+    setAvailableYears(prev => [...prev, year].sort((a, b) => a - b));
     setSelectedYear(year);
+    setLoading(false);
+    alert(`Año ${year} creado exitosamente con registros iniciales.`);
   };
 
   const handleDeleteYear = async (year: number) => {

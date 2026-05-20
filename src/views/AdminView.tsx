@@ -155,7 +155,7 @@ export default function AdminView() {
           />
           <ModuleCard 
             title="Gestión de Códigos y Diluciones"
-            desc="Submódulo maestro para administración de Excel, correlativos y catálogos."
+            desc="Gestión de Códigos y Diluciones."
             icon={Database}
             onClick={() => setView('codigos_y_diluciones')}
             color="orange"
@@ -560,7 +560,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs kardex-table">
             <thead>
               <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
@@ -568,7 +568,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Nombre MV</th>
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Mail / Fono</th>
                 <th className="p-4 text-right bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Consulta</th>
-                <th className="p-4 text-right text-blue-900 bg-[#1E293B]/50">Pago Vet</th>
+                <th className="p-4 text-right text-white bg-[#1E293B]/50">Pago Vet</th>
                 <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Pago</th>
                 <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Gestión</th>
               </tr>
@@ -584,7 +584,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                     <span className="text-[10px]">{r.fono}</span>
                   </td>
                   <td className="p-4 text-right">{formatCurrency(r.pagoConsulta || r.pago1 || 0)}</td>
-                  <td className="p-4 text-right font-black bg-[#1E293B]/80 text-blue-900 border-x border-[#1E293B]">{formatCurrency(r.pagoVeterinario || r.pago2 || 0)}</td>
+                  <td className="p-4 text-right font-black bg-[#1E293B]/80 text-[#38BDF8] border-x border-[#1E293B]">{formatCurrency(r.pagoVeterinario || r.pago2 || 0)}</td>
                   <td className="p-4 text-center font-mono opacity-60 italic">{formatDate(r.fechaPago || r.pagoVeterinario)}</td>
                   <td className="p-4 text-center">
                     <RecordActions 
@@ -915,16 +915,27 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
             </select>
           </FormField>
           <FormField label="Estado">
-            <select className="w-full border-b p-2 text-sm font-bold" value={form.estado || 'Pendiente'} onChange={e => setForm({...form, estado: e.target.value})}>
-              {statuses.map(s => <option key={s}>{s}</option>)}
+            <select 
+              className={cn(
+                "w-full p-2 rounded-xl text-sm font-black uppercase tracking-wider transition-all border-2 outline-none",
+                form.estado === 'Aprobada' ? "bg-emerald-600 text-white border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]" :
+                form.estado === 'Anulada' ? "bg-red-600 text-white border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.3)]" :
+                "bg-amber-500 text-white border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+              )}
+              value={form.estado || 'Pendiente'} 
+              onChange={e => setForm({...form, estado: e.target.value})}
+            >
+              <option value="Pendiente" className="bg-[#152035] text-white font-bold">Pendiente</option>
+              <option value="Aprobada" className="bg-[#152035] text-white font-bold">Aprobada</option>
+              <option value="Anulada" className="bg-[#152035] text-white font-bold">Anulada</option>
             </select>
           </FormField>
           <FormField label="Fecha Aprob"><input type="date" className="w-full border-b p-2 text-sm font-bold" value={form.fechaAprob || ''} onChange={e => setForm({...form, fechaAprob: e.target.value})} /></FormField>
           
           <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-6">
-            <FormField label="UND Total (Pedido)"><input type="number" className="w-full border-b p-3 text-lg font-black text-[#38BDF8] bg-[#152035] rounded-t" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
-            <FormField label="Und a hacer"><input type="number" className="w-full border-b p-3 text-lg font-bold text-amber-700 bg-amber-50 rounded-t" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
-            <FormField label="UND Inventario (Auto)"><input type="number" className="w-full border-b p-3 text-lg font-bold text-slate-400 bg-[#152035] rounded-t" value={form.invUnits || 0} readOnly /></FormField>
+            <FormField label="UND Total (Pedido)"><input type="number" className="w-full p-3 text-xl font-black text-[#00F0FF] bg-[#152035] rounded-xl border-2 border-[#00F0FF] shadow-[0_0_15px_rgba(0,240,255,0.45)] outline-none" value={form.undTotal || 0} onChange={e => handleTotalChange(parseInt(e.target.value) || 0)} /></FormField>
+            <FormField label="Und a hacer"><input type="number" className="w-full p-3 text-xl font-bold text-[#FF9F00] bg-[#152035] rounded-xl border-2 border-[#FF9F00] shadow-[0_0_15px_rgba(255,159,0,0.45)] outline-none" value={form.todoUnits || 0} onChange={e => handleTodoChange(parseInt(e.target.value) || 0)} /></FormField>
+            <FormField label="UND Inventario (Auto)"><input type="number" className="w-full p-3 text-xl font-bold text-[#00FF66] bg-[#152035] rounded-xl border-2 border-[#00FF66] shadow-[0_0_15px_rgba(0,255,102,0.45)] outline-none" value={form.invUnits || 0} readOnly /></FormField>
             <div className="flex items-end">
                 <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-4 rounded-2xl font-black shadow-xl hover:bg-[#152035] flex items-center justify-center gap-2 uppercase tracking-widest transition-all active:scale-95 text-xs">
                   <Save className="w-5 h-5 text-emerald-400" /> GUARDAR COTIZACIÓN
@@ -1001,7 +1012,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs kardex-table">
             <thead>
               <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
                 <th className="p-4 text-center bg-indigo-900 border-r border-[#1E293B]/50">Año/Mes</th>
@@ -1018,25 +1029,28 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                 <tr key={r.id} className="hover:bg-[#152035] transition-colors italic">
                   <td className="p-4 text-center text-slate-400">{r.anio || ''} / {r.mes || ''}</td>
                   <td className="p-4 font-bold text-white">{r.nroCotiz || ''}</td>
-                  <td className="p-4 font-black">{r.cliente || ''}</td>
-                  <td className="p-4 font-bold">{r.vendedor || ''}</td>
+                  <td className="p-4 font-black text-white">{r.cliente || ''}</td>
+                  <td className="p-4 font-bold text-white">{r.vendedor || ''}</td>
                   <td className="p-4 text-center">
                     <select 
                       className={cn(
-                        "px-2 py-0.5 rounded-full uppercase text-[9px] font-black border-none outline-none cursor-pointer",
-                        r.estado === 'Aprobada' ? "bg-green-50 text-green-700" : 
-                        r.estado === 'Anulada' ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"
+                        "px-3 py-1.5 rounded-full uppercase text-[10px] font-black border-2 outline-none cursor-pointer text-center transition-all",
+                        r.estado === 'Aprobada' ? "bg-emerald-600 text-white border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" :
+                        r.estado === 'Anulada' ? "bg-red-600 text-white border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]" :
+                        "bg-amber-500 text-white border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.4)]"
                       )}
                       value={r.estado || 'Pendiente'}
                       onChange={(e) => updateStatus(r.id, e.target.value)}
                     >
-                      {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                      <option value="Pendiente" className="bg-[#152035] text-white font-bold">Pendiente</option>
+                      <option value="Aprobada" className="bg-[#152035] text-white font-bold">Aprobada</option>
+                      <option value="Anulada" className="bg-[#152035] text-white font-bold">Anulada</option>
                     </select>
                   </td>
                   <td className="p-4 text-center font-black text-[#38BDF8] italic">
-                    <div className="flex flex-col items-center">
-                      <span>{r.undTotal || 0}</span>
-                      <span className="text-[8px] text-slate-400 font-normal">Inv: {r.invUnits || 0} / Pro: {r.todoUnits || 0}</span>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-3xl font-black drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]">{r.undTotal || 0}</span>
+                      <span className="text-sm text-slate-300 font-extrabold bg-[#111A2E]/50 px-2 py-0.5 rounded-full border border-white/10">Inv: {r.invUnits || 0} / Pro: {r.todoUnits || 0}</span>
                     </div>
                   </td>
                   <td className="p-4 text-center">
@@ -1376,7 +1390,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                 onClick={() => {
                   const data = filteredRecords.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0, formatCurrency(r.valorCotizacion || 0)]);
                   data.push(['', '', 'TOTAL', totalFrascos, formatCurrency(totalCotizacion)]);
-                  exportTableToPDF('Reporte: Ventas Gestión', ['Fecha', 'Documento', 'Cliente', 'Frascos', 'Valor Cotiz'], data, 'reporte_ventas_gestion');
+                  exportTableToPDF('Reporte: Ventas Gestión', ['Fecha', 'Documento', 'Cliente', 'Frascos', 'Valor Cotiz'], data, 'reporte_ventas_gestion', 'l');
                 }}
                 className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1" 
                 title="Descargar PDF"
@@ -2627,10 +2641,6 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
              <span className="flex items-center gap-2">
                <Receipt className="w-5 h-5" /> {editingId ? 'Editando Registro DTE' : 'Registro Administrativo de DTE'}
              </span>
-             <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
-                <span className="text-[9px] font-black uppercase text-blue-400">Total DTE:</span>
-                <span className="text-[11px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.total) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
-             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <input 
@@ -2732,10 +2742,23 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
         <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex flex-wrap justify-between items-center font-black text-[10px]  uppercase tracking-widest gap-4">
           <div className="flex items-center gap-4">
              <span>Consulta de Registros DTE</span>
-             <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
-                <span className="text-[9px] font-black uppercase text-emerald-400">Total Neto:</span>
-                <span className="text-[11px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.montoNeto) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
-             </div>
+             {(() => {
+                const sumNeto = filteredRecords.reduce((sum, r) => sum + (Number(r.montoNeto) || 0), 0);
+                const sumTotalDte = filteredRecords.reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+                return (
+                  <div className="flex items-center gap-4 bg-[#1E293B]/80 px-3 py-1.5 rounded-xl border border-white/20">
+                     <div className="flex items-center gap-1">
+                       <span className="text-[9px] font-black uppercase text-emerald-400">Total Neto:</span>
+                       <span className="text-[11px] font-black text-white">{sumNeto.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
+                     </div>
+                     <div className="border-l border-white/20 h-3"></div>
+                     <div className="flex items-center gap-1">
+                       <span className="text-[9px] font-black uppercase text-[#38BDF8]">Total DTE:</span>
+                       <span className="text-[11px] font-black text-[#38BDF8]">{sumTotalDte.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
+                     </div>
+                  </div>
+                );
+             })()}
           </div>
           <div className="flex items-center gap-2 flex-wrap text-normal normal-case">
               <div className="flex items-center gap-1">
@@ -2786,7 +2809,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs font-medium">
+          <table className="w-full text-xs font-medium kardex-table">
             <thead>
               <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
@@ -2808,7 +2831,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                   <td className="p-4 text-right">{formatCurrency(r.montoNeto)}</td>
                   <td className={cn(
                     "p-4 text-right font-black",
-                    String(r.nroDto || '').toUpperCase().startsWith('NCE') ? "text-red-600" : (String(r.nroDto || '').toUpperCase().startsWith('GDE') ? "text-slate-400" : "text-blue-900")
+                    String(r.nroDto || '').toUpperCase().startsWith('NCE') ? "text-red-600" : (String(r.nroDto || '').toUpperCase().startsWith('GDE') ? "text-slate-400" : "text-[#38BDF8]")
                   )}>
                     {formatCurrency(r.total)}
                   </td>

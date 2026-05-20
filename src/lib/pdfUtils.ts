@@ -4,13 +4,7 @@ import autoTable from 'jspdf-autotable';
 const PRIMARY_COLOR: [number, number, number] = [30, 58, 95]; // #1E3A5F Azul Marino Oscuro
 
 const addWatermark = (doc: jsPDF, pageWidth: number, pageHeight: number) => {
-  // Use a very subtle grey for watermark
-  doc.setTextColor(240, 243, 247); 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(100);
-  
-  // Center watermark and rotate
-  doc.text('CIMASUR', pageWidth / 2, pageHeight / 2 + 20, { align: 'center', angle: 45 });
+  // Watermark removed per user request: "en el PDF en genral solo me interesa el contenido de la ficha y nada más el resto chao"
 };
 
 const setupPremiumPage = (
@@ -26,37 +20,17 @@ const setupPremiumPage = (
   const pageWidth = orientation === 'p' ? 210 : 297;
   const pageHeight = orientation === 'p' ? 297 : 210;
   
-  addWatermark(doc, pageWidth, pageHeight);
-
-  // Left Side: Brand & Subtitle
-  doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+  // Minimal clean title header on top so we know what the document is, but without watermarks, decorative lines or big dates.
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(cimasurFontSize);
-  doc.text('CIMASUR', 14, 20);
-  
-  if (subtitle) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(subtitleFontSize);
-    doc.setTextColor(30, 41, 59); // Slate 800
-    doc.text(subtitle, 14, 27);
-  }
-
-  // Right Side: Report Title & Date
-  const cleanTitle = title.replace(/Sistema |CIMASUR|Dashboard|Gestión de|Panel Administrativo/gi, '').trim();
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(titleFontSize);
+  doc.setFontSize(11);
   doc.setTextColor(30, 41, 59); // Slate 800
-  doc.text(cleanTitle.toUpperCase(), pageWidth - 14, 20, { align: 'right' });
+  doc.text(title.toUpperCase(), 14, 15);
   
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(dateFontSize);
-  doc.setTextColor(100, 113, 128);
-  doc.text(`Fecha Emisión: ${new Date().toLocaleString('es-CL')}`, pageWidth - 14, 25, { align: 'right' });
-  
-  // Clean separator line
-  doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
-  doc.setLineWidth(0.5);
-  doc.line(14, 30, pageWidth - 14, 30);
+  if (subtitle && subtitle !== 'Ficha de Registro') {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(subtitle, 14, 21);
+  }
 
   return { pageWidth, pageHeight };
 };
@@ -70,7 +44,7 @@ export const exportTableToPDF = (title: string, headers: string[], data: any[][]
   const safeData = data.map(row => row.map(cell => cell ?? ''));
   
   autoTable(doc, {
-    startY: 40,
+    startY: 25,
     head: [headers],
     body: safeData,
     theme: 'plain',
@@ -136,39 +110,92 @@ export const exportExpedienteToPDF = (
   const doc = new jsPDF({ orientation });
   const productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
+   const { pageWidth, pageHeight } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
-  const { pageWidth, pageHeight } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
-  
-  let currentY = 40;
+  let currentY = 25;
 
   // Main Fields Table
-  const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente');
+  const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente' && item.label !== '---');
   if (filterData.length > 0) {
-    autoTable(doc, {
-      startY: currentY,
-      body: filterData.map(item => [
-        String(item.label).toUpperCase(),
-        item.value !== null && item.value !== undefined ? String(item.value) : ''
-      ]),
-      theme: 'plain',
-      margin: { left: 14, right: 14 },
-      columnStyles: { 
-        0: { fontStyle: 'bold', cellWidth: 50, textColor: PRIMARY_COLOR },
-        1: { textColor: [51, 65, 85] }
-      },
-      styles: { fontSize: 8, cellPadding: {top: 3, bottom: 3, left: 2, right: 2} },
-      didDrawCell: (data) => {
-         doc.setDrawColor(226, 232, 240);
-         doc.setLineWidth(0.1);
-         doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+    if (title === 'REPORTE ANALÍTICO DE VENTAS' || filterData.length > 4) {
+      // Create a 2-column key-value grid (which makes 4 columns total: Label1, Value1, Label2, Value2)
+      const half = Math.ceil(filterData.length / 2);
+      const gridRows = [];
+      for (let i = 0; i < half; i++) {
+        const item1 = filterData[i];
+        const item2 = filterData[i + half];
+        gridRows.push([
+          String(item1.label).toUpperCase(),
+          item1.value !== null && item1.value !== undefined ? String(item1.value) : '',
+          item2 ? String(item2.label).toUpperCase() : '',
+          item2 && item2.value !== null && item2.value !== undefined ? String(item2.value) : ''
+        ]);
       }
-    });
-    currentY = (doc as any).lastAutoTable.finalY + 15;
+      autoTable(doc, {
+        startY: currentY,
+        body: gridRows,
+        theme: 'plain',
+        margin: { left: 14, right: 14 },
+        columnStyles: { 
+          0: { fontStyle: 'bold', cellWidth: 'wrap', textColor: PRIMARY_COLOR },
+          1: { textColor: [51, 65, 85] },
+          2: { fontStyle: 'bold', cellWidth: 'wrap', textColor: PRIMARY_COLOR },
+          3: { textColor: [51, 65, 85] }
+        },
+        styles: { fontSize: 7.5, cellPadding: {top: 2, bottom: 2, left: 2, right: 2} },
+        didDrawCell: (data) => {
+           doc.setDrawColor(226, 232, 240);
+           doc.setLineWidth(0.1);
+           doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+        }
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+    } else {
+      autoTable(doc, {
+        startY: currentY,
+        body: filterData.map(item => [
+          String(item.label).toUpperCase(),
+          item.value !== null && item.value !== undefined ? String(item.value) : ''
+        ]),
+        theme: 'plain',
+        margin: { left: 14, right: 14 },
+        columnStyles: { 
+          0: { fontStyle: 'bold', cellWidth: 50, textColor: PRIMARY_COLOR },
+          1: { textColor: [51, 65, 85] }
+        },
+        styles: { fontSize: 8, cellPadding: {top: 3, bottom: 3, left: 2, right: 2} },
+        didDrawCell: (data) => {
+           doc.setDrawColor(226, 232, 240);
+           doc.setLineWidth(0.1);
+           doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+        }
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
   }
 
-  // Additional Tables
+  // Draw images first (so that they stay with the cover/dashboard section, e.g. on Page 1)
+  const isAnalitico = title === 'REPORTE ANALÍTICO DE VENTAS';
+  if (images && images.length > 0 && !isAnalitico) {
+     images.forEach(imgData => {
+         if (currentY + 95 > pageHeight) {
+             doc.addPage(orientation);
+             currentY = 25;
+         }
+         const imgWidth = pageWidth - 28;
+         const imgHeight = 90;
+         
+         doc.addImage(imgData, 'PNG', 14, currentY, imgWidth, imgHeight);
+         currentY += imgHeight + 15;
+     });
+  }
+
+  // Additional Tables (each starting on its own brand new page!)
   if (tables && tables.length > 0) {
     tables.forEach(table => {
+      doc.addPage(orientation);
+      currentY = 25;
+      
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
@@ -211,21 +238,14 @@ export const exportExpedienteToPDF = (
       currentY = (doc as any).lastAutoTable.finalY + 15;
     });
   }
-  
-  if (images && images.length > 0) {
+
+  if (images && images.length > 0 && isAnalitico) {
      images.forEach(imgData => {
-         // Add a new page for each image if desired, or if it doesn't fit
-         if (currentY + 100 > pageHeight) {
-             doc.addPage(orientation);
-             currentY = 20;
-         }
-         // Image width based on page margins
+         doc.addPage(orientation);
+         currentY = 25;
          const imgWidth = pageWidth - 28;
-         // Typical height for charts in landscape PDF is 100-140
-         const imgHeight = 100;
-         
+         const imgHeight = 90;
          doc.addImage(imgData, 'PNG', 14, currentY, imgWidth, imgHeight);
-         currentY += imgHeight + 15;
      });
   }
   

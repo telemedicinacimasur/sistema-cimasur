@@ -802,6 +802,26 @@ function GestionList({
               title="Exportar Todo a Excel"
             >
                <FileSpreadsheet className="w-5 h-5" /> EXPORTAR TODO
+             </button>
+             <button 
+               onClick={() => {
+                  const headers = ["F. Registro", "Nombre/Razón Social", "RUT", "Tipo", "Celular", "Email", "Categoría", "Estado"];
+                  const data = filtered.map(r => [
+                    formatDate(r.fechaIngreso),
+                    r.nombre || r.cliente || '---',
+                    r.rut || '---',
+                    r.tipoEmpresa || '---',
+                    r.celular || '---',
+                    r.email || '---',
+                    r.categoria || '---',
+                    r.estado || '---'
+                  ]);
+                  exportTableToPDF('Clientes Gestión Completo', headers, data, 'listado_gestion_todo_pdf', 'l');
+               }}
+               className="bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 p-2 rounded-2xl hover:bg-[#38BDF8]/30 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-2 text-[10px] font-bold"
+               title="Exportar Todo a PDF"
+             >
+                <Download className="w-5 h-5" /> EXPORTAR PDF
             </button>
          </div>
       </div>
@@ -916,6 +936,46 @@ function GestionList({
                               title="Ver Expediente (Pestaña)"
                             >
                                <ExternalLink className="w-4 h-4" />
+                             </button>
+                             <button 
+                               onClick={() => {
+                                 const data = [
+                                   { label: 'Nombre', value: r.nombre || r.cliente },
+                                   { label: 'RUT', value: r.rut },
+                                   { label: 'Tipo Empresa', value: r.tipoEmpresa || 'Otros' },
+                                   { label: 'Dirección', value: `${r.direccion || ''} ${r.comuna || ''} ${r.region || ''}` },
+                                   { label: 'Celular', value: r.celular || '---' },
+                                   { label: 'Email', value: r.email || '---' },
+                                   { label: 'Medio', value: `${r.medioContacto || '---'} ${r.medioContactoDetalle ? '('+r.medioContactoDetalle+')' : ''}` },
+                                   { label: 'Especialidad', value: r.especialidadCliente || '---' },
+                                   { label: 'Consultora', value: r.consultora },
+                                   { label: 'Categoría', value: r.categoria },
+                                   { label: 'Estado', value: r.estado },
+                                   { label: 'Fecha Ingreso', value: formatDate(r.fechaIngreso) },
+                                   { label: 'Observaciones', value: r.observaciones || 'Sin registros.' }
+                                 ];
+                                 const clientActivities = activities.filter(a => a.clienteRut === r.rut || (r.id && a.clienteId === r.id));
+                                 const tables = clientActivities.length > 0 ? [
+                                   {
+                                     title: 'Historial de Actividades',
+                                     headers: ['Fecha', 'Actividad', 'Responsable', 'Detalle'],
+                                     rows: clientActivities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(a => [
+                                       formatDate(a.fecha),
+                                       a.actividad,
+                                       a.responsable,
+                                       a.detalle || '---'
+                                     ])
+                                   }
+                                 ] : [];
+                                 
+                                 import('../lib/pdfUtils').then(pdf => {
+                                   pdf.exportExpedienteToPDF(`Expediente Gestión: ${r.nombre || r.cliente}`, data, `gestion_${r.rut}`, tables);
+                                 });
+                               }}
+                               className="bg-red-500/10 p-2 rounded-2xl hover:bg-red-500/20 text-red-500 border border-red-500/35 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+                               title="Descargar Expediente PDF"
+                             >
+                                <Download className="w-4 h-4" />
                             </button>
                             <button 
                               onClick={() => onEdit(r)}

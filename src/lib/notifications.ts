@@ -7,25 +7,77 @@ export interface Notification {
   title: string;
   message: string;
   recipientRoles: string[]; // ['admin', 'lab', 'crm', 'school', 'gestion']
+  recipientUsers?: string[]; // Specific emails or usernames representing tagged workers
   sender: string;
   createdAt: any;
   read: boolean;
 }
 
 export const subscribeToNotifications = (userRoles: string[], currentUserName: string, callback: (notifications: Notification[]) => void) => {
-  const isRecipient = (notification: Notification) => {
+  const isRecipient = (notification: any) => {
+    // Attempt to load current user identity from session storage
+    let currentUser: any = null;
+    try {
+      const local = sessionStorage.getItem('cimasur_user');
+      if (local) currentUser = JSON.parse(local);
+    } catch (e) {
+      console.error(e);
+    }
+
+    const senderLower = (notification.sender || '').toLowerCase();
+    const currentUserNameLower = currentUserName.toLowerCase();
+    const currentUserEmailLower = currentUser?.email ? currentUser.email.toLowerCase() : '';
+    const currentUserDisplayNameLower = currentUser?.displayName ? currentUser.displayName.toLowerCase() : '';
+
     // Filter out notifications created by the same user
-    if (notification.sender === currentUserName) return false;
+    if (
+      senderLower === currentUserNameLower ||
+      (currentUserEmailLower && senderLower === currentUserEmailLower) ||
+      (currentUserDisplayNameLower && senderLower === currentUserDisplayNameLower)
+    ) {
+      return false;
+    }
+
+    // Check if user is explicitly mentioned (by username or email or select worker)
+    if (notification.recipientUsers && notification.recipientUsers.length > 0) {
+      const isMentioned = notification.recipientUsers.some((u: string) => {
+        const lowerU = u.toLowerCase();
+        return (
+          lowerU === currentUserNameLower ||
+          (currentUserEmailLower && lowerU === currentUserEmailLower) ||
+          (currentUserDisplayNameLower && lowerU === currentUserDisplayNameLower)
+        );
+      });
+      if (isMentioned) return true;
+    }
 
     if (!notification.recipientRoles || notification.recipientRoles.length === 0) return true;
     
     const normalizedUserRoles = userRoles.map(r => r.toLowerCase());
     const normalizedRecipientRoles = notification.recipientRoles.map(r => r.toLowerCase());
     
-    // Check if any of the user's roles matches or encompasses the recipient role
-    // e.g. user with 'viewer_lab' should receive notifications for 'lab'
-    return normalizedUserRoles.includes('admin') || 
-           normalizedRecipientRoles.some(rRole => 
+    // Check if user is Admin. Administrators always receive all notifications
+    // "ADMINISTRADOR CISTEMA: LE LLEGAN TODAS LAS NOTIFICACIONES DE LOS MODULOS"
+    if (normalizedUserRoles.includes('admin')) {
+      return true;
+    }
+
+    // "AL MÓDULO DE LABORATORIO SOLO DEBEN LLEGARLE ALERTAS CUANDO EN Seguimiento de Cotizaciones SE CAMBIE UN REGISTRO A APROBADO Y LA ALERTA DE STOCK DE INSUMOS BAJOS POR DÍA SEGÚN LA ALERTA QUE SE GENERÓ POR CADA UNO (NADA MÁS)"
+    const isLab = normalizedUserRoles.some(role => role === 'lab' || role === 'viewer_lab');
+    if (isLab) {
+      const isApprovedQuote = notification.title === 'Cotización Aprobada';
+      const isStockAlert = notification.title === 'Alerta de Stock Bajo';
+      const isCommentOnMyModule = notification.title && 
+        notification.title.startsWith('Nuevo Comentario') && 
+        normalizedRecipientRoles.includes('lab');
+
+      if (!isApprovedQuote && !isStockAlert && !isCommentOnMyModule) {
+        return false;
+      }
+    }
+
+    // Check if any of the user's roles matches the recipient role
+    return normalizedRecipientRoles.some(rRole => 
              normalizedUserRoles.some(uRole => uRole === rRole || uRole === `viewer_${rRole}`)
            );
   };

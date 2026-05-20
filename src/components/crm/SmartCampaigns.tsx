@@ -1,13 +1,32 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, Activity, BrainCircuit, Target, Lightbulb, PlaySquare, 
-  ChevronRight, RefreshCw, BarChart, Send, AlertCircle, Bot
+  ChevronRight, RefreshCw, BarChart, Send, AlertCircle, Bot,
+  MessageSquare, Mail, Share2, CheckCircle, FileText, Check, Copy
 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const CATEGORIAS_CRM = ['Sin compra', 'Sin categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
 const CATEGORIAS_SCHOOL = ['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'];
+
+// Preloaded template defaults to give immediate utility
+const PRELOADED_TEMPLATES_CRM: Record<string, string> = {
+  'Sin compra': "Hola {{NOMBRE}}, te escribimos de CIMASUR. Vemos que estás registrado en nuestra base pero aún no has programado tus fórmulas magistrales. ¡Queremos ayudarte! Hoy te ofrecemos un 15% de descuento en tu primer pedido de gotas puras o tinturas. ¿Te gustaría cotizar?",
+  'Sin categoría': "Estimado/a {{NOMBRE}}, te saludamos de parte del equipo CIMASUR. Tenemos nuevos catálogos de diluciones y materias primas listos para entrega inmediata esta semana. ¿Podemos asistirte hoy?",
+  'Bronce': "Hola {{NOMBRE}}, agradecemos tu preferencia técnica con CIMASUR. Como cliente BRONCE, tienes acceso a webinars clínicos mensuales gratuitos. Te invitamos a conocer el cronograma de este mes. ¡Hablemos!",
+  'Plata': "Estimado/a {{NOMBRE}}, excelente día. Valoramos mucho tu recurrencia en CIMASUR. Queremos contarte que tu cuenta califica para el programa de envíos優先 priorizados. Contáctanos para coordinar tus despachos de esta semana.",
+  'Oro': "¡Hola {{NOMBRE}}! Como miembro distinguido ORO en CIMASUR, cuentas con un canal de atención clínico prioritario y un 5% de descuento permanente en todas tus preparaciones y nosodes. ¿En qué podemos asesorarte hoy?",
+  'Platinum': "Estimado/a doctor/a {{NOMBRE}}, un orgullo saludarle. Su cuenta PLATINUM en CIMASUR tiene habilitado despacho gratuito inmediato sin monto mínimo y asesoría técnica directa con el laboratorio jefe. Consúltenos el estatus de sus pedidos aquí."
+};
+
+const PRELOADED_TEMPLATES_SCHOOL: Record<string, string> = {
+  'Médico Veterinario': "Estimado/a Dr./Dra. {{NOMBRE}}, le saludamos de la Escuela de Especialización CIMASUR. Iniciamos matrículas para el nuevo Postítulo en Homeopatía y Formulaciones Magistrales Veterinarias. Cupos limitados. ¿Le gustaría recibir el temario académico?",
+  'Técnico': "Hola {{NOMBRE}}, paso por aquí desde Escuela CIMASUR. Te invitamos al nuevo Seminario Práctico sobre Diluciones Homotoxicológicas y manejo de stock de insumos. Conviértete en especialista homologado. ¿Te inscribimos?",
+  'No califica': "Hola {{NOMBRE}}, te escribimos de Escuela CIMASUR. Tenemos cursos de capacitación abierta y charlas generales de introducción a la veterinaria integrativa que podrían interesarte. ¡Te esperamos!",
+  'Sin información': "Hola {{NOMBRE}}, te saludamos de Escuela CIMASUR. Quisiéramos actualizar sus credenciales para enviarle invitaciones a congresos científicos afines a su perfil profesional. ¿Podría respondernos indicando si es Veterinario, Técnico o Estudiante?",
+  'Otro': "Hola {{NOMBRE}}, gusto en saludarle de Escuela CIMASUR. Contamos con programas multidisciplinarios en terapias complementarias listos para comenzar. Solicite asesoría académica personalizada respondiendo este mensaje."
+};
 
 export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
   const [clients, setClients] = useState<any[]>([]);
@@ -25,10 +44,18 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
     contenido: string;
   } | null>(null);
 
+  // Broadcast campaign states
+  const [channel, setChannel] = useState<'whatsapp' | 'email'>('whatsapp');
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [sentStatuses, setSentStatuses] = useState<Record<string, boolean>>({});
+  const [isSavingLog, setIsSavingLog] = useState(false);
+
   useEffect(() => {
     setSelectedCategory(isSchool ? CATEGORIAS_SCHOOL[0] : CATEGORIAS_CRM[1]);
     setAiResult(null);
     setPrompt("");
+    setSentStatuses({});
   }, [isSchool]);
 
   useEffect(() => {
@@ -49,6 +76,14 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
     load();
   }, [isSchool]);
 
+  // Load a beautiful preloaded template when changing category or channel
+  useEffect(() => {
+    const templates = isSchool ? PRELOADED_TEMPLATES_SCHOOL : PRELOADED_TEMPLATES_CRM;
+    const defaultText = templates[selectedCategory] || "Hola {{NOMBRE}}, te saludamos de CIMASUR cobijas de salud técnica. ¿Cómo podemos colaborar con tus objetivos hoy?";
+    setBroadcastMessage(defaultText);
+    setBroadcastSubject(isSchool ? `Invitación Educativa CIMASUR - ${selectedCategory}` : `Innovación CIMASUR - Beneficios ${selectedCategory}`);
+  }, [selectedCategory, isSchool]);
+
   const catClients = useMemo(() => {
     return clients.filter(c => {
       const cat = isSchool ? (c.clasificacion || 'Sin información') : (c.categoria || 'Sin categoría');
@@ -57,7 +92,6 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
   }, [clients, selectedCategory, isSchool]);
 
   const lastActivity = useMemo(() => {
-    // Buscar la última actividad que incluya esta categoría
     const relevant = activities.filter(a => {
       if (isSchool) {
         return a.categoriaObjetivo === 'Todos' || a.categoriaObjetivo === selectedCategory;
@@ -95,7 +129,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
 
       const response = await ai.models.generateContent({
         model: "gemini-3.1-pro-preview",
-        contents: `Eres un Motor de IA de Estrategia Analítica para ${isSchool ? 'Escuela CIMASUR (Educación Médica)' : 'CIMASUR Comercial'}. Contexto actual:\n${context}\n\nInstrucciones del usuario: "${prompt}".\n\nGenera un plan estratégico que devuelva un objeto JSON con los siguientes campos obligatorios:\n- "auditoria": Un diagnóstico profundo del impacto promocional previo o situación actual (1 párrafo).\n- "ficha": Un array de 3 objetos, cada uno con "target" (a quién va dirigido específicamente), "accion" (qué hacer), y "kpi" (qué indicador mejorar).\n- "pasos": Un array de strings con 3-5 pasos operativos inmediatos para el gestor del sistema.\n- "tipo_envio": Debe ser estrictamente "whatsapp" o "email" dependiendo del canal estratégico óptimo.\n- "contenido": Si "tipo_envio" es "whatsapp", proporciona un texto de mensaje altamente persuasivo junto con sugerencias de emojis/imagen. Si es "email", proporciona CÓDIGO HTML COMPLETO de una plantilla lista para enviar por correo, con diseño limpio y atractivo usando colores corporativos, tablas y listados si aplica.`,
+        contents: `Eres un Motor de IA de Estrategia Analítica para ${isSchool ? 'Escuela CIMASUR (Educación Médica)' : 'CIMASUR Comercial'}. Contexto actual:\n${context}\n\nInstrucciones del usuario: "${prompt}".\n\nGenera un plan estratégico que devuelva un objeto JSON con los siguientes campos obligatorios:\n- "auditoria": Un diagnóstico profundo del impacto promocional previo o situación actual (1 párrafo).\n- "ficha": Un array de 3 objetos, cada uno con "target" (a quién va dirigido específicamente), "accion" (qué hacer), y "kpi" (qué indicador mejorar).\n- "pasos": Un array de strings con 3-5 pasos operativos inmediatos para el gestor del sistema.\n- "tipo_envio": Debe ser estrictamente "whatsapp" o "email" dependiendo del canal estratégico óptimo.\n- "contenido": Si "tipo_envio" es "whatsapp", proporciona un texto de mensaje altamente persuasivo preparado con marcadores dinámicos corporativos {{NOMBRE}} y {{CATEGORIA}} o {{PROGRAMA}} junto con sugerencias de emojis. Si es "email", proporciona CÓDIGO HTML COMPLETO de una plantilla lista para enviar por correo de alta fidelidad, con marcadores {{NOMBRE}}. No salgas con markdown adicional fuera del JSON.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -127,11 +161,100 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
       });
       const parsed = JSON.parse(response.text || "{}");
       setAiResult(parsed);
+      
+      // Auto-populate the broadcast templates with the AI outcome to optimize direct flow!
+      if (parsed.contenido) {
+        setBroadcastMessage(parsed.contenido);
+        setChannel(parsed.tipo_envio || "whatsapp");
+      }
     } catch (err) {
       console.error(err);
-      alert("Error al comunicarse con la IA. Revisa consola.");
+      alert("Error al comunicarse con la IA o API Key saturada.");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Helper to replace markers per contact
+  const personalizeMessage = (templateText: string, client: any) => {
+    let text = templateText;
+    text = text.replace(/{{NOMBRE}}/g, client.name || 'Cliente');
+    text = text.replace(/{{CATEGORIA}}/g, client.categoria || selectedCategory);
+    text = text.replace(/{{PROGRAMA}}/g, client.programa || 'Programa de Interés');
+    return text;
+  };
+
+  const handleLaunchWhatsApp = (client: any, text: string) => {
+    const rawNumber = client.phone || '';
+    // Clean characters from phone line
+    const cleanNum = rawNumber.replace(/[^\d+]/g, '');
+    const personalizedText = personalizeMessage(text, client);
+    const apiTarget = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanNum)}&text=${encodeURIComponent(personalizedText)}`;
+    
+    // Mark as messaged locally
+    setSentStatuses(prev => ({ ...prev, [client.id || client.name]: true }));
+    window.open(apiTarget, '_blank');
+  };
+
+  const handleLaunchEmail = (client: any, text: string) => {
+    const mailTo = client.email || '';
+    const personalizedText = personalizeMessage(text, client);
+    const subject = personalizeMessage(broadcastSubject, client);
+    const mailtoUrl = `mailto:${encodeURIComponent(mailTo)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedText)}`;
+    
+    setSentStatuses(prev => ({ ...prev, [client.id || client.name]: true }));
+    window.open(mailtoUrl, '_blank');
+  };
+
+  const handleApplyAICardContent = () => {
+    if (aiResult?.contenido) {
+      setBroadcastMessage(aiResult.contenido);
+      setChannel(aiResult.tipo_envio);
+      alert("¡Plantilla del Motor de IA aplicada con éxito!");
+    }
+  };
+
+  const handleSaveBroadcastCampaign = async () => {
+    if (catClients.length === 0) {
+      alert("No hay destinatarios en el segmento actual para registrar.");
+      return;
+    }
+    
+    setIsSavingLog(true);
+    try {
+      const now = new Date();
+      if (isSchool) {
+        const payload = {
+          createdAt: now.toISOString(),
+          fecha: now.toISOString().split('T')[0],
+          actividad: `Difusión Masiva: ${selectedCategory}`,
+          tipo: channel === 'whatsapp' ? 'WhatsApp Directo' : 'Correo Directo',
+          categoriaObjetivo: selectedCategory,
+          responsable: 'Motor Comercial',
+          detalles: `Mensaje enviado a segmento ${selectedCategory}: "${broadcastMessage.substring(0, 150)}..."`
+        };
+        await localDB.saveToCollection('school_activities', payload);
+        setActivities(prev => [payload, ...prev]);
+      } else {
+        const payload = {
+          createdAt: now.toISOString(),
+          fecha: now.toISOString().split('T')[0],
+          campania: `Difusión Masiva: ${selectedCategory}`,
+          tipo: channel === 'whatsapp' ? 'WhatsApp Directo' : 'Correo Directo',
+          targetCategories: [selectedCategory],
+          estado: 'Completado',
+          creador: 'Motor Comercial',
+          detalles: `Mensaje enviado a segmento ${selectedCategory}: "${broadcastMessage.substring(0, 150)}..."`
+        };
+        await localDB.saveToCollection('crm_activities', payload);
+        setActivities(prev => [payload, ...prev]);
+      }
+      alert("¡La campaña de difusión ha sido guardada con éxito en el Registro de Actividades!");
+    } catch (e) {
+      console.error(e);
+      alert("Error al registrar actividad.");
+    } finally {
+      setIsSavingLog(false);
     }
   };
 
@@ -155,16 +278,16 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
 
         <div className="bg-[#152035] rounded-3xl p-6 lg:p-8 border border-slate-800 shadow-2xl space-y-6">
            <div className="space-y-2">
-             <label className={`text-xs font-black uppercase tracking-widest ${isSchool ? 'text-green-400' : 'text-indigo-400'}`}>
-               {isSchool ? 'Filtrar Clasificación Profesional' : 'Filtrar Categoría Comercial'}
-             </label>
-             <select 
-               className={`w-full lg:w-1/3 bg-[#0D1527] border border-slate-700 text-white rounded-xl px-4 py-3 font-bold focus:ring-2 outline-none ${isSchool ? 'focus:ring-green-500' : 'focus:ring-indigo-500'}`}
-               value={selectedCategory}
-               onChange={(e) => setSelectedCategory(e.target.value)}
-             >
-               {categories.map(c => <option key={c} value={c}>{c}</option>)}
-             </select>
+              <label className={`text-xs font-black uppercase tracking-widest ${isSchool ? 'text-green-400' : 'text-indigo-400'}`}>
+                {isSchool ? 'Filtrar Clasificación Profesional' : 'Filtrar Categoría Comercial'}
+              </label>
+              <select 
+                className={`w-full lg:w-1/3 bg-[#0D1527] border border-slate-700 text-white rounded-xl px-4 py-3 font-bold focus:ring-2 outline-none ${isSchool ? 'focus:ring-green-500' : 'focus:ring-indigo-500'}`}
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
            </div>
 
            <div className="space-y-4 pt-4 border-t border-slate-800/50">
@@ -253,6 +376,179 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
            </div>
         </div>
 
+        {/* 📢 2.5 NUEVO PANEL DE DIFUSIÓN COMERCIAL DIRECTA E INTERACTIVA */}
+        <div className="bg-[#152035] rounded-3xl p-6 lg:p-8 border border-slate-700/60 shadow-2xl space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-[#38BDF8]" />
+                <h3 className="text-lg font-black uppercase tracking-tighter text-white">📢 Panel de Difusión Directa</h3>
+              </div>
+              <p className="text-slate-400 text-xs mt-1">Personaliza y distribuye mensajes directos a tu segmento con WhatsApp y correo.</p>
+            </div>
+            
+            <div className="flex gap-2 bg-[#0D1527] p-1 rounded-xl">
+              <button
+                onClick={() => setChannel('whatsapp')}
+                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all gap-1.5 flex items-center ${channel === 'whatsapp' ? 'bg-[#38BDF8] text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+              </button>
+              <button
+                onClick={() => setChannel('email')}
+                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all gap-1.5 flex items-center ${channel === 'email' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              >
+                <Mail className="w-3.5 h-3.5" /> Email Directo
+              </button>
+            </div>
+          </div>
+
+          {/* Quick template customizer */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-8 space-y-4">
+              {channel === 'email' && (
+                <div className="space-y-2">
+                  <label className="text-[10.5px] uppercase font-black tracking-widest text-[#38BDF8]">Asunto del Correo</label>
+                  <input
+                    type="text"
+                    value={broadcastSubject}
+                    onChange={(e) => setBroadcastSubject(e.target.value)}
+                    className="w-full bg-[#0D1527] border border-slate-700 rounded-xl px-4 py-3 text-xs font-bold text-white focus:ring-1 outline-none"
+                    placeholder="Asunto para la campaña..."
+                  />
+                  <p className="text-[9px] text-slate-500 font-medium">Puedes usar etiquetas como: <strong className="text-[#38BDF8]">&#123;&#123;NOMBRE&#125;&#125;</strong></p>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10.5px] uppercase font-black tracking-widest text-[#38BDF8]">Escribe o Ajusta tu Plantilla Masiva</label>
+                  {aiResult?.contenido && (
+                    <button
+                      onClick={handleApplyAICardContent}
+                      className="text-[9px] bg-indigo-500/20 text-indigo-300 font-black px-2.5 py-1 rounded-md border border-indigo-500/30 hover:bg-indigo-500 hover:text-white transition-all flex items-center gap-1"
+                    >
+                      <Bot className="w-3 h-3" /> Usar contenido de la IA
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  className="w-full bg-[#0D1527] border border-slate-700 rounded-xl p-4 text-xs font-medium text-slate-200 h-32 focus:ring-1 outline-none resize-none"
+                  placeholder="Redacta la plantilla..."
+                />
+                <div className="flex flex-wrap gap-2 text-[10px] text-slate-400 items-center">
+                  <span>Variables dinámicas disponibles:</span>
+                  <span className="px-1.5 py-0.5 bg-slate-800 text-white font-mono rounded select-all">&#123;&#123;NOMBRE&#125;&#125;</span>
+                  {!isSchool && <span className="px-1.5 py-0.5 bg-slate-800 text-white font-mono rounded select-all">&#123;&#123;CATEGORIA&#125;&#125;</span>}
+                  {isSchool && <span className="px-1.5 py-0.5 bg-slate-800 text-white font-mono rounded select-all">&#123;&#123;PROGRAMA&#125;&#125;</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Live interactive previews panel */}
+            <div className="lg:col-span-4 bg-[#0D1527] border border-slate-800 rounded-2xl p-4 space-y-4">
+              <h4 className="text-[10.5px] uppercase font-black tracking-widest text-[#38BDF8] border-b border-slate-800 pb-2">Vista Previa Dinámica</h4>
+              {catClients.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 bg-[#152035] px-3 py-1.5 rounded-lg border border-slate-800">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold text-slate-300">Generando borrador para: {catClients[0].name}</span>
+                  </div>
+                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-[11px] leading-relaxed select-all max-h-40 overflow-y-auto font-medium">
+                    {personalizeMessage(broadcastMessage, catClients[0])}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-slate-500 text-[10px]">Sin destinatarios en la categoría seleccionada para previsualizar.</p>
+              )}
+              
+              <div className="pt-2">
+                <button
+                  onClick={handleSaveBroadcastCampaign}
+                  disabled={isSavingLog || catClients.length === 0}
+                  className="w-full bg-[#1e293b] hover:bg-[#344155] border border-slate-700/60 text-white text-[10px] font-black uppercase tracking-widest py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <FileText className="w-3.5 h-3.5" /> Registrar Difusión en Historial
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* List of prospects with active fast launch buttons */}
+          <div className="space-y-3 pt-4 border-t border-slate-800">
+            <div className="flex justify-between items-center">
+              <h4 className="text-[11px] uppercase font-black tracking-widest text-white flex items-center gap-1.5">
+                ⚡ Despacho Directo por Destinatario: <span className="text-[#38BDF8]">{catClients.length} Prospectos listos</span>
+              </h4>
+            </div>
+            
+            {catClients.length > 0 ? (
+              <div className="max-h-[300px] overflow-y-auto border border-slate-800/80 rounded-xl custom-scrollbar bg-slate-900/40">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#111A2E]/50 border-b border-slate-800 text-slate-400">
+                      <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-wider">Prospecto (Contacto)</th>
+                      <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-wider">Contacto (Celular / Email)</th>
+                      <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-right">Lanzamiento Directo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catClients.map((client, idx) => {
+                      const isSent = sentStatuses[client.id || client.name];
+                      const contactInfo = channel === 'whatsapp' ? (client.phone || 'Sin número') : (client.email || 'Sin email');
+                      
+                      return (
+                        <tr key={idx} className="border-b border-slate-800 hover:bg-[#152035]/60 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-1">
+                              {isSent ? (
+                                <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              ) : (
+                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                              )}
+                              <span className="font-bold text-white text-[11px] block truncate max-w-[200px]">{client.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="text-[10px] font-mono text-slate-400">{contactInfo}</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {channel === 'whatsapp' ? (
+                              <button
+                                onClick={() => handleLaunchWhatsApp(client, broadcastMessage)}
+                                className={`text-[10px] font-black uppercase px-2.5 py-1.5 rounded-md tracking-wider transition-all inline-flex items-center gap-1.5 border ${isSent ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-green-600 hover:bg-green-500 text-white shadow-sm border-green-700'}`}
+                              >
+                                {isSent ? <Check className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
+                                {isSent ? 'Enviado' : 'WhatsApp'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleLaunchEmail(client, broadcastMessage)}
+                                className={`text-[10px] font-black uppercase px-2.5 py-1.5 rounded-md tracking-wider transition-all inline-flex items-center gap-1.5 border ${isSent ? 'bg-[#38BDF8]/10 border-[#38BDF8]/20 text-[#38BDF8]' : 'bg-indigo-600 hover:bg-indigo-505 text-white shadow-sm border-indigo-700'}`}
+                              >
+                                {isSent ? <Check className="w-3 h-3" /> : <Mail className="w-3 h-3" />}
+                                {isSent ? 'Enviado' : 'Enviar Email'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 text-center bg-slate-900/10 border border-slate-800 rounded-xl">
+                <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                <p className="text-slate-400 text-[11px] font-bold">No hay prospectos o clientes registrados en la categoría "{selectedCategory}".</p>
+                <p className="text-slate-600 text-[10px] mt-0.5">Asigne clientes a este segmento en el panel de registro comercial.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* 3. Consola de Outputs Estructurados de IA (Bloque Inferior) */}
         {aiResult && (
           <div className={`bg-[#152035] rounded-3xl border-2 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500 ${isSchool ? 'border-green-500/40 shadow-green-500/10' : 'border-indigo-500/40 shadow-indigo-500/10'}`}>
@@ -282,7 +578,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                         <div className="h-px bg-slate-800" />
                         <div>
                            <p className="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-1">Acción</p>
-                           <p className="text-sm font-bold text-blue-400">{f.accion}</p>
+                           <p className="text-sm font-bold text-[#38BDF8]">{f.accion}</p>
                         </div>
                         <div className="h-px bg-slate-800" />
                         <div>
