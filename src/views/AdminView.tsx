@@ -63,8 +63,9 @@ import { addNotification } from '../lib/notifications';
 
 import CimasurInventoryManager from './admin/CimasurInventoryManager';
 import ResumenVentasManager from './admin/ResumenVentasManager';
+import PresupuestoFlujoManager from './admin/PresupuestoFlujoManager';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas' | 'presupuesto_flujo';
 
 export default function AdminView() {
   const { user } = useAuth();
@@ -87,6 +88,7 @@ export default function AdminView() {
       if (view === 'dte') col = 'dte_records';
       if (view === 'pet_payments') col = 'pet_payments';
       if (view === 'school_payments') col = 'school_payments';
+      if (view === 'presupuesto_flujo') col = 'presupuesto_records';
       const data = await localDB.getCollection(col);
       setRecords(data);
     };
@@ -165,6 +167,13 @@ export default function AdminView() {
             onClick={() => setView('resumen_ventas')}
             color="indigo"
           />
+          <ModuleCard 
+            title="Matriz de Presupuesto y Flujo"
+            desc="Control detallado de presupuesto anual, proyecciones y gastos mensuales."
+            icon={FileSpreadsheet}
+            onClick={() => setView('presupuesto_flujo')}
+            color="purple"
+          />
         </div>
       </div>
     );
@@ -188,6 +197,7 @@ export default function AdminView() {
       {view === 'resumen_ventas' && <ResumenVentasManager />}
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'school_payments' && <SchoolPaymentsManager records={records} setRecords={setRecords} />}
+      {view === 'presupuesto_flujo' && <PresupuestoFlujoManager />}
       
     </div>
   );

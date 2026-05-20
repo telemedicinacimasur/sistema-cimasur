@@ -258,38 +258,50 @@ export default function ResumenVentasManager() {
         const tables = [];
         const images: string[] = [];
 
+        // Calculation of totals for summarized section
+        let totalFrascos = 0;
+        let countFrascos = 0;
+        let totalPesos = 0;
+        let countPesos = 0;
+
         // Capture frascos chart
         if (viewFilter === 'all' || viewFilter === 'frascos') {
              const chartF = document.getElementById('chart-frascos');
              if (chartF) {
-                 const dataUrl = await toPng(chartF, { backgroundColor: '#0D1527', pixelRatio: 2 });
+                 // Add temporary title for capture
+                 const titleEl = document.createElement('div');
+                 titleEl.innerText = `UNIDADES FRASCOS - AÑOS ${currentYears.join(', ')}`;
+                 titleEl.style.color = '#FBBF24';
+                 titleEl.style.fontWeight = 'bold';
+                 titleEl.style.textAlign = 'center';
+                 titleEl.style.marginBottom = '10px';
+                 chartF.prepend(titleEl);
+                 
+                 const dataUrl = await toPng(chartF, { backgroundColor: '#0D1527', pixelRatio: 1.5 });
                  images.push(dataUrl);
+                 
+                 chartF.removeChild(titleEl);
              }
 
              // Frascos Table rows
              const frascosRows = [];
              MONTHS.forEach((m, idx) => {
-                 frascosRows.push([
-                     m.toUpperCase(),
-                     ...currentYears.map(y => getFrascos(y, idx) || '-')
-                 ]);
+                 const rowCells = [m.toUpperCase()];
+                 currentYears.forEach(y => {
+                     const v = getFrascos(y, idx);
+                     if (isDateInRange(y, idx)) {
+                         totalFrascos += v;
+                         countFrascos++;
+                     }
+                     rowCells.push(String(v || '-'));
+                 });
+                 frascosRows.push(rowCells);
              });
              const arrTotalsFrascos = currentYears.map(y => {
-                 let t = 0; for(let i=0; i<12; i++) t += getFrascos(y, i); return t || '-';
+                 let t = 0; for(let i=0; i<12; i++) t += getFrascos(y, i); return String(t || '-');
              });
              frascosRows.push(['TOTAL ANUAL', ...arrTotalsFrascos]);
              
-             const arrMetaFrascos = currentYears.map(y => {
-                 return getMetaFrascosAnual(y) || '-';
-             });
-             frascosRows.push(['META ANUAL', ...arrMetaFrascos]);
-             
-             const arrDiffFrascos = currentYears.map(y => {
-                 let t = 0; for(let i=0; i<12; i++) { t += getFrascos(y, i); }
-                 const ma = getMetaFrascosAnual(y); if(t===0 || ma===0) return '-'; return String(t - ma);
-             });
-             frascosRows.push(['DIFERENCIA', ...arrDiffFrascos]);
-
              tables.push({
                  title: `Unidades: Frascos (${currentYears[0]} - ${currentYears[currentYears.length-1]})`,
                  headers,
@@ -301,36 +313,40 @@ export default function ResumenVentasManager() {
         if (viewFilter === 'all' || viewFilter === 'pesos') {
              const chartP = document.getElementById('chart-pesos');
              if (chartP) {
-                 const dataUrl = await toPng(chartP, { backgroundColor: '#0D1527', pixelRatio: 2 });
+                 // Add temporary title for capture
+                 const titleEl = document.createElement('div');
+                 titleEl.innerText = `RECAUDACIÓN PESOS - AÑOS ${currentYears.join(', ')}`;
+                 titleEl.style.color = '#10B981';
+                 titleEl.style.fontWeight = 'bold';
+                 titleEl.style.textAlign = 'center';
+                 titleEl.style.marginBottom = '10px';
+                 chartP.prepend(titleEl);
+
+                 const dataUrl = await toPng(chartP, { backgroundColor: '#0D1527', pixelRatio: 1.5 });
                  images.push(dataUrl);
+
+                 chartP.removeChild(titleEl);
              }
 
              // Pesos Table rows
              const pesosRows = [];
              MONTHS.forEach((m, idx) => {
-                 pesosRows.push([
-                     m.toUpperCase(),
-                     ...currentYears.map(y => {
-                         const v = getPesos(y, idx); return v > 0 ? `$${v.toLocaleString('es-CL')}` : '-';
-                     })
-                 ]);
+                 const rowCells = [m.toUpperCase()];
+                 currentYears.forEach(y => {
+                     const v = getPesos(y, idx);
+                     if (isDateInRange(y, idx)) {
+                         totalPesos += v;
+                         countPesos++;
+                     }
+                     rowCells.push(v > 0 ? `$${v.toLocaleString('es-CL')}` : '-');
+                 });
+                 pesosRows.push(rowCells);
              });
              const arrTotalsPesos = currentYears.map(y => {
                  let t = 0; for(let i=0; i<12; i++) t += getPesos(y, i); return t > 0 ? `$${t.toLocaleString('es-CL')}` : '-';
              });
              pesosRows.push(['TOTAL ANUAL $', ...arrTotalsPesos]);
              
-             const arrMetaPesos = currentYears.map(y => {
-                 const m = getMetaPesosAnual(y); return m > 0 ? `$${m.toLocaleString('es-CL')}` : '-';
-             });
-             pesosRows.push(['META ANUAL $', ...arrMetaPesos]);
-             
-             const arrDiffPesos = currentYears.map(y => {
-                 let t = 0; for(let i=0; i<12; i++) { t += getPesos(y, i); }
-                 const ma = getMetaPesosAnual(y); if(t===0 || ma===0) return '-'; return `$${(t - ma).toLocaleString('es-CL')}`;
-             });
-             pesosRows.push(['DIFERENCIA $', ...arrDiffPesos]);
-
              tables.push({
                  title: `Recaudación: Pesos (${currentYears[0]} - ${currentYears[currentYears.length-1]})`,
                  headers,
@@ -338,17 +354,26 @@ export default function ResumenVentasManager() {
              });
         }
 
+        const avgFrascos = countFrascos > 0 ? (totalFrascos / countFrascos).toFixed(1) : 0;
+        const avgPesos = countPesos > 0 ? (totalPesos / countPesos) : 0;
+
         exportExpedienteToPDF(
             'REPORTE ANALÍTICO DE VENTAS',
             [
-                { label: 'Rango Visual', value: `${currentYears[0]} a ${currentYears[currentYears.length-1]}` },
                 { label: 'Filtro Activo', value: viewFilter === 'all' ? 'Unidades y Pesos' : viewFilter === 'frascos' ? 'Solo Unidades' : 'Solo Pesos' },
-                { label: 'Fecha de Emisión', value: new Date().toLocaleDateString('es-CL') }
+                { label: 'Rango de Años', value: `${currentYears.join(', ')}` },
+                { label: 'Período', value: `${MONTHS[desde.month]} ${desde.year} - ${MONTHS[hasta.month]} ${hasta.year}` },
+                { label: 'Fecha de Emisión', value: new Date().toLocaleString('es-CL') },
+                { label: '---', value: '---' },
+                { label: 'Total Acumulado Frascos', value: totalFrascos.toLocaleString('es-CL') },
+                { label: 'Total Promedio Frascos', value: String(avgFrascos) },
+                { label: 'Total Acumulado Pesos', value: `$${totalPesos.toLocaleString('es-CL')}` },
+                { label: 'Total Promedio Pesos', value: `$${Math.round(avgPesos).toLocaleString('es-CL')}` }
             ],
-            `analisis_ventas_${Date.now()}`,
+            `rep_ventas_${desde.year}_${Date.now()}`,
             tables,
-            'l', // HORIZONTAL
-            9, 16, 11, 8,
+            'l', 
+            7, 14, 10, 7, // Smaller font sizes to fit
             images
         );
   }

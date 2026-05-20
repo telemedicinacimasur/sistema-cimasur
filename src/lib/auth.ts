@@ -175,7 +175,10 @@ export const localDB = {
   updateInCollection: async (name: string, id: string, updates: any) => {
     if (isFirebaseReady && db) {
       try {
-        await updateDoc(doc(db, name, id), updates);
+        await setDoc(doc(db, name, id), {
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
       } catch (error) {
         console.error(`Firebase update error in ${name}/${id}:`, error);
         throw error;

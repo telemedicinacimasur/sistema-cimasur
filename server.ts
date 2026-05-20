@@ -187,12 +187,12 @@ async function startServer() {
     const records = await readRecords(collection);
     const idx = records.findIndex(r => r.id === id);
     if (idx !== -1) {
-      records[idx] = { ...records[idx], ...req.body };
-      await writeRecords(collection, records);
-      res.json({ success: true });
+      records[idx] = { ...records[idx], ...req.body, id }; // Ensure ID is preserved
     } else {
-      res.status(404).json({ error: 'Registro no encontrado' });
+      records.push({ ...req.body, id });
     }
+    await writeRecords(collection, records);
+    res.json({ success: true });
   });
 
   app.delete('/api/records/:collection/:id', async (req, res) => {
