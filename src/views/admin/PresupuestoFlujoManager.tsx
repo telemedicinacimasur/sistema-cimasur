@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { localDB } from '../../lib/auth';
 import { formatCurrency, cn } from '../../lib/utils';
-import { Save, Plus, Trash2, FileSpreadsheet, RefreshCw, Download, Upload, FileText, X, ChevronRight, ChevronDown, Pencil, Filter } from 'lucide-react';
+import { Save, Plus, Trash2, FileSpreadsheet, RefreshCw, Download, Upload, FileText, X, ChevronRight, ChevronDown, Pencil, Filter, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { addAuditLog } from '../../lib/auth';
 import * as XLSX from 'xlsx';
@@ -41,6 +41,8 @@ export default function PresupuestoFlujoManager() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [visibleMonths, setVisibleMonths] = useState<number[]>([0,1,2,3,4,5,6,7,8,9,10,11]);
   const [showMonthFilter, setShowMonthFilter] = useState(false);
+
+  const [showTotals, setShowTotals] = useState({ ppto: true, gasto: true, saldo: true });
 
   const toggleGroup = (groupId: string) => {
     const newSet = new Set(collapsedGroups);
@@ -542,8 +544,8 @@ export default function PresupuestoFlujoManager() {
                 {renderEditableCell(row.id, 'glosa', row.glosa, 'text')}
               </div>
               {row.canAddChildren && (
-                 <button onClick={handleAddChild} title="Agregar Sub-ítem" className="opacity-0 group-hover/row:opacity-100 p-1 hover:text-emerald-400 text-slate-500 transition-all mr-2">
-                   <Plus className="w-3 h-3"/>
+                 <button onClick={handleAddChild} title="Agregar Sub-ítem" className="p-1 hover:text-emerald-400 text-slate-400 bg-slate-800/50 hover:bg-slate-700 rounded transition-all mr-2 flex items-center justify-center shadow">
+                   <Plus className="w-3.5 h-3.5"/>
                  </button>
               )}
               {isGroup && (
@@ -552,14 +554,6 @@ export default function PresupuestoFlujoManager() {
                   </div>
               )}
             </div>
-          </td>
-          <td className="p-0 border border-slate-800 bg-[#152035]/30 relative">
-            {renderEditableCell(row.id, 'saldoInicial', row.saldoInicial)}
-            {isGroup && children.length > 0 && (
-               <div className="absolute right-1 bottom-0.5 text-[8px] text-blue-300 font-mono tracking-widest uppercase pointer-events-none opacity-60">
-                  {vals.saldoInicial.toLocaleString('es-CL')}
-               </div>
-            )}
           </td>
           {row.months.map((m, idx) => visibleMonths.includes(idx) ? (
             <React.Fragment key={idx}>
@@ -581,18 +575,24 @@ export default function PresupuestoFlujoManager() {
               </td>
             </React.Fragment>
           ) : null)}
-          <td className="p-2 border border-slate-800 text-center font-mono text-blue-300 font-bold bg-[#1E293B]/50">
-            {formatCurrency(vals.totalP)}
-          </td>
-          <td className="p-2 border border-slate-800 text-center font-mono text-emerald-400 font-bold bg-[#1E293B]/50">
-            {formatCurrency(vals.totalG)}
-          </td>
-          <td className={cn(
-            "p-2 border border-slate-800 text-center font-mono font-black bg-[#1E293B]",
-            vals.saldo >= 0 ? "text-purple-400" : "text-rose-500"
-          )}>
-            {formatCurrency(vals.saldo)}
-          </td>
+          {showTotals.ppto && (
+            <td className="p-1.5 border border-slate-800 text-right font-mono text-blue-300 font-bold bg-[#1E293B]/50 text-[10px]">
+              {formatCurrency(vals.totalP)}
+            </td>
+          )}
+          {showTotals.gasto && (
+            <td className="p-1.5 border border-slate-800 text-right font-mono text-emerald-400 font-bold bg-[#1E293B]/50 text-[10px]">
+              {formatCurrency(vals.totalG)}
+            </td>
+          )}
+          {showTotals.saldo && (
+            <td className={cn(
+              "p-1.5 border border-slate-800 text-right font-mono font-black bg-[#1E293B] text-[10px]",
+              vals.saldo >= 0 ? "text-purple-400" : "text-rose-500"
+            )}>
+              {formatCurrency(vals.saldo)}
+            </td>
+          )}
           <td className="p-2 border border-slate-800 text-center">
             {(!row.isGroup || children.length === 0) && (
               <button title="Borrar Fila" onClick={() => handleDeleteRow(row.id)} className="text-slate-600 hover:text-red-500 transition-colors">
@@ -768,20 +768,37 @@ export default function PresupuestoFlujoManager() {
             <thead>
               <tr className="bg-[#1E3A5F] text-white">
                 <th rowSpan={2} className="sticky left-0 z-20 p-2 border border-slate-700 w-64 bg-[#1E3A5F] text-left font-black uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">PRESUPUESTO / GLOSA</th>
-                <th rowSpan={2} className="p-2 border border-slate-700 w-28 text-center font-black uppercase text-blue-300">SALDO INICIAL</th>
                 {MONTH_NAMES.map((m, i) => visibleMonths.includes(i) ? (
-                  <th key={m} colSpan={2} className="p-2 border-x border-t border-slate-700 text-center font-black uppercase text-[10px]">{m}</th>
+                  <th key={m} colSpan={2} className="p-2 border-x border-t border-slate-700 text-center font-black uppercase text-xs tracking-wider">{m}</th>
                 ) : null)}
-                <th rowSpan={2} className="p-2 border border-slate-700 w-32 text-center font-black uppercase">TOTAL PPTO</th>
-                <th rowSpan={2} className="p-2 border border-slate-700 w-32 text-center font-black uppercase">TOTAL GASTO</th>
-                <th rowSpan={2} className="p-2 border border-slate-700 w-32 text-center font-black uppercase">SALDO</th>
-                <th rowSpan={2} className="p-2 border border-slate-700 w-10"></th>
+                {showTotals.ppto && (
+                  <th rowSpan={2} className="p-1.5 border border-slate-700 w-24 text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50" onClick={() => setShowTotals({...showTotals, ppto: false})}>
+                    <div className="flex items-center justify-center gap-1">TOTAL PPTO <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
+                  </th>
+                )}
+                {showTotals.gasto && (
+                  <th rowSpan={2} className="p-1.5 border border-slate-700 w-24 text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50" onClick={() => setShowTotals({...showTotals, gasto: false})}>
+                    <div className="flex items-center justify-center gap-1">TOTAL GASTO <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
+                  </th>
+                )}
+                {showTotals.saldo && (
+                  <th rowSpan={2} className="p-1.5 border border-slate-700 w-24 text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50" onClick={() => setShowTotals({...showTotals, saldo: false})}>
+                    <div className="flex items-center justify-center gap-1">SALDO <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
+                  </th>
+                )}
+                <th rowSpan={2} className="p-2 border border-slate-700 w-12 text-center text-slate-500">
+                  {(!showTotals.ppto || !showTotals.gasto || !showTotals.saldo) && (
+                     <button onClick={() => setShowTotals({ppto: true, gasto: true, saldo: true})} title="Restaurar Totales" className="hover:text-sky-400">
+                       <Eye className="w-3.5 h-3.5" />
+                     </button>
+                  )}
+                </th>
               </tr>
-              <tr className="bg-[#1E3A5F]/80 text-white font-black text-[9px]">
+              <tr className="bg-[#1E3A5F]/80 text-white font-black text-[10px]">
                 {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
-                    <th className="p-1 border border-slate-700 w-14 text-center text-blue-300">Ppto</th>
-                    <th className="p-1 border border-slate-700 w-14 text-center text-emerald-300">Real</th>
+                    <th className="p-1.5 border border-slate-700 w-20 text-center text-blue-300">Ppto</th>
+                    <th className="p-1.5 border border-slate-700 w-20 text-center text-emerald-300">Real</th>
                   </React.Fragment>
                 ) : null)}
               </tr>
@@ -789,65 +806,62 @@ export default function PresupuestoFlujoManager() {
             <tbody className="bg-[#0F172A] divide-y divide-slate-800">
               {/* SECCIÓN INGRESOS */}
               <tr className="bg-[#064E3B]/40 text-emerald-400 font-black text-[10px] uppercase">
-                <td colSpan={2 + 24 + 3 + 1} className="p-1 pl-4 border border-slate-800">INGRESOS</td>
+                <td colSpan={1 + 24 + 3 + 1} className="p-1 pl-4 border border-slate-800">INGRESOS</td>
               </tr>
               {renderTree('income')}
               
               {/* TOTAL INGRESOS PIE */}
               <tr className="bg-[#1E293B] text-emerald-400 font-black text-[10px] uppercase">
                 <td className="sticky left-0 z-10 p-2 border border-slate-700 bg-[#1E293B]">TOTAL INGRESOS</td>
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.saldoInicial)}</td>
                 {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
-                    <td className="p-1 border border-slate-700 text-center font-mono">{incomeTotals.months[i].p.toLocaleString('es-CL')}</td>
-                    <td className="p-1 border border-slate-700 text-center font-mono">{incomeTotals.months[i].g.toLocaleString('es-CL')}</td>
+                    <td className="p-1.5 border border-slate-700 text-right font-mono text-[9px]">{incomeTotals.months[i].p.toLocaleString('es-CL')}</td>
+                    <td className="p-1.5 border border-slate-700 text-right font-mono text-[9px]">{incomeTotals.months[i].g.toLocaleString('es-CL')}</td>
                   </React.Fragment>
                 ) : null)}
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.sumP)}</td>
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.sumG)}</td>
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.sumP - incomeTotals.sumG)}</td>
+                {showTotals.ppto && <td className="p-1.5 border border-slate-700 text-right font-mono text-[10px]">{formatCurrency(incomeTotals.sumP)}</td>}
+                {showTotals.gasto && <td className="p-1.5 border border-slate-700 text-right font-mono text-[10px]">{formatCurrency(incomeTotals.sumG)}</td>}
+                {showTotals.saldo && <td className="p-1.5 border border-slate-700 text-right font-mono text-[10px]">{formatCurrency(incomeTotals.sumP - incomeTotals.sumG)}</td>}
                 <td className="p-2 border border-slate-700"></td>
               </tr>
 
               {/* SECCIÓN EGRESOS */}
               <tr className="bg-[#450A0A]/40 text-red-400 font-black text-[10px] uppercase">
-                <td colSpan={2 + 24 + 3 + 1} className="p-1 pl-4 border border-slate-800">EGRESOS</td>
+                <td colSpan={1 + 24 + 3 + 1} className="p-1 pl-4 border border-slate-800">EGRESOS</td>
               </tr>
               {renderTree('expense')}
 
               {/* TOTAL EGRESOS PIE */}
               <tr className="bg-[#1E293B] text-red-400 font-black text-[10px] uppercase">
                 <td className="sticky left-0 z-10 p-2 border border-slate-700 bg-[#1E293B]">TOTAL EGRESOS</td>
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.saldoInicial)}</td>
                 {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
-                    <td className="p-1 border border-slate-700 text-center font-mono">{expenseTotals.months[i].p.toLocaleString('es-CL')}</td>
-                    <td className="p-1 border border-slate-700 text-center font-mono">{expenseTotals.months[i].g.toLocaleString('es-CL')}</td>
+                    <td className="p-1.5 border border-slate-700 text-right font-mono text-[9px]">{expenseTotals.months[i].p.toLocaleString('es-CL')}</td>
+                    <td className="p-1.5 border border-slate-700 text-right font-mono text-[9px]">{expenseTotals.months[i].g.toLocaleString('es-CL')}</td>
                   </React.Fragment>
                 ) : null)}
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.sumP)}</td>
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.sumG)}</td>
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(expenseTotals.sumP - expenseTotals.sumG)}</td>
+                {showTotals.ppto && <td className="p-1.5 border border-slate-700 text-right font-mono text-[10px]">{formatCurrency(expenseTotals.sumP)}</td>}
+                {showTotals.gasto && <td className="p-1.5 border border-slate-700 text-right font-mono text-[10px]">{formatCurrency(expenseTotals.sumG)}</td>}
+                {showTotals.saldo && <td className="p-1.5 border border-slate-700 text-right font-mono text-[10px]">{formatCurrency(expenseTotals.sumP - expenseTotals.sumG)}</td>}
                 <td className="p-2 border border-slate-700"></td>
               </tr>
 
               {/* SALDOS (INGRESO - EGRESO) */}
               <tr className="bg-slate-900 text-white font-black text-[11px] border-t-2 border-slate-600">
                 <td className="sticky left-0 z-10 p-2 border border-slate-700 bg-slate-900">SALDOS NETOS</td>
-                <td className="p-2 border border-slate-700 text-center font-mono">{formatCurrency(incomeTotals.saldoInicial - expenseTotals.saldoInicial)}</td>
                 {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
-                    <td className={cn("p-1 border border-slate-700 text-center font-mono", (incomeTotals.months[i].p - expenseTotals.months[i].p) >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    <td className={cn("p-1.5 border border-slate-700 text-right font-mono text-[9px]", (incomeTotals.months[i].p - expenseTotals.months[i].p) >= 0 ? "text-emerald-400" : "text-red-400")}>
                       {(incomeTotals.months[i].p - expenseTotals.months[i].p).toLocaleString('es-CL')}
                     </td>
-                    <td className={cn("p-1 border border-slate-700 text-center font-mono font-black", (incomeTotals.months[i].g - expenseTotals.months[i].g) >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    <td className={cn("p-1.5 border border-slate-700 text-right font-mono font-black text-[9px]", (incomeTotals.months[i].g - expenseTotals.months[i].g) >= 0 ? "text-emerald-400" : "text-red-400")}>
                       {(incomeTotals.months[i].g - expenseTotals.months[i].g).toLocaleString('es-CL')}
                     </td>
                   </React.Fragment>
                 ) : null)}
-                <td className="p-2 border border-slate-700 text-center font-mono text-blue-300">{formatCurrency(incomeTotals.sumP - expenseTotals.sumP)}</td>
-                <td className="p-2 border border-slate-700 text-center font-mono text-emerald-300">{formatCurrency(incomeTotals.sumG - expenseTotals.sumG)}</td>
-                <td className="p-2 border border-slate-700 text-center font-mono text-purple-400">{formatCurrency((incomeTotals.sumP - incomeTotals.sumG) - (expenseTotals.sumP - expenseTotals.sumG))}</td>
+                {showTotals.ppto && <td className="p-1.5 border border-slate-700 text-right font-mono text-blue-300 text-[10px]">{formatCurrency(incomeTotals.sumP - expenseTotals.sumP)}</td>}
+                {showTotals.gasto && <td className="p-1.5 border border-slate-700 text-right font-mono text-emerald-300 text-[10px]">{formatCurrency(incomeTotals.sumG - expenseTotals.sumG)}</td>}
+                {showTotals.saldo && <td className="p-1.5 border border-slate-700 text-right font-mono text-purple-400 text-[10px]">{formatCurrency((incomeTotals.sumP - incomeTotals.sumG) - (expenseTotals.sumP - expenseTotals.sumG))}</td>}
                 <td className="p-2 border border-slate-700"></td>
               </tr>
             </tbody>

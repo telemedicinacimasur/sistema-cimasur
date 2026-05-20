@@ -66,15 +66,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Polling for local mode to sync user data across tabs
       const interval = setInterval(async () => {
-        const localUser = sessionStorage.getItem('cimasur_user');
-        if (localUser) {
-          const parsedLocal = JSON.parse(localUser);
-          const { localAuth } = await import('../lib/auth');
-          const updated = await localAuth.getUserById(parsedLocal.uid);
-          if (updated && JSON.stringify(updated) !== JSON.stringify(parsedLocal)) {
-            setUser(updated);
-            sessionStorage.setItem('cimasur_user', JSON.stringify(updated));
+        try {
+          const localUser = sessionStorage.getItem('cimasur_user');
+          if (localUser) {
+            const parsedLocal = JSON.parse(localUser);
+            const { localAuth } = await import('../lib/auth');
+            const updated = await localAuth.getUserById(parsedLocal.uid);
+            if (updated && JSON.stringify(updated) !== JSON.stringify(parsedLocal)) {
+              setUser(updated);
+              sessionStorage.setItem('cimasur_user', JSON.stringify(updated));
+            }
           }
+        } catch (error) {
+          console.warn("Polling user session temporarily failed", error);
         }
       }, 10000); // Check every 10 seconds
 

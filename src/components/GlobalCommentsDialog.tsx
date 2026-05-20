@@ -10,6 +10,13 @@ interface GlobalCommentsDialogProps {
   onClose: () => void;
 }
 
+interface CommentReply {
+  id: string;
+  autor: string;
+  texto: string;
+  fecha: string;
+}
+
 interface CommentRecord {
   id?: string;
   modulo: string;
@@ -19,6 +26,9 @@ interface CommentRecord {
   autorEmail: string;
   fecha: string;
   trabajadorMencionado?: string; // email or username
+  estado?: 'Pendiente' | 'En proceso' | 'Comprado';
+  visibilidad?: string[]; // user emails allowed to see, empty = all
+  respuestas?: CommentReply[];
 }
 
 export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOpen, onClose }) => {
@@ -32,6 +42,11 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
   const [selectedSubModulo, setSelectedSubModulo] = useState('');
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [selectedTrabajador, setSelectedTrabajador] = useState('');
+  const [visibilidad, setVisibilidad] = useState<string[]>([]);
+  
+  // Reply states
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
 
   // Feed Filter states
   const [filterModulo, setFilterModulo] = useState('Todos');
@@ -187,13 +202,17 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
     const tagWorker = selectedTrabajador ? selectedTrabajador : undefined;
 
     const commentItem: CommentRecord = {
+      id: crypto.randomUUID(),
       modulo: selectedModulo,
       subModulo: selectedSubModulo,
       comentario: nuevoComentario,
       autor: user?.displayName || user?.email || 'Usuario',
       autorEmail: user?.email || 'usuario@cimasur.cl',
       fecha: new Date().toISOString(),
-      trabajadorMencionado: tagWorker
+      trabajadorMencionado: tagWorker,
+      estado: 'Pendiente',
+      visibilidad: visibilidad.length > 0 ? visibilidad : undefined,
+      respuestas: []
     };
 
     try {
@@ -216,6 +235,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
       // Reset fields
       setNuevoComentario('');
       setSelectedTrabajador('');
+      setVisibilidad([]);
       
       // Reload feed
       await loadData();
@@ -232,8 +252,51 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
     if (filterModulo !== 'Todos' && c.modulo !== filterModulo) {
       return false;
     }
+    
+    // Visibility check
+    if (c.visibilidad && c.visibilidad.length > 0) {
+      if (!isAdmin && !c.visibilidad.includes(user?.email || '')) {
+        return false; // Not in allowed list and not admin
+      }
+    }
+    
     return true;
   });
+
+  const handleStatusChange = async (id: string, newStatus: 'Pendiente' | 'En proceso' | 'Comprado') => {
+    try {
+      const dbComments = await localDB.getCollection('comments');
+      const target = dbComments.find((c: any) => c.id === id);
+      if (target) {
+        target.estado = newStatus;
+        await localDB.saveToCollection('comments', target);
+        loadData();
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleReplySubmit = async (e: React.FormEvent, commentId: string) => {
+    e.preventDefault();
+    if (!replyText.trim()) return;
+
+    try {
+      const dbComments = await localDB.getCollection('comments');
+      const target = dbComments.find((c: any) => c.id === commentId);
+      if (target) {
+        if (!target.respuestas) target.respuestas = [];
+        target.respuestas.push({
+          id: crypto.randomUUID(),
+          autor: user?.displayName || user?.email || 'Usuario',
+          texto: replyText,
+          fecha: new Date().toISOString(),
+        });
+        await localDB.saveToCollection('comments', target);
+        setReplyText('');
+        setReplyingTo(null);
+        loadData();
+      }
+    } catch (e) { console.error(e); }
+  };
 
   if (!isOpen) return null;
 
@@ -336,6 +399,29 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                   </span>
                 </div>
 
+                {/* Visibility logic */}
+                <div>
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Visibilidad (Quién lo puede ver)</label>
+                  <select
+                    multiple
+                    className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors h-24"
+                    value={visibilidad}
+                    onChange={(e) => {
+                      const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                      if (options.includes('')) setVisibilidad([]);
+                      else setVisibilidad(options);
+                    }}
+                  >
+                    <option value="">Todos los que tengan acceso</option>
+                    {workers.map(w => (
+                      <option key={`vis_${w.uid}`} value={w.email}>{w.displayName || w.email}</option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] text-slate-500 font-bold block mt-1">
+                    Usa Ctrl/Cmd + click para seleccionar varios. (Vacío = todos).
+                  </span>
+                </div>
+
                 {/* Actual Comment textarea */}
                 <div>
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Comentario / Mensaje</label>
@@ -407,9 +493,24 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                         <span className="font-extrabold text-[#38BDF8]">{c.autor}</span>
                         <span className="text-slate-500 font-bold">&lt;{c.autorEmail}&gt;</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-slate-500 font-bold">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {new Date(c.fecha).toLocaleString()}
+                      <div className="flex items-center gap-2">
+                        <select 
+                          className={cn(
+                            "bg-transparent border border-slate-700 rounded-lg p-1 text-[9px] font-black uppercase outline-none cursor-pointer transition-colors",
+                            c.estado === 'Comprado' ? "text-emerald-400 border-emerald-500/30" :
+                            c.estado === 'En proceso' ? "text-amber-400 border-amber-500/30" : "text-rose-400 border-rose-500/30"
+                          )}
+                          value={c.estado || 'Pendiente'}
+                          onChange={(e) => handleStatusChange(c.id!, e.target.value as any)}
+                        >
+                          <option value="Pendiente" className="bg-[#111C31] text-rose-400">Pendiente</option>
+                          <option value="En proceso" className="bg-[#111C31] text-amber-400">En proceso</option>
+                          <option value="Comprado" className="bg-[#111C31] text-emerald-400">Comprado</option>
+                        </select>
+                        <div className="flex items-center gap-1.5 text-slate-500 font-bold">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(c.fecha).toLocaleString()}
+                        </div>
                       </div>
                     </div>
 
@@ -429,9 +530,51 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                     </div>
 
                     {/* Comment text */}
-                    <p className="text-white text-xs font-bold leading-relaxed mb-1 whitespace-pre-wrap">
+                    <p className="text-white text-xs font-bold leading-relaxed mb-3 whitespace-pre-wrap">
                       {c.comentario}
                     </p>
+
+                    {/* Replies */}
+                    {c.respuestas && c.respuestas.length > 0 && (
+                      <div className="mt-2 space-y-2 border-l-2 border-slate-700/50 pl-3">
+                        {c.respuestas.map(r => (
+                          <div key={r.id} className="bg-slate-800/30 p-2.5 rounded-xl border border-slate-700/30 text-[10px]">
+                            <div className="flex justify-between text-slate-400 font-bold mb-1">
+                              <span className="text-sky-300">{r.autor}</span>
+                              <span>{new Date(r.fecha).toLocaleString()}</span>
+                            </div>
+                            <p className="text-slate-200">{r.texto}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="mt-3 flex justify-end">
+                      <button 
+                        onClick={() => setReplyingTo(replyingTo === c.id ? null : c.id!)}
+                        className="text-[10px] font-black uppercase tracking-wider text-sky-400 hover:text-sky-300 flex items-center gap-1.5 transition-colors bg-sky-500/10 px-3 py-1.5 rounded-lg"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" /> {c.respuestas?.length || 0} Respuestas
+                      </button>
+                    </div>
+
+                    {/* Reply Form */}
+                    {replyingTo === c.id && (
+                      <form onSubmit={(e) => handleReplySubmit(e, c.id!)} className="mt-3 pt-3 border-t border-slate-700/50 flex gap-2">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder="Escribe una respuesta..."
+                          className="flex-1 bg-[#090F1B] border border-[#1E3A5F] rounded-lg px-3 py-2 text-xs text-white focus:border-sky-500 outline-none"
+                        />
+                        <button type="submit" className="bg-sky-500 hover:bg-sky-600 text-white rounded-lg px-3 py-2 flex items-center justify-center transition-colors">
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      </form>
+                    )}
                   </div>
                 ))
               )}

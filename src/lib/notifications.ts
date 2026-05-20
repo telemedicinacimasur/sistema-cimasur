@@ -97,14 +97,18 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
   
   // Local mode fallback
   const handleLocalChange = async () => {
-    const data = await localDB.getCollection('notifications');
-    const sorted = [...data].sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return timeB - timeA;
-    });
-    const filtered = sorted.filter(isRecipient);
-    callback(filtered);
+    try {
+      const data = await localDB.getCollection('notifications');
+      const sorted = [...data].sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      const filtered = sorted.filter(isRecipient);
+      callback(filtered);
+    } catch (e) {
+      console.warn("Polling notifications temporarily failed", e);
+    }
   };
 
   handleLocalChange();
