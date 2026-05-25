@@ -1171,6 +1171,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState('Todos');
   const [showProductSummary, setShowProductSummary] = useState(false);
+  const [selectedProductDocs, setSelectedProductDocs] = useState<string | null>(null);
 
   const downloadExcelTemplate = () => {
     const headers = [
@@ -1284,6 +1285,23 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
     return Object.entries(counts)
       .map(([name, qty]) => ({ name, qty }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  const getSalesForProduct = (productName: string) => {
+    return filteredRecords.filter(r => {
+      if (!r.detalleProductos) return false;
+      const items = r.detalleProductos.split(/[,\n]/);
+      return items.some((item: string) => {
+        const trimmed = item.trim();
+        if (!trimmed) return false;
+        const match = trimmed.match(/^(\d+)\s*[xX*]?\s*(.+)$/);
+        let name = trimmed;
+        if (match) {
+          name = match[2].trim();
+        }
+        return name.toUpperCase() === productName.toUpperCase();
+      });
+    });
   };
 
   const consolidated = getConsolidatedProducts();
@@ -1441,26 +1459,33 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
           </div>
 
           {showProductSummary && (
-            <div className="p-4 bg-amber-50 border-b border-amber-100 animate-in slide-in-from-top duration-300">
-               <h4 className="text-[10px] font-black text-amber-800 uppercase mb-3 flex items-center gap-2">
-                 <ListChecks className="w-4 h-4" /> Resumen Consolidado de Productos ({filterMonth})
+            <div className="p-4 bg-[#111C31]/90 border-b border-[#1E3A5F]/60 animate-in slide-in-from-top duration-300">
+               <h4 className="text-[10px] font-black text-amber-400 uppercase mb-3 flex items-center gap-2">
+                 <ListChecks className="w-4 h-4 text-amber-400" /> Resumen Consolidado de Productos ({filterMonth})
                </h4>
-               <div className="bg-[#152035] p-0 rounded-2xl border border-amber-200 shadow-inner max-h-80 overflow-y-auto">
+               <div className="bg-[#152035] p-0 rounded-2xl border border-[#1E3A5F]/50 shadow-inner max-h-80 overflow-y-auto">
                  {consolidated.length > 0 ? (
                    <table className="w-full text-xs">
-                     <thead className="bg-amber-100/50 sticky top-0">
-                       <tr className="text-[9px] font-black text-amber-900 uppercase text-left border-b border-amber-200">
-                         <th className="p-2">Producto</th>
-                         <th className="p-2 text-center w-20">Total</th>
+                     <thead className="bg-[#0A111F] sticky top-0">
+                       <tr className="text-[9px] font-black text-amber-400 uppercase text-left border-b border-[#1E3A5F]/40">
+                         <th className="p-2.5">Producto (Haz clic para ver sus documentos)</th>
+                         <th className="p-2.5 text-center w-28">Total</th>
                        </tr>
                      </thead>
-                     <tbody className="divide-y divide-amber-100">
+                     <tbody className="divide-y divide-slate-800/40">
                        {consolidated.map((item, i) => (
-                         <tr key={i} className="hover:bg-amber-50/50 transition-colors">
-                           <td className="p-2 font-bold text-slate-200">{item.name}</td>
-                           <td className="p-2 text-center">
-                             <span className="bg-amber-600 text-white px-2 py-0.5 rounded-full font-black text-[10px]">
-                               {item.qty}
+                         <tr 
+                           key={i} 
+                           onClick={() => setSelectedProductDocs(item.name)}
+                           className="hover:bg-amber-500/10 cursor-pointer transition-colors"
+                           title={`Haga clic para ver a qué documentos pertenece ${item.name}`}
+                         >
+                           <td className="p-2.5 font-bold text-slate-200 hover:text-amber-400 transition-colors flex items-center gap-2">
+                             <span className="text-amber-500 font-bold">🎯</span> {item.name}
+                           </td>
+                           <td className="p-2.5 text-center">
+                             <span className="bg-amber-500/15 text-amber-400 border border-amber-500/40 px-2.5 py-0.5 rounded-full font-black text-[10px]">
+                               {item.qty} frascos
                              </span>
                            </td>
                          </tr>
@@ -1471,15 +1496,15 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                    <p className="text-xs text-slate-400 italic text-center py-8">No hay detalles de productos para consolidar en esta selección.</p>
                  )}
                </div>
-               <div className="mt-3 text-[9px] text-amber-700 flex justify-between font-bold uppercase">
-                  <span>Mostrando {consolidated.length} productos únicos</span>
+               <div className="mt-3 text-[9px] text-amber-400 flex justify-between font-bold uppercase items-center">
+                  <span>Mostrando {consolidated.length} productos únicos • Haga clic en un producto para ver a qué documentos pertenece.</span>
                   <button 
                     onClick={() => {
                       const text = consolidated.map(item => `${item.qty}x ${item.name}`).join('\n');
                       navigator.clipboard.writeText(text);
                       alert('Resumen consolidado copiado');
                     }}
-                    className="flex items-center gap-1 hover:text-amber-900"
+                    className="flex items-center gap-1 hover:text-white transition-colors"
                   >
                     <ClipboardList className="w-3 h-3" /> Copiar Resumen
                   </button>
@@ -1558,6 +1583,90 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
           </div>
         </div>
       </div>
+
+      {/* Modal to show documents for a selected product */}
+      {selectedProductDocs && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#152035] border-2 border-[#1E293B] shadow-2xl rounded-3xl p-6 w-full max-w-2xl transform transition-all scale-in-center overflow-hidden text-left bg-gradient-to-b from-[#152035] to-[#0F172A]">
+            <div className="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-4">
+              <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <ListChecks className="text-amber-500 w-5 h-5" /> Documentos del Producto: <span className="text-amber-400">{selectedProductDocs}</span>
+              </h4>
+              <button 
+                onClick={() => setSelectedProductDocs(null)} 
+                className="text-slate-400 hover:text-white font-bold text-sm bg-slate-800/60 p-1.5 rounded-full w-8 h-8 flex items-center justify-center transition-colors hover:scale-110 active:scale-95"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-[350px] overflow-y-auto pr-1 space-y-3">
+              {(() => {
+                const matching = getSalesForProduct(selectedProductDocs);
+                if (matching.length > 0) {
+                  return (
+                    <div className="overflow-x-auto rounded-xl border border-slate-750">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="bg-[#111C31] text-slate-300 font-bold border-b border-slate-700 uppercase text-[9px] tracking-wider">
+                            <th className="p-3">Fecha</th>
+                            <th className="p-3">Documento / Boleta</th>
+                            <th className="p-3">Cliente</th>
+                            <th className="p-3 text-center">Unidades</th>
+                            <th className="p-3 text-right">Total Venta</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                          {matching.map((r, idx) => {
+                            let itemQty = 0;
+                            if (r.detalleProductos) {
+                              const items = r.detalleProductos.split(/[,\n]/);
+                              const targetItem = items.find((item: string) => {
+                                const trimmed = item.trim();
+                                if (!trimmed) return false;
+                                const match = trimmed.match(/^(\d+)\s*[xX*]?\s*(.+)$/);
+                                let name = trimmed;
+                                if (match) name = match[2].trim();
+                                return name.toUpperCase() === selectedProductDocs.toUpperCase();
+                              });
+                              if (targetItem) {
+                                const match = targetItem.trim().match(/^(\d+)\s*[xX*]?\s*(.+)$/);
+                                itemQty = match ? parseInt(match[1]) : 1;
+                              }
+                            }
+                            return (
+                              <tr key={r.id || idx} className="hover:bg-slate-850 transition-colors">
+                                <td className="p-3 font-mono text-slate-400">{formatDate(r.fecha)}</td>
+                                <td className="p-3 font-black text-[#38BDF8] font-mono">{r.documento}</td>
+                                <td className="p-3 font-bold text-slate-100 uppercase">{r.cliente}</td>
+                                <td className="p-3 text-center font-extrabold text-amber-400 font-mono text-sm">{itemQty || 1}</td>
+                                <td className="p-3 text-right font-black text-emerald-400 font-mono">{formatCurrency(r.valorCotizacion || 0)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <p className="text-slate-400 italic text-center py-6">No se encontraron documentos de venta para este producto.</p>
+                  );
+                }
+              })()}
+            </div>
+
+            <div className="mt-6 flex justify-end border-t border-slate-700/60 pt-4">
+              <button 
+                onClick={() => setSelectedProductDocs(null)} 
+                className="bg-amber-500 hover:bg-amber-600 text-[#111C31] px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+              >
+                Cerrar Detalle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

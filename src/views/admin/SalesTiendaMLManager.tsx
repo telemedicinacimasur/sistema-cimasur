@@ -212,7 +212,7 @@ export default function SalesTiendaMLManager() {
     }
   };
 
-  const handleAddSaleItem = () => {
+   const handleAddSaleItem = () => {
     if (!tempProduct) {
       alert('Por favor seleccione un producto');
       return;
@@ -230,11 +230,6 @@ export default function SalesTiendaMLManager() {
     };
 
     setSaleItems([...saleItems, newItem]);
-
-    setForm(prev => ({
-      ...prev,
-      valorCotizacion: (prev.valorCotizacion || 0) + newItem.total
-    }));
     
     // Reset temp fields
     setTempProduct('');
@@ -243,14 +238,7 @@ export default function SalesTiendaMLManager() {
   };
 
   const handleRemoveSaleItem = (index: number) => {
-    const itemToRemove = saleItems[index];
     setSaleItems(saleItems.filter((_, i) => i !== index));
-    if (itemToRemove) {
-      setForm(prev => ({
-        ...prev,
-        valorCotizacion: Math.max(0, (prev.valorCotizacion || 0) - itemToRemove.total)
-      }));
-    }
   };
 
   // Automatic month/year sync when date changes
@@ -338,16 +326,13 @@ export default function SalesTiendaMLManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('¿Está seguro de eliminar este registro de venta?')) {
-      try {
-        await localDB.deleteFromCollection('sales_tienda_ml', id);
-        await addAuditLog(user as any, `Eliminó Venta Tienda/ML`, 'Administración');
-        alert('Venta eliminada.');
-        loadData();
-      } catch (err) {
-        console.error(err);
-        alert('Error al intentar eliminar.');
-      }
+    try {
+      await localDB.deleteFromCollection('sales_tienda_ml', id);
+      await addAuditLog(user as any, `Eliminó Venta Tienda/ML`, 'Administración');
+      loadData();
+    } catch (err) {
+      console.error(err);
+      alert('Error al intentar eliminar.');
     }
   };
 
@@ -1134,6 +1119,22 @@ export default function SalesTiendaMLManager() {
                     </tr>
                   )}
                 </tbody>
+                {filteredRecords.length > 0 && (
+                  <tfoot className="bg-[#111C31] border-t-2 border-slate-700 font-bold">
+                    <tr className="text-slate-200">
+                      <td colSpan={3} className="p-4 text-left font-black uppercase text-[10px] tracking-widest text-[#38BDF8]">
+                        SUMA TOTAL CONSOLIDADA
+                      </td>
+                      <td className="p-4 text-center font-black text-amber-400 text-[14px] font-mono whitespace-nowrap">
+                        {listFrascos} frascos
+                      </td>
+                      <td className="p-4 text-right font-black text-emerald-400 text-[14px] font-mono whitespace-nowrap">
+                        {formatCurrency(listCotizacion)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
 
