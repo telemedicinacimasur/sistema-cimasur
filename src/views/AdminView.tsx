@@ -64,8 +64,9 @@ import { addNotification } from '../lib/notifications';
 import CimasurInventoryManager from './admin/CimasurInventoryManager';
 import ResumenVentasManager from './admin/ResumenVentasManager';
 import PresupuestoFlujoManager from './admin/PresupuestoFlujoManager';
+import SalesTiendaMLManager from './admin/SalesTiendaMLManager';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas' | 'presupuesto_flujo';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'sales_tienda_ml' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas' | 'presupuesto_flujo';
 
 export default function AdminView() {
   const { user } = useAuth();
@@ -85,6 +86,7 @@ export default function AdminView() {
       let col = 'quotes';
       if (view === 'sales') col = 'sales';
       if (view === 'sales_gestion') col = 'sales_gestion';
+      if (view === 'sales_tienda_ml') col = 'sales_tienda_ml';
       if (view === 'dte') col = 'dte_records';
       if (view === 'pet_payments') col = 'pet_payments';
       if (view === 'school_payments') col = 'school_payments';
@@ -136,6 +138,15 @@ export default function AdminView() {
               icon={ShoppingCart}
               onClick={() => setView('sales_gestion')}
               color="amber"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_gestion')) && (
+            <ModuleCard 
+              title="Ventas Tienda y ML"
+              desc="Detalle de Ventas para canales Tienda Física y Mercado Libre."
+              icon={ShoppingCart}
+              onClick={() => setView('sales_tienda_ml')}
+              color="orange"
             />
           )}
           {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('dte')) && (
@@ -207,10 +218,11 @@ export default function AdminView() {
         <span className="text-sm uppercase tracking-widest">Volver al Menú de Administración</span>
       </button>
 
-      {view === 'codigos_y_diluciones' && <CimasurInventoryManager />}
+       {view === 'codigos_y_diluciones' && <CimasurInventoryManager />}
       {view === 'quotes' && <QuoteManager records={records} setRecords={setRecords} />}
       {view === 'sales' && <SalesManager records={records} setRecords={setRecords} />}
       {view === 'sales_gestion' && <SalesGestionManager records={records} setRecords={setRecords} />}
+      {view === 'sales_tienda_ml' && <SalesTiendaMLManager />}
       {view === 'dte' && <DTEManager records={records} setRecords={setRecords} />}
       {view === 'resumen_ventas' && <ResumenVentasManager />}
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}

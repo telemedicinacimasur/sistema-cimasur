@@ -213,7 +213,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
       autor: user?.displayName || user?.email || 'Usuario',
       autorEmail: user?.email || 'usuario@cimasur.cl',
       fecha: new Date().toISOString(),
-      fechaAsignacion: tagWorker ? fechaAsignacion : undefined,
+      fechaAsignacion: fechaAsignacion || undefined,
       trabajadorMencionado: tagWorker,
       estado: 'Pendiente',
       visibilidad: visibilidad.length > 0 ? visibilidad : undefined,
@@ -269,6 +269,11 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
       if (!isAdmin && !c.visibilidad.includes(user?.email || '')) {
         return false; // Not in allowed list and not admin
       }
+    }
+
+    // Hide archived comments unless showArchived is true
+    if (c.estado === 'Comprado' && !showArchived) {
+      return false;
     }
     
     return true;
@@ -329,7 +334,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
   };
 
   const calendarDays = getCalendarDays();
-  const activeTasks = comments.filter(c => c.trabajadorMencionado && (showArchived ? c.estado === 'Comprado' : c.estado !== 'Comprado'));
+  const activeTasks = comments.filter(c => c.fechaAsignacion && (showArchived ? c.estado === 'Comprado' : c.estado !== 'Comprado'));
 
   if (!isOpen) return null;
 
@@ -521,15 +526,14 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                     
                     {/* Fecha de la tarea */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Fecha de la Tarea en Calendario</label>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Fecha de la Tarea en Calendario (Asignación)</label>
                       <input
                         type="date"
                         className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors uppercase h-[46px]"
                         value={fechaAsignacion}
                         onChange={(e) => setFechaAsignacion(e.target.value)}
-                        disabled={!selectedTrabajador}
-                        required={!!selectedTrabajador}
-                        title={selectedTrabajador ? "Selecciona el día para poner esta nota adhesiva en el Calendario" : "Solo se requiere fecha para tareas dirigidas a trabajadores"}
+                        required
+                        title="Selecciona la fecha para mostrar este comentario en el Calendario"
                       />
                     </div>
                   </div>
@@ -599,6 +603,19 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
               
               {/* Filters for Feed */}
               <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowArchived(!showArchived)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-colors flex items-center gap-1",
+                    showArchived 
+                      ? "bg-[#1E3A5F] text-sky-400 border-[#38BDF8]/40" 
+                      : "bg-[#111C31] text-slate-400 border-slate-700 hover:text-white"
+                  )}
+                  title="Filtra comentarios archivados (marcados como Comprado/Archivado)"
+                >
+                  {showArchived ? 'Ver Archivados ✔' : 'Ocultar Archivados ✖'}
+                </button>
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 <select
                   className="bg-[#111C31] text-[#38BDF8] border border-[#1E3A5F]/50 rounded-lg p-1 px-2 font-bold outline-none"
