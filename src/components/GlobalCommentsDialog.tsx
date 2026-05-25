@@ -335,10 +335,10 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
 
   return (
     <div className="fixed inset-0 bg-[#060B13]/70 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-      <div className="bg-[#0B1527] border border-[#1E3A5F]/80 rounded-3xl w-full max-w-5xl h-[85vh] shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-[#0B1527] border border-[#1E3A5F]/80 rounded-3xl w-full max-w-6xl h-[85vh] shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-[#1E3A5F]/40 bg-[#111C31]">
+        <div className="flex justify-between items-center p-6 border-b border-[#1E3A5F]/40 bg-[#111C31] shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-sky-500/10 rounded-2xl border border-sky-500/30 text-sky-400">
               <MessageSquare className="w-6 h-6 animate-pulse" />
@@ -361,226 +361,237 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
           </button>
         </div>
 
-        {/* TAREAS / NOTAS TIPO CALENDARIO */}
-        <div className="bg-[#091120] border-b border-[#1E3A5F]/40 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-sky-400" />
-              <h3 className="text-[10px] font-black uppercase text-sky-400 tracking-wider">
-                Calendario de Tareas - {new Date().toLocaleString('es-CL', { month: 'long', year: 'numeric' })}
-              </h3>
-            </div>
-            <button 
-              onClick={() => setShowArchived(!showArchived)}
-              className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full border transition-all", showArchived ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white")}
-            >
-              {showArchived ? 'MOSTRANDO ARCHIVADOS' : 'VER ARCHIVADOS'}
-            </button>
-          </div>
-          <div className="p-3 bg-[#0C192E]">
-            <div className="grid grid-cols-7 gap-1 text-[9px] font-black text-slate-500 uppercase text-center mb-1">
-              <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((dateStr, i) => {
-                const dayTasks = dateStr ? activeTasks.filter(c => {
-                   const taskDateStr = c.fechaAsignacion || c.fecha.split('T')[0];
-                   return taskDateStr === dateStr;
-                }) : [];
-                const isToday = dateStr === new Date().toISOString().split('T')[0];
-                
-                return (
-                  <div key={i} className={cn("h-16 md:h-20 rounded-lg p-1 border flex flex-col relative transition-colors", 
-                    dateStr ? "bg-[#111C31] border-slate-800 hover:border-slate-600" : "bg-transparent border-transparent",
-                    isToday && "border-sky-500/50 bg-sky-950/20"
-                  )}>
-                    {dateStr && (
-                      <span className={cn("text-[9px] font-black pl-1", isToday ? "text-sky-400" : "text-slate-500")}>
-                        {parseInt(dateStr.split('-')[2], 10)}
-                      </span>
-                    )}
-                    {dayTasks.length > 0 && (
-                      <div 
-                        onClick={() => setFilterDate(dateStr)}
-                        className="flex-1 mt-1 cursor-pointer relative group"
-                      >
-                         {/* Visual stack of notes */}
-                         {dayTasks.slice(0, 3).map((task, idx) => (
-                           <div 
-                             key={task.id}
-                             className="absolute inset-x-0 bg-yellow-200/90 rounded border border-yellow-400/50 shadow-sm overflow-hidden flex flex-col p-1 transition-transform group-hover:-translate-y-1"
-                             style={{ 
-                               top: `${idx * 4}px`, 
-                               zIndex: 10 - idx,
-                               transform: `scale(${1 - idx * 0.05})`,
-                               opacity: 1 - idx * 0.1
-                             }}
-                           >
-                              <div className="flex items-center gap-1 mb-[1px]">
-                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-sm shrink-0" /> {/* Pin */}
-                                <span className="text-[7px] font-black text-yellow-900 truncate uppercase leading-none">{task.trabajadorMencionado}</span>
-                              </div>
-                              {idx === 0 && (
-                                 <p className="text-[7px] text-yellow-900/80 leading-tight line-clamp-2 truncate">
-                                   {task.comentario}
-                                 </p>
-                              )}
-                           </div>
-                         ))}
-                         {dayTasks.length > 3 && (
-                           <div className="absolute right-0 bottom-0 bg-slate-900 text-white text-[7px] font-bold px-1 rounded-sm z-20">
-                             +{dayTasks.length - 3}
-                           </div>
-                         )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            
-            {/* Replaced Modal with Feed Filter */}
-          </div>
-        </div>
-
-        {/* Content Body */}
-        <div className="flex-1 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#1E3A5F]/40 overflow-hidden">
+        {/* Main Split Layout */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-[#1E3A5F]/40">
           
-          {/* Left panel: Create Comment */}
-          <div className="w-full md:w-[40%] p-6 overflow-y-auto bg-[#0C192E]">
-            <h3 className="text-xs font-black uppercase text-sky-400 tracking-wider mb-4 flex items-center gap-2">
-              <Send className="w-4 h-4" /> Registrar Nuevo Comentario
-            </h3>
-
-            {visibleModules.length === 0 ? (
-              <div className="bg-red-500/10 border border-red-500/35 rounded-2xl p-4 text-center">
-                <ShieldAlert className="w-8 h-8 text-red-500 mx-auto mb-2 animate-bounce" />
-                <p className="text-xs font-black text-white uppercase">Sin permisos de escritura</p>
-                <p className="text-slate-400 text-[11px] font-bold mt-1">No tienes módulos asignados con permisos visibles.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                
-                {/* Module selection */}
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Módulo Destino</label>
-                  <select
-                    className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors"
-                    value={selectedModulo}
-                    onChange={(e) => handleModuloChange(e.target.value)}
-                    required
-                  >
-                    {visibleModules.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+          {/* Left panel: Calendar + Form (Scrollable) */}
+          <div className="w-full lg:w-[55%] flex flex-col overflow-y-auto custom-scrollbar bg-[#0C192E]">
+            
+            {/* TAREAS / NOTAS TIPO CALENDARIO */}
+            <div className="bg-[#091120] border-b border-[#1E3A5F]/40 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-sky-400" />
+                  <h3 className="text-[10px] font-black uppercase text-sky-400 tracking-wider">
+                    Calendario de Tareas - {new Date().toLocaleString('es-CL', { month: 'long', year: 'numeric' })}
+                  </h3>
                 </div>
+                <button 
+                  onClick={() => setShowArchived(!showArchived)}
+                  className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full border transition-all", showArchived ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white")}
+                >
+                  {showArchived ? 'MOSTRANDO ARCHIVADOS' : 'VER ARCHIVADOS'}
+                </button>
+              </div>
+              
+              <div className="p-3 bg-[#0C192E] rounded-xl border border-slate-800">
+                <div className="grid grid-cols-7 gap-1 text-[9px] font-black text-slate-500 uppercase text-center mb-1">
+                  <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarDays.map((dateStr, i) => {
+                    const dayTasks = dateStr ? activeTasks.filter(c => {
+                       const taskDateStr = c.fechaAsignacion || c.fecha.split('T')[0];
+                       return taskDateStr === dateStr;
+                    }) : [];
+                    const isToday = dateStr === new Date().toISOString().split('T')[0];
+                    const isSelected = dateStr === filterDate;
+                    
+                    return (
+                      <div key={i} className={cn("h-16 rounded-lg p-1 border flex flex-col relative transition-colors", 
+                        dateStr ? "bg-[#111C31] border-slate-800 hover:border-slate-600" : "bg-transparent border-transparent",
+                        isToday && "border-sky-500/40 bg-sky-950/20",
+                        isSelected && "border-amber-400/85 bg-amber-950/15"
+                      )}>
+                        {dateStr && (
+                          <span className={cn("text-[9px] font-black pl-1", isToday ? "text-sky-400" : isSelected ? "text-amber-400" : "text-slate-500")}>
+                            {parseInt(dateStr.split('-')[2], 10)}
+                          </span>
+                        )}
+                        {dayTasks.length > 0 && (
+                          <div 
+                            onClick={() => setFilterDate(isSelected ? null : dateStr)}
+                            className="flex-1 mt-0.5 cursor-pointer relative group"
+                            title="Haz clic para filtrar comentarios por este día"
+                          >
+                             {/* Visual stack of notes */}
+                             {dayTasks.slice(0, 3).map((task, idx) => (
+                               <div 
+                                 key={task.id}
+                                 className="absolute inset-x-0 bg-yellow-200/95 rounded border border-yellow-400/50 shadow-sm overflow-hidden flex flex-col p-1 transition-transform group-hover:-translate-y-1"
+                                 style={{ 
+                                   top: `${idx * 4}px`, 
+                                   zIndex: 10 - idx,
+                                   transform: `scale(${1 - idx * 0.05})`,
+                                   opacity: 1 - idx * 0.1
+                                 }}
+                               >
+                                  <div className="flex items-center gap-1 mb-[1px]">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-sm shrink-0" /> {/* Pin */}
+                                    <span className="text-[7.5px] font-extrabold text-yellow-900 truncate uppercase leading-none">{task.trabajadorMencionado?.split('@')[0]}</span>
+                                  </div>
+                                  {idx === 0 && (
+                                     <p className="text-[7px] text-yellow-900/80 leading-tight line-clamp-1 truncate">
+                                       {task.comentario}
+                                     </p>
+                                  )}
+                               </div>
+                             ))}
+                             {dayTasks.length > 3 && (
+                               <div className="absolute right-0 bottom-0 bg-slate-900 text-white text-[7px] font-bold px-1 rounded-sm z-20">
+                                 +{dayTasks.length - 3}
+                               </div>
+                             )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
 
-                {/* Sub-module filter/selection */}
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Sub-Módulo Asociado</label>
-                  <select
-                    className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors"
-                    value={selectedSubModulo}
-                    onChange={(e) => setSelectedSubModulo(e.target.value)}
-                    required
-                  >
-                    {(subModulesMap[selectedModulo] || []).map(sm => (
-                      <option key={sm} value={sm}>{sm}</option>
-                    ))}
-                  </select>
+            {/* Formulario de registro */}
+            <div className="p-6 bg-[#091120]/40">
+              <h3 className="text-xs font-black uppercase text-sky-400 tracking-wider mb-4 flex items-center gap-2">
+                <Send className="w-4 h-4" /> Registrar Nuevo Comentario / Tarea (Nota Adhesiva)
+              </h3>
+
+              {visibleModules.length === 0 ? (
+                <div className="bg-red-500/10 border border-red-500/35 rounded-2xl p-4 text-center">
+                  <ShieldAlert className="w-8 h-8 text-red-500 mx-auto mb-2 animate-bounce" />
+                  <p className="text-xs font-black text-white uppercase">Sin permisos de escritura</p>
+                  <p className="text-slate-400 text-[11px] font-bold mt-1">No tienes módulos asignados con permisos visibles.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Module selection */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Módulo Destino</label>
+                      <select
+                        className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors"
+                        value={selectedModulo}
+                        onChange={(e) => handleModuloChange(e.target.value)}
+                        required
+                      >
+                        {visibleModules.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Sub-module filter/selection */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Sub-Módulo Asociado</label>
+                      <select
+                        className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors"
+                        value={selectedSubModulo}
+                        onChange={(e) => setSelectedSubModulo(e.target.value)}
+                        required
+                      >
+                        {(subModulesMap[selectedModulo] || []).map(sm => (
+                          <option key={sm} value={sm}>{sm}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   {subModulesDescriptions[selectedSubModulo] && (
-                    <span className="text-[10px] text-sky-400 font-bold block mt-1.5 italic bg-sky-500/5 p-2 rounded-lg border border-sky-500/15">
+                    <span className="text-[10px] text-sky-400 font-bold block italic bg-sky-500/5 p-2 rounded-lg border border-sky-500/15">
                       💡 {subModulesDescriptions[selectedSubModulo]}
                     </span>
                   )}
-                </div>
 
-                {/* Mention a specific worker (email/username) */}
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Dirigido a Trabajador (Opcional)</label>
-                  <select
-                    className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors"
-                    value={selectedTrabajador}
-                    onChange={(e) => setSelectedTrabajador(e.target.value)}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Mention a specific worker (email/username) */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Dirigido a Trabajador (Opcional)</label>
+                      <select
+                        className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors"
+                        value={selectedTrabajador}
+                        onChange={(e) => setSelectedTrabajador(e.target.value)}
+                      >
+                        <option value="">A todo el equipo del módulo</option>
+                        {workers.map(w => (
+                          <option key={w.uid} value={w.email || w.displayName}>{w.displayName || w.email} ({w.role})</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Fecha de la tarea */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Fecha de la Tarea en Calendario</label>
+                      <input
+                        type="date"
+                        className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors uppercase h-[46px]"
+                        value={fechaAsignacion}
+                        onChange={(e) => setFechaAsignacion(e.target.value)}
+                        disabled={!selectedTrabajador}
+                        required={!!selectedTrabajador}
+                        title={selectedTrabajador ? "Selecciona el día para poner esta nota adhesiva en el Calendario" : "Solo se requiere fecha para tareas dirigidas a trabajadores"}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Visibility logic */}
+                  <div>
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Visibilidad (Quién lo puede ver)</label>
+                    <select
+                      multiple
+                      className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-2.5 text-xs font-bold focus:border-sky-500 outline-none transition-colors h-20"
+                      value={visibilidad}
+                      onChange={(e) => {
+                        const options = Array.from(e.target.selectedOptions).map((o: any) => o.value);
+                        if (options.includes('')) setVisibilidad([]);
+                        else setVisibilidad(options);
+                      }}
+                    >
+                      <option value="">Todos los que tengan acceso</option>
+                      {workers.map(w => (
+                        <option key={`vis_${w.uid}`} value={w.email}>{w.displayName || w.email}</option>
+                      ))}
+                    </select>
+                    <span className="text-[9px] text-slate-500 font-bold block mt-1">
+                      Usa Ctrl/Cmd + click para seleccionar varios. (Vacío = todos).
+                    </span>
+                  </div>
+
+                  {/* Actual Comment textarea */}
+                  <div>
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Comentario / Mensaje</label>
+                    <textarea
+                      className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-medium h-24 focus:border-sky-500 outline-none transition-colors resize-none"
+                      placeholder="Escribe aquí el mensaje, directriz o consulta para tu equipo..."
+                      value={nuevoComentario}
+                      onChange={(e) => setNuevoComentario(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* Submit button */}
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-sky-500 to-sky-600 text-white py-3 rounded-xl font-bold uppercase text-[11px] tracking-widest hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(56,189,248,0.2)]"
                   >
-                    <option value="">A todo el equipo del módulo</option>
-                    {workers.map(w => (
-                      <option key={w.uid} value={w.email || w.displayName}>{w.displayName || w.email} ({w.role})</option>
-                    ))}
-                  </select>
-                  <span className="text-[10px] text-slate-500 font-bold block mt-1">
-                    Esto enviará una notificación dirigida directamente a este usuario.
-                  </span>
-                </div>
-                
-                {selectedTrabajador && (
-                   <div>
-                     <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Fecha de la Tarea en Calendario</label>
-                     <input
-                       type="date"
-                       className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors uppercase"
-                       value={fechaAsignacion}
-                       onChange={(e) => setFechaAsignacion(e.target.value)}
-                       required
-                     />
-                   </div>
-                )}
+                    <Send className="w-4 h-4" /> GUARDAR COMENTARIO
+                  </button>
+                </form>
+              )}
+            </div>
 
-                {/* Visibility logic */}
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Visibilidad (Quién lo puede ver)</label>
-                  <select
-                    multiple
-                    className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors h-24"
-                    value={visibilidad}
-                    onChange={(e) => {
-                      const options = Array.from(e.target.selectedOptions).map((o: any) => o.value);
-                      if (options.includes('')) setVisibilidad([]);
-                      else setVisibilidad(options);
-                    }}
-                  >
-                    <option value="">Todos los que tengan acceso</option>
-                    {workers.map(w => (
-                      <option key={`vis_${w.uid}`} value={w.email}>{w.displayName || w.email}</option>
-                    ))}
-                  </select>
-                  <span className="text-[10px] text-slate-500 font-bold block mt-1">
-                    Usa Ctrl/Cmd + click para seleccionar varios. (Vacío = todos).
-                  </span>
-                </div>
-
-                {/* Actual Comment textarea */}
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Comentario / Mensaje</label>
-                  <textarea
-                    className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-medium h-28 focus:border-sky-500 outline-none transition-colors resize-none"
-                    placeholder="Escribe aquí el mensaje, directriz o consulta para tu equipo..."
-                    value={nuevoComentario}
-                    onChange={(e) => setNuevoComentario(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* Submit button */}
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-sky-500 to-sky-600 text-white py-3 rounded-xl font-bold uppercase text-[11px] tracking-widest hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(56,189,248,0.2)]"
-                >
-                  <Send className="w-4 h-4" /> GUARDAR COMENTARIO
-                </button>
-              </form>
-            )}
           </div>
 
-          {/* Right panel: Recent History Feed */}
-          <div className="flex-1 p-6 flex flex-col overflow-hidden bg-[#0A111F]">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h3 className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-2">
+          {/* Right panel: Recent History Feed (Fully independently scrollable) */}
+          <div className="w-full lg:w-[45%] flex flex-col overflow-hidden bg-[#0A111F] p-5">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2 shrink-0">
+              <h3 className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-sky-400" /> 
-                {filterDate ? `Tareas del ${filterDate.split('-').reverse().join('/')}` : 'Historial de Comentarios Recientes'}
+                <span className="truncate">
+                  {filterDate ? `Tareas del ${filterDate.split('-').reverse().join('/')}` : 'Comentarios Recientes'}
+                </span>
                 {filterDate && (
-                   <button onClick={() => setFilterDate(null)} className="ml-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-red-400 bg-red-400/10 px-2 py-1 rounded transition-colors inline-flex items-center gap-1">
+                   <button onClick={() => setFilterDate(null)} className="ml-1 text-[9px] font-black uppercase bg-red-400/10 px-2 py-1 rounded text-red-400 hover:text-white transition-colors flex items-center gap-0.5">
                      <X className="w-3 h-3" /> VER TODOS
                    </button>
                 )}
@@ -590,7 +601,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
               <div className="flex items-center gap-2 text-xs">
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 <select
-                  className="bg-[#111C31] text-[#38BDF8] border border-[#1E3A5F]/50 rounded-lg p-1 px-2.5 font-bold outline-none"
+                  className="bg-[#111C31] text-[#38BDF8] border border-[#1E3A5F]/50 rounded-lg p-1 px-2 font-bold outline-none"
                   value={filterModulo}
                   onChange={(e) => setFilterModulo(e.target.value)}
                 >
@@ -603,14 +614,14 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
             </div>
 
             {/* Comments scrollfeed */}
-            <div className="flex-1 overflow-y-auto space-y-3.5 pr-2">
+            <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 custom-scrollbar">
               {loading ? (
                 <div className="text-center py-12 text-slate-400 text-xs font-bold">
                   Buscando historial de comentarios en base de datos...
                 </div>
               ) : filteredCommentsFeed.length === 0 ? (
                 <div className="text-center py-16 border-2 border-dashed border-[#1E3A5F]/30 rounded-2xl bg-[#090F1B]/40 text-slate-400 text-xs font-medium italic">
-                  No se han registrado comentarios en tus módulos accesibles aún.
+                  {filterDate ? "No hay tareas o comentarios registrados para este día." : "No se han registrado comentarios accesibles aún."}
                 </div>
               ) : (
                 filteredCommentsFeed.map((c, i) => (
@@ -619,15 +630,17 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                     className="p-4 bg-[#111C31]/90 rounded-2xl border border-[#1E3A5F]/40 hover:border-sky-500/40 hover:shadow-[0_4px_15px_rgba(0,0,0,0.3)] transition-all flex flex-col relative overflow-hidden group"
                   >
                     {/* Header line of item */}
-                    <div className="flex justify-between items-start gap-3 mb-2 flex-wrap text-[11px]">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-700 font-bold text-white flex items-center justify-center text-[10px]">
+                    <div className="flex justify-between items-start gap-2 mb-2 flex-wrap text-[11px]">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-6 h-6 rounded-full bg-slate-700 font-bold text-white flex items-center justify-center text-[10px] shrink-0">
                           {c.autor[0]?.toUpperCase()}
                         </div>
-                        <span className="font-extrabold text-[#38BDF8]">{c.autor}</span>
-                        <span className="text-slate-500 font-bold">&lt;{c.autorEmail}&gt;</span>
+                        <div className="truncate">
+                          <span className="font-extrabold text-[#38BDF8] block truncate">{c.autor}</span>
+                          <span className="text-slate-500 font-bold text-[9px] block truncate">{c.autorEmail}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <select 
                           className={cn(
                             "bg-transparent border border-slate-700 rounded-lg p-1 text-[9px] font-black uppercase outline-none cursor-pointer transition-colors",
@@ -639,26 +652,30 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                         >
                           <option value="Pendiente" className="bg-[#111C31] text-rose-400">Pendiente</option>
                           <option value="En proceso" className="bg-[#111C31] text-amber-400">En proceso</option>
-                          <option value="Comprado" className="bg-[#111C31] text-emerald-400">Comprado</option>
+                          <option value="Comprado" className="bg-[#111C31] text-emerald-400 font-black">Archivar ✔</option>
                         </select>
-                        <div className="flex items-center gap-1.5 text-slate-500 font-bold">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {new Date(c.fecha).toLocaleString()}
+                        <div className="text-slate-500 font-bold text-[9px] whitespace-nowrap">
+                          {new Date(c.fecha).toLocaleDateString()}
                         </div>
                       </div>
                     </div>
 
                     {/* Tags */}
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500/15 border border-rose-500/35 text-rose-400">
+                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500/15 border border-rose-500/35 text-rose-400">
                         {c.modulo}
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-500/15 border border-indigo-500/35 text-indigo-400">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-500/15 border border-indigo-500/35 text-indigo-400">
                         {c.subModulo}
                       </span>
                       {c.trabajadorMencionado && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/15 border border-amber-500/35 text-amber-400 flex items-center gap-1">
-                          <User className="w-2.5 h-2.5 text-amber-400" /> Dirigido a: {c.trabajadorMencionado}
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/15 border border-amber-500/35 text-amber-500 flex items-center gap-1">
+                          <User className="w-2.5 h-2.5 text-amber-400" /> Para: {c.trabajadorMencionado}
+                        </span>
+                      )}
+                      {c.fechaAsignacion && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-sky-500/15 border border-sky-500/35 text-sky-400 flex items-center gap-1">
+                          <Calendar className="w-2.5 h-2.5 text-sky-400" /> Tarea en: {c.fechaAsignacion.split('-').reverse().join('/')}
                         </span>
                       )}
                     </div>
@@ -687,7 +704,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                     <div className="mt-3 flex justify-end">
                       <button 
                         onClick={() => setReplyingTo(replyingTo === c.id ? null : c.id!)}
-                        className="text-[10px] font-black uppercase tracking-wider text-sky-400 hover:text-sky-300 flex items-center gap-1.5 transition-colors bg-sky-500/10 px-3 py-1.5 rounded-lg"
+                        className="text-[10px] font-black uppercase tracking-wider text-sky-400 hover:text-sky-300 flex items-center gap-1.5 transition-colors bg-sky-500/15 px-3 py-1.5 rounded-lg"
                       >
                         <MessageSquare className="w-3.5 h-3.5" /> {c.respuestas?.length || 0} Respuestas
                       </button>
