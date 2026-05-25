@@ -147,41 +147,9 @@ export default function CimasurInventoryManager() {
     });
   };
 
-  const generateCodeForCurrentForm = () => {
-    const currentBase = activeTab === 'MATRIZ COMPLETA' ? form.base_master || 'SALINA CS' : activeTab;
-    let prefix = PREFIX_MAP[currentBase] || '';
-    
-    const baseRecords = records.filter(r => r.base_master === currentBase);
-    const nums: number[] = [];
-    
-    for (const r of baseRecords) {
-        if (!r.codigo_barras || r.codigo_barras === 'CÓDIGO ÚNICO') continue;
-        const codeStr = String(r.codigo_barras);
-        const match = codeStr.match(/\d+/);
-        if (match) {
-            nums.push(parseInt(match[0], 10));
-        }
-    }
-    
-    let nextNum = 1;
-    if (nums.length > 0) {
-      nextNum = Math.max(...nums) + 1;
-    }
-    
-    if (currentBase === 'ALTAS DILUCIONES') {
-        return `AD${nextNum.toString().padStart(2, '0')}`;
-    }
-    
-    if (currentBase === 'GOTAS PURAS') {
-        return nextNum.toString();
-    }
-    
-    return prefix ? `${prefix}-${nextNum.toString().padStart(3, '0')}` : nextNum.toString();
-  };
-
   useEffect(() => {
     if (showModal && !editingId) {
-       setForm(prev => ({ ...prev, codigo_barras: generateCodeForCurrentForm() }));
+       setForm(prev => ({ ...prev, codigo_barras: '' }));
     }
   }, [showModal, form.categoria_tipo, activeTab]);
 

@@ -41,6 +41,7 @@ export default function PresupuestoFlujoManager() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [visibleMonths, setVisibleMonths] = useState<number[]>([0,1,2,3,4,5,6,7,8,9,10,11]);
   const [showMonthFilter, setShowMonthFilter] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [showTotals, setShowTotals] = useState({ ppto: true, gasto: true, saldo: true });
 
@@ -200,7 +201,9 @@ export default function PresupuestoFlujoManager() {
       glosa: type === 'income' ? 'Nuevo Ingreso' : 'Nuevo Ítem de Gasto',
       saldoInicial: 0,
       months: Array.from({ length: 12 }, () => ({ p: 0, g: 0 })),
-      type
+      type,
+      isGroup: true,
+      canAddChildren: true
     };
     const saved = await localDB.saveToCollection('presupuesto_records', newRow);
     setRows(prev => [...prev, saved]);
@@ -208,9 +211,15 @@ export default function PresupuestoFlujoManager() {
   };
 
   const handleDeleteRow = async (id: string) => {
-    if (!confirm('¿Está seguro de eliminar esta fila?')) return;
+    if (!confirm('¿Está seguro de eliminar esta fila y todo su contenido?')) return;
+    
+    const childrenToDel = rows.filter(r => r.parentId === id);
+    for (const child of childrenToDel) {
+      await localDB.deleteFromCollection('presupuesto_records', child.id);
+    }
     await localDB.deleteFromCollection('presupuesto_records', id);
-    setRows(prev => prev.filter(r => r.id !== id));
+    
+    setRows(prev => prev.filter(r => r.id !== id && r.parentId !== id));
     if (user) await addAuditLog(user, 'Eliminó fila de Matriz de Presupuesto', 'Administración');
   };
 
@@ -453,6 +462,25 @@ export default function PresupuestoFlujoManager() {
     const isEditing = editingCell?.rowId === rowId && editingCell?.field === field && editingCell?.monthIdx === monthIdx;
 
     if (isEditing) {
+      if (type === 'text') {
+        return (
+          <textarea 
+            autoFocus
+            className="w-full h-full min-h-[40px] p-2 bg-[#1E293B] text-white outline-none font-sans text-xs text-left whitespace-pre-wrap resize-none"
+            defaultValue={value}
+            onBlur={(e) => {
+              handleValueChange(rowId, e.target.value, field, monthIdx);
+              handleCellBlur();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
+          />
+        );
+      }
       return (
         <input 
           autoFocus
@@ -472,7 +500,10 @@ export default function PresupuestoFlujoManager() {
 
     return (
       <div 
-        className="p-2 cursor-pointer hover:bg-white/5 truncate text-center font-mono"
+        className={cn(
+          "p-2 cursor-pointer hover:bg-white/5",
+          type === 'number' ? "truncate text-center font-mono" : "text-left whitespace-normal break-words leading-snug font-sans text-[11px]"
+        )}
         onClick={() => setEditingCell({ rowId, field, monthIdx })}
       >
         {type === 'number' ? (value === 0 ? '-' : value.toLocaleString('es-CL')) : value}
@@ -483,11 +514,23 @@ export default function PresupuestoFlujoManager() {
   const renderTree = (type: 'income' | 'expense') => {
     const parentRows = rows.filter(r => r.type === type && !r.parentId);
     
+    const checkMatch = (r: BudgetRow): boolean => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      if (r.glosa.toLowerCase().includes(term)) return true;
+      const rChildren = rows.filter(c => c.parentId === r.id);
+      return rChildren.some(checkMatch);
+    };
+
     const renderNode = (row: BudgetRow, level: number = 0): React.ReactNode[] => {
+      if (!checkMatch(row)) return [];
+
       const children = rows.filter(r => r.parentId === row.id);
-      const isCollapsed = collapsedGroups.has(row.id);
+      // If there is a search term, auto-expand to show matching children
+      const isCollapsed = searchTerm ? false : collapsedGroups.has(row.id);
       
       const isGroup = row.isGroup;
+
       
       let vals = { saldoInicial: row.saldoInicial, months: row.months, totalP: 0, totalG: 0, saldo: 0 };
       if (isGroup) {
@@ -530,11 +573,11 @@ export default function PresupuestoFlujoManager() {
       const rowElement = (
         <tr key={row.id} className={cn("hover:bg-slate-800/30 transition-colors group/row", isGroup ? "bg-blue-900/10 border-y-2 border-blue-500/30" : "")}>
           <td className={cn("sticky left-0 z-10 p-0 border border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.1)]", isGroup ? "bg-blue-900/30" : "bg-[#0F172A] group-hover/row:bg-slate-800")}>
-            <div className="flex items-center" style={{ paddingLeft: `${paddingLeft}px` }}>
+            <div className="flex items-start pt-1.5" style={{ paddingLeft: `${paddingLeft}px` }}>
               {isGroup && children.length > 0 && (
                 <button 
                   onClick={() => toggleGroup(row.id)}
-                  className="w-4 h-4 mr-1 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                  className="w-4 h-4 mr-1 flex items-center justify-center text-slate-400 hover:text-white transition-colors mt-0.5"
                 >
                   {isCollapsed ? <ChevronRight className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>}
                 </button>
@@ -594,11 +637,9 @@ export default function PresupuestoFlujoManager() {
             </td>
           )}
           <td className="p-2 border border-slate-800 text-center">
-            {(!row.isGroup || children.length === 0) && (
               <button title="Borrar Fila" onClick={() => handleDeleteRow(row.id)} className="text-slate-600 hover:text-red-500 transition-colors">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-            )}
           </td>
         </tr>
       );
@@ -679,9 +720,22 @@ export default function PresupuestoFlujoManager() {
               </button>
             </div>
           </div>
+          
+          <div className="relative mt-4">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center justify-center pointer-events-none">
+              <Filter className="h-4 w-4 text-slate-500" />
+            </div>
+            <input
+              type="text"
+              placeholder="BUSCAR GLOSA..."
+              className="w-full bg-[#0F172A] border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-xs font-bold text-white uppercase outline-none focus:border-purple-500 transition-colors placeholder:text-slate-600"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap flex-col md:flex-row gap-2 w-full md:w-auto">
           <button 
             onClick={() => handleAddRow('income')} 
             className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
@@ -767,9 +821,11 @@ export default function PresupuestoFlujoManager() {
           <table className="w-full border-collapse border-spacing-0 text-[11.5px] table-fixed">
             <thead>
               <tr className="bg-[#1E3A5F] text-white">
-                <th rowSpan={2} className="sticky left-0 z-20 p-2 border border-slate-700 w-64 bg-[#1E3A5F] text-left font-black uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">PRESUPUESTO / GLOSA</th>
+                <th rowSpan={2} className="sticky left-0 z-20 p-2 border border-slate-700 w-48 bg-[#1E3A5F] text-left font-black uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">PRESUPUESTO / GLOSA</th>
                 {MONTH_NAMES.map((m, i) => visibleMonths.includes(i) ? (
-                  <th key={m} colSpan={2} className="p-2 border-x border-t border-slate-700 text-center font-black uppercase text-xs tracking-wider">{m}</th>
+                  <th key={m} colSpan={2} className="p-2 border-x border-t border-slate-700 text-center font-black uppercase text-xs tracking-wider group cursor-pointer hover:bg-slate-700/50" onClick={() => setVisibleMonths(prev => prev.filter(v => v !== i))}>
+                    <div className="flex items-center justify-center gap-1">{m} <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
+                  </th>
                 ) : null)}
                 {showTotals.ppto && (
                   <th rowSpan={2} className="p-1.5 border border-slate-700 w-24 text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50" onClick={() => setShowTotals({...showTotals, ppto: false})}>
@@ -797,8 +853,8 @@ export default function PresupuestoFlujoManager() {
               <tr className="bg-[#1E3A5F]/80 text-white font-black text-[10px]">
                 {MONTH_NAMES.map((_, i) => visibleMonths.includes(i) ? (
                   <React.Fragment key={i}>
-                    <th className="p-1.5 border border-slate-700 w-20 text-center text-blue-300">Ppto</th>
-                    <th className="p-1.5 border border-slate-700 w-20 text-center text-emerald-300">Real</th>
+                    <th className="p-1.5 border border-slate-700 w-32 text-center text-blue-300">Ppto</th>
+                    <th className="p-1.5 border border-slate-700 w-32 text-center text-emerald-300">Real</th>
                   </React.Fragment>
                 ) : null)}
               </tr>

@@ -328,6 +328,49 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
           </button>
         </div>
 
+        {/* TAREAS / NOTAS TIPO CALENDARIO */}
+        <div className="bg-[#091120] border-b border-[#1E3A5F]/40 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
+              Calendario de Tareas - {new Date().toLocaleString('es-CL', { month: 'long', year: 'numeric' })}
+            </h3>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+            {comments.filter(c => c.trabajadorMencionado && c.estado !== 'Comprado').length === 0 ? (
+              <div className="text-xs text-slate-500 font-bold italic py-2 px-4 bg-[#111C31] rounded-xl border border-slate-700/50">
+                No hay tareas pendientes asignadas para este mes.
+              </div>
+            ) : (
+              comments
+                .filter(c => c.trabajadorMencionado && c.estado !== 'Comprado')
+                .map(c => (
+                  <div key={`task_${c.id}`} className="min-w-[240px] max-w-[280px] bg-[#152035] p-3 rounded-xl border border-emerald-500/20 shadow-md shrink-0 flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase">
+                          Para: {c.trabajadorMencionado}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-bold">{new Date(c.fecha).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-200 font-bold mb-2 break-words line-clamp-3 leading-snug">
+                        {c.comentario}
+                      </p>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                       <span className={cn("text-[9px] font-black uppercase p-1 px-2 rounded", c.estado === 'En proceso' ? "bg-amber-500/20 text-amber-400" : "bg-rose-500/20 text-rose-400")}>
+                         {c.estado || 'Pendiente'}
+                       </span>
+                       <button onClick={() => handleStatusChange(c.id!, 'Comprado')} className="text-[9px] font-black uppercase bg-slate-800 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 transition-colors px-2 py-1 rounded border border-slate-700">
+                         Archivar ✔
+                       </button>
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+
         {/* Content Body */}
         <div className="flex-1 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#1E3A5F]/40 overflow-hidden">
           
