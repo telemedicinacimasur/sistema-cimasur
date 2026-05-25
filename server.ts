@@ -209,6 +209,55 @@ async function startServer() {
     res.json({ message: 'Backup system needs update' });
   });
 
+  app.post('/api/ai/generate', async (req, res) => {
+    console.log('API call: POST /api/ai/generate');
+    try {
+      const { prompt, context, isSchool } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor." });
+      }
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: `Eres un Motor de IA de Estrategia Analítica para ${isSchool ? 'Escuela CIMASUR (Educación Médica)' : 'CIMASUR Comercial'}. Contexto actual:\n${context}\n\nInstrucciones del usuario: "${prompt}".\n\nGenera un plan estratégico que devuelva un objeto JSON con los siguientes campos obligatorios:\n- "auditoria": Un diagnóstico profundo del impacto promocional previo o situación actual (1 párrafo).\n- "ficha": Un array de 3 objetos, cada uno con "target" (a quién va dirigido específicamente), "accion" (qué hacer), y "kpi" (qué indicador mejorar).\n- "pasos": Un array de strings con 3-5 pasos operativos inmediatos para el gestor del sistema.\n- "tipo_envio": Debe ser estrictamente "whatsapp" o "email" dependiendo del canal estratégico óptimo.\n- "contenido": Si "tipo_envio" es "whatsapp", proporciona un texto de mensaje altamente persuasivo preparado con marcadores dinámicos corporativos {{NOMBRE}} y {{CATEGORIA}} o {{PROGRAMA}} junto con sugerencias de emojis. Si es "email", proporciona CÓDIGO HTML COMPLETO de una plantilla lista para enviar por correo de alta fidelidad, con marcadores {{NOMBRE}}. No salgas con markdown adicional fuera del JSON.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+             type: Type.OBJECT,
+             properties: {
+               auditoria: { type: Type.STRING },
+               ficha: {
+                 type: Type.ARRAY,
+                 items: {
+                   type: Type.OBJECT,
+                   properties: {
+                     target: { type: Type.STRING },
+                     accion: { type: Type.STRING },
+                     kpi: { type: Type.STRING }
+                   }
+                 }
+               },
+               pasos: { type: Type.ARRAY, items: { type: Type.STRING } },
+               tipo_envio: { type: Type.STRING },
+               contenido: { type: Type.STRING }
+             }
+          }
+        }
+      });
+      
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Error AI' });
+    }
+  });
+
   // Integración con Vite para Desarrollo
   if (process.env.NODE_ENV !== 'production') {
     console.log('Iniciando middleware de Vite...');

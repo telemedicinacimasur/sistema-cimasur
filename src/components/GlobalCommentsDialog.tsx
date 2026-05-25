@@ -25,6 +25,7 @@ interface CommentRecord {
   autor: string;
   autorEmail: string;
   fecha: string;
+  fechaAsignacion?: string;
   trabajadorMencionado?: string; // email or username
   estado?: 'Pendiente' | 'En proceso' | 'Comprado';
   visibilidad?: string[]; // user emails allowed to see, empty = all
@@ -42,6 +43,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
   const [selectedSubModulo, setSelectedSubModulo] = useState('');
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [selectedTrabajador, setSelectedTrabajador] = useState('');
+  const [fechaAsignacion, setFechaAsignacion] = useState(new Date().toISOString().split('T')[0]);
   const [visibilidad, setVisibilidad] = useState<string[]>([]);
   
   // Reply states
@@ -50,6 +52,8 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
 
   // Feed Filter states
   const [filterModulo, setFilterModulo] = useState('Todos');
+  const [showArchived, setShowArchived] = useState(false);
+  const [filterDate, setFilterDate] = useState<string | null>(null);
 
   // Sub-modules definition
   const subModulesMap: Record<string, string[]> = {
@@ -209,6 +213,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
       autor: user?.displayName || user?.email || 'Usuario',
       autorEmail: user?.email || 'usuario@cimasur.cl',
       fecha: new Date().toISOString(),
+      fechaAsignacion: tagWorker ? fechaAsignacion : undefined,
       trabajadorMencionado: tagWorker,
       estado: 'Pendiente',
       visibilidad: visibilidad.length > 0 ? visibilidad : undefined,
@@ -235,6 +240,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
       // Reset fields
       setNuevoComentario('');
       setSelectedTrabajador('');
+      setFechaAsignacion(new Date().toISOString().split('T')[0]);
       setVisibilidad([]);
       
       // Reload feed
@@ -253,6 +259,11 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
       return false;
     }
     
+    if (filterDate) {
+      const taskDateStr = c.fechaAsignacion || c.fecha.split('T')[0];
+      if (taskDateStr !== filterDate) return false;
+    }
+
     // Visibility check
     if (c.visibilidad && c.visibilidad.length > 0) {
       if (!isAdmin && !c.visibilidad.includes(user?.email || '')) {
@@ -298,6 +309,28 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
     } catch (e) { console.error(e); }
   };
 
+  // Calendar state
+
+  const getCalendarDays = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const emptyDays = firstDay === 0 ? 6 : firstDay - 1; // Start on Monday
+    
+    const days = [];
+    for (let i = 0; i < emptyDays; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) {
+       const dateStr = new Date(currentYear, currentMonth, i).toISOString().split('T')[0];
+       days.push(dateStr);
+    }
+    return days;
+  };
+
+  const calendarDays = getCalendarDays();
+  const activeTasks = comments.filter(c => c.trabajadorMencionado && (showArchived ? c.estado === 'Comprado' : c.estado !== 'Comprado'));
+
   if (!isOpen) return null;
 
   return (
@@ -330,44 +363,83 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
 
         {/* TAREAS / NOTAS TIPO CALENDARIO */}
         <div className="bg-[#091120] border-b border-[#1E3A5F]/40 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
-              Calendario de Tareas - {new Date().toLocaleString('es-CL', { month: 'long', year: 'numeric' })}
-            </h3>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-sky-400" />
+              <h3 className="text-[10px] font-black uppercase text-sky-400 tracking-wider">
+                Calendario de Tareas - {new Date().toLocaleString('es-CL', { month: 'long', year: 'numeric' })}
+              </h3>
+            </div>
+            <button 
+              onClick={() => setShowArchived(!showArchived)}
+              className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full border transition-all", showArchived ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white")}
+            >
+              {showArchived ? 'MOSTRANDO ARCHIVADOS' : 'VER ARCHIVADOS'}
+            </button>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-            {comments.filter(c => c.trabajadorMencionado && c.estado !== 'Comprado').length === 0 ? (
-              <div className="text-xs text-slate-500 font-bold italic py-2 px-4 bg-[#111C31] rounded-xl border border-slate-700/50">
-                No hay tareas pendientes asignadas para este mes.
-              </div>
-            ) : (
-              comments
-                .filter(c => c.trabajadorMencionado && c.estado !== 'Comprado')
-                .map(c => (
-                  <div key={`task_${c.id}`} className="min-w-[240px] max-w-[280px] bg-[#152035] p-3 rounded-xl border border-emerald-500/20 shadow-md shrink-0 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase">
-                          Para: {c.trabajadorMencionado}
-                        </span>
-                        <span className="text-[9px] text-slate-400 font-bold">{new Date(c.fecha).toLocaleDateString()}</span>
+          <div className="p-3 bg-[#0C192E]">
+            <div className="grid grid-cols-7 gap-1 text-[9px] font-black text-slate-500 uppercase text-center mb-1">
+              <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((dateStr, i) => {
+                const dayTasks = dateStr ? activeTasks.filter(c => {
+                   const taskDateStr = c.fechaAsignacion || c.fecha.split('T')[0];
+                   return taskDateStr === dateStr;
+                }) : [];
+                const isToday = dateStr === new Date().toISOString().split('T')[0];
+                
+                return (
+                  <div key={i} className={cn("h-16 md:h-20 rounded-lg p-1 border flex flex-col relative transition-colors", 
+                    dateStr ? "bg-[#111C31] border-slate-800 hover:border-slate-600" : "bg-transparent border-transparent",
+                    isToday && "border-sky-500/50 bg-sky-950/20"
+                  )}>
+                    {dateStr && (
+                      <span className={cn("text-[9px] font-black pl-1", isToday ? "text-sky-400" : "text-slate-500")}>
+                        {parseInt(dateStr.split('-')[2], 10)}
+                      </span>
+                    )}
+                    {dayTasks.length > 0 && (
+                      <div 
+                        onClick={() => setFilterDate(dateStr)}
+                        className="flex-1 mt-1 cursor-pointer relative group"
+                      >
+                         {/* Visual stack of notes */}
+                         {dayTasks.slice(0, 3).map((task, idx) => (
+                           <div 
+                             key={task.id}
+                             className="absolute inset-x-0 bg-yellow-200/90 rounded border border-yellow-400/50 shadow-sm overflow-hidden flex flex-col p-1 transition-transform group-hover:-translate-y-1"
+                             style={{ 
+                               top: `${idx * 4}px`, 
+                               zIndex: 10 - idx,
+                               transform: `scale(${1 - idx * 0.05})`,
+                               opacity: 1 - idx * 0.1
+                             }}
+                           >
+                              <div className="flex items-center gap-1 mb-[1px]">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-sm shrink-0" /> {/* Pin */}
+                                <span className="text-[7px] font-black text-yellow-900 truncate uppercase leading-none">{task.trabajadorMencionado}</span>
+                              </div>
+                              {idx === 0 && (
+                                 <p className="text-[7px] text-yellow-900/80 leading-tight line-clamp-2 truncate">
+                                   {task.comentario}
+                                 </p>
+                              )}
+                           </div>
+                         ))}
+                         {dayTasks.length > 3 && (
+                           <div className="absolute right-0 bottom-0 bg-slate-900 text-white text-[7px] font-bold px-1 rounded-sm z-20">
+                             +{dayTasks.length - 3}
+                           </div>
+                         )}
                       </div>
-                      <p className="text-[11px] text-slate-200 font-bold mb-2 break-words line-clamp-3 leading-snug">
-                        {c.comentario}
-                      </p>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                       <span className={cn("text-[9px] font-black uppercase p-1 px-2 rounded", c.estado === 'En proceso' ? "bg-amber-500/20 text-amber-400" : "bg-rose-500/20 text-rose-400")}>
-                         {c.estado || 'Pendiente'}
-                       </span>
-                       <button onClick={() => handleStatusChange(c.id!, 'Comprado')} className="text-[9px] font-black uppercase bg-slate-800 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 transition-colors px-2 py-1 rounded border border-slate-700">
-                         Archivar ✔
-                       </button>
-                    </div>
+                    )}
                   </div>
-                ))
-            )}
+                )
+              })}
+            </div>
+            
+            {/* Replaced Modal with Feed Filter */}
           </div>
         </div>
 
@@ -441,6 +513,19 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                     Esto enviará una notificación dirigida directamente a este usuario.
                   </span>
                 </div>
+                
+                {selectedTrabajador && (
+                   <div>
+                     <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Fecha de la Tarea en Calendario</label>
+                     <input
+                       type="date"
+                       className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors uppercase"
+                       value={fechaAsignacion}
+                       onChange={(e) => setFechaAsignacion(e.target.value)}
+                       required
+                     />
+                   </div>
+                )}
 
                 {/* Visibility logic */}
                 <div>
@@ -450,7 +535,7 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
                     className="w-full bg-[#111C31] text-white border-2 border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold focus:border-sky-500 outline-none transition-colors h-24"
                     value={visibilidad}
                     onChange={(e) => {
-                      const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                      const options = Array.from(e.target.selectedOptions).map((o: any) => o.value);
                       if (options.includes('')) setVisibilidad([]);
                       else setVisibilidad(options);
                     }}
@@ -492,7 +577,13 @@ export const GlobalCommentsDialog: React.FC<GlobalCommentsDialogProps> = ({ isOp
           <div className="flex-1 p-6 flex flex-col overflow-hidden bg-[#0A111F]">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-2">
-                <Users className="w-4 h-4 text-sky-400" /> Historial de Comentarios Recientes
+                <Users className="w-4 h-4 text-sky-400" /> 
+                {filterDate ? `Tareas del ${filterDate.split('-').reverse().join('/')}` : 'Historial de Comentarios Recientes'}
+                {filterDate && (
+                   <button onClick={() => setFilterDate(null)} className="ml-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-red-400 bg-red-400/10 px-2 py-1 rounded transition-colors inline-flex items-center gap-1">
+                     <X className="w-3 h-3" /> VER TODOS
+                   </button>
+                )}
               </h3>
               
               {/* Filters for Feed */}

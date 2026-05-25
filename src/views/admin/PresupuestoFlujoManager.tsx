@@ -40,6 +40,7 @@ export default function PresupuestoFlujoManager() {
   const [editingCell, setEditingCell] = useState<{ rowId: string, field: string, monthIdx?: number } | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [visibleMonths, setVisibleMonths] = useState<number[]>([0,1,2,3,4,5,6,7,8,9,10,11]);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showMonthFilter, setShowMonthFilter] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -211,16 +212,20 @@ export default function PresupuestoFlujoManager() {
   };
 
   const handleDeleteRow = async (id: string) => {
-    if (!confirm('¿Está seguro de eliminar esta fila y todo su contenido?')) return;
-    
-    const childrenToDel = rows.filter(r => r.parentId === id);
-    for (const child of childrenToDel) {
-      await localDB.deleteFromCollection('presupuesto_records', child.id);
-    }
-    await localDB.deleteFromCollection('presupuesto_records', id);
-    
+    // Optimistically update UI
     setRows(prev => prev.filter(r => r.id !== id && r.parentId !== id));
-    if (user) await addAuditLog(user, 'Eliminó fila de Matriz de Presupuesto', 'Administración');
+    setConfirmDelete(null);
+
+    try {
+      const childrenToDel = rows.filter(r => r.parentId === id);
+      for (const child of childrenToDel) {
+        await localDB.deleteFromCollection('presupuesto_records', child.id).catch(console.error);
+      }
+      await localDB.deleteFromCollection('presupuesto_records', id).catch(console.error);
+      if (user) await addAuditLog(user, 'Eliminó fila de Matriz de Presupuesto', 'Administración');
+    } catch (err) {
+      console.error('Error al eliminar fila:', err);
+    }
   };
 
   const updateRow = async (id: string, updates: Partial<BudgetRow>) => {
@@ -637,9 +642,20 @@ export default function PresupuestoFlujoManager() {
             </td>
           )}
           <td className="p-2 border border-slate-800 text-center">
-              <button title="Borrar Fila" onClick={() => handleDeleteRow(row.id)} className="text-slate-600 hover:text-red-500 transition-colors">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {confirmDelete === row.id ? (
+                 <div className="flex items-center justify-center gap-1">
+                   <button title="Confirmar Eliminar" onClick={() => handleDeleteRow(row.id)} className="text-red-500 hover:text-red-400 bg-red-500/10 px-1 py-0.5 rounded transition-colors text-[9px] font-black uppercase">
+                     Sí
+                   </button>
+                   <button title="Cancelar" onClick={() => setConfirmDelete(null)} className="text-slate-400 hover:text-white bg-slate-800 px-1 py-0.5 rounded transition-colors text-[9px] font-black uppercase">
+                     No
+                   </button>
+                 </div>
+              ) : (
+                 <button title="Borrar Fila" onClick={() => setConfirmDelete(row.id)} className="text-slate-600 hover:text-red-500 transition-colors">
+                   <Trash2 className="w-3.5 h-3.5" />
+                 </button>
+              )}
           </td>
         </tr>
       );
@@ -817,29 +833,45 @@ export default function PresupuestoFlujoManager() {
       </div>
 
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse border-spacing-0 text-[11.5px] table-fixed">
+        <div className="overflow-x-auto min-h-[500px]">
+          <table className="w-full border-collapse border-spacing-0 text-[11.5px]">
             <thead>
               <tr className="bg-[#1E3A5F] text-white">
-                <th rowSpan={2} className="sticky left-0 z-20 p-2 border border-slate-700 w-48 bg-[#1E3A5F] text-left font-black uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">PRESUPUESTO / GLOSA</th>
+                <th rowSpan={2} className="sticky left-0 z-20 p-2 border border-slate-700 basis-auto min-w-[200px] bg-[#1E3A5F] text-left font-black uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)] w-[300px]">
+                  <div className="flex justify-between items-center">
+                    <span>PRESUPUESTO / GLOSA</span>
+                    {(visibleMonths.length < 12 || !showTotals.ppto || !showTotals.gasto || !showTotals.saldo) && (
+                      <button 
+                        onClick={() => {
+                          setVisibleMonths([0,1,2,3,4,5,6,7,8,9,10,11]);
+                          setShowTotals({ ppto: true, gasto: true, saldo: true });
+                        }} 
+                        className="text-emerald-400 hover:text-emerald-300 transition-colors animate-pulse" 
+                        title="Restaurar Columnas Ocultas"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </th>
                 {MONTH_NAMES.map((m, i) => visibleMonths.includes(i) ? (
-                  <th key={m} colSpan={2} className="p-2 border-x border-t border-slate-700 text-center font-black uppercase text-xs tracking-wider group cursor-pointer hover:bg-slate-700/50" onClick={() => setVisibleMonths(prev => prev.filter(v => v !== i))}>
+                  <th key={m} colSpan={2} className="p-2 border-x border-t border-slate-700 text-center font-black uppercase text-xs tracking-wider group cursor-pointer hover:bg-slate-700/50 min-w-[140px]" onClick={() => setVisibleMonths(prev => prev.filter(v => v !== i))}>
                     <div className="flex items-center justify-center gap-1">{m} <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
                   </th>
                 ) : null)}
                 {showTotals.ppto && (
-                  <th rowSpan={2} className="p-1.5 border border-slate-700 w-24 text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50" onClick={() => setShowTotals({...showTotals, ppto: false})}>
-                    <div className="flex items-center justify-center gap-1">TOTAL PPTO <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
+                  <th rowSpan={2} className="p-1 border border-slate-700 w-[60px] text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50 whitespace-normal leading-tight" onClick={() => setShowTotals({...showTotals, ppto: false})}>
+                    <div className="flex flex-col items-center justify-center gap-0.5">TOT <span className="text-blue-300">PPTO</span> <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100 hidden group-hover:block" /></div>
                   </th>
                 )}
                 {showTotals.gasto && (
-                  <th rowSpan={2} className="p-1.5 border border-slate-700 w-24 text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50" onClick={() => setShowTotals({...showTotals, gasto: false})}>
-                    <div className="flex items-center justify-center gap-1">TOTAL GASTO <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
+                  <th rowSpan={2} className="p-1 border border-slate-700 w-[60px] text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50 whitespace-normal leading-tight" onClick={() => setShowTotals({...showTotals, gasto: false})}>
+                    <div className="flex flex-col items-center justify-center gap-0.5">TOT <span className="text-emerald-400">GASTO</span> <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100 hidden group-hover:block" /></div>
                   </th>
                 )}
                 {showTotals.saldo && (
-                  <th rowSpan={2} className="p-1.5 border border-slate-700 w-24 text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50" onClick={() => setShowTotals({...showTotals, saldo: false})}>
-                    <div className="flex items-center justify-center gap-1">SALDO <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100" /></div>
+                  <th rowSpan={2} className="p-1 border border-slate-700 w-[60px] text-center font-black uppercase text-[9px] group cursor-pointer hover:bg-slate-700/50 whitespace-normal leading-tight" onClick={() => setShowTotals({...showTotals, saldo: false})}>
+                    <div className="flex flex-col items-center justify-center gap-0.5">SALDO <span className="text-purple-400">FINAL</span> <EyeOff className="w-3 h-3 text-slate-400 opacity-50 group-hover:opacity-100 hidden group-hover:block" /></div>
                   </th>
                 )}
                 <th rowSpan={2} className="p-2 border border-slate-700 w-12 text-center text-slate-500">

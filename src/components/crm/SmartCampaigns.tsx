@@ -113,13 +113,6 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
     }
     setIsGenerating(true);
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        alert("Falta configurar la GEMINI_API_KEY.");
-        setIsGenerating(false);
-        return;
-      }
-      
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const actTitle = isSchool ? (lastActivity?.actividad || 'Ninguna actividad') : (lastActivity?.campania || 'Ninguna actividad registrada');
       const context = `
       Segmento analizado: ${selectedCategory}
@@ -127,39 +120,20 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
       Última actividad enviada: ${lastActivity ? actTitle + ' ('+lastActivity.tipo+')' : 'Ninguna actividad registrada'}
       `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: `Eres un Motor de IA de Estrategia Analítica para ${isSchool ? 'Escuela CIMASUR (Educación Médica)' : 'CIMASUR Comercial'}. Contexto actual:\n${context}\n\nInstrucciones del usuario: "${prompt}".\n\nGenera un plan estratégico que devuelva un objeto JSON con los siguientes campos obligatorios:\n- "auditoria": Un diagnóstico profundo del impacto promocional previo o situación actual (1 párrafo).\n- "ficha": Un array de 3 objetos, cada uno con "target" (a quién va dirigido específicamente), "accion" (qué hacer), y "kpi" (qué indicador mejorar).\n- "pasos": Un array de strings con 3-5 pasos operativos inmediatos para el gestor del sistema.\n- "tipo_envio": Debe ser estrictamente "whatsapp" o "email" dependiendo del canal estratégico óptimo.\n- "contenido": Si "tipo_envio" es "whatsapp", proporciona un texto de mensaje altamente persuasivo preparado con marcadores dinámicos corporativos {{NOMBRE}} y {{CATEGORIA}} o {{PROGRAMA}} junto con sugerencias de emojis. Si es "email", proporciona CÓDIGO HTML COMPLETO de una plantilla lista para enviar por correo de alta fidelidad, con marcadores {{NOMBRE}}. No salgas con markdown adicional fuera del JSON.`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              auditoria: { type: Type.STRING },
-              ficha: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    target: { type: Type.STRING },
-                    accion: { type: Type.STRING },
-                    kpi: { type: Type.STRING }
-                  },
-                  required: ["target", "accion", "kpi"]
-                }
-              },
-              pasos: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              },
-              tipo_envio: { type: Type.STRING, enum: ["whatsapp", "email"] },
-              contenido: { type: Type.STRING }
-            },
-            required: ["auditoria", "ficha", "pasos", "tipo_envio", "contenido"]
-          }
-        }
+      const reqRes = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt, context, isSchool })
       });
-      const parsed = JSON.parse(response.text || "{}");
+      
+      if (!reqRes.ok) {
+        throw new Error('Error en Motor IA');
+      }
+      
+      const parsed = await reqRes.json();
+      
       setAiResult(parsed);
       
       // Auto-populate the broadcast templates with the AI outcome to optimize direct flow!

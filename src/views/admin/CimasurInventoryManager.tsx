@@ -27,7 +27,10 @@ const GENERIC_CATEGORIES = [
   'Fórmula Magistral',
   'Productos Simples',
   'Nosodes Simples',
-  'Complejos C100/C200'
+  'Oftálmico',
+  'Esencia Floral',
+  'Producto Simple',
+  'Nosode Simple',
 ];
 
 const PREFIX_MAP: Record<string, string> = {
@@ -147,6 +150,46 @@ export default function CimasurInventoryManager() {
     });
   };
 
+  const getCodeStats = () => {
+    const currentBase = activeTab === 'MATRIZ COMPLETA' ? form.base_master || 'SALINA CS' : activeTab;
+    let prefix = PREFIX_MAP[currentBase] || '';
+    
+    const baseRecords = records.filter(r => r.base_master === currentBase);
+    const nums: number[] = [];
+    
+    for (const r of baseRecords) {
+        if (!r.codigo_barras || r.codigo_barras === 'CÓDIGO ÚNICO') continue;
+        const codeStr = String(r.codigo_barras);
+        const match = codeStr.match(/\d+/);
+        if (match) {
+            nums.push(parseInt(match[0], 10));
+        }
+    }
+    
+    const sortedNums = [...nums].sort((a,b) => a - b);
+    const missing: number[] = [];
+    let nextNum = 1;
+    
+    if (sortedNums.length > 0) {
+       nextNum = sortedNums[sortedNums.length - 1] + 1;
+       // Find gaps up to nextNum
+       const numSet = new Set(sortedNums);
+       for (let i = 1; i < nextNum; i++) {
+          if (!numSet.has(i)) {
+             missing.push(i);
+          }
+       }
+    }
+    
+    const formatCode = (n: number) => {
+       if (currentBase === 'ALTAS DILUCIONES') return `AD${n.toString().padStart(2, '0')}`;
+       if (currentBase === 'GOTAS PURAS') return n.toString();
+       return prefix ? `${prefix}-${n.toString().padStart(3, '0')}` : n.toString();
+    };
+
+    return { nextCode: formatCode(nextNum), missingCodes: missing.map(formatCode).slice(0, 10) };
+  };
+
   useEffect(() => {
     if (showModal && !editingId) {
        setForm(prev => ({ ...prev, codigo_barras: '' }));
@@ -185,6 +228,7 @@ export default function CimasurInventoryManager() {
 
     const finalData = {
       ...form,
+      codigo_barras: isGeneric ? 'GENÉRICO' : form.codigo_barras,
       base_master: currentBase,
       type: 'inventory',
       [editingId ? 'updatedAt' : 'createdAt']: new Date().toISOString(),
@@ -670,21 +714,50 @@ export default function CimasurInventoryManager() {
                 </FormField>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
                 <FormField label={getHeadersForTab(activeTab)[0] || "CÓDIGO"}>
                   <input
                     type="text"
                     required
+                    readOnly={isGeneric}
                     className={cn(
                         "w-full border-b p-2 text-sm font-mono font-bold outline-none",
-                        isGeneric && !editingId ? "border-amber-200 focus:border-amber-500 bg-amber-50 text-amber-900" : "border-[#1E293B] focus:border-[#001736] text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]"
+                        isGeneric ? "border-amber-200 bg-amber-500/10 text-amber-500 cursor-not-allowed" : "border-[#1E293B] focus:border-[#001736] text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]"
                     )}
-                    value={form.codigo_barras || ''}
+                    value={isGeneric ? 'GENÉRICO' : (form.codigo_barras || '')}
                     onChange={e => setForm({...form, codigo_barras: e.target.value})}
                   />
-                  {isGeneric && !editingId && <span className="text-[9px] text-amber-700 font-black uppercase mt-1">CÓDIGO COMPARTIDO (SE PUEDE MODIFICAR)</span>}
+                  {isGeneric && <span className="text-[10px] text-amber-500 font-black uppercase mt-1">GENÉRICO FIJO (NO CORRELATIVO)</span>}
                   {!isGeneric && !editingId && <span className="text-[9px] text-[#38BDF8] font-black uppercase mt-1">CÓDIGO ÚNICO CORRELATIVO</span>}
                 </FormField>
+                
+                {!editingId && !isGeneric && (() => {
+                   const stats = getCodeStats();
+                   return (
+                     <div className="mt-2 bg-[#0F172A] p-3 rounded-xl border border-[#1E293B]">
+                        <h4 className="text-[10px] font-black text-slate-400 mb-2 uppercase">Sugerencias de Códigos:</h4>
+                        <div className="flex flex-wrap gap-2">
+                           <button 
+                               type="button" 
+                               onClick={() => setForm(prev => ({ ...prev, codigo_barras: stats.nextCode }))}
+                               className="text-xs font-mono font-bold bg-sky-500/20 text-sky-400 px-3 py-1.5 rounded-lg border border-sky-500/30 hover:bg-sky-500/40 transition-colors"
+                           >
+                              SIGUIENTE: {stats.nextCode}
+                           </button>
+                           {stats.missingCodes.map(code => (
+                              <button 
+                                  key={code} 
+                                  type="button" 
+                                  onClick={() => setForm(prev => ({ ...prev, codigo_barras: code }))}
+                                  className="text-xs font-mono font-bold bg-rose-500/10 text-rose-400 px-3 py-1.5 rounded-lg border border-rose-500/20 hover:bg-rose-500/30 transition-colors"
+                              >
+                                  RECUPERAR: {code}
+                              </button>
+                           ))}
+                        </div>
+                     </div>
+                   );
+                })()}
               </div>
 
               <FormField label={getHeadersForTab(activeTab)[1] || "PRODUCTO"}>
