@@ -844,16 +844,27 @@ export default function SalesTiendaMLManager() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button 
                     onClick={() => {
-                      const data = filteredRecords.map(r => [
-                        formatDate(r.fecha), 
-                        r.vendedor, 
-                        r.cliente || '', 
-                        r.nroFrascos || 0, 
-                        formatCurrency(r.valorCotizacion || 0),
-                        r.detalleProductos || ''
-                      ]);
-                      data.push(['', '', 'TOTALES', listFrascos, formatCurrency(listCotizacion), '']);
-                      exportTableToPDF('Reporte Ventas Tienda y ML', ['Fecha', 'Canal', 'Cliente', 'Frascos', 'Monto Venta', 'Desglose'], data, 'reporte_ventas_tienda_ml', 'l');
+                      const data = filteredRecords.map(r => {
+                        const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join('\n') || r.detalleProductos || '';
+                        const pricesStr = r.productos?.map(p => formatCurrency(p.precioUnitario)).join('\n') || '';
+                        return [
+                          formatDate(r.fecha), 
+                          r.vendedor, 
+                          r.cliente || '', 
+                          itemsStr,
+                          pricesStr,
+                          r.nroFrascos || 0, 
+                          formatCurrency(r.valorCotizacion || 0)
+                        ];
+                      });
+                      data.push(['', '', 'TOTAL CONSOLIDADO', '', '', listFrascos, formatCurrency(listCotizacion)]);
+                      exportTableToPDF(
+                        'Reporte Ventas Tienda y ML', 
+                        ['Fecha', 'Canal', 'Cliente', 'Productos Detalle', 'Precio Unitario ($)', 'Unidades', 'Total de la Venta ($)'], 
+                        data, 
+                        'reporte_ventas_tienda_ml', 
+                        'l'
+                      );
                     }}
                     className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1.5"
                     title="Exportar registros filtrados a PDF"
@@ -862,17 +873,22 @@ export default function SalesTiendaMLManager() {
                   </button>
                   <button 
                     onClick={() => {
-                      const headers = ['Año', 'Mes', 'Fecha Exacta', 'Canal Vendedor', 'Cliente', 'Total Frascos/Unidades', 'Total Venta ($)', 'Productos Detalle'];
-                      const data = filteredRecords.map(r => [
-                        r.anio, 
-                        r.mes, 
-                        formatDate(r.fecha), 
-                        r.vendedor, 
-                        r.cliente || '', 
-                        r.nroFrascos || 0, 
-                        r.valorCotizacion || 0, 
-                        r.detalleProductos || ''
-                      ]);
+                      const headers = ['Año', 'Mes', 'Fecha Exacta', 'Canal Vendedor', 'Cliente', 'Detalle Productos', 'Precio Unitario ($)', 'Total Frascos/Unidades', 'Total de la Venta ($)'];
+                      const data = filteredRecords.map(r => {
+                        const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join(', ') || r.detalleProductos || '';
+                        const pricesStr = r.productos?.map(p => formatCurrency(p.precioUnitario)).join(', ') || '';
+                        return [
+                          r.anio, 
+                          r.mes, 
+                          formatDate(r.fecha), 
+                          r.vendedor, 
+                          r.cliente || '', 
+                          itemsStr,
+                          pricesStr,
+                          r.nroFrascos || 0, 
+                          r.valorCotizacion || 0
+                        ];
+                      });
                       exportTableToExcel('Ventas Tienda y Mercado Libre', headers, data, 'ventas_tienda_ml_reporte');
                     }}
                     className="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 border border-emerald-500/50 shadow"
@@ -1036,8 +1052,9 @@ export default function SalesTiendaMLManager() {
                     <th className="p-4">Fecha</th>
                     <th className="p-4">Canal</th>
                     <th className="p-4">Cliente / Desglose</th>
-                    <th className="p-4 text-center">Frascos</th>
-                    <th className="p-4 text-right">Monto Venta</th>
+                    <th className="p-4 text-center">Unidades</th>
+                    <th className="p-4 text-right">Precio Unitario ($)</th>
+                    <th className="p-4 text-right">Total de la Venta ($)</th>
                     <th className="p-4 text-center">Gestión</th>
                   </tr>
                 </thead>
@@ -1059,14 +1076,47 @@ export default function SalesTiendaMLManager() {
                       </td>
                       <td className="p-4 max-w-sm">
                         <span className="block font-black text-slate-100 uppercase text-[11px] truncate">{r.cliente}</span>
-                        <span className="block text-[10px] text-slate-400 mt-1 whitespace-pre-line leading-relaxed italic border-l-2 border-slate-700/60 pl-2">
-                          {r.detalleProductos}
-                        </span>
+                        <div className="mt-1 space-y-1">
+                          {r.productos && r.productos.length > 0 ? (
+                            r.productos.map((prod, pIdx) => (
+                              <div key={pIdx} className="text-[10px] text-slate-300 flex items-center gap-1.5 uppercase font-medium">
+                                <span className="text-amber-500">🎯</span> {prod.nombre}
+                              </div>
+                            ))
+                          ) : (
+                            <span className="block text-[10px] text-slate-400 mt-1 whitespace-pre-line leading-relaxed italic border-l-2 border-slate-700/60 pl-2">
+                              {r.detalleProductos}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="p-4 text-center font-extrabold text-white text-[13px] font-mono">
-                        {r.nroFrascos}
+                      <td className="p-4 text-center text-white text-[13px] font-mono">
+                        {r.productos && r.productos.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {r.productos.map((prod, pIdx) => (
+                              <div key={pIdx} className="font-extrabold text-[12px] py-0.5">
+                                {prod.cantidad} x
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="font-extrabold">{r.nroFrascos}</span>
+                        )}
                       </td>
-                      <td className="p-4 text-right font-black text-[#38BDF8] text-[13px] font-mono">
+                      <td className="p-4 text-right text-amber-400 text-[13px] font-mono">
+                        {r.productos && r.productos.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {r.productos.map((prod, pIdx) => (
+                              <div key={pIdx} className="font-semibold text-[11px] py-0.5">
+                                {formatCurrency(prod.precioUnitario)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 italic">-</span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right font-black text-emerald-400 text-[13px] font-mono whitespace-nowrap">
                         {formatCurrency(r.valorCotizacion)}
                       </td>
                       <td className="p-4">
@@ -1113,7 +1163,7 @@ export default function SalesTiendaMLManager() {
 
                   {filteredRecords.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="p-12 text-center text-slate-500 italic">
+                      <td colSpan={7} className="p-12 text-center text-slate-500 italic">
                         No se encontraron registros de ventas que coincidan con los filtros seleccionados.
                       </td>
                     </tr>
@@ -1126,7 +1176,10 @@ export default function SalesTiendaMLManager() {
                         SUMA TOTAL CONSOLIDADA
                       </td>
                       <td className="p-4 text-center font-black text-amber-400 text-[14px] font-mono whitespace-nowrap">
-                        {listFrascos} frascos
+                        {listFrascos} u.
+                      </td>
+                      <td className="p-4 text-right">
+                        {/* Empty spacing space under Unit Prices */}
                       </td>
                       <td className="p-4 text-right font-black text-emerald-400 text-[14px] font-mono whitespace-nowrap">
                         {formatCurrency(listCotizacion)}
