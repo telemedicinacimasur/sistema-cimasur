@@ -199,6 +199,7 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'quotes', label: 'Cotizaciones Generales' },
     { id: 'sales', label: 'Centro de Ventas CRM' },
     { id: 'sales_gestion', label: 'Centro Ventas Gestión' },
+    { id: 'sales_tienda_ml', label: 'Ventas Tienda y Mercado Libre' },
     { id: 'dte', label: 'DTE y Documentos' },
     { id: 'pet_payments', label: 'Pagos Veterinarios' },
     { id: 'school_payments', label: 'Pagos Escuela' },

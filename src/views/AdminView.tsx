@@ -559,6 +559,9 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                     formatCurrency(r.pagoVeterinario || r.pago2 || 0), 
                     formatDate(r.fechaPago || r.pagoVeterinario)
                   ]);
+                  const sumaConsulta = filteredRecords.reduce((acc, r) => acc + (r.pagoConsulta || r.pago1 || 0), 0);
+                  const sumaVeterinario = filteredRecords.reduce((acc, r) => acc + (r.pagoVeterinario || r.pago2 || 0), 0);
+                  data.push(['', 'TOTAL', formatCurrency(sumaConsulta), formatCurrency(sumaVeterinario), '']);
                   exportTableToPDF('Reporte Pagos Veterinarios', ['Fecha', 'Tutor', 'Consulta', 'Veterinario', 'Fecha Pago'], data, 'reporte_pagos_vet', 'l');
                 }}
                 className="bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 text-white p-2 rounded-2xl hover:bg-[#38BDF8]/30 shadow-lg shadow-blue-100"
@@ -579,6 +582,9 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                     r.pagoVeterinario || r.pago2 || 0, 
                     formatDate(r.fechaPago || r.pagoVeterinario)
                   ]);
+                  const sumaConsulta = filteredRecords.reduce((acc, r) => acc + (r.pagoConsulta || r.pago1 || 0), 0);
+                  const sumaVeterinario = filteredRecords.reduce((acc, r) => acc + (r.pagoVeterinario || r.pago2 || 0), 0);
+                  data.push(['', '', '', '', 'TOTAL', sumaConsulta, sumaVeterinario, '']);
                   exportTableToExcel('Reporte Pagos Veterinarios', headers, data, 'reporte_pagos_vet');
                 }}
                 className="bg-emerald-600 text-white p-2 rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-100"
@@ -1031,6 +1037,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                     r.estado || '',
                     r.undTotal || 0,
                   ]);
+                  const sumaUnd = filteredRecords.reduce((acc, r) => acc + (r.undTotal || 0), 0);
+                  data.push(['', '', '', '', 'TOTAL', sumaUnd]);
                   exportTableToPDF('Reporte: Cotizaciones', ['Año/Mes', 'N° Cotiz', 'Cliente', 'Vend', 'Estado', 'UND'], data, 'reporte_cotizaciones', 'l');
                 }}
                 className="bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition-colors hover:bg-[#38BDF8]/30 flex items-center gap-1" 
@@ -2030,6 +2038,8 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
        const exportData = filteredRecords.map(r => [
           r.tipo, r.nombreAlumno || r.rut, formatDate(r.fechaPago), formatCurrency(r.montoTotalRecibido), r.nroFactura || '---'
        ]);
+       const suma = filteredRecords.reduce((acc, r) => acc + (r.tipo === 'Ingreso Alumno' ? r.montoTotalRecibido : -r.montoTotalRecibido), 0);
+       exportData.push(['', '', 'BALANCE TOTAL', formatCurrency(suma), '']);
        exportTableToPDF('Saldos Escuela - Filtro', ['Tipo', 'Nombre/RUT', 'Fecha', 'Monto Recibido', 'N° Factura'], exportData, 'saldos_escuela');
     } else {
        const exportData = filteredRecords.map(r => ({
@@ -2739,7 +2749,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
   };
 
   const getExportData = () => {
-    return filteredRecords.map(r => [
+    const data = filteredRecords.map(r => [
       r.anio || '',
       r.mes || '',
       formatDate(r.fecha) || '',
@@ -2753,10 +2763,15 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       formatCurrency((r.montoNeto || 0) * 0.19),
       formatCurrency(r.total || 0)
     ]);
+    const sumaNeto = filteredRecords.reduce((acc, r) => acc + (r.montoNeto || 0), 0);
+    const sumaIva = filteredRecords.reduce((acc, r) => acc + ((r.montoNeto || 0) * 0.19), 0);
+    const sumaTotal = filteredRecords.reduce((acc, r) => acc + (r.total || 0), 0);
+    data.push(['', '', '', '', 'TOTAL CONSOLIDADO', '', '', '', '', formatCurrency(sumaNeto), formatCurrency(sumaIva), formatCurrency(sumaTotal)]);
+    return data;
   };
   
   const getExcelExportData = () => {
-    return filteredRecords.map(r => [
+    const data = filteredRecords.map(r => [
       r.anio || '',
       r.mes || '',
       formatDateForExcel(r.fecha) || '',
@@ -2770,6 +2785,11 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       (r.montoNeto || 0) * 0.19,
       r.total || 0
     ]);
+    const sumaNeto = filteredRecords.reduce((acc, r) => acc + (r.montoNeto || 0), 0);
+    const sumaIva = filteredRecords.reduce((acc, r) => acc + ((r.montoNeto || 0) * 0.19), 0);
+    const sumaTotal = filteredRecords.reduce((acc, r) => acc + (r.total || 0), 0);
+    data.push(['', '', '', '', 'TOTAL CONSOLIDADO', '', '', '', '', sumaNeto, sumaIva, sumaTotal]);
+    return data;
   };
 
   return (

@@ -20,43 +20,38 @@ import {
   Trash,
   Filter,
   Save,
-  Package
+  Package,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 // Lists of built-in products
 const MERCADO_LIBRE_PRODUCTS = [
-  "Cimasur - Arnica Cs Control Natural Artrosis Perros Y Gatos",
-  "Calostrum Cs Mejora Sistema Inmunológico En Perros Y Gatos.",
-  "Cimasur - Beilschmiedia Cs Bienestar Articular Perros Gatos",
-  "Cimasur - Melissa P Cs Calma Y Tranquiliza En Forma Natural",
-  "Cimasur - Muces Cs Salud Digestiva Para Perros Y Gatos.",
-  "Cimasur - Cocculus Cs Control Natural De Mareos En Viaje",
-  "Cimasur - Kit Fin De Año Cs Evita Stres Por Ruidos Naturales",
-  "Cimasur - Kit Geriátrico Osteoarticular Cs",
-  "Cimasur - Kit Inmunitario Para Cachorros",
-  "Cimasur - Kit Natural Viaje Cs - Viajes Tranquilo Sin Mareos",
-  "Cimasur - Echinac A Cs Inmunoestimulante Para Perros Y Gatos",
-  "Cimasur - Maqui Cs Antioxidante Natural Para Perros Y Gatos"
+  "ARNICA CS Salina",
+  "MELISSA P CS SALINA",
+  "BEILSCHMIEDIA CS SALINA",
+  "CALOSTRUM CS SALINA",
+  "COCCULUS CS SALINA",
+  "MAQUI CS SALINA",
+  "ECHINAC A CS SALINA",
+  "MUCES CS SALINA",
+  "KIT OSTEOARTICULAR CS SALINA",
+  "KIT MODULADOR DIGESTIVO CS SALINA",
+  "KIT VIAJE CS SALINA",
+  "KIN FIN DE AÑO CS SALINA"
 ];
 
 const TIENDA_PRODUCTS = [
-  "Acqua Maris CS – Etanol",
-  "Acqua Maris CS – Salina",
-  "Allium S CS – Etanol",
-  "Allium S CS",
-  "Arnica CS Etanol",
+  "Acqua Maris CS Salina",
+  "allium s cs Salina",
   "Arnica CS Salina",
-  "Beilschmiedia CS – Etanol",
-  "Beilschmiedia CS – Salina",
-  "Calostrum CS – Etanol",
-  "Calostrum CS – Salina",
-  "Cina CS – Etanol",
-  "Cina CS – Salina",
-  "Daucus CS – Etanol",
-  "Daucus CS – Salina",
+  "Beilschmiedia CS Salina",
+  "Calostrum CS Salina",
+  "Cina CS Salina",
+  "Daucus CS Salina",
   "E.F. Aprende CS – Salina",
-  "E.F. Cambios CS – Salina",
+  "E.F. Cambios Cs – Salina",
   "E.F. Energia CS – Salina",
   "E.F. Libre CS – Salina",
   "E.F. Lider CS – Salina",
@@ -67,25 +62,15 @@ const TIENDA_PRODUCTS = [
   "E.F.D. A – Arnica CS – Etanol",
   "E.F.D. D – Fuchsia CS – Etanol",
   "E.F.D. E – Dandelion CS – Etanol",
-  "Echinac A CS – Etanol",
   "Echinac A CS – Salina",
-  "Kalium Tic CS – Etanol",
   "Kalium Tic CS – Salina",
-  "Kit Fin de Año – Etanol",
   "Kit Fin de Año – Salina",
-  "Kit Modulador Digestivo – Etanol",
   "Kit Modulador Digestivo – Salina",
-  "Kit Viaje – Etanol",
   "Kit Viaje – Salina",
-  "Maqui CS – Etanol",
   "Maqui CS – Salina",
-  "Melissa P CS – Etanol",
   "Melissa P CS – Salina",
-  "Muces CS – Etanol",
   "Muces CS – Salina",
-  "Neem CS – Etanol",
   "Neem CS – Salina",
-  "Sarsaparrilla CS – Etanol",
   "Sarsaparrilla CS – Salina"
 ];
 
@@ -157,6 +142,7 @@ export default function SalesTiendaMLManager() {
   const [filterProducto, setFilterProducto] = useState('Todos');
   
   const [showProductSummary, setShowProductSummary] = useState(false);
+  const [showMontoConsolidado, setShowMontoConsolidado] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -547,7 +533,7 @@ export default function SalesTiendaMLManager() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column: Form Editor */}
-        <div className="lg:col-span-5 bg-[#152035] rounded-3xl border border-[#1E293B] shadow-xl overflow-hidden h-fit">
+        <div className="lg:col-span-4 bg-[#152035] rounded-3xl border border-[#1E293B] shadow-xl overflow-hidden h-fit">
           <div className="bg-[#1E3A5F] text-white p-5 font-bold flex items-center justify-between">
             <span className="flex items-center gap-2 text-sm uppercase">
               <PlusCircle className="w-5 h-5 text-sky-400" /> 
@@ -558,11 +544,11 @@ export default function SalesTiendaMLManager() {
             </span>
           </div>
 
-          <form className="p-6 space-y-5" onSubmit={handleSubmit}>
+          <form className="p-4 space-y-4" onSubmit={handleSubmit}>
             
             {/* Seller Select Choice */}
             <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1.5">Canal de Vendedor</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1">Canal de Vendedor</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -571,13 +557,13 @@ export default function SalesTiendaMLManager() {
                     setSaleItems([]);
                   }}
                   className={cn(
-                    "py-2.5 rounded-xl text-xs font-black uppercase border transition-all",
+                    "py-2 rounded-lg text-[10px] font-black uppercase border transition-all",
                     form.vendedor === 'Tienda' 
-                      ? "bg-amber-600 border-amber-500 text-white shadow-lg" 
+                      ? "bg-amber-600 border-amber-500 text-white shadow" 
                       : "bg-[#111C31] border-slate-800 text-slate-400 hover:text-white"
                   )}
                 >
-                  🏪 Tienda Física
+                  🏪 Tienda Online
                 </button>
                 <button
                   type="button"
@@ -586,9 +572,9 @@ export default function SalesTiendaMLManager() {
                     setSaleItems([]);
                   }}
                   className={cn(
-                    "py-2.5 rounded-xl text-xs font-black uppercase border transition-all",
+                    "py-2 rounded-lg text-[10px] font-black uppercase border transition-all",
                     form.vendedor === 'Mercado Libre' 
-                      ? "bg-yellow-600 border-yellow-500 text-white shadow-lg" 
+                      ? "bg-yellow-600 border-yellow-500 text-white shadow" 
                       : "bg-[#111C31] border-slate-800 text-slate-400 hover:text-white"
                   )}
                 >
@@ -597,70 +583,72 @@ export default function SalesTiendaMLManager() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1.5">Fecha Exacta</label>
+            <div className="flex gap-2">
+              <div className="w-[45%]">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Fecha</label>
                 <input 
                   type="date" 
-                  className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold outline-none focus:border-[#38BDF8]" 
+                  className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-[#38BDF8]" 
                   value={form.fecha} 
                   onChange={e => handleDateChange(e.target.value)} 
                   required 
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1.5">Año / Mes Corresp.</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <input 
-                    className="w-full bg-[#111C31]/50 text-slate-400 border border-[#1E3A5F]/40 rounded-xl p-3 text-xs font-bold font-mono outline-none" 
-                    value={form.anio} 
-                    readOnly 
-                  />
-                  <input 
-                    className="w-full bg-[#111C31]/50 text-slate-400 border border-[#1E3A5F]/40 rounded-xl p-3 text-xs font-bold outline-none uppercase" 
-                    value={form.mes} 
-                    readOnly 
-                  />
-                </div>
+              <div className="w-[20%]">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Año</label>
+                <input 
+                  className="w-full bg-[#111C31]/50 text-slate-400 border border-[#1E3A5F]/40 rounded-lg p-2 text-[10px] font-bold font-mono outline-none text-center" 
+                  value={form.anio} 
+                  readOnly 
+                />
+              </div>
+              <div className="w-[35%]">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Mes</label>
+                <input 
+                  className="w-full bg-[#111C31]/50 text-slate-400 border border-[#1E3A5F]/40 rounded-lg p-2 text-[10px] font-bold outline-none uppercase text-center" 
+                  value={form.mes} 
+                  readOnly 
+                />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1.5">Total de la Venta ($)</label>
+            <div className="flex gap-2">
+              <div className="w-[60%]">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Cliente</label>
                 <input 
-                  type="number"
-                  placeholder="Ej: 15200"
-                  className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold outline-none focus:border-[#38BDF8] font-mono" 
-                  value={form.valorCotizacion || ''} 
-                  onChange={e => setForm({...form, valorCotizacion: parseInt(e.target.value) || 0})} 
+                  placeholder="Escriba aquí..."
+                  className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-lg p-2 text-[10px] font-bold uppercase outline-none focus:border-[#38BDF8]" 
+                  value={form.cliente} 
+                  onChange={e => setForm({...form, cliente: e.target.value})} 
                   required 
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1.5">Cliente (Nombre Completo)</label>
+              <div className="w-[40%]">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Total Venta ($)</label>
                 <input 
-                  placeholder="Ej: Sebastián Piñera"
-                  className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-xl p-3 text-xs font-bold uppercase outline-none focus:border-[#38BDF8]" 
-                  value={form.cliente} 
-                  onChange={e => setForm({...form, cliente: e.target.value})} 
+                  type="number"
+                  placeholder="Ej: 15200"
+                  className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-[#38BDF8] font-mono" 
+                  value={saleItems.length > 0 ? totalCotizacion : (form.valorCotizacion || '')} 
+                  onChange={e => setForm({...form, valorCotizacion: parseInt(e.target.value) || 0})} 
+                  readOnly={saleItems.length > 0}
                   required 
                 />
               </div>
             </div>
 
             {/* Custom Products creation helper */}
-            <div className="border border-slate-700/60 p-4 rounded-2xl bg-[#0A111F]/50">
+            <div className="border border-slate-700/60 p-3 rounded-xl bg-[#0A111F]/50">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5" /> Productos de la Lista
+                <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-1">
+                  <Package className="w-3.5 h-3.5" /> Productos
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowCustomProdForm(!showCustomProdForm)}
                   className="text-[9px] font-bold text-sky-400 hover:underline uppercase"
                 >
-                  {showCustomProdForm ? '[Cerrar Panel]' : '[+] Crear y Guardar Producto nuevo'}
+                  {showCustomProdForm ? '[Cerrar Panel]' : '[+] Producto nuevo'}
                 </button>
               </div>
 
@@ -670,15 +658,15 @@ export default function SalesTiendaMLManager() {
                   <div className="flex gap-2">
                     <input 
                       type="text"
-                      className="bg-[#0A111F] text-xs border border-indigo-500/20 rounded px-2.5 py-1.5 grow font-bold"
-                      placeholder="Ej: Calcetín Cs Suave Perros"
+                      className="bg-[#0A111F] text-[10px] border border-indigo-500/20 rounded px-2.5 py-1.5 grow font-bold text-slate-200"
+                      placeholder="Ej: Nuevo Producto..."
                       value={newCustomProduct}
                       onChange={e => setNewCustomProduct(e.target.value)}
                     />
                     <button
                       type="button"
                       onClick={handleAddNewCustomProduct}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1.5 text-xs font-black uppercase shrink-0"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1.5 text-[9px] font-black uppercase shrink-0"
                     >
                       Guardar
                     </button>
@@ -690,48 +678,52 @@ export default function SalesTiendaMLManager() {
               <div className="space-y-3 p-3 bg-[#111C31] rounded-xl border border-slate-800">
                 <div>
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Seleccionar Producto</label>
-                  <select
-                    className="w-full bg-[#0A111F] text-slate-200 text-xs font-bold rounded p-2 border border-slate-700 outline-none"
+                  <input
+                    type="text"
+                    list="product-list-options"
+                    placeholder="Buscar o elegir producto..."
+                    className="w-full bg-[#0A111F] text-slate-200 text-[10px] font-bold rounded p-2 border border-slate-700 outline-none"
                     value={tempProduct}
                     onChange={e => setTempProduct(e.target.value)}
-                  >
-                    <option value="">-- Elige un producto --</option>
+                  />
+                  <datalist id="product-list-options">
                     {activeProductOptions.map((prod, idx) => (
-                      <option key={idx} value={prod}>{prod}</option>
+                      <option key={idx} value={prod} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cantidad</label>
+                <div className="flex gap-2 items-end">
+                  <div className="w-1/4">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cant</label>
                     <input
                       type="number"
                       min={1}
-                      className="w-full bg-[#0A111F] text-slate-200 text-xs font-bold rounded p-2 border border-slate-700 font-mono"
+                      className="w-full bg-[#0A111F] text-slate-200 text-[10px] font-bold rounded p-2 border border-slate-700 font-mono outline-none"
                       value={tempQty}
                       onChange={e => setTempQty(parseInt(e.target.value) || 1)}
                     />
                   </div>
-                  <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Precio Unitario ($)</label>
+                  <div className="w-2/4">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Precio Un ($)</label>
                     <input
                       type="number"
                       placeholder="Precio..."
-                      className="w-full bg-[#0A111F] text-slate-200 text-xs font-bold rounded p-2 border border-slate-700 font-mono"
+                      className="w-full bg-[#0A111F] text-slate-200 text-[10px] font-bold rounded p-2 border border-slate-700 font-mono outline-none"
                       value={tempPrice}
                       onChange={e => setTempPrice(parseInt(e.target.value) || 0)}
                     />
                   </div>
+                  <div className="w-1/4">
+                    <button
+                      type="button"
+                      onClick={handleAddSaleItem}
+                      className="w-full h-[34px] bg-slate-700 hover:bg-slate-600 font-black text-[10px] tracking-widest rounded-lg text-white uppercase flex items-center justify-center gap-1 border border-slate-600 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Agregar
+                    </button>
+                  </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleAddSaleItem}
-                  className="w-full bg-slate-700 hover:bg-slate-600 font-black text-[10px] tracking-widest py-2 rounded-lg text-white uppercase flex items-center justify-center gap-1.5 border border-slate-600"
-                >
-                  <Plus className="w-4 h-4" /> Agregar Producto a la Venta
-                </button>
               </div>
             </div>
 
@@ -768,23 +760,23 @@ export default function SalesTiendaMLManager() {
             )}
 
             {/* Resume Summary totals */}
-            <div className="p-4 bg-[#1E3A5F]/30 rounded-2xl border border-[#1E3A5F]/70 flex items-center justify-between">
+            <div className="p-3 bg-[#1E3A5F]/30 rounded-xl border border-[#1E3A5F]/70 flex items-center justify-between mt-4">
               <div>
                 <span className="text-[8px] font-black uppercase text-slate-300 tracking-widest block">Total Frascos/Unidades</span>
-                <span className="text-xl font-black text-white font-mono">{totalFrascos}</span>
+                <span className="text-lg font-black text-white font-mono">{totalFrascos}</span>
               </div>
               <div className="text-right">
                 <span className="text-[8px] font-black uppercase text-slate-300 tracking-widest block">Total Venta ($)</span>
-                <span className="text-xl font-black text-emerald-400 font-mono">{formatCurrency(form.valorCotizacion)}</span>
+                <span className="text-lg font-black text-emerald-400 font-mono">{formatCurrency(form.valorCotizacion)}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 pt-2">
               <button
                 type="submit"
-                className="w-full bg-[#1E3A5F] hover:bg-[#254B7B] text-white py-3.5 rounded-2xl font-black uppercase text-xs tracking-wider transition-all"
+                className="w-full bg-[#1E3A5F] hover:bg-[#254B7B] text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-wider transition-all"
               >
-                {editingId ? 'ACTUALIZAR DETALLE DE VENTA' : 'GUARDAR HISTORIAL DE VENTA'}
+                {editingId ? 'ACTUALIZAR VENTA' : 'GUARDAR VENTA'}
               </button>
               {editingId && (
                 <button
@@ -801,7 +793,7 @@ export default function SalesTiendaMLManager() {
                     });
                     setSaleItems([]);
                   }}
-                  className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-3.5 rounded-2xl hover:bg-red-600/30 text-xs font-black"
+                  className="bg-red-600/20 text-red-400 border border-red-500/30 px-3 py-2.5 rounded-xl hover:bg-red-600/30 text-[10px] font-black uppercase"
                 >
                   Cancelar
                 </button>
@@ -812,14 +804,26 @@ export default function SalesTiendaMLManager() {
         </div>
 
         {/* Right Column: Historical Sales List & Filters */}
-        <div className="lg:col-span-7 space-y-5">
+        <div className="lg:col-span-8 space-y-5">
           
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#152035] rounded-3xl p-5 border border-[#1E293B] shadow-lg">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Monto Consolidado</span>
+            <div className="bg-[#152035] rounded-3xl p-5 border border-[#1E293B] shadow-lg relative">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Monto Consolidado</span>
+                <button
+                  type="button"
+                  onClick={() => setShowMontoConsolidado(!showMontoConsolidado)}
+                  className="text-slate-400 hover:text-sky-400 transition-colors p-1"
+                  title={showMontoConsolidado ? "Ocultar Monto Consolidado" : "Mostrar Monto Consolidado"}
+                >
+                  {showMontoConsolidado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-rose-500" />}
+                </button>
+              </div>
               <span className="text-xl font-extrabold text-[#38BDF8] font-mono">
-                {listCotizacion.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
+                {showMontoConsolidado 
+                  ? listCotizacion.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })
+                  : '$ ••••••'}
               </span>
             </div>
             <div className="bg-[#152035] rounded-3xl p-5 border border-[#1E293B] shadow-lg">
@@ -844,6 +848,7 @@ export default function SalesTiendaMLManager() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button 
                     onClick={() => {
+                      const listPrecioUnitario = filteredRecords.reduce((acc, r) => acc + (r.productos?.reduce((pAcc, p) => pAcc + (p.precioUnitario || 0), 0) || 0), 0);
                       const data = filteredRecords.map(r => {
                         const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join('\n') || r.detalleProductos || '';
                         const pricesStr = r.productos?.map(p => formatCurrency(p.precioUnitario)).join('\n') || '';
@@ -854,10 +859,10 @@ export default function SalesTiendaMLManager() {
                           itemsStr,
                           pricesStr,
                           r.nroFrascos || 0, 
-                          formatCurrency(r.valorCotizacion || 0)
+                          formatCurrency(r.valorCotizacion || form.valorCotizacion || 0)
                         ];
                       });
-                      data.push(['', '', 'TOTAL CONSOLIDADO', '', '', listFrascos, formatCurrency(listCotizacion)]);
+                      data.push(['', '', 'TOTAL CONSOLIDADO', '', formatCurrency(listPrecioUnitario), listFrascos, formatCurrency(listCotizacion)]);
                       exportTableToPDF(
                         'Reporte Ventas Tienda y ML', 
                         ['Fecha', 'Canal', 'Cliente', 'Productos Detalle', 'Precio Unitario ($)', 'Unidades', 'Total de la Venta ($)'], 
@@ -873,6 +878,7 @@ export default function SalesTiendaMLManager() {
                   </button>
                   <button 
                     onClick={() => {
+                      const listPrecioUnitario = filteredRecords.reduce((acc, r) => acc + (r.productos?.reduce((pAcc, p) => pAcc + (p.precioUnitario || 0), 0) || 0), 0);
                       const headers = ['Año', 'Mes', 'Fecha Exacta', 'Canal Vendedor', 'Cliente', 'Detalle Productos', 'Precio Unitario ($)', 'Total Frascos/Unidades', 'Total de la Venta ($)'];
                       const data = filteredRecords.map(r => {
                         const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join(', ') || r.detalleProductos || '';
@@ -889,6 +895,7 @@ export default function SalesTiendaMLManager() {
                           r.valorCotizacion || 0
                         ];
                       });
+                      data.push(['', '', '', '', 'TOTAL CONSOLIDADO', '', listPrecioUnitario, listFrascos, listCotizacion]);
                       exportTableToExcel('Ventas Tienda y Mercado Libre', headers, data, 'ventas_tienda_ml_reporte');
                     }}
                     className="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 border border-emerald-500/50 shadow"
@@ -899,8 +906,8 @@ export default function SalesTiendaMLManager() {
                   <button 
                     onClick={() => setShowProductSummary(!showProductSummary)}
                     className={cn(
-                      "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 transition-all",
-                      showProductSummary ? "bg-amber-500 text-white" : "bg-slate-700 text-white hover:bg-[#152035]"
+                      "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 transition-all shadow",
+                      showProductSummary ? "bg-red-700 text-white" : "bg-red-600 text-white hover:bg-red-700"
                     )}
                   >
                     <ClipboardList className="w-3.5 h-3.5" /> Consolidar Productos
@@ -1182,7 +1189,7 @@ export default function SalesTiendaMLManager() {
                         {/* Empty spacing space under Unit Prices */}
                       </td>
                       <td className="p-4 text-right font-black text-emerald-400 text-[14px] font-mono whitespace-nowrap">
-                        {formatCurrency(listCotizacion)}
+                        {showMontoConsolidado ? formatCurrency(listCotizacion) : '$ ••••••'}
                       </td>
                       <td></td>
                     </tr>
