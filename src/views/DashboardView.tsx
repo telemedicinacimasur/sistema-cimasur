@@ -15,11 +15,9 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { localDB } from '../lib/auth';
 import { formatCurrency } from '../lib/utils';
-import { GlobalCommentsDialog } from '../components/GlobalCommentsDialog';
 
 export default function DashboardView() {
   const { user, loading } = useAuth();
-  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [stats, setStats] = useState({
     quotesCount: 0,
     quotesTotal: 0,
@@ -139,28 +137,6 @@ export default function DashboardView() {
         ))}
       </div>
 
-      {/* Central Comments Hub Action Box */}
-      <div className="flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-[#1E3A5F]/20 to-[#111C31] border border-[#38BDF8]/40 p-6 rounded-3xl shadow-[0_4px_30px_rgba(56,189,248,0.1)] text-white relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#38BDF8]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-        <div className="flex items-center gap-4 z-10">
-          <div className="p-4 bg-sky-500/10 rounded-2xl border border-sky-500/30 text-sky-400">
-            <MessageSquare className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-lg font-black uppercase tracking-tighter text-[#1e61ff] drop-shadow-[0_0_12px_rgba(30,97,255,0.9)] animate-pulse">Centro de Comunicación y Comentarios</h3>
-            <p className="text-[#2e82ff] text-xs font-bold leading-relaxed max-w-xl drop-shadow-[0_0_8px_rgba(46,130,255,0.7)]">
-              Coordinación inter-módulos directa. Consulta estados, comparte anotaciones y notifica a trabajadores específicos de manera instantánea.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => setIsCommentsOpen(true)}
-          className="mt-4 md:mt-0 px-6 py-4 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#00F0FF] hover:to-[#0284C7] text-slate-950 font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-[0_0_20px_rgba(56,189,248,0.3)] active:scale-[0.97] flex items-center gap-2"
-        >
-          <MessageSquare className="w-5 h-5 text-slate-950" /> COMENTARIOS
-        </button>
-      </div>
-
       <div className="relative rounded-3xl overflow-hidden h-[400px] shadow-sm group border border-[#1e3a5f]">
         <img 
           src="https://cimasur.cl/wp-content/uploads/2023/12/Portada-web-1.jpg" 
@@ -188,8 +164,6 @@ export default function DashboardView() {
            <Activity className="w-3 h-3" /> v4.5.0 © 2026 CIMASUR BIOTECHNOLOGY
         </div>
       </div>
-
-      <GlobalCommentsDialog isOpen={isCommentsOpen} onClose={() => setIsCommentsOpen(false)} />
     </div>
   );
 }

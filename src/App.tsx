@@ -6,6 +6,7 @@ import MainLayout from './views/components/MainLayout';
 import LoginView from './views/LoginView';
 
 const DashboardView = React.lazy(() => import('./views/DashboardView'));
+const PizarraView = React.lazy(() => import('./views/PizarraView'));
 const SchoolView = React.lazy(() => import('./views/SchoolView'));
 const LabView = React.lazy(() => import('./views/LabView'));
 const AdminView = React.lazy(() => import('./views/AdminView'));
@@ -51,6 +52,10 @@ export default function App() {
                     <Suspense fallback={<div className="h-full flex items-center justify-center font-sans text-primary">Cargando módulo...</div>}>
                       <Routes>
                         <Route path="/" element={<DashboardView />} />
+                        <Route 
+                          path="/pizarra" 
+                          element={<PizarraView />} 
+                        />
                         <Route 
                           path="/laboratorio" 
                           element={<RoleRoute roles={['admin', 'lab']}><LabView /></RoleRoute>} 

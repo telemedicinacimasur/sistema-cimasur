@@ -46,7 +46,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   const menuItems = [
     { name: 'CPANEL SISTEMA', icon: ShieldCheck, path: '/cpanel', roles: ['admin'] },
-    { name: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'manager', 'lab', 'crm', 'school', 'gestion'] },
+    { name: 'Menú principal', icon: LayoutDashboard, path: '/', roles: ['admin', 'manager', 'lab', 'crm', 'school', 'gestion'] },
+    { name: 'Pizarra de Notas', icon: Bell, path: '/pizarra', roles: ['admin', 'manager', 'lab', 'crm', 'school', 'gestion'] },
     { name: 'Laboratorio', icon: FlaskConical, path: '/laboratorio', roles: ['admin', 'lab'] },
     { name: 'Administración', icon: ShieldCheck, path: '/administracion', roles: ['admin', 'manager'] },
     { name: 'CRM Comercial', icon: TrendingUp, path: '/crm', roles: ['admin', 'crm'] },
