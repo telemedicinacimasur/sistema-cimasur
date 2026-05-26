@@ -39,7 +39,11 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
     }
 
     // Check if user is explicitly mentioned (by username or email or select worker)
+    let isMentionedOrExclusive = false;
+    let hasExclusiveUsers = false;
+
     if (notification.recipientUsers && notification.recipientUsers.length > 0) {
+      hasExclusiveUsers = true;
       const isMentioned = notification.recipientUsers.some((u: string) => {
         const lowerU = u.toLowerCase();
         return (
@@ -51,16 +55,23 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
       if (isMentioned) return true;
     }
 
-    if (!notification.recipientRoles || notification.recipientRoles.length === 0) return true;
-    
     const normalizedUserRoles = userRoles.map(r => r.toLowerCase());
-    const normalizedRecipientRoles = notification.recipientRoles.map(r => r.toLowerCase());
     
     // Check if user is Admin. Administrators always receive all notifications
     // "ADMINISTRADOR CISTEMA: LE LLEGAN TODAS LAS NOTIFICACIONES DE LOS MODULOS"
     if (normalizedUserRoles.includes('admin')) {
       return true;
     }
+
+    // If it was targeted to specific users, and we are not one of them, and we are not an admin...
+    // then if there are NO recipient roles specified, we should NOT get this notification.
+    if (hasExclusiveUsers && (!notification.recipientRoles || notification.recipientRoles.length === 0)) {
+       return false; 
+    }
+
+    if (!notification.recipientRoles || notification.recipientRoles.length === 0) return true;
+    
+    const normalizedRecipientRoles = notification.recipientRoles.map(r => r.toLowerCase());
 
     // "AL MÓDULO DE LABORATORIO SOLO DEBEN LLEGARLE ALERTAS CUANDO EN Seguimiento de Cotizaciones SE CAMBIE UN REGISTRO A APROBADO Y LA ALERTA DE STOCK DE INSUMOS BAJOS POR DÍA SEGÚN LA ALERTA QUE SE GENERÓ POR CADA UNO (NADA MÁS)"
     const isLab = normalizedUserRoles.some(role => role === 'lab' || role === 'viewer_lab');

@@ -70,7 +70,7 @@ export const localAuth = {
   },
   updateUser: async (uid: string, data: Partial<UserProfile>) => {
     if (isFirebaseReady && db) {
-      await updateDoc(doc(db, 'users', uid), data);
+      await setDoc(doc(db, 'users', uid), data, { merge: true });
     } else {
       await fetch(`/api/users/${uid}`, {
         method: 'PUT',

@@ -145,7 +145,7 @@ export default function CRMView() {
              await addNotification({
                title: 'Nuevo Comentario CRM',
                message: `${user?.displayName || user?.email} comentó en ${commentTarget.name}: ${comment.substring(0, 50)}...`,
-               recipientRoles: ['admin', 'lab'],
+               recipientRoles: ['admin', 'crm'],
                sender: user?.displayName || user?.email || 'Sistema'
              });
 
@@ -216,7 +216,7 @@ function CRMRegister() {
     await addNotification({
       title: 'Nuevo Cliente CRM',
       message: `${user.displayName || user.email} registró a ${form.name}`,
-      recipientRoles: ['admin', 'lab'],
+      recipientRoles: ['admin', 'crm', 'gestion'],
       sender: user.displayName || user.email || 'Sistema'
     });
     await addAuditLog(user, `Registró Cliente ${form.name}`, 'CRM');
@@ -1107,7 +1107,7 @@ function CRMActivities() {
       await addNotification({
         title: 'Nueva Actividad Comercial',
         message: `${user.displayName || user.email} registró: ${form.campania} (${form.tipo})`,
-        recipientRoles: ['admin', 'lab'],
+        recipientRoles: ['admin', 'crm'],
         sender: user.displayName || user.email || 'Sistema'
       });
       await addAuditLog(user, `Registró Actividad: ${form.campania}`, 'CRM');

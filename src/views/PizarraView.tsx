@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { localDB, localAuth } from '../lib/auth';
-import { Calendar, Clock, CheckCircle, Archive, Plus, Edit2, Trash2 } from 'lucide-react';
+import { addNotification } from '../lib/notifications';
+import { Calendar, Clock, CheckCircle, Archive, Plus, Edit2, Trash2, MessageCircle, Send } from 'lucide-react';
+
+interface NoteReply {
+  id: string;
+  autor: string;
+  autorEmail: string;
+  texto: string;
+  fecha: string;
+}
 
 interface NoteRecord {
   id?: string;
@@ -15,6 +24,7 @@ interface NoteRecord {
   fechaTermino: string;
   estado: 'Pendiente' | 'Proceso' | 'Terminado' | 'Archivar';
   fechaCreacion: string;
+  respuestas?: NoteReply[];
 }
 
 export default function PizarraView() {
@@ -32,6 +42,9 @@ export default function PizarraView() {
   const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
   const [fechaTermino, setFechaTermino] = useState(new Date().toISOString().split('T')[0]);
   const [estado, setEstado] = useState<'Pendiente' | 'Proceso' | 'Terminado' | 'Archivar'>('Pendiente');
+
+  const [replyDialogNote, setReplyDialogNote] = useState<NoteRecord | null>(null);
+  const [replyText, setReplyText] = useState('');
 
   const [showArchived, setShowArchived] = useState(false);
 
@@ -73,7 +86,35 @@ export default function PizarraView() {
       ...(editingId ? { fechaCreacion: notes.find(n => n.id === editingId)?.fechaCreacion || new Date().toISOString() } : {})
     };
 
+    const isNew = !editingId;
     await localDB.saveToCollection('pizarra_notes', payload);
+
+    if (isNew || targetUsers.length > 0) {
+       const notifUsers = [...new Set([...targetUsers, ...workersAllowed])];
+
+       // Only explicitly send if there are targeted users or allowed workers
+       if (notifUsers.length > 0) {
+           await addNotification({
+               title: 'Nueva Nota en Pizarra',
+               message: `${user?.displayName || user?.email} te ha asignado/mencionado en una nota.`,
+               type: 'info',
+               sender: user?.email || 'Sistema',
+               recipientRoles: [], 
+               recipientUsers: notifUsers
+           });
+       } else if (isNew) {
+           // Provide an explicit general notification or roles if no target was set
+           await addNotification({
+               title: 'Nueva Nota en Pizarra',
+               message: `${user?.displayName || user?.email} ha creado una nueva nota global.`,
+               type: 'info',
+               sender: user?.email || 'Sistema',
+               recipientRoles: ['admin', 'manager', 'lab', 'crm', 'school', 'gestion'], 
+               recipientUsers: []
+           });
+       }
+    }
+
     resetForm();
     loadData();
   };
@@ -109,6 +150,64 @@ export default function PizarraView() {
 
   const handleStateChange = async (note: NoteRecord, newState: 'Pendiente' | 'Proceso' | 'Terminado' | 'Archivar') => {
     await localDB.saveToCollection('pizarra_notes', { ...note, estado: newState });
+    
+    // Notify users involved in this note about the state change
+    const targetUsers = note.targetUsers || (note.targetUser ? [note.targetUser] : []);
+    const notifUsers = [...new Set([...targetUsers, ...(note.workersAllowed || []), note.autorEmail])].filter(email => email !== user?.email); // Do not notify oneself
+
+    if (notifUsers.length > 0) {
+        await addNotification({
+            title: `Actualización de Nota en Pizarra`,
+            message: `El estado de una nota ha cambiado a "${newState}".`,
+            type: newState === 'Terminado' ? 'success' : 'info',
+            sender: user?.email || 'Sistema',
+            recipientRoles: [], 
+            recipientUsers: notifUsers
+        });
+    }
+
+    loadData();
+  };
+
+  const handleAddReply = async (note: NoteRecord) => {
+    if (!replyText.trim()) return;
+    
+    const newReply: NoteReply = {
+      id: crypto.randomUUID(),
+      autor: user?.displayName || user?.email || 'Usuario',
+      autorEmail: user?.email || '',
+      texto: replyText.trim(),
+      fecha: new Date().toISOString()
+    };
+    
+    const updatedNote = {
+      ...note,
+      respuestas: [...(note.respuestas || []), newReply]
+    };
+    
+    await localDB.saveToCollection('pizarra_notes', updatedNote);
+    
+    // Notify author and other involved users
+    const notifUsers = [...new Set([
+        note.autorEmail,
+        ...(note.targetUsers || []),
+        ...(note.targetUser ? [note.targetUser] : []),
+        ...(note.respuestas?.map(r => r.autorEmail) || [])
+    ])].filter(email => email !== user?.email);
+
+    if (notifUsers.length > 0) {
+       await addNotification({
+           title: 'Nueva Respuesta en Pizarra',
+           message: `${user?.displayName || user?.email} ha respondido a una nota.`,
+           type: 'info',
+           sender: user?.email || 'Sistema',
+           recipientRoles: [], 
+           recipientUsers: notifUsers
+       });
+    }
+
+    setReplyText('');
+    setReplyDialogNote(updatedNote as NoteRecord);
     loadData();
   };
 
@@ -179,7 +278,13 @@ export default function PizarraView() {
             </div>
 
             <div>
-               <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">Dirigido a (Usuarios)</label>
+               <div className="flex justify-between items-center mb-2">
+                 <label className="block text-[10px] font-black uppercase text-slate-400">Dirigido a (Usuarios)</label>
+                 <div className="flex gap-1">
+                   <button type="button" onClick={() => setTargetUsers(workers.map(w => w.email))} className="text-[9px] font-black uppercase px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 transition-colors">Todos</button>
+                   <button type="button" onClick={() => setTargetUsers([])} className="text-[9px] font-black uppercase px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 transition-colors">Ninguno</button>
+                 </div>
+               </div>
                <div className="relative border border-slate-200 bg-slate-50 rounded-xl max-h-32 overflow-y-auto p-2">
                  <div className="text-xs text-slate-500 mb-1">Si no seleccionas a nadie, no va dirigido a nadie en específico.</div>
                  {workers.map(w => (
@@ -200,7 +305,13 @@ export default function PizarraView() {
             </div>
 
             <div>
-               <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">¿Quién puede ver? (Visibilidad)</label>
+               <div className="flex justify-between items-center mb-2">
+                 <label className="block text-[10px] font-black uppercase text-slate-400">¿Quién puede ver? (Visibilidad)</label>
+                 <div className="flex gap-1">
+                   <button type="button" onClick={() => setWorkersAllowed(workers.map(w => w.email))} className="text-[9px] font-black uppercase px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 transition-colors">Todos</button>
+                   <button type="button" onClick={() => setWorkersAllowed([])} className="text-[9px] font-black uppercase px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 transition-colors">Ninguno</button>
+                 </div>
+               </div>
                <div className="relative border border-slate-200 bg-slate-50 rounded-xl max-h-32 overflow-y-auto p-2">
                  <div className="text-xs text-slate-500 mb-1">Si no seleccionas a nadie, todos podrán verla.</div>
                  {workers.map(w => (
@@ -249,9 +360,9 @@ export default function PizarraView() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-[#38BDF8]"
               >
                  <option value="Pendiente">Pendiente</option>
-                 <option value="Proceso">Proceso</option>
+                 <option value="Proceso">En Proceso</option>
                  <option value="Terminado">Terminado</option>
-                 <option value="Archivar">Archivar</option>
+                 <option value="Archivar">Archivado/Finalizado</option>
               </select>
             </div>
           </div>
@@ -342,18 +453,29 @@ export default function PizarraView() {
                            className={`text-[9px] font-black uppercase pl-2 pr-4 py-1 rounded appearance-none outline-none cursor-pointer ${statusColor}`}
                          >
                            <option value="Pendiente">Pendiente</option>
-                           <option value="Proceso">Proceso</option>
+                           <option value="Proceso">En Proceso</option>
                            <option value="Terminado">Terminado</option>
-                           <option value="Archivar">Archivar</option>
+                           <option value="Archivar">Archivado / Finalizado</option>
                          </select>
                          
-                         {(isAdmin || note.autorEmail === user?.email) && (
+                         {(note.autorEmail === user?.email) && (
                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                              <button onClick={() => startEdit(note)} className="p-1.5 hover:bg-white/50 rounded-md transition-colors" title="Editar"><Edit2 className="w-3 h-3" /></button>
                              <button onClick={() => handleDelete(note.id!)} className="p-1.5 hover:bg-white/50 rounded-md transition-colors text-red-600" title="Eliminar"><Trash2 className="w-3 h-3" /></button>
                            </div>
                          )}
                       </div>
+                      
+                      <div className="mt-2 w-full">
+                        <button 
+                          onClick={() => setReplyDialogNote(note)}
+                          className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-white/40 hover:bg-white/60 rounded-lg text-[9px] font-black uppercase transition-colors border border-black/5"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          {note.respuestas && note.respuestas.length > 0 ? `Respuestas (${note.respuestas.length})` : 'Responder'}
+                        </button>
+                      </div>
+
                     </div>
                   </div>
                 </div>
@@ -368,6 +490,79 @@ export default function PizarraView() {
           )}
         </div>
       </div>
+
+      {replyDialogNote && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+               <h3 className="font-black text-slate-800 flex items-center gap-2">
+                 <MessageCircle className="w-5 h-5 text-[#38BDF8]" /> 
+                 Oculto: Respuestas de la Nota
+               </h3>
+               <button onClick={() => setReplyDialogNote(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                 <Trash2 className="w-5 h-5 opacity-0" />
+                 <span className="sr-only">Cerrar</span>
+                 <svg className="w-5 h-5 absolute top-5 right-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+               </button>
+             </div>
+             
+             <div className="p-4 flex-1 overflow-y-auto bg-slate-50/50">
+               <div className="mb-6 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                 <div className="text-xs font-bold text-slate-500 mb-2">Nota Original:</div>
+                 <p className="text-sm text-slate-700 whitespace-pre-wrap">{replyDialogNote.comentario}</p>
+                 <div className="mt-2 text-[10px] text-slate-400">Por {replyDialogNote.autor} el {new Date(replyDialogNote.fechaCreacion).toLocaleString()}</div>
+                 {(() => {
+                    const targets = replyDialogNote.targetUsers || (replyDialogNote.targetUser ? [replyDialogNote.targetUser] : []);
+                    if (targets.length > 0) {
+                      return (
+                        <div className="mt-2 text-[10px] font-bold text-[#1E293B] bg-slate-100 p-2 rounded-lg">
+                          A cargo: {targets.map(t => workers.find(w => w.email === t)?.displayName || t).join(', ')}
+                        </div>
+                      );
+                    }
+                    return null;
+                 })()}
+               </div>
+
+               <div className="space-y-3">
+                 {replyDialogNote.respuestas && replyDialogNote.respuestas.length > 0 ? (
+                   replyDialogNote.respuestas.map(reply => (
+                     <div key={reply.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-1 text-[10px] font-black uppercase text-slate-500">
+                          <span className="text-[#38BDF8]">{reply.autor}</span>
+                          <span>{new Date(reply.fecha).toLocaleString()}</span>
+                        </div>
+                        <p className="text-xs text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">
+                          {reply.texto}
+                        </p>
+                     </div>
+                   ))
+                 ) : (
+                   <p className="text-center text-slate-400 text-sm italic py-4">No hay respuestas aún. Sé el primero en responder.</p>
+                 )}
+               </div>
+             </div>
+
+             <div className="p-4 border-t border-slate-100 bg-white flex gap-2">
+               <textarea
+                 value={replyText}
+                 onChange={e => setReplyText(e.target.value)}
+                 placeholder="Escribe una respuesta confidencial..."
+                 className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-[#38BDF8] resize-none h-14"
+               />
+               <button 
+                 onClick={() => {
+                   handleAddReply(replyDialogNote);
+                 }}
+                 disabled={!replyText.trim()}
+                 className="px-4 bg-[#1E293B] text-white rounded-xl hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+               >
+                 <Send className="w-5 h-5" />
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
