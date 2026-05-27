@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, Check, User, ShieldAlert } from 'lucide-react';
+import { X, Bell, Check, User, ShieldAlert, Volume2, VolumeX, ExternalLink } from 'lucide-react';
 import { localDB } from '../lib/auth';
 import { formatDate } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 import { subscribeToNotifications, Notification, markNotificationAsRead } from '../lib/notifications';
+import { useNavigate } from 'react-router-dom';
 
 interface NotificationsDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  isMuted?: boolean;
+  toggleMute?: () => void;
 }
 
-export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen, onClose }) => {
+export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen, onClose, isMuted, toggleMute }) => {
   const [showRead, setShowRead] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const filteredNotifications = notifications.filter(n => showRead || !n.read);
 
@@ -55,6 +59,11 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-bold text-lg text-white flex items-center gap-2">
             <Bell className="w-5 h-5 text-[#38BDF8]" /> Notificaciones
+            {toggleMute && (
+              <button onClick={toggleMute} className="ml-2 p-1.5 text-slate-400 hover:text-white hover:bg-[#1E3A5F] rounded-lg transition-all" title={isMuted ? "Activar Sonido" : "Silenciar Notificaciones"}>
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            )}
           </h2>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowRead(!showRead)} className={cn("text-[10px] uppercase font-black px-3 py-1.5 rounded-full transition-colors", showRead ? "bg-[#38BDF8] text-[#111A2E]" : "bg-[#1E3A5F] text-slate-300 hover:bg-[#111A2E]")}>
@@ -83,8 +92,18 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
                          <span className="truncate">{selectedNotif.sender || 'Sistema'}</span>
                       </div>
                    </div>
-                   <div className="bg-[#152035] p-3 rounded-xl border border-[#1E3A5F]">
-                      <span className="text-[9px] uppercase font-black text-slate-500 block mb-1">Módulo Destino</span>
+                   <div className="bg-[#152035] p-3 rounded-xl border border-[#1E3A5F] cursor-pointer hover:border-[#38BDF8] transition-colors" onClick={() => {
+                      const roles = selectedNotif.recipientRoles || [];
+                      let route = '/';
+                      if (roles.includes('lab')) route = '/lab';
+                      else if (roles.includes('crm')) route = '/crm';
+                      else if (roles.includes('admin') || roles.includes('manager')) route = '/admin';
+                      else if (roles.includes('school')) route = '/school';
+                      else if (roles.includes('gestion')) route = '/gestion';
+                      navigate(route);
+                      onClose();
+                   }} title="Ir al módulo">
+                      <span className="text-[9px] uppercase font-black text-slate-500 block mb-1 flex items-center justify-between">Módulo Destino <ExternalLink className="w-3 h-3 text-[#38BDF8]" /></span>
                       <div className="flex items-center gap-2 text-xs font-bold text-[#38BDF8]">
                          <ShieldAlert className="w-3.5 h-3.5" />
                          <span className="truncate">{getModuleLabel(selectedNotif.recipientRoles)}</span>

@@ -638,7 +638,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                   <td className="p-4 text-center font-mono opacity-60 italic">{formatDate(r.fechaPago || r.pagoVeterinario)}</td>
                   <td className="p-4 text-center">
                     <RecordActions 
-                      module="admin"
+                      module="manager"
                       onEdit={() => handleEdit(r)}
                       onDelete={() => handleDelete(r.id)}
                     />
@@ -1108,7 +1108,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                   <td className="p-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                     <RecordActions
-                      module="admin"
+                      module="manager"
                       onView={() => {
                         const data = [
                           { label: 'N° Cotiz', value: r.nroCotiz || '' },
@@ -1557,7 +1557,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <RecordActions
-                          module="admin"
+                          module="manager"
                           onView={() => {
                             const data = [
                               { label: 'Documento', value: r.documento || '' },
@@ -1945,7 +1945,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <RecordActions
-                          module="admin"
+                          module="manager"
                           onEdit={() => {
                             setEditingId(r.id);
                             setForm(r);
@@ -2402,7 +2402,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                         <td className="p-3 text-right">{formatCurrency(r.montoTotalPagado)}</td>
                         <td className="p-3 text-right font-black text-emerald-600">+{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
-                          <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                          <RecordActions module="manager" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
                         </td>
                       </tr>
                     ))}
@@ -2492,7 +2492,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                         <td className="p-3 text-slate-400">{r.observaciones}</td>
                         <td className="p-3 text-right font-black text-orange-600">-{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
-                          <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                          <RecordActions module="manager" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
                         </td>
                       </tr>
                     ))}
@@ -2581,7 +2581,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                         <td className="p-3 text-slate-400">{r.observaciones}</td>
                         <td className="p-3 text-right font-black text-rose-600">-{formatCurrency(r.montoTotalRecibido)}</td>
                         <td className="p-3 text-center">
-                          <RecordActions module="admin" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
+                          <RecordActions module="manager" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
                         </td>
                       </tr>
                     ))}
@@ -3010,7 +3010,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
                   </td>
                   <td className="p-4 text-center">
                     <RecordActions
-                      module="admin"
+                      module="manager"
                       onView={() => {
                         const dteData = [
                           { label: 'N° Documento', value: r.nroDto },

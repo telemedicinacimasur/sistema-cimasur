@@ -10,6 +10,8 @@ export interface UserProfile {
   photoURL: string | null;
   role: string;
   roles?: string[];
+  permissions?: any;
+  allowedSubmodules?: any;
 }
 
 interface AuthContextType {
@@ -40,7 +42,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: userData.role || 'viewer',
                 roles: Array.isArray(userData.roles) 
                     ? userData.roles 
-                    : (userData.roles && typeof userData.roles === 'object' ? Object.values(userData.roles) : [userData.role || 'viewer'])
+                    : (userData.roles && typeof userData.roles === 'object' ? Object.values(userData.roles) : [userData.role || 'viewer']),
+                permissions: userData.permissions,
+                allowedSubmodules: userData.allowedSubmodules
             });
         } catch (error) {
             console.error("Error refreshing user data:", error);
@@ -113,7 +117,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     displayName: userData.displayName || firebaseUser.displayName || 'Usuario Cimasur',
                     photoURL: userData.photoURL || firebaseUser.photoURL,
                     role: userData.role || 'viewer',
-                    roles: roles as string[]
+                    roles: roles as string[],
+                    permissions: userData.permissions,
+                    allowedSubmodules: userData.allowedSubmodules
                 });
               } else {
                 // If it doesn't exist, we fallback to viewer

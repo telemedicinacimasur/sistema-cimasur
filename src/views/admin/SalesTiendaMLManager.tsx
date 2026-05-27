@@ -1129,7 +1129,7 @@ export default function SalesTiendaMLManager() {
                       <td className="p-4">
                         <div className="flex items-center justify-center">
                           <RecordActions
-                            module="admin"
+                            module="manager"
                             onView={() => {
                               const itemsList = r.productos || [];
                               const data = [

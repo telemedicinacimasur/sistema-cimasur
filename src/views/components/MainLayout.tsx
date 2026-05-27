@@ -158,9 +158,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <button onClick={toggleMute} className="p-2.5 text-slate-400 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all" title={isMuted ? "Activar Sonido" : "Silenciar Notificaciones"}>
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              </button>
               <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all relative" title="Notificaciones">
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
@@ -201,7 +198,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </main>
       <BackToTop />
       <UserSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} user={user} onUpdate={() => window.location.reload()} />
-      <NotificationsDialog isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
+      <NotificationsDialog isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} isMuted={isMuted} toggleMute={toggleMute} />
     </div>
   );
 }
