@@ -38,6 +38,23 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
       return false;
     }
 
+    // Check if it is a Pizarra or Comment or Reply notification (should reach everyone)
+    const isPizarraOrComment = 
+      (notification.title && (
+        notification.title.toLowerCase().includes('pizarra') || 
+        notification.title.toLowerCase().includes('comentario') || 
+        notification.title.toLowerCase().includes('respuesta')
+      )) || 
+      (notification.message && (
+        notification.message.toLowerCase().includes('pizarra') || 
+        notification.message.toLowerCase().includes('comentó') || 
+        notification.message.toLowerCase().includes('respondió')
+      ));
+
+    if (isPizarraOrComment) {
+      return true;
+    }
+
     // Check if user is explicitly mentioned (by username or email or select worker)
     let isMentionedOrExclusive = false;
     let hasExclusiveUsers = false;
@@ -158,6 +175,16 @@ export const addNotification = async (notification: Omit<Notification, 'id' | 'c
         read: false,
         createdAt: new Date().toISOString()
     });
+  }
+  window.dispatchEvent(new Event('db-change'));
+};
+
+export const deleteNotification = async (id: string) => {
+  if (isFirebaseReady && db) {
+    const { doc, deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'notifications', id));
+  } else {
+    await localDB.deleteFromCollection('notifications', id);
   }
   window.dispatchEvent(new Event('db-change'));
 };

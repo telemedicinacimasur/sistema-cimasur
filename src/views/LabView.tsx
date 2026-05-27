@@ -4429,6 +4429,12 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     return () => window.removeEventListener('db-change', loadTrackingData);
   }, []);
 
+  useEffect(() => {
+    if (trackingRecords.length > 0) {
+      checkPendingOrderAlerts();
+    }
+  }, [trackingRecords]);
+
   const couriers = ['Blue express', 'Correos Chile', 'Starken', 'Chilexpress', 'Retiro en Oficina', 'Mercado Libre'];
   const situaciones = ['PENDIENTE', 'EN TRÁNSITO', 'OK', 'NULA', 'DEVOLUCIÓN', 'SIN RETIRO', 'RECHAZADO'];
 
@@ -4594,6 +4600,15 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         // Registrar cambios importantes
         if (safe(existing.situacion) !== safe(form.situacion)) {
           newLogs.push({ date: timestamp, user: userName, action: `Estado: ${safe(existing.situacion)} -> ${safe(form.situacion)}` });
+          
+          if (safe(form.situacion).toUpperCase() === 'OK' || safe(form.situacion).toUpperCase() === 'APROBADA') {
+            await addNotification({
+              title: 'Seguimiento de Pedido Aprobado',
+              message: `El seguimiento del pedido N° ${form.nroCotiz || 'S/N'} para ${form.cliente || 'Sin Cliente'} ha cambiado a ${form.situacion}.`,
+              recipientRoles: ['admin', 'manager', 'lab', 'crm'],
+              sender: user?.displayName || user?.email || 'Sistema'
+            });
+          }
         }
         if (safe(existing.ot) !== safe(form.ot)) {
           newLogs.push({ date: timestamp, user: userName, action: `OT Actualizada: ${safe(form.ot) || 'QUITADA'}` });
@@ -4616,6 +4631,15 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       } else {
         const initialLogs = [{ date: timestamp, user: userName, action: 'Ingreso inicial a seguimiento' }];
         await localDB.saveToCollection('order_tracking', { ...form, logs: initialLogs });
+
+        if (safe(form.situacion).toUpperCase() === 'OK' || safe(form.situacion).toUpperCase() === 'APROBADA') {
+          await addNotification({
+            title: 'Seguimiento de Pedido Aprobado',
+            message: `El seguimiento del pedido N° ${form.nroCotiz || 'S/N'} para ${form.cliente || 'Sin Cliente'} ha sido registrado como ${form.situacion}.`,
+            recipientRoles: ['admin', 'manager', 'lab', 'crm'],
+            sender: user?.displayName || user?.email || 'Sistema'
+          });
+        }
       }
       
       const updated = await localDB.getCollection('order_tracking');
@@ -4923,10 +4947,16 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
                         </>
                       ) : '---'}
                    </td>
-                   <td className="p-2 font-medium uppercase truncate" title={safe(r.cliente)}>{safe(r.cliente)}</td>
+                   <td className="p-2 font-medium uppercase">
+                      <div className="max-w-[200px] whitespace-normal break-words line-clamp-2" title={safe(r.cliente)}>{safe(r.cliente)}</div>
+                   </td>
                    <td className="p-2 text-center text-slate-400">{formatDate(r.fechaCotiz)}</td>
                    <td className="p-2 text-center font-bold text-emerald-600">{r.fechaEnvio ? formatDate(r.fechaEnvio) : '---'}</td>
-                   <td className="p-2 text-slate-400 italic truncate" title={safe(r.detalleSeguimiento)}>{safe(r.detalleSeguimiento) || '---'}</td>
+                   <td className="p-2 text-slate-400 italic">
+                      <div className="max-w-[250px] whitespace-normal break-words max-h-20 overflow-y-auto pr-1" title={safe(r.detalleSeguimiento)}>
+                         {safe(r.detalleSeguimiento) || '---'}
+                      </div>
+                   </td>
                    <td className="p-2 text-center font-bold">{safe(r.courier)}</td>
                    <td className="p-2 text-center">
                     <span className={cn(

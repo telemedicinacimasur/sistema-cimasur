@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, Check, User, ShieldAlert, Volume2, VolumeX, ExternalLink, CheckCheck } from 'lucide-react';
+import { X, Bell, Check, User, ShieldAlert, Volume2, VolumeX, ExternalLink, CheckCheck, Trash2 } from 'lucide-react';
 import { localDB } from '../lib/auth';
 import { formatDate } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
-import { subscribeToNotifications, Notification, markNotificationAsRead } from '../lib/notifications';
+import { subscribeToNotifications, Notification, markNotificationAsRead, deleteNotification } from '../lib/notifications';
 import { useNavigate } from 'react-router-dom';
 
 interface NotificationsDialogProps {
@@ -21,10 +21,17 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  const parseNotificationTime = (val: any) => {
+    if (!val) return 0;
+    if (val.seconds) return val.seconds * 1000;
+    const t = new Date(val).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
   const pendingCount = notifications.filter(n => !n.read).length;
-  const filteredNotifications = notifications.filter(n => 
-    activeTab === 'read' ? n.read : !n.read
-  );
+  const filteredNotifications = notifications
+    .filter(n => activeTab === 'read' ? n.read : !n.read)
+    .sort((a, b) => parseNotificationTime(b.createdAt) - parseNotificationTime(a.createdAt));
 
   useEffect(() => {
     if (user) {
@@ -224,14 +231,28 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
                  onClick={() => handleSelectNotif(n)}
                  className={cn("p-4 rounded-xl border cursor-pointer hover:shadow-lg transition-all group", n.read ? "bg-[#111A2E]/50 border-[#1E293B] opacity-70" : "bg-[#111A2E] border-[#38BDF8]/40 hover:border-[#38BDF8]")}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className={cn("font-bold text-sm", n.read ? "text-slate-400" : "text-white group-hover:text-[#38BDF8] transition-colors")}>{n.title}</h4>
-                  {!n.read && (
-                      <button onClick={(e) => markAsRead(n.id, e)} className="text-[#38BDF8] hover:text-white bg-[#152035] hover:bg-[#38BDF8] px-2 py-1.5 rounded-lg z-10 flex items-center gap-1.5 transition-colors border border-[#1E3A5F] hover:border-[#38BDF8]" title="Marcar como leída">
-                          <Check className="w-3.5 h-3.5" />
-                          <span className="text-[9px] font-black uppercase tracking-widest hidden group-hover:block">Leída</span>
-                      </button>
-                  )}
+                <div className="flex justify-between items-start mb-2 gap-2">
+                  <h4 className={cn("font-bold text-sm flex-1", n.read ? "text-slate-400" : "text-white group-hover:text-[#38BDF8] transition-colors")}>{n.title}</h4>
+                  <div className="flex items-center gap-1.5">
+                    {!n.read && (
+                        <button onClick={(e) => markAsRead(n.id, e)} className="text-[#38BDF8] hover:text-white bg-[#152035] hover:bg-[#38BDF8] px-2 py-1.5 rounded-lg z-10 flex items-center gap-1 transition-colors border border-[#1E3A5F] hover:border-[#38BDF8]" title="Marcar como leída">
+                            <Check className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-black uppercase tracking-widest hidden group-hover:inline-block">Leída</span>
+                        </button>
+                    )}
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (n.id) {
+                          await deleteNotification(n.id);
+                        }
+                      }} 
+                      className="text-red-400 hover:text-white bg-[#152035] hover:bg-red-500 p-1.5 rounded-lg z-10 transition-colors border border-red-500/20 hover:border-red-500" 
+                      title="Eliminar notificación"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-300 mb-3 line-clamp-2">{n.message}</p>
                 <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
