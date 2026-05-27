@@ -336,8 +336,11 @@ export default function PizarraView() {
       return true; // if empty, visible to all
     })
     .filter((note) => {
-      if (!showArchived && note.estado === "Archivar") return false;
-      return true;
+      if (showArchived) {
+        return note.estado === "Archivar";
+      } else {
+        return note.estado !== "Archivar";
+      }
     })
     .sort(
       (a, b) =>

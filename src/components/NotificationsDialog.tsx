@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, Check, User, ShieldAlert, Volume2, VolumeX, ExternalLink } from 'lucide-react';
+import { X, Bell, Check, User, ShieldAlert, Volume2, VolumeX, ExternalLink, CheckCheck } from 'lucide-react';
 import { localDB } from '../lib/auth';
 import { formatDate } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,13 +15,16 @@ interface NotificationsDialogProps {
 }
 
 export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen, onClose, isMuted, toggleMute }) => {
-  const [showRead, setShowRead] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pending' | 'read'>('pending');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  const filteredNotifications = notifications.filter(n => showRead || !n.read);
+  const pendingCount = notifications.filter(n => !n.read).length;
+  const filteredNotifications = notifications.filter(n => 
+    activeTab === 'read' ? n.read : !n.read
+  );
 
   useEffect(() => {
     if (user) {
@@ -33,12 +36,77 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
     }
   }, [user]);
 
-  const markAsRead = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const markAsRead = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     await markNotificationAsRead(id);
   };
 
-  const getModuleLabel = (roles: string[]) => {
+  const handleMarkAllAsRead = async () => {
+    const unread = notifications.filter(n => !n.read);
+    for (const n of unread) {
+      if (n.id) {
+        await markNotificationAsRead(n.id);
+      }
+    }
+  };
+
+  const handleSelectNotif = async (n: Notification) => {
+    setSelectedNotif(n);
+    if (!n.read && n.id) {
+      await markNotificationAsRead(n.id);
+    }
+  };
+
+  const handleNavigateToTargetForNotif = (notif: Notification) => {
+    const titleLower = (notif.title || '').toLowerCase();
+    const msgLower = (notif.message || '').toLowerCase();
+    const roles = notif.recipientRoles || [];
+
+    let route = '/';
+    
+    if (titleLower.includes('pizarra') || msgLower.includes('pizarra')) {
+      route = '/pizarra';
+    } else if (roles.includes('lab') || titleLower.includes('evaluación gota') || titleLower.includes('laboratorio')) {
+      route = '/laboratorio';
+    } else if (roles.includes('crm') || titleLower.includes('crm') || titleLower.includes('cotización')) {
+      route = '/crm';
+    } else if (roles.includes('school') || titleLower.includes('escuela') || titleLower.includes('alumno')) {
+      route = '/escuela';
+    } else if (roles.includes('gestion') || titleLower.includes('gestion') || titleLower.includes('gestión')) {
+      route = '/gestion';
+    } else if (roles.includes('admin') || roles.includes('manager') || titleLower.includes('administracion') || titleLower.includes('administración')) {
+      route = '/administracion';
+    }
+
+    navigate(route);
+    onClose();
+  };
+
+  const getModuleLabel = (notif: Notification) => {
+    const titleLower = (notif.title || '').toLowerCase();
+    const msgLower = (notif.message || '').toLowerCase();
+
+    if (titleLower.includes('pizarra') || msgLower.includes('pizarra')) {
+      return 'Pizarra de Notas';
+    }
+
+    const roles = notif.recipientRoles || [];
+    if (roles.includes('lab') || titleLower.includes('evaluación gota') || titleLower.includes('laboratorio')) {
+      return 'Laboratorio';
+    }
+    if (roles.includes('crm') || titleLower.includes('crm') || titleLower.includes('cotización')) {
+      return 'CRM Comercial';
+    }
+    if (roles.includes('school') || titleLower.includes('escuela') || titleLower.includes('alumno')) {
+      return 'Escuela CIMASUR';
+    }
+    if (roles.includes('gestion') || titleLower.includes('gestion') || titleLower.includes('gestión')) {
+      return 'Gestión';
+    }
+    if (roles.includes('admin') || roles.includes('manager') || titleLower.includes('administracion') || titleLower.includes('administración')) {
+      return 'Administración';
+    }
+
     if (!roles || roles.length === 0) return 'Sistema General';
     const labels: Record<string, string> = {
       admin: 'Administración',
@@ -55,7 +123,7 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-end p-4">
-      <div className="bg-[#152035] rounded-2xl w-full max-w-sm shadow-2xl p-6 mt-16 animate-in slide-in-from-right border border-[#1E3A5F]">
+      <div className="bg-[#152035] rounded-x2l rounded-2xl w-full max-w-sm shadow-2xl p-6 mt-16 animate-in slide-in-from-right border border-[#1E3A5F]">
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-bold text-lg text-white flex items-center gap-2">
             <Bell className="w-5 h-5 text-[#38BDF8]" /> Notificaciones
@@ -65,13 +133,54 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
               </button>
             )}
           </h2>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowRead(!showRead)} className={cn("text-[10px] uppercase font-black px-3 py-1.5 rounded-full transition-colors", showRead ? "bg-[#38BDF8] text-[#111A2E]" : "bg-[#1E3A5F] text-slate-300 hover:bg-[#111A2E]")}>
-              {showRead ? 'Ocultar leídas' : 'Ver todas'}
-            </button>
-            <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
+
+        {/* Tab Selection Header and Quick Select Button */}
+        {!selectedNotif && (
+          <div className="flex items-center justify-between gap-2 border-b border-[#1E293B] pb-3 mb-4">
+            <div className="flex gap-2.5">
+              <button 
+                onClick={() => setActiveTab('pending')} 
+                className={cn(
+                  "text-[10px] uppercase font-black px-3.5 py-2 rounded-full transition-all flex items-center gap-1.5", 
+                  activeTab === 'pending' 
+                    ? "bg-[#38BDF8] text-[#111A2E] shadow" 
+                    : "bg-[#1E3A5F] text-slate-300 hover:bg-[#111A2E]"
+                )}
+              >
+                No leídas
+                {pendingCount > 0 && (
+                  <span className="bg-[#EF4444] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+              <button 
+                onClick={() => setActiveTab('read')} 
+                className={cn(
+                  "text-[10px] uppercase font-black px-3.5 py-2 rounded-full transition-all", 
+                  activeTab === 'read' 
+                    ? "bg-[#38BDF8] text-[#111A2E] shadow" 
+                    : "bg-[#1E3A5F] text-slate-300 hover:bg-[#111A2E]"
+                )}
+              >
+                Leídas
+              </button>
+            </div>
+
+            {activeTab === 'pending' && pendingCount > 0 && (
+              <button 
+                onClick={handleMarkAllAsRead} 
+                className="text-emerald-400 hover:text-emerald-300 transition-colors text-[10px] font-black uppercase flex items-center gap-1.5 border border-emerald-400/20 bg-emerald-400/5 hover:bg-emerald-400/10 px-2.5 py-1.5 rounded-xl"
+                title="Marcar todas como leídas"
+              >
+                <CheckCheck className="w-3.5 h-3.5" />
+                Marcar todo
+              </button>
+            )}
+          </div>
+        )}
         
         {selectedNotif ? (
           <div className="animate-in slide-in-from-right-8 fade-in">
@@ -92,33 +201,27 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
                          <span className="truncate">{selectedNotif.sender || 'Sistema'}</span>
                       </div>
                    </div>
-                   <div className="bg-[#152035] p-3 rounded-xl border border-[#1E3A5F] cursor-pointer hover:border-[#38BDF8] transition-colors" onClick={() => {
-                      const roles = selectedNotif.recipientRoles || [];
-                      let route = '/';
-                      if (roles.includes('lab')) route = '/lab';
-                      else if (roles.includes('crm')) route = '/crm';
-                      else if (roles.includes('admin') || roles.includes('manager')) route = '/admin';
-                      else if (roles.includes('school')) route = '/school';
-                      else if (roles.includes('gestion')) route = '/gestion';
-                      navigate(route);
-                      onClose();
-                   }} title="Ir al módulo">
+                   <div className="bg-[#152035] p-3 rounded-xl border border-[#1E3A5F] cursor-pointer hover:border-[#38BDF8] hover:bg-[#38BDF8]/10 transition-colors" onClick={() => handleNavigateToTargetForNotif(selectedNotif)} title="Ir al módulo">
                       <span className="text-[9px] uppercase font-black text-slate-500 block mb-1 flex items-center justify-between">Módulo Destino <ExternalLink className="w-3 h-3 text-[#38BDF8]" /></span>
                       <div className="flex items-center gap-2 text-xs font-bold text-[#38BDF8]">
                          <ShieldAlert className="w-3.5 h-3.5" />
-                         <span className="truncate">{getModuleLabel(selectedNotif.recipientRoles)}</span>
+                         <span className="truncate">{getModuleLabel(selectedNotif)}</span>
                       </div>
                    </div>
                 </div>
              </div>
           </div>
         ) : (
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[#1E3A5F] pr-2 -mr-2">
-            {filteredNotifications.length === 0 && <p className="text-sm text-slate-500 text-center py-8 italic">No tienes notificaciones pendientes.</p>}
+          <div className="space-y-3 max-h-[55vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[#1E3A5F] pr-2 -mr-2">
+            {filteredNotifications.length === 0 && (
+              <p className="text-sm text-slate-500 text-center py-8 italic">
+                {activeTab === 'pending' ? 'No tienes notificaciones pendientes.' : 'No tienes notificaciones leídas.'}
+              </p>
+            )}
             {filteredNotifications.map((n: any) => (
               <div 
                  key={n.id} 
-                 onClick={() => setSelectedNotif(n)}
+                 onClick={() => handleSelectNotif(n)}
                  className={cn("p-4 rounded-xl border cursor-pointer hover:shadow-lg transition-all group", n.read ? "bg-[#111A2E]/50 border-[#1E293B] opacity-70" : "bg-[#111A2E] border-[#38BDF8]/40 hover:border-[#38BDF8]")}
               >
                 <div className="flex justify-between items-start mb-2">

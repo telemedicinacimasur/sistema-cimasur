@@ -53,8 +53,10 @@ export default function LabView() {
   const [activeForm, setActiveForm] = useState<LabFormType>('default');
   const [records, setRecords] = useState<any[]>([]);
 
-  const canEdit = user?.roles?.includes('admin') || user?.permissions?.['lab']?.edit !== false;
-  const canDelete = user?.roles?.includes('admin') || user?.permissions?.['lab']?.delete !== false;
+  const permissions = user?.permissions?.['lab'];
+  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
+  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
 
   // Generic data fetching for the active form from localDB
   useEffect(() => {
@@ -203,7 +205,7 @@ export default function LabView() {
     <div className="space-y-6 font-bold">
       {!canEdit && (
         <style>{`
-          form { pointer-events: none; opacity: 0.5; position: relative; }
+          form, form input, form textarea, form select, input[required], select[required], textarea[required], button[type="submit"] { pointer-events: none !important; opacity: 0.5 !important; }
           form::after { content: '🛡️ MODO LECTOR ACTIVO - INGRESO BLOQUEADO'; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #0F172A; color: #38BDF8; font-weight: 900; font-size: 10px; padding: 6px 16px; border-radius: 8px; border: 1px solid #1E293B; letter-spacing: 0.1em; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         `}</style>
       )}

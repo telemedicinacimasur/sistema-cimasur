@@ -73,24 +73,25 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
     
     const normalizedRecipientRoles = notification.recipientRoles.map(r => r.toLowerCase());
 
-    // "AL MÓDULO DE LABORATORIO SOLO DEBEN LLEGARLE ALERTAS CUANDO EN Seguimiento de Cotizaciones SE CAMBIE UN REGISTRO A APROBADO Y LA ALERTA DE STOCK DE INSUMOS BAJOS POR DÍA SEGÚN LA ALERTA QUE SE GENERÓ POR CADA UNO (NADA MÁS)"
+    // Check if any of the user's roles matches the recipient role
+    const isRoleRecipient = normalizedRecipientRoles.some(rRole => 
+             normalizedUserRoles.some(uRole => uRole === rRole || uRole === `viewer_${rRole}`)
+           );
+
+    // "AL MÓDULO DE LABORATORIO LE LLEGARAN LAS NOTIFICACIONES DE TODOS LOS USUARIOS DE INGRESO A ESE MODULO"
+    // "... Y EL INGRESO DE SEGUIMIENTO DE COTIZACIONES APROBADAS POR ADMINISTRACION YA QUE ESTAN SINCRONIZADAS"
     const isLab = normalizedUserRoles.some(role => role === 'lab' || role === 'viewer_lab');
     if (isLab) {
       const isApprovedQuote = notification.title === 'Cotización Aprobada';
       const isStockAlert = notification.title === 'Alerta de Stock Bajo';
-      const isCommentOnMyModule = notification.title && 
-        notification.title.startsWith('Nuevo Comentario') && 
-        normalizedRecipientRoles.includes('lab');
-
-      if (!isApprovedQuote && !isStockAlert && !isCommentOnMyModule) {
-        return false;
+      
+      // If it's explicitly for laboratory, or it is a special synchronized alert
+      if (isApprovedQuote || isStockAlert || isRoleRecipient) {
+        return true;
       }
     }
 
-    // Check if any of the user's roles matches the recipient role
-    return normalizedRecipientRoles.some(rRole => 
-             normalizedUserRoles.some(uRole => uRole === rRole || uRole === `viewer_${rRole}`)
-           );
+    return isRoleRecipient;
   };
 
   if (isFirebaseReady && db) {
