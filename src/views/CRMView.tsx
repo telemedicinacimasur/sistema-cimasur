@@ -32,6 +32,9 @@ export default function CRMView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
 
+  const canEdit = user?.roles?.includes('admin') || user?.permissions?.['crm']?.edit !== false;
+  const canDelete = user?.roles?.includes('admin') || user?.permissions?.['crm']?.delete !== false;
+
   const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'intranet' | 'smart'>('register');
   const [records, setRecords] = useState<any[]>([]);
   const [intranetClients, setIntranetClients] = useState<any[]>([]);
@@ -61,6 +64,17 @@ export default function CRMView() {
 
   return (
     <div className="space-y-6">
+      {!canEdit && (
+        <style>{`
+          form { pointer-events: none; opacity: 0.5; position: relative; }
+          form::after { content: '🛡️ MODO LECTOR ACTIVO - INGRESO BLOQUEADO'; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #0F172A; color: #38BDF8; font-weight: 900; font-size: 10px; padding: 6px 16px; border-radius: 8px; border: 1px solid #1E293B; letter-spacing: 0.1em; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        `}</style>
+      )}
+      {!canDelete && (
+        <style>{`
+          button[title*="eliminar" i], button[title*="borrar" i], button.text-red-500, button.text-red-400 { display: none !important; }
+        `}</style>
+      )}
       <div className="flex justify-between items-end mb-8 sticky top-0 z-40 bg-[#0D1527] border-b border-slate-700/50 pb-4 pt-4 -mx-6 px-6">
         <div>
           <h2 className="text-3xl font-bold text-white">CRM Comercial</h2>

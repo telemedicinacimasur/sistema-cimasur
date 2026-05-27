@@ -53,6 +53,9 @@ export default function LabView() {
   const [activeForm, setActiveForm] = useState<LabFormType>('default');
   const [records, setRecords] = useState<any[]>([]);
 
+  const canEdit = user?.roles?.includes('admin') || user?.permissions?.['lab']?.edit !== false;
+  const canDelete = user?.roles?.includes('admin') || user?.permissions?.['lab']?.delete !== false;
+
   // Generic data fetching for the active form from localDB
   useEffect(() => {
     if (activeForm === 'default') return;
@@ -198,6 +201,17 @@ export default function LabView() {
 
   return (
     <div className="space-y-6 font-bold">
+      {!canEdit && (
+        <style>{`
+          form { pointer-events: none; opacity: 0.5; position: relative; }
+          form::after { content: '🛡️ MODO LECTOR ACTIVO - INGRESO BLOQUEADO'; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #0F172A; color: #38BDF8; font-weight: 900; font-size: 10px; padding: 6px 16px; border-radius: 8px; border: 1px solid #1E293B; letter-spacing: 0.1em; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        `}</style>
+      )}
+      {!canDelete && (
+        <style>{`
+          button[title*="eliminar" i], button[title*="borrar" i], button.text-red-500, button.text-red-400 { display: none !important; }
+        `}</style>
+      )}
       {/* Back Button */}
       <div className="mb-6">
         <button 

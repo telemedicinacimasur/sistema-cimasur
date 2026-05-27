@@ -47,6 +47,9 @@ export default function SchoolView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
 
+  const canEdit = user?.roles?.includes('admin') || user?.permissions?.['school']?.edit !== false;
+  const canDelete = user?.roles?.includes('admin') || user?.permissions?.['school']?.delete !== false;
+
   const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities' | 'commercial'>('register');
   const [data, setData] = useState<any[]>([]);
 
@@ -63,6 +66,17 @@ export default function SchoolView() {
 
   return (
     <div className="space-y-8">
+      {!canEdit && (
+        <style>{`
+          form { pointer-events: none; opacity: 0.5; position: relative; }
+          form::after { content: '🛡️ MODO LECTOR ACTIVO - INGRESO BLOQUEADO'; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #0F172A; color: #38BDF8; font-weight: 900; font-size: 10px; padding: 6px 16px; border-radius: 8px; border: 1px solid #1E293B; letter-spacing: 0.1em; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        `}</style>
+      )}
+      {!canDelete && (
+        <style>{`
+          button[title*="eliminar" i], button[title*="borrar" i], button.text-red-500, button.text-red-400 { display: none !important; }
+        `}</style>
+      )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black text-white tracking-tight">Centro Académico CIMASUR</h2>

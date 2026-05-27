@@ -11,7 +11,9 @@ import {
   Bell,
   Settings,
   Home,
-  Activity
+  Activity,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
@@ -28,6 +30,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [isMuted, setIsMuted] = React.useState(() => {
+    return localStorage.getItem('notifications_muted') === 'true';
+  });
+  const prevUnreadRef = React.useRef(0);
+
   const location = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -38,11 +45,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     if (user) {
       const userRoles = user.roles || [user.role || 'viewer'];
       const unsubscribe = subscribeToNotifications(userRoles, user.displayName || user.email || 'Sistema', (data) => {
+        const newUnread = data.filter(n => !n.read).length;
+        if (newUnread > prevUnreadRef.current && prevUnreadRef.current !== 0 && !isMuted) {
+          try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('Audio autoplay prevented', e));
+          } catch(e) {}
+        }
+        prevUnreadRef.current = newUnread;
         setNotifications(data);
       });
       return () => unsubscribe();
     }
-  }, [user]);
+  }, [user, isMuted]);
+
+  const toggleMute = () => {
+    const newState = !isMuted;
+    setIsMuted(newState);
+    localStorage.setItem('notifications_muted', String(newState));
+  };
 
   const menuItems = [
     { name: 'CPANEL SISTEMA', icon: ShieldCheck, path: '/cpanel', roles: ['admin'] },
@@ -136,7 +158,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all relative">
+              <button onClick={toggleMute} className="p-2.5 text-slate-400 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all" title={isMuted ? "Activar Sonido" : "Silenciar Notificaciones"}>
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+              <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all relative" title="Notificaciones">
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center rounded-full shadow-sm">

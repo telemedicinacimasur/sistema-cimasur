@@ -82,11 +82,14 @@ export const localAuth = {
   createUser: async (userData: any) => {
     if (isFirebaseReady && db) {
       try {
-        await addDoc(collection(db, 'users'), {
+        await setDoc(doc(db, 'users', userData.uid || `user-${Date.now()}`), {
           email: userData.email || 'anónimo@cimasur.cl',
           displayName: userData.displayName || 'Anónimo',
           role: userData.role || 'viewer',
           roles: userData.roles || [userData.role || 'viewer'],
+          permissions: userData.permissions || {},
+          allowedSubmodules: userData.allowedSubmodules || {},
+          pass: userData.pass || '',
           createdAt: new Date().toISOString()
         });
       } catch (error) {
@@ -97,7 +100,17 @@ export const localAuth = {
       await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
+        body: JSON.stringify({
+          uid: userData.uid || `user-${Date.now()}`,
+          email: userData.email || 'anónimo@cimasur.cl',
+          displayName: userData.displayName || 'Anónimo',
+          role: userData.role || 'viewer',
+          roles: userData.roles || [userData.role || 'viewer'],
+          permissions: userData.permissions || {},
+          allowedSubmodules: userData.allowedSubmodules || {},
+          pass: userData.pass || '',
+          createdAt: new Date().toISOString()
+        })
       });
     }
   },

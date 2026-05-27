@@ -131,22 +131,13 @@ export default function AdminView() {
               color="emerald"
             />
           )}
-          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_gestion')) && (
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('resumen_ventas')) && (
             <ModuleCard 
-              title="Detalle de Ventas GESTIÓN"
-              desc="Registro diario de ventas con detalle de productos y cotización."
-              icon={ShoppingCart}
-              onClick={() => setView('sales_gestion')}
-              color="amber"
-            />
-          )}
-          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_gestion')) && (
-            <ModuleCard 
-              title="Ventas Tienda y ML"
-              desc="Detalle de Ventas para canales Tienda Física y Mercado Libre."
-              icon={ShoppingCart}
-              onClick={() => setView('sales_tienda_ml')}
-              color="orange"
+              title="Resumen de ventas Frascos y Pesos"
+              desc="Análisis dinámico de volumen de frascos y recaudación por documentos."
+              icon={Activity}
+              onClick={() => setView('resumen_ventas')}
+              color="indigo"
             />
           )}
           {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('dte')) && (
@@ -156,6 +147,24 @@ export default function AdminView() {
               icon={Receipt}
               onClick={() => setView('dte')}
               color="rose"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_gestion')) && (
+            <ModuleCard 
+              title="Detalle de Ventas GESTIÓN"
+              desc="Registro diario de ventas con detalle de productos y cotización."
+              icon={ShoppingCart}
+              onClick={() => setView('sales_gestion')}
+              color="amber"
+            />
+          )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_tienda_ml')) && (
+            <ModuleCard 
+              title="Ventas Tienda y ML"
+              desc="Detalle de Ventas para canales Tienda Física y Mercado Libre."
+              icon={ShoppingCart}
+              onClick={() => setView('sales_tienda_ml')}
+              color="orange"
             />
           )}
           {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('pet_payments')) && (
@@ -185,15 +194,6 @@ export default function AdminView() {
               color="orange"
             />
           )}
-          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('resumen_ventas')) && (
-            <ModuleCard 
-              title="Resumen de ventas Frascos y Pesos"
-              desc="Análisis dinámico de volumen de frascos y recaudación por documentos."
-              icon={Activity}
-              onClick={() => setView('resumen_ventas')}
-              color="indigo"
-            />
-          )}
           {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('presupuesto_flujo')) && (
             <ModuleCard 
               title="Matriz de Presupuesto y Flujo"
@@ -208,8 +208,22 @@ export default function AdminView() {
     );
   }
 
+  const canEdit = user?.roles?.includes('admin') || user?.permissions?.['manager']?.edit !== false;
+  const canDelete = user?.roles?.includes('admin') || user?.permissions?.['manager']?.delete !== false;
+
   return (
     <div className="space-y-6 relative font-bold">
+      {!canEdit && (
+        <style>{`
+          form { pointer-events: none; opacity: 0.5; position: relative; }
+          form::after { content: '🛡️ MODO LECTOR ACTIVO - INGRESO BLOQUEADO'; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #0F172A; color: #38BDF8; font-weight: 900; font-size: 10px; padding: 6px 16px; border-radius: 8px; border: 1px solid #1E293B; letter-spacing: 0.1em; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        `}</style>
+      )}
+      {!canDelete && (
+        <style>{`
+          button[title*="eliminar" i], button[title*="borrar" i], button.text-red-500, button.text-red-400 { display: none !important; }
+        `}</style>
+      )}
       <button 
         onClick={() => setView('menu')}
         className="flex items-center gap-2 text-slate-400 hover:text-[#38BDF8] transition-colors mb-2 group w-fit"
