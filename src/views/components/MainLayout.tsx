@@ -13,7 +13,8 @@ import {
   Home,
   Activity,
   Volume2,
-  VolumeX
+  VolumeX,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
@@ -34,6 +35,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     return localStorage.getItem('notifications_muted') === 'true';
   });
   const prevUnreadRef = React.useRef(0);
+  
+  // Real-time toast "cloud" states
+  const [toastNotification, setToastNotification] = React.useState<Notification | null>(null);
+  const [showToast, setShowToast] = React.useState(false);
+  const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -44,14 +50,29 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   React.useEffect(() => {
     if (user) {
       const userRoles = user.roles || [user.role || 'viewer'];
-      const unsubscribe = subscribeToNotifications(userRoles, user.displayName || user.email || 'Sistema', (data) => {
+      const unsubscribe = subscribeToNotifications(userRoles, user.displayName || user.email || 'Sistema', user.email || '', (data) => {
         const newUnread = data.filter(n => !n.read).length;
-        if (newUnread > prevUnreadRef.current && prevUnreadRef.current !== 0 && !isMuted) {
-          try {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(e => console.log('Audio autoplay prevented', e));
-          } catch(e) {}
+        if (newUnread > prevUnreadRef.current && prevUnreadRef.current !== 0) {
+          if (!isMuted) {
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+              audio.volume = 1.0; // MAX VOLUME! Louder sound (tono máximo)
+              audio.play().catch(e => console.log('Audio autoplay prevented', e));
+            } catch(e) {}
+          }
+
+          // Search for the newly added unread notification to show a real-time toast
+          const unreadList = data.filter(n => !n.read);
+          const latestUnread = unreadList[0];
+          if (latestUnread) {
+            setToastNotification(latestUnread);
+            setShowToast(true);
+
+            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+            toastTimeoutRef.current = setTimeout(() => {
+              setShowToast(false);
+            }, 8000); // 8 seconds visible on-screen
+          }
         }
         prevUnreadRef.current = newUnread;
         setNotifications(data);
@@ -59,6 +80,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       return () => unsubscribe();
     }
   }, [user, isMuted]);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
 
   const toggleMute = () => {
     const newState = !isMuted;
@@ -197,6 +224,57 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
       </main>
       <BackToTop />
+      {showToast && toastNotification && (
+        <div 
+          onClick={() => {
+            setIsNotificationsOpen(true);
+            setShowToast(false);
+          }}
+          className="fixed bottom-6 right-6 z-[99999] max-w-sm bg-gradient-to-r from-[#111A2E] to-[#0A0F1D]/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.6)] border-2 border-[#38BDF8]/65 p-5 transform transition-all duration-500 ease-out hover:scale-105 cursor-pointer flex flex-col gap-2.5 animate-in slide-in-from-bottom-5 border-l-8 border-l-[#38BDF8] select-none"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-sky-400 animate-ping" />
+              <h4 className="font-extrabold text-xs text-white uppercase tracking-wider">{toastNotification.title}</h4>
+            </div>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowToast(false);
+              }}
+              className="p-1 rounded bg-[#152035] text-slate-400 hover:text-white transition-colors border border-[#1E293B]"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            {toastNotification.message}
+          </p>
+
+          {(() => {
+            const isDirectResponsible = toastNotification.recipientUsers && user?.email && toastNotification.recipientUsers.map((u: string) => u.toLowerCase().trim()).includes(user.email.toLowerCase().trim());
+            if (isDirectResponsible) {
+              return (
+                <div className="mt-1 bg-red-600/20 text-red-400 border border-red-500/30 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center gap-1 animate-pulse self-start">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  <span>Eres el responsable directo</span>
+                </div>
+              );
+            }
+            return (
+              <div className="mt-1 bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg self-start">
+                <span>Nota de Pizarra / Copia</span>
+              </div>
+            );
+          })()}
+
+          <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase mt-1">
+            <span>De: {toastNotification.sender || 'Sistema'}</span>
+            <span className="text-[#38BDF8] font-black">Hacer Clic para ver</span>
+          </div>
+        </div>
+      )}
       <UserSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} user={user} onUpdate={() => window.location.reload()} />
       <NotificationsDialog isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} isMuted={isMuted} toggleMute={toggleMute} />
     </div>

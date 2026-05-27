@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
+  AlertTriangle,
 } from "lucide-react";
 
 interface NoteReply {
@@ -174,18 +175,22 @@ export default function PizarraView() {
 
       // Only explicitly send if there are targeted users or allowed workers
       if (notifUsers.length > 0) {
+        const assignedNames = notifUsers.map(email => {
+          return workers.find(w => w.email === email)?.displayName || email.split('@')[0];
+        }).join(', ');
+
         await addNotification({
           title: "Nueva Nota en Pizarra",
-          message: `${user?.displayName || user?.email} te ha asignado/mencionado en una nota.`,
+          message: `${user?.displayName || user?.email} realizó una nota en la que asignó a: ${assignedNames}.`,
           sender: user?.email || "Sistema",
-          recipientRoles: [],
+          recipientRoles: ["admin", "manager", "lab", "crm", "school", "gestion"],
           recipientUsers: notifUsers,
         });
       } else if (isNew) {
         // Provide an explicit general notification or roles if no target was set
         await addNotification({
           title: "Nueva Nota en Pizarra",
-          message: `${user?.displayName || user?.email} ha creado una nueva nota global.`,
+          message: `${user?.displayName || user?.email} ha creado una nueva nota global en la pizarra.`,
           sender: user?.email || "Sistema",
           recipientRoles: [
             "admin",
@@ -243,6 +248,16 @@ export default function PizarraView() {
     note: NoteRecord,
     newState: "Pendiente" | "Proceso" | "Terminado" | "Archivar",
   ) => {
+    if (note.estado === "Archivar") {
+      alert("Esta nota ya está Finalizada/Archivada y su estado no puede ser modificado.");
+      return;
+    }
+
+    if (newState === "Archivar" && note.autorEmail !== user?.email) {
+      alert("Solo el creador de la nota puede dar el finalizado (archivado/finalizado)");
+      return;
+    }
+
     await localDB.saveToCollection("pizarra_notes", {
       ...note,
       estado: newState,
@@ -259,15 +274,17 @@ export default function PizarraView() {
       ]),
     ].filter((email) => email !== user?.email); // Do not notify oneself
 
-    if (notifUsers.length > 0) {
-      await addNotification({
-        title: `Actualización de Nota en Pizarra`,
-        message: `El estado de una nota ha cambiado a "${newState}".`,
-        sender: user?.email || "Sistema",
-        recipientRoles: [],
-        recipientUsers: notifUsers,
-      });
-    }
+    const assignedNames = targetUsers.length > 0 
+      ? targetUsers.map(email => workers.find(w => w.email === email)?.displayName || email.split('@')[0]).join(', ')
+      : 'todos';
+
+    await addNotification({
+      title: `Actualización de Nota en Pizarra`,
+      message: `El estado de la nota de ${note.autor} para ${assignedNames} ha cambiado a "${newState}" por ${user?.displayName || user?.email}.`,
+      sender: user?.email || "Sistema",
+      recipientRoles: ["admin", "manager", "lab", "crm", "school", "gestion"],
+      recipientUsers: notifUsers,
+    });
 
     loadData();
   };
@@ -291,24 +308,27 @@ export default function PizarraView() {
     await localDB.saveToCollection("pizarra_notes", updatedNote);
 
     // Notify author and other involved users
+    const targetUsers =
+      note.targetUsers || (note.targetUser ? [note.targetUser] : []);
     const notifUsers = [
       ...new Set([
         note.autorEmail,
-        ...(note.targetUsers || []),
-        ...(note.targetUser ? [note.targetUser] : []),
+        ...targetUsers,
         ...(note.respuestas?.map((r) => r.autorEmail) || []),
       ]),
     ].filter((email) => email !== user?.email);
 
-    if (notifUsers.length > 0) {
-      await addNotification({
-        title: "Nueva Respuesta en Pizarra",
-        message: `${user?.displayName || user?.email} ha respondido a una nota.`,
-        sender: user?.email || "Sistema",
-        recipientRoles: [],
-        recipientUsers: notifUsers,
-      });
-    }
+    const assignedNames = targetUsers.length > 0 
+      ? targetUsers.map(email => workers.find(w => w.email === email)?.displayName || email.split('@')[0]).join(', ')
+      : 'todos';
+
+    await addNotification({
+      title: "Nueva Respuesta en Pizarra",
+      message: `${user?.displayName || user?.email} respondió en la nota de ${note.autor} para ${assignedNames}: "${replyText.trim().substring(0, 60)}${replyText.trim().length > 60 ? '...' : ''}"`,
+      sender: user?.email || "Sistema",
+      recipientRoles: ["admin", "manager", "lab", "crm", "school", "gestion"],
+      recipientUsers: notifUsers,
+    });
 
     setReplyText("");
     setReplyDialogNote(updatedNote as NoteRecord);
@@ -604,6 +624,19 @@ export default function PizarraView() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
           {visibleNotes.map((note) => {
+            const isOverdue = (() => {
+              if (note.estado === "Terminado" || note.estado === "Archivar") return false;
+              if (!note.fechaTermino) return false;
+              
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              
+              const limitDate = new Date(note.fechaTermino);
+              limitDate.setHours(23, 59, 59, 999);
+              
+              return today > limitDate;
+            })();
+
             let noteColor =
               "bg-[#fcf8e3] border-[#faebcc] shadow-amber-900/10 text-[#8a6d3b]";
             let statusColor = "bg-amber-100 text-amber-800";
@@ -623,6 +656,11 @@ export default function PizarraView() {
                 "bg-slate-100 border-slate-300 shadow-slate-900/10 text-slate-500 opacity-80";
               statusColor = "bg-slate-200 text-slate-700";
               statusIcon = <Archive className="w-3 h-3" />;
+            }
+
+            if (isOverdue) {
+              noteColor = "bg-[#fff1f2] border-red-500 shadow-red-900/15 text-red-900 !border-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]";
+              statusColor = "bg-red-200 text-red-800";
             }
 
             return (
@@ -680,6 +718,13 @@ export default function PizarraView() {
                   )}
                 </div>
 
+                {isOverdue && (
+                  <div className="flex items-center gap-1 bg-red-600 text-white font-black text-[9px] uppercase tracking-widest px-2 py-1 rounded mb-3 animate-pulse border border-red-700 shadow-sm inline-flex self-start">
+                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                    <span>¡Fecha Límite Superada!</span>
+                  </div>
+                )}
+
                 {note.titulo && (
                   <h3 className="text-base font-black uppercase tracking-tight mb-2 leading-tight opacity-90">
                     {note.titulo}
@@ -705,22 +750,30 @@ export default function PizarraView() {
                       </div>
 
                       <div className="flex mt-2 justify-between items-center w-full bg-white/30 p-1.5 rounded-lg border border-black/5">
-                        <select
-                          value={note.estado}
-                          onChange={(e) =>
-                            handleStateChange(note, e.target.value as any)
-                          }
-                          className={`text-[9px] font-black uppercase pl-2 pr-4 py-1 rounded appearance-none outline-none cursor-pointer ${statusColor}`}
-                        >
-                          <option value="Pendiente">Pendiente</option>
-                          <option value="Proceso">En Proceso</option>
-                          <option value="Terminado">Terminado</option>
-                          <option value="Archivar">
-                            Archivado / Finalizado
-                          </option>
-                        </select>
+                        {note.estado === "Archivar" ? (
+                          <span className={`text-[9px] font-black uppercase px-2 py-1 rounded inline-flex items-center gap-1 bg-slate-200 text-slate-700 border border-slate-300 w-full justify-center`}>
+                            {statusIcon} Archivado / Finalizado
+                          </span>
+                        ) : (
+                          <select
+                            value={note.estado}
+                            onChange={(e) =>
+                              handleStateChange(note, e.target.value as any)
+                            }
+                            className={`text-[9px] font-black uppercase pl-2 pr-4 py-1 rounded appearance-none outline-none cursor-pointer ${statusColor}`}
+                          >
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Proceso">En Proceso</option>
+                            <option value="Terminado">Terminado</option>
+                            {note.autorEmail === user?.email && (
+                              <option value="Archivar">
+                                Archivado / Finalizado
+                              </option>
+                            )}
+                          </select>
+                        )}
 
-                        {note.autorEmail === user?.email && (
+                        {note.autorEmail === user?.email && note.estado !== "Archivar" && (
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => startEdit(note)}

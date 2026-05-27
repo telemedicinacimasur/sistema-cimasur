@@ -13,7 +13,7 @@ export interface Notification {
   read: boolean;
 }
 
-export const subscribeToNotifications = (userRoles: string[], currentUserName: string, callback: (notifications: Notification[]) => void) => {
+export const subscribeToNotifications = (userRoles: string[], currentUserName: string, currentUserEmail: string, callback: (notifications: Notification[]) => void) => {
   const isRecipient = (notification: any) => {
     // Attempt to load current user identity from session storage
     let currentUser: any = null;
@@ -24,34 +24,80 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
       console.error(e);
     }
 
-    const senderLower = (notification.sender || '').toLowerCase();
-    const currentUserNameLower = currentUserName.toLowerCase();
-    const currentUserEmailLower = currentUser?.email ? currentUser.email.toLowerCase() : '';
-    const currentUserDisplayNameLower = currentUser?.displayName ? currentUser.displayName.toLowerCase() : '';
+    const senderLower = (notification.sender || '').toLowerCase().trim();
+    const currentUserNameLower = currentUserName.toLowerCase().trim();
+    const currentUserEmailLower = (currentUserEmail || currentUser?.email || '').toLowerCase().trim();
+    const currentUserDisplayNameLower = currentUser?.displayName ? currentUser.displayName.toLowerCase().trim() : '';
 
     // Filter out notifications created by the same user
     if (
-      senderLower === currentUserNameLower ||
+      (senderLower && senderLower === currentUserNameLower) ||
       (currentUserEmailLower && senderLower === currentUserEmailLower) ||
-      (currentUserDisplayNameLower && senderLower === currentUserDisplayNameLower)
+      (currentUserDisplayNameLower && senderLower === currentUserDisplayNameLower) ||
+      (notification.message && (
+        notification.message.toLowerCase().includes(`${currentUserDisplayNameLower} realizó`) ||
+        notification.message.toLowerCase().includes(`${currentUserEmailLower} realizó`) ||
+        notification.message.toLowerCase().includes(`${currentUserDisplayNameLower} ha creado`) ||
+        notification.message.toLowerCase().includes(`${currentUserEmailLower} ha creado`) ||
+        notification.message.toLowerCase().includes(`${currentUserDisplayNameLower} comentó`) ||
+        notification.message.toLowerCase().includes(`${currentUserEmailLower} comentó`)
+      ))
     ) {
       return false;
     }
 
-    // Check if it is a Pizarra or Comment or Reply notification (should reach everyone)
+    // Check if it is a Pizarra or Comment or Reply notification (should reach involved users and admins/lab)
     const isPizarraOrComment = 
       (notification.title && (
         notification.title.toLowerCase().includes('pizarra') || 
         notification.title.toLowerCase().includes('comentario') || 
-        notification.title.toLowerCase().includes('respuesta')
+        notification.title.toLowerCase().includes('comentarios') || 
+        notification.title.toLowerCase().includes('respuesta') ||
+        notification.title.toLowerCase().includes('nota') ||
+        notification.title.toLowerCase().includes('notas')
       )) || 
       (notification.message && (
         notification.message.toLowerCase().includes('pizarra') || 
         notification.message.toLowerCase().includes('comentó') || 
-        notification.message.toLowerCase().includes('respondió')
+        notification.message.toLowerCase().includes('comento') || 
+        notification.message.toLowerCase().includes('respondió') ||
+        notification.message.toLowerCase().includes('respondio') ||
+        notification.message.toLowerCase().includes('nota') ||
+        notification.message.toLowerCase().includes('notas') ||
+        notification.message.toLowerCase().includes('comentario') ||
+        notification.message.toLowerCase().includes('comentarios')
       ));
 
     if (isPizarraOrComment) {
+      // If there are targeted/specific users assigned to this note/comment, filter nicely
+      if (notification.recipientUsers && notification.recipientUsers.length > 0) {
+        const isMentioned = notification.recipientUsers.some((u: string) => {
+          const lowerU = u.toLowerCase().trim();
+          return (
+            lowerU === currentUserNameLower ||
+            (currentUserEmailLower && lowerU === currentUserEmailLower) ||
+            (currentUserDisplayNameLower && lowerU === currentUserDisplayNameLower)
+          );
+        });
+
+        const normalizedUserRoles = userRoles.map(r => r.toLowerCase());
+        const isLabOrAdmin = normalizedUserRoles.some(r => r === 'admin' || r === 'lab');
+
+        // Only deliver to explicitly assigned users OR anyone with admin/lab role
+        return isMentioned || isLabOrAdmin;
+      }
+      
+      // If global (no specific recipientUsers specified), anyone matching roles in recipientRoles receives it
+      const normalizedUserRoles = userRoles.map(r => r.toLowerCase());
+      if (normalizedUserRoles.includes('admin') || normalizedUserRoles.includes('lab')) {
+        return true;
+      }
+      if (notification.recipientRoles && notification.recipientRoles.length > 0) {
+        const normalizedRecipientRoles = notification.recipientRoles.map((r: string) => r.toLowerCase());
+        return normalizedRecipientRoles.some((rRole: string) => 
+          normalizedUserRoles.some(uRole => uRole === rRole || uRole === `viewer_${rRole}`)
+        );
+      }
       return true;
     }
 
@@ -88,10 +134,10 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
 
     if (!notification.recipientRoles || notification.recipientRoles.length === 0) return true;
     
-    const normalizedRecipientRoles = notification.recipientRoles.map(r => r.toLowerCase());
+    const normalizedRecipientRoles = notification.recipientRoles.map((r: string) => r.toLowerCase());
 
     // Check if any of the user's roles matches the recipient role
-    const isRoleRecipient = normalizedRecipientRoles.some(rRole => 
+    const isRoleRecipient = normalizedRecipientRoles.some((rRole: string) => 
              normalizedUserRoles.some(uRole => uRole === rRole || uRole === `viewer_${rRole}`)
            );
 

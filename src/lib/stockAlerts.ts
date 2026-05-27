@@ -71,8 +71,8 @@ export const checkStockAlerts = async (inventory: any[]) => {
 
 export const checkPendingOrderAlerts = async () => {
     const orders = await localDB.getCollection('order_tracking');
-    const sixDaysAgo = new Date();
-    sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
+    const tenDaysAgo = new Date();
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
     
     for (const order of orders) {
         const orderStatus = (order.situacion || '').toUpperCase();
@@ -80,9 +80,9 @@ export const checkPendingOrderAlerts = async () => {
             const dateStr = order.fechaEnvio || order.fechaCotiz || order.fecha;
             if (dateStr) {
                 const orderDate = new Date(dateStr);
-                if (orderDate.getTime() > 0 && orderDate < sixDaysAgo) {
-                    const title = 'Alerta de Revisión Logística';
-                    const message = `El pedido de ${order.cliente} lleva más de 6 días en estado ${order.situacion}.`;
+                if (orderDate.getTime() > 0 && orderDate < tenDaysAgo) {
+                    const title = 'Alerta de Revisión seguimiento de pedidos';
+                    const message = `El pedido N° ${order.nroCotiz || 'S/N'} de ${order.cliente || 'Sin Cliente'} lleva más de 10 días en estado ${order.situacion}.`;
 
                     if (!(await hasRecentNotification(title, message))) {
                         await addNotification({
