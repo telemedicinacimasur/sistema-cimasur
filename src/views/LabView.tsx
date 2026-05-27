@@ -3189,7 +3189,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showLogsModal, setShowLogsModal] = useState<any | null>(null);
-  const [logForm, setLogForm] = useState({ fecha: new Date().toISOString().split('T')[0], tecnico: '', detalle: '', proximaMantencion: '' });
+  const [logForm, setLogForm] = useState({ fecha: new Date().toISOString().split('T')[0], tecnico: '', detalle: '', proximaMantencion: '', valorMantencion: '', fechaEntrega: '' });
 
   const areas = [
     'OFICINA LABORATORIO (O.D.L)',
@@ -3328,52 +3328,84 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
     setShowLogsModal({ ...showLogsModal, mantenciones: newMantenciones });
     const updated = await localDB.getCollection('lab_records');
     setRecords(updated);
-    setLogForm({ fecha: new Date().toISOString().split('T')[0], tecnico: '', detalle: '', proximaMantencion: '' });
+    setLogForm({ fecha: new Date().toISOString().split('T')[0], tecnico: '', detalle: '', proximaMantencion: '', valorMantencion: '', fechaEntrega: '' });
+  };
+
+  const handleDeleteLog = async (index: number) => {
+    if (!showLogsModal) return;
+    if (window.confirm('¿Está seguro de que desea eliminar este registro?')) {
+      const newMantenciones = [...(showLogsModal.mantenciones || [])];
+      newMantenciones.splice(index, 1);
+      await localDB.updateInCollection('lab_records', showLogsModal.id, { mantenciones: newMantenciones });
+      setShowLogsModal({ ...showLogsModal, mantenciones: newMantenciones });
+      const updated = await localDB.getCollection('lab_records');
+      setRecords(updated);
+    }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {showLogsModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-[#152035] rounded-2xl shadow-2xl p-6 max-w-2xl w-full">
+          <div className="bg-[#152035] rounded-2xl shadow-2xl p-6 max-w-4xl w-full">
             <div className="flex justify-between items-center mb-4 border-b pb-2">
               <h3 className="font-bold text-white">Historial de Mantenciones: {showLogsModal.producto} ({showLogsModal.codigo})</h3>
-              <button onClick={() => setShowLogsModal(null)} className="text-slate-400 hover:text-black font-bold">X</button>
+              <button onClick={() => setShowLogsModal(null)} className="text-slate-400 hover:text-white font-bold text-lg leading-none">X</button>
             </div>
             
-            <form onSubmit={handleAddLog} className="grid grid-cols-2 gap-4 mb-6 bg-[#152035] p-4 rounded-2xl border">
-              <FormField label="Fecha Mantención"><input type="date" className="w-full border-b p-2 text-sm bg-[#152035]" value={logForm.fecha} onChange={e => setLogForm({...logForm, fecha: e.target.value})} required /></FormField>
-              <FormField label="Técnico / Responsable"><input className="w-full border-b p-2 text-sm bg-[#152035]" value={logForm.tecnico} onChange={e => setLogForm({...logForm, tecnico: e.target.value})} required /></FormField>
-              <FormField label="Próxima Mantención (Opcional)"><input type="date" className="w-full border-b p-2 text-sm bg-[#152035]" value={logForm.proximaMantencion} onChange={e => setLogForm({...logForm, proximaMantencion: e.target.value})} /></FormField>
-              <div className="col-span-2">
-                <FormField label="Detalle de Trabajos Realizados"><textarea className="w-full border p-2 text-sm bg-[#152035] rounded h-16" value={logForm.detalle} onChange={e => setLogForm({...logForm, detalle: e.target.value})} required /></FormField>
+            <form onSubmit={handleAddLog} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-[#18263f] p-4 rounded-2xl border border-[#1E3A5F]">
+              <FormField label="Fecha Mantención"><input type="date" className="w-full border-b border-[#1E3A5F] p-2 text-sm bg-transparent outline-none text-white focus:border-[#38BDF8]" value={logForm.fecha} onChange={e => setLogForm({...logForm, fecha: e.target.value})} required /></FormField>
+              <FormField label="Técnico / Responsable"><input className="w-full border-b border-[#1E3A5F] p-2 text-sm bg-transparent outline-none text-white focus:border-[#38BDF8]" value={logForm.tecnico} onChange={e => setLogForm({...logForm, tecnico: e.target.value})} required /></FormField>
+              <FormField label="Próxima Mantención (Opcional)"><input type="date" className="w-full border-b border-[#1E3A5F] p-2 text-sm bg-transparent outline-none text-white focus:border-[#38BDF8]" value={logForm.proximaMantencion} onChange={e => setLogForm({...logForm, proximaMantencion: e.target.value})} /></FormField>
+              
+              <FormField label="Valor de la Mantención"><input type="text" placeholder="Ej: $50.000" className="w-full border-b border-[#1E3A5F] p-2 text-sm bg-transparent outline-none text-white focus:border-[#38BDF8]" value={logForm.valorMantencion} onChange={e => setLogForm({...logForm, valorMantencion: e.target.value})} /></FormField>
+              <FormField label="Fecha Entrega a Encargado"><input type="date" className="w-full border-b border-[#1E3A5F] p-2 text-sm bg-transparent outline-none text-white focus:border-[#38BDF8]" value={logForm.fechaEntrega} onChange={e => setLogForm({...logForm, fechaEntrega: e.target.value})} /></FormField>
+              
+              <div className="col-span-1 md:col-span-3">
+                <FormField label="Detalle de Trabajos Realizados"><textarea className="w-full border border-[#1E3A5F] p-2 text-sm bg-transparent outline-none text-white focus:border-[#38BDF8] rounded h-16 resize-none" value={logForm.detalle} onChange={e => setLogForm({...logForm, detalle: e.target.value})} required /></FormField>
               </div>
-              <div className="col-span-2 flex justify-end">
-                <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-6 py-2 rounded-2xl font-bold text-sm">AÑADIR REGISTRO</button>
+              <div className="col-span-1 md:col-span-3 flex justify-end mt-2">
+                <button type="submit" className="bg-[#38BDF8] text-[#0F172A] hover:bg-[#0284C7] hover:text-white px-6 py-2 rounded-xl font-black uppercase text-xs tracking-wider transition-colors shadow-lg">Añadir Registro</button>
               </div>
             </form>
 
-            <div className="max-h-60 overflow-y-auto border rounded-2xl">
-              <table className="w-full text-xs">
-                <thead className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  sticky top-0">
+            <div className="max-h-60 overflow-y-auto border border-[#1E3A5F] rounded-xl shadow-inner scrollbar-thin scrollbar-thumb-slate-700">
+              <table className="w-full text-xs text-white">
+                <thead className="bg-[#1E3A5F] sticky top-0 uppercase tracking-wider font-black text-[10px]">
                   <tr>
-                    <th className="p-2 text-left">Fecha</th>
-                    <th className="p-2 text-left">Técnico</th>
-                    <th className="p-2 text-left">Detalle</th>
-                    <th className="p-2 text-left">Próxima</th>
+                    <th className="p-3 text-left">Fecha</th>
+                    <th className="p-3 text-left">Técnico</th>
+                    <th className="p-3 text-left">Valor</th>
+                    <th className="p-3 text-left">Entrega</th>
+                    <th className="p-3 text-left">Detalle</th>
+                    <th className="p-3 text-left w-32 w-[180px]">Próxima / Acción</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-[#1E3A5F]">
                   {(showLogsModal.mantenciones || []).map((m: any, i: number) => (
-                    <tr key={i} className="hover:bg-[#152035]">
-                      <td className="p-2 font-medium">{formatDate(m.fecha)}</td>
-                      <td className="p-2">{m.tecnico}</td>
-                      <td className="p-2">{m.detalle}</td>
-                      <td className="p-2 text-slate-400">{m.proximaMantencion ? formatDate(m.proximaMantencion) : '---'}</td>
+                    <tr key={i} className="hover:bg-[#1C2C47] transition-colors group">
+                      <td className="p-3 font-medium whitespace-nowrap">{formatDate(m.fecha)}</td>
+                      <td className="p-3">{m.tecnico}</td>
+                      <td className="p-3 font-mono text-[#38BDF8]">{m.valorMantencion || '---'}</td>
+                      <td className="p-3 text-slate-300">{m.fechaEntrega ? formatDate(m.fechaEntrega) : '---'}</td>
+                      <td className="p-3 min-w-[200px]">{m.detalle}</td>
+                      <td className="p-3 align-middle">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-emerald-400 font-bold tracking-wide whitespace-nowrap">{m.proximaMantencion ? formatDate(m.proximaMantencion) : '---'}</span>
+                          <button 
+                            type="button" 
+                            title="Eliminar Registro" 
+                            onClick={() => handleDeleteLog(i)} 
+                            className="bg-transparent text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {(!showLogsModal.mantenciones || showLogsModal.mantenciones.length === 0) && (
-                    <tr><td colSpan={4} className="p-6 text-center text-slate-400 italic">No hay mantenciones registradas</td></tr>
+                    <tr><td colSpan={6} className="p-8 text-center text-slate-500 italic font-medium">No hay mantenciones registradas en el historial.</td></tr>
                   )}
                 </tbody>
               </table>
