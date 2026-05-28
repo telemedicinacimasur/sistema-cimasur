@@ -18,7 +18,7 @@ const BASE_CATEGORIES = [
   'Nosodes Simples',
   'Complejos C100/C200',
   'Packs Especiales',
-  'Productos CS CIMASUR'
+  'Productos Base/Avanzado'
 ];
 
 const GENERIC_CATEGORIES = [
@@ -83,7 +83,13 @@ export default function CimasurInventoryManager() {
 
   const loadData = async () => {
     const allRecords = await localDB.getCollection('inventory_master');
-    setRecords(allRecords);
+    const mapped = allRecords.map((r: any) => {
+      if (r.categoria_tipo === 'Productos CS CIMASUR') {
+        return { ...r, categoria_tipo: 'Productos Base/Avanzado' };
+      }
+      return r;
+    });
+    setRecords(mapped);
   };
 
   const getFilteredRecords = () => {
@@ -326,17 +332,17 @@ export default function CimasurInventoryManager() {
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-    XLSX.writeFile(wb, `cimasur_inventario_${activeTab}_${Date.now()}.xlsx`);
+    XLSX.writeFile(wb, `cimasur_inventario_${activeTab.replace(' CS', '')}_${Date.now()}.xlsx`);
   };
 
   const exportPDF = () => {
     const data = getFilteredRecords().map(r => getRowForTab(r, activeTab));
     const headers = getHeadersForTab(activeTab);
     exportTableToPDF(
-      `INVENTARIO CIMASUR - ${activeTab}`,
+      `INVENTARIO CIMASUR - ${activeTab.replace(' CS', '')}`,
       headers,
       data,
-      `cimasur_inventario_${activeTab}`,
+      `cimasur_inventario_${activeTab.replace(' CS', '')}`,
       'p'
     );
   };
@@ -387,11 +393,16 @@ export default function CimasurInventoryManager() {
             }
           }
 
+          let importedCat = safe(row['CATEGORÍA'] || row['CATEGORIA'] || activeCategory);
+          if (importedCat === 'Productos CS CIMASUR') {
+            importedCat = 'Productos Base/Avanzado';
+          }
+
           validRows.push({
             cd: cd.trim(),
             nm: nm.trim(),
             sol: safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['OBSERVACIÓN'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || ''),
-            cat: safe(row['CATEGORÍA'] || row['CATEGORIA'] || activeCategory),
+            cat: importedCat,
             fec: safe(row['FECHA']),
             doc: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR'])
           });
@@ -551,7 +562,7 @@ export default function CimasurInventoryManager() {
                         : "border-[#1E293B] text-slate-400 hover:text-slate-300 hover:bg-[#111A2E]"
                     )}
                   >
-                    {tab}
+                    {tab.replace(' CS', '')}
                   </button>
                 ))}
               </div>
@@ -688,7 +699,7 @@ export default function CimasurInventoryManager() {
               </table>
             </div>
             <div className="bg-[#111A2E] p-3 border-t text-[10px] uppercase font-black tracking-widest text-white flex justify-between">
-              <span>Base: {activeTab} {isBaseModule && `> ${activeCategory}`}</span>
+              <span>Base: {activeTab.replace(' CS', '')} {isBaseModule && `> ${activeCategory}`}</span>
               <span>{filtered.length} registros</span>
             </div>
           </div>
@@ -715,7 +726,7 @@ export default function CimasurInventoryManager() {
                     value={form.base_master || 'SALINA CS'}
                     onChange={e => setForm({...form, base_master: e.target.value})}
                   >
-                    {Object.keys(PREFIX_MAP).map(bm => <option key={bm} value={bm}>{bm}</option>)}
+                    {Object.keys(PREFIX_MAP).map(bm => <option key={bm} value={bm}>{bm.replace(' CS', '')}</option>)}
                   </select>
                 </FormField>
               )}

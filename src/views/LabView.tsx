@@ -3757,6 +3757,8 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     return localStorage.getItem('all_stock_alerts_muted') === 'true';
   });
 
+  const [showBulkControls, setShowBulkControls] = useState<boolean>(false);
+
   const toggleGlobalAlerts = () => {
     const newVal = !globalAlertsMuted;
     setGlobalAlertsMuted(newVal);
@@ -3777,6 +3779,35 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
       window.dispatchEvent(new Event('db-change'));
     } catch (err) {
       console.error("Error toggling item alert:", err);
+    }
+  };
+
+  const handleBulkDeactivateAlerts = async (deactivate: boolean) => {
+    try {
+      const itemsToUpdate = filteredRecords;
+      if (itemsToUpdate.length === 0) {
+        alert("No hay insumos filtrados en este momento.");
+        return;
+      }
+      const msg = deactivate
+        ? `¿Está seguro de que desea DESACTIVAR las alertas para los ${itemsToUpdate.length} insumos de la lista filtrada?`
+        : `¿Está seguro de que desea ACTIVAR las alertas para los ${itemsToUpdate.length} insumos de la lista filtrada?`;
+      
+      if (confirm(msg)) {
+        for (const record of itemsToUpdate) {
+          await localDB.updateInCollection('inventory', record.id, {
+            alertaDesactivada: deactivate,
+            updatedAt: new Date().toISOString()
+          });
+        }
+        const updated = await localDB.getCollection('inventory');
+        setInventoryRecords(updated);
+        window.dispatchEvent(new Event('db-change'));
+        alert(`Se han ${deactivate ? 'desactivado' : 'activado'} las alertas de bajo stock para los ${itemsToUpdate.length} insumos correctamente.`);
+      }
+    } catch (err) {
+      console.error("Error toggling bulk alerts:", err);
+      alert("Ocurrió un error al aplicar el cambio masivo.");
     }
   };
 
@@ -4153,6 +4184,20 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                     </>
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkControls(!showBulkControls)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border shadow-sm cursor-pointer",
+                    showBulkControls
+                      ? "bg-amber-500/15 text-amber-400 border-amber-500/40 hover:bg-amber-500/25"
+                      : "bg-[#1E293B]/60 text-slate-400 border-slate-700/60 hover:bg-[#1E293B]/90 hover:text-white"
+                  )}
+                  title={showBulkControls ? "Ocultar panel de gestión masiva de alertas" : "Mostrar panel de gestión masiva de alertas"}
+                >
+                  <Settings className={cn("w-3.5 h-3.5", showBulkControls && "animate-spin")} />
+                  {showBulkControls ? "ACCIONES MASIVAS: ABIERTO" : "ACCIONES MASIVAS"}
+                </button>
                 <button 
                   onClick={() => {
                     const data = filteredRecords.map(r => [
@@ -4205,12 +4250,37 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                 </div>
               </div>
            </div>
+           {showBulkControls && filteredRecords.length > 0 && (
+              <div className="bg-[#111A2E]/60 px-4 py-3 border-b border-[#1E293B] flex-wrap items-center justify-between gap-3 flex">
+                <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#38BDF8] animate-ping"></span>
+                  Acción masiva para los <strong className="text-white font-black">{filteredRecords.length}</strong> insumos del filtro actual:
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleBulkDeactivateAlerts(true)}
+                    className="px-2.5 py-1 rounded bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all"
+                    title="Silenciar alertas para todo el grupo filtrado"
+                  >
+                    <BellOff className="w-3 h-3 text-red-500" /> Desactivar Alertas del Grupo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkDeactivateAlerts(false)}
+                    className="px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all"
+                    title="Activar alertas para todo el grupo filtrado"
+                  >
+                    <Bell className="w-3 h-3 text-emerald-400 animate-bounce" /> Activar Alertas del Grupo
+                  </button>
+                </div>
+              </div>
+            )}
            <div className="overflow-x-auto">
              <table className="w-full text-xs">
                 <thead className="bg-[#111A2E] text-slate-400 text-[10px] uppercase font-black">
                    <tr className="text-left border-b">
                       <th className="p-4">Insumo / Código</th>
-                      <th className="p-4 text-center">Alerta Insumo</th>
                       <th className="p-4 text-center">Stock Actual</th>
                       <th className="p-4 text-center">Consumo (Descuento)</th>
                       <th className="p-4 text-center">Gestión</th>
@@ -4232,33 +4302,35 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                             <>
                               <div className="font-bold text-white">{record.item}</div>
                               <div className="text-[9px] font-mono text-slate-400">{record.code}</div>
-                              <div className="text-[9px] mt-1 text-slate-500 font-bold">Límite Alerta: <span className="text-red-400 font-extrabold">{getRecordAlertaThreshold(record)}</span></div>
+                              <div className="text-[9px] mt-1.5 flex items-center gap-2 flex-wrap text-left">
+                                <span className="text-slate-500 font-bold">Límite Alerta: <span className="text-red-400 font-extrabold">{getRecordAlertaThreshold(record)}</span></span>
+                                <span className="text-slate-600">|</span>
+                                <button
+                                  onClick={() => toggleRecordAlert(record)}
+                                  type="button"
+                                  className={cn(
+                                    "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer border",
+                                    record.alertaDesactivada === true
+                                      ? "bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/30 text-left"
+                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30 text-left"
+                                  )}
+                                  title={record.alertaDesactivada === true ? "Alerta desactivada para este insumo. Haga clic para activar." : "Alerta activa para este insumo. Haga clic para desactivar."}
+                                >
+                                  {record.alertaDesactivada === true ? (
+                                    <>
+                                      <BellOff className="w-2.5 h-2.5 text-red-500" /> ALERTA OFF
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Bell className="w-2.5 h-2.5 text-emerald-400 animate-pulse" /> ALERTA ON
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             </>
                           )}
                        </td>
-                       <td className="p-4 text-center">
-                          <button
-                            onClick={() => toggleRecordAlert(record)}
-                            type="button"
-                            className={cn(
-                              "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 mx-auto border cursor-pointer",
-                              record.alertaDesactivada === true
-                                ? "bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20"
-                                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                            )}
-                            title={record.alertaDesactivada === true ? "Alerta desactivada para este insumo. Haga clic para activar." : "Alerta activa para este insumo. Haga clic para desactivar."}
-                          >
-                            {record.alertaDesactivada === true ? (
-                              <>
-                                <BellOff className="w-3 h-3 text-red-500" /> DESACTIVADA
-                              </>
-                            ) : (
-                              <>
-                                <Bell className="w-3 h-3 text-emerald-400 animate-bounce" /> ACTIVA
-                              </>
-                            )}
-                          </button>
-                       </td>
+                       
                        <td className="p-4 text-center">
                           {editingStockId === record.id ? (
                             <input type="number" className="w-16 border rounded text-center py-1 font-bold block mx-auto" value={editingStockQty || 0} onChange={e => setEditingStockQty(parseInt(e.target.value) || 0)} />

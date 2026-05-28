@@ -18,6 +18,7 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
   const [activeTab, setActiveTab] = useState<'pending' | 'read'>('pending');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -55,6 +56,15 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
         await markNotificationAsRead(n.id);
       }
     }
+  };
+
+  const handleDeleteAllRead = async () => {
+    for (const n of filteredNotifications) {
+      if (n.id) {
+        await deleteNotification(n.id);
+      }
+    }
+    setIsConfirmingDelete(false);
   };
 
   const handleSelectNotif = async (n: Notification) => {
@@ -148,7 +158,7 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
           <div className="flex items-center justify-between gap-2 border-b border-[#1E293B] pb-3 mb-4">
             <div className="flex gap-2.5">
               <button 
-                onClick={() => setActiveTab('pending')} 
+                onClick={() => { setActiveTab('pending'); setIsConfirmingDelete(false); }} 
                 className={cn(
                   "text-[10px] uppercase font-black px-3.5 py-2 rounded-full transition-all flex items-center gap-1.5", 
                   activeTab === 'pending' 
@@ -164,7 +174,7 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
                 )}
               </button>
               <button 
-                onClick={() => setActiveTab('read')} 
+                onClick={() => { setActiveTab('read'); setIsConfirmingDelete(false); }} 
                 className={cn(
                   "text-[10px] uppercase font-black px-3.5 py-2 rounded-full transition-all", 
                   activeTab === 'read' 
@@ -185,6 +195,37 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
                 <CheckCheck className="w-3.5 h-3.5" />
                 Marcar todo
               </button>
+            )}
+
+            {activeTab === 'read' && filteredNotifications.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                {isConfirmingDelete ? (
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={handleDeleteAllRead} 
+                      className="text-red-400 hover:text-white hover:bg-red-500 transition-all text-[9px] font-black uppercase flex items-center gap-1 border border-red-500/30 bg-red-500/15 px-2.5 py-1.5 rounded-lg cursor-pointer"
+                      title="Confirmar eliminación de todas las leídas"
+                    >
+                      Sí, eliminar
+                    </button>
+                    <button 
+                      onClick={() => setIsConfirmingDelete(false)} 
+                      className="text-slate-400 hover:text-slate-200 transition-all text-[9px] font-black uppercase flex items-center gap-1 border border-slate-700 bg-slate-800/55 px-2.5 py-1.5 rounded-lg cursor-pointer"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => setIsConfirmingDelete(true)} 
+                    className="text-red-400 hover:text-red-300 transition-colors text-[10px] font-black uppercase flex items-center gap-1.5 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 px-2.5 py-1.5 rounded-xl"
+                    title="Eliminar todas las notificaciones leídas"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Vaciar leídas
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
