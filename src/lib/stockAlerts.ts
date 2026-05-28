@@ -21,51 +21,47 @@ const hasRecentNotification = async (title: string, message: string): Promise<bo
 };
 
 export const checkStockAlerts = async (inventory: any[]) => {
-  const alerts = [
-    { name: 'Salina', min: 9 },
-    { name: 'Etanol', min: 9 },
-    { name: 'Estuches', min: 250 },
-    { name: 'Plantillas', min: 20 },
-    { name: 'Insumo Varios', min: 2 },
-  ];
+  for (const item of inventory) {
+    if (!item || !item.item) continue;
 
-  for (const alert of alerts) {
-    const item = inventory.find(i => i.item?.toLowerCase().includes(alert.name.toLowerCase()));
-    if (item) {
-        const itemQty = typeof item.qty !== 'undefined' ? item.qty : item.stock;
-        if (typeof itemQty !== 'undefined' && itemQty < alert.min) {
-            const title = 'Alerta de Stock Bajo';
-            const message = `El insumo ${item.item} tiene un stock crítico de ${itemQty}. Mínimo requerido: ${alert.min}.`;
-            
-            if (!(await hasRecentNotification(title, message))) {
-                await addNotification({
-                    title,
-                    message,
-                    recipientRoles: ['admin', 'lab', 'manager'],
-                    sender: 'Sistema de Inventario'
-                });
-            }
-        }
-    }
-  }
+    // Determine the threshold for this item:
+    let minThreshold = 5; // general fallback
 
-  // Handle Frascos 30ml specifically
-  const frascos = inventory.find(i => i.item?.toLowerCase().includes('frascos') && i.item?.toLowerCase().includes('30ml'));
-  if (frascos) {
-      const frascosQty = typeof frascos.qty !== 'undefined' ? frascos.qty : frascos.stock;
-      if (typeof frascosQty !== 'undefined' && frascosQty < 2500) {
-          const title = 'Alerta de Stock Bajo';
-          const message = `Los frascos de 30ml tienen un stock crítico de ${frascosQty}. Mínimo requerido: 2500.`;
-          
-          if (!(await hasRecentNotification(title, message))) {
-            await addNotification({
-                title,
-                message,
-                recipientRoles: ['admin', 'lab', 'manager'],
-                sender: 'Sistema de Inventario'
-            });
-          }
+    // Check if the item has a custom alert threshold
+    if (item.alertaStock !== undefined && item.alertaStock !== null && item.alertaStock !== '') {
+      minThreshold = Number(item.alertaStock);
+    } else {
+      // Use fallback defaults based on name matching
+      const nameLower = item.item.toLowerCase();
+      if (nameLower.includes('salina')) {
+        minThreshold = 9;
+      } else if (nameLower.includes('etanol')) {
+        minThreshold = 9;
+      } else if (nameLower.includes('estuches')) {
+        minThreshold = 250;
+      } else if (nameLower.includes('plantillas')) {
+        minThreshold = 20;
+      } else if (nameLower.includes('insumo varios') || nameLower.includes('insumos varios')) {
+        minThreshold = 2;
+      } else if (nameLower.includes('frascos') && nameLower.includes('30ml')) {
+        minThreshold = 2500;
       }
+    }
+
+    const itemQty = typeof item.qty !== 'undefined' ? item.qty : item.stock;
+    if (typeof itemQty !== 'undefined' && itemQty <= minThreshold) {
+      const title = 'Alerta de Stock Bajo';
+      const message = `El insumo ${item.item} tiene un stock crítico de ${itemQty}. Mínimo requerido: ${minThreshold}.`;
+
+      if (!(await hasRecentNotification(title, message))) {
+        await addNotification({
+          title,
+          message,
+          recipientRoles: ['admin', 'lab', 'manager'],
+          sender: 'Sistema de Inventario'
+        });
+      }
+    }
   }
 };
 

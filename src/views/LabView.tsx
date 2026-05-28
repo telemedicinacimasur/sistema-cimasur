@@ -3687,6 +3687,20 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
   );
 }
 
+const getRecordAlertaThreshold = (record: any) => {
+  if (record.alertaStock !== undefined && record.alertaStock !== null && record.alertaStock !== '') {
+    return Number(record.alertaStock);
+  }
+  const nameLower = (record.item || '').toLowerCase();
+  if (nameLower.includes('salina')) return 9;
+  if (nameLower.includes('etanol')) return 9;
+  if (nameLower.includes('estuches')) return 250;
+  if (nameLower.includes('plantillas')) return 20;
+  if (nameLower.includes('insumo varios') || nameLower.includes('insumos varios')) return 2;
+  if (nameLower.includes('frascos') && nameLower.includes('30ml')) return 2500;
+  return 5;
+};
+
 function StockManager({ records: _, setRecords: __ }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -3714,6 +3728,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     item: '',
     code: '',
     qty: 0,
+    alertaStock: 5,
     motivo: 'Compra / Ingreso Nuevo'
   });
 
@@ -3734,6 +3749,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [editingStockItem, setEditingStockItem] = useState('');
   const [editingStockQty, setEditingStockQty] = useState(0);
+  const [editingStockMinAlert, setEditingStockMinAlert] = useState<number>(5);
 
   useEffect(() => {
     const loadData = async () => {
@@ -3767,6 +3783,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
       await localDB.updateInCollection('inventory', id, { 
         item: editingStockItem, 
         qty: Number(editingStockQty) || 0,
+        alertaStock: Number(editingStockMinAlert) >= 0 ? Number(editingStockMinAlert) : 5,
         updatedAt: new Date().toISOString()
       });
       setEditingStockId(null);
@@ -3811,6 +3828,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
         
         await localDB.updateInCollection('inventory', duplicate.id, { 
           qty: newQty,
+          alertaStock: Number(form.alertaStock) >= 0 ? Number(form.alertaStock) : (duplicate.alertaStock || 5),
           updatedAt: new Date().toISOString()
         });
 
@@ -3831,6 +3849,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
           item: form.item.trim(),
           code: form.code.trim() || `MAN-${Math.floor(Math.random() * 10000)}`,
           qty: Number(form.qty) || 0,
+          alertaStock: Number(form.alertaStock) >= 0 ? Number(form.alertaStock) : 5,
           updatedAt: new Date().toISOString()
         };
 
@@ -3849,7 +3868,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
         alert('Nuevo insumo registrado con éxito');
       }
       
-      setForm({ ...form, item: '', code: '', qty: 0, motivo: 'Compra / Ingreso Nuevo' });
+      setForm({ ...form, item: '', code: '', qty: 0, alertaStock: 5, motivo: 'Compra / Ingreso Nuevo' });
       const updated = await localDB.getCollection('inventory');
       setInventoryRecords(updated);
       window.dispatchEvent(new Event('db-change'));
@@ -4063,6 +4082,16 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
             <FormField label="Nombre Insumo"><input className="w-full border-b p-2 text-xs" value={form.item || ''} onChange={e => setForm({...form, item: e.target.value})} required /></FormField>
             <FormField label="Código SKU"><input className="w-full border-b p-2 text-xs font-mono" value={form.code || ''} onChange={e => setForm({...form, code: e.target.value})} required /></FormField>
             <FormField label="Cant."><input type="number" className="w-full border-b p-2 text-xs font-bold" value={form.qty || 0} onChange={e => setForm({...form, qty: parseInt(e.target.value) || 0})} /></FormField>
+            <FormField label="Alerta de Stock Mínimo (Notificaciones en Rojo)">
+              <input 
+                type="number" 
+                className="w-full border-b p-2 text-xs font-bold text-red-400" 
+                value={form.alertaStock} 
+                onChange={e => setForm({...form, alertaStock: parseInt(e.target.value) || 0})} 
+                min="0"
+                required
+              />
+            </FormField>
             <FormField label="Detalle de compra (Kardex)"><input className="w-full border-b p-2 text-xs" value={form.motivo || ''} onChange={e => setForm({...form, motivo: e.target.value})} placeholder="Ej: Compra Mayo, Donación, etc." /></FormField>
             <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-3 rounded font-black text-[10px] uppercase shadow-lg">Registrar Entrada</button>
           </form>
@@ -4141,11 +4170,18 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                      <tr key={record.id} className="hover:bg-[#152035]/20 transition-colors">
                        <td className="p-4">
                           {editingStockId === record.id ? (
-                            <input type="text" className="w-full border rounded px-2 py-1 text-xs" value={editingStockItem || ''} onChange={e => setEditingStockItem(e.target.value)} />
+                            <div className="space-y-2 text-left">
+                              <input type="text" className="w-full border rounded px-2 py-1 text-xs bg-[#111A2E] text-white border-[#1E293B]" value={editingStockItem || ''} onChange={e => setEditingStockItem(e.target.value)} />
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] text-slate-400 font-extrabold uppercase">Límite Alerta:</span>
+                                <input type="number" className="w-20 border rounded px-2 py-0.5 text-xs bg-[#111A2E] text-red-500 font-bold border-[#1E293B]" value={editingStockMinAlert} onChange={e => setEditingStockMinAlert(parseInt(e.target.value) || 0)} />
+                              </div>
+                            </div>
                           ) : (
                             <>
                               <div className="font-bold text-white">{record.item}</div>
                               <div className="text-[9px] font-mono text-slate-400">{record.code}</div>
+                              <div className="text-[9px] mt-1 text-slate-500 font-bold">Límite Alerta: <span className="text-red-400 font-extrabold">{getRecordAlertaThreshold(record)}</span></div>
                             </>
                           )}
                        </td>
@@ -4155,7 +4191,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                           ) : (
                             <span className={cn(
                               "font-black text-sm",
-                              record.qty <= 5 ? "text-red-500" : "text-[#38BDF8]"
+                              record.qty <= getRecordAlertaThreshold(record) ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] font-extrabold animate-pulse" : "text-[#38BDF8]"
                             )}>{record.qty}</span>
                           )}
                        </td>
@@ -4182,7 +4218,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                               {editingStockId === record.id ? (
                                 <button onClick={() => handleEditItemSave(record.id)} className="text-green-500 hover:text-green-700 bg-green-50 px-2 py-1 rounded w-full flex justify-center"><Download className="w-3.5 h-3.5" /></button>
                               ) : (
-                                <button onClick={() => { setEditingStockId(record.id); setEditingStockItem(record.item); setEditingStockQty(record.qty); }} className="text-[#38BDF8] hover:text-[#38BDF8] bg-[#152035] px-2 py-1 rounded w-full flex justify-center"><Edit className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => { setEditingStockId(record.id); setEditingStockItem(record.item); setEditingStockQty(record.qty); setEditingStockMinAlert(record.alertaStock !== undefined && record.alertaStock !== null ? record.alertaStock : getRecordAlertaThreshold(record)); }} className="text-[#38BDF8] hover:text-[#38BDF8] bg-[#152035] px-2 py-1 rounded w-full flex justify-center"><Edit className="w-3.5 h-3.5" /></button>
                               )}
                               <button onClick={() => handleDeleteItem(record.id)} className="text-red-400 hover:text-red-600 bg-red-50 px-2 py-1 rounded w-full flex justify-center"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
