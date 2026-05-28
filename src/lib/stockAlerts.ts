@@ -21,8 +21,13 @@ const hasRecentNotification = async (title: string, message: string): Promise<bo
 };
 
 export const checkStockAlerts = async (inventory: any[]) => {
+  if (typeof window !== 'undefined' && window.localStorage.getItem('all_stock_alerts_muted') === 'true') {
+    return;
+  }
+
   for (const item of inventory) {
     if (!item || !item.item) continue;
+    if (item.alertaDesactivada === true) continue;
 
     // Determine the threshold for this item:
     let minThreshold = 5; // general fallback

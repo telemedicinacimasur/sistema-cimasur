@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, Plus, Search, FileSpreadsheet, Upload, Download, ArrowLeft, Filter, Hexagon, Droplet, Activity, FlaskConical, TestTube, Layers, Edit, Box, Hash, AlertCircle } from 'lucide-react';
+import { Database, Plus, Search, FileSpreadsheet, Upload, Download, ArrowLeft, Filter, Hexagon, Droplet, Activity, FlaskConical, TestTube, Layers, Edit, Box, Hash, AlertCircle, Trash2 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn, safe } from '../../lib/utils';
@@ -266,6 +266,19 @@ export default function CimasurInventoryManager() {
       doctor: r.doctor || ''
     });
     setShowModal(true);
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (confirm(`¿Está seguro de que desea eliminar el registro "${name}"? Esta acción no se puede deshacer.`)) {
+      try {
+        await localDB.deleteFromCollection('inventory_master', id);
+        alert('Registro eliminado con éxito.');
+        await loadData();
+      } catch (err) {
+        console.error("Error al eliminar el registro de la matriz:", err);
+        alert('Error al intentar eliminar el registro.');
+      }
+    }
   };
 
   const getHeadersForTab = (tab: MainTab) => {
@@ -633,7 +646,7 @@ export default function CimasurInventoryManager() {
                     {getHeadersForTab(activeTab).map((h, i) => (
                       <th key={i} className={`p-4 border-r border-[#1E293B] bg-[#111A2E] sticky top-0 ${i === 0 ? 'w-32' : ''}`}>{h}</th>
                     ))}
-                    <th className="p-5 w-12 text-center bg-[#111A2E] sticky top-0"></th>
+                    <th className="p-5 w-24 text-center bg-[#111A2E] sticky top-0">ACCIONES</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -648,9 +661,14 @@ export default function CimasurInventoryManager() {
                            </td>
                         ))}
                         <td className="p-4 text-center">
-                          <button onClick={() => handleEdit(r)} className="p-1.5 text-slate-400 hover:text-[#38BDF8] bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border rounded-md hover:border-[#38BDF8]/50 transition-colors" title="Editar">
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button onClick={() => handleEdit(r)} className="p-1.5 text-slate-400 hover:text-[#38BDF8] bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border rounded-md hover:border-[#38BDF8]/50 transition-all cursor-pointer" title="Editar">
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDelete(r.id, r.nombre_producto)} className="p-1.5 text-slate-400 hover:text-red-500 bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-red-500/10 rounded-md hover:border-red-500/50 transition-all cursor-pointer" title="Eliminar">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                       )

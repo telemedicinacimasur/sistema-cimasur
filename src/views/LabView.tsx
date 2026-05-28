@@ -19,6 +19,8 @@ import {
   Settings,
   Droplets,
   Trash2,
+  Bell,
+  BellOff,
   Edit,
   FileUp,
   PlusCircle,
@@ -3751,6 +3753,33 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   const [editingStockQty, setEditingStockQty] = useState(0);
   const [editingStockMinAlert, setEditingStockMinAlert] = useState<number>(5);
 
+  const [globalAlertsMuted, setGlobalAlertsMuted] = useState<boolean>(() => {
+    return localStorage.getItem('all_stock_alerts_muted') === 'true';
+  });
+
+  const toggleGlobalAlerts = () => {
+    const newVal = !globalAlertsMuted;
+    setGlobalAlertsMuted(newVal);
+    localStorage.setItem('all_stock_alerts_muted', String(newVal));
+    window.dispatchEvent(new Event('db-change'));
+  };
+
+  const toggleRecordAlert = async (record: any) => {
+    try {
+      const currentVal = record.alertaDesactivada === true;
+      const newVal = !currentVal;
+      await localDB.updateInCollection('inventory', record.id, {
+        alertaDesactivada: newVal,
+        updatedAt: new Date().toISOString()
+      });
+      const updated = await localDB.getCollection('inventory');
+      setInventoryRecords(updated);
+      window.dispatchEvent(new Event('db-change'));
+    } catch (err) {
+      console.error("Error toggling item alert:", err);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -4103,6 +4132,27 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
            <div className="bg-[#152035] p-4 border-b flex justify-between items-center text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">
               <h3 className="text-[10px] font-black uppercase tracking-widest">Stock de Insumo Diario - {selectedArea}</h3>
               <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={toggleGlobalAlerts}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border shadow-sm cursor-pointer",
+                    globalAlertsMuted
+                      ? "bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
+                      : "bg-[#38BDF8]/10 text-[#38BDF8] border-[#38BDF8]/30 hover:bg-[#38BDF8]/20"
+                  )}
+                  title={globalAlertsMuted ? "Haga clic para activar todas las alertas de bajo stock" : "Haga clic para desactivar todas las alertas de bajo stock"}
+                >
+                  {globalAlertsMuted ? (
+                    <>
+                      <BellOff className="w-3.5 h-3.5" /> ALERTAS: OFF
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="w-3.5 h-3.5 text-amber-400" /> ALERTAS: ON
+                    </>
+                  )}
+                </button>
                 <button 
                   onClick={() => {
                     const data = filteredRecords.map(r => [
@@ -4160,6 +4210,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                 <thead className="bg-[#111A2E] text-slate-400 text-[10px] uppercase font-black">
                    <tr className="text-left border-b">
                       <th className="p-4">Insumo / Código</th>
+                      <th className="p-4 text-center">Alerta Insumo</th>
                       <th className="p-4 text-center">Stock Actual</th>
                       <th className="p-4 text-center">Consumo (Descuento)</th>
                       <th className="p-4 text-center">Gestión</th>
@@ -4186,12 +4237,35 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                           )}
                        </td>
                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => toggleRecordAlert(record)}
+                            type="button"
+                            className={cn(
+                              "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 mx-auto border cursor-pointer",
+                              record.alertaDesactivada === true
+                                ? "bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20"
+                                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                            )}
+                            title={record.alertaDesactivada === true ? "Alerta desactivada para este insumo. Haga clic para activar." : "Alerta activa para este insumo. Haga clic para desactivar."}
+                          >
+                            {record.alertaDesactivada === true ? (
+                              <>
+                                <BellOff className="w-3 h-3 text-red-500" /> DESACTIVADA
+                              </>
+                            ) : (
+                              <>
+                                <Bell className="w-3 h-3 text-emerald-400 animate-bounce" /> ACTIVA
+                              </>
+                            )}
+                          </button>
+                       </td>
+                       <td className="p-4 text-center">
                           {editingStockId === record.id ? (
                             <input type="number" className="w-16 border rounded text-center py-1 font-bold block mx-auto" value={editingStockQty || 0} onChange={e => setEditingStockQty(parseInt(e.target.value) || 0)} />
                           ) : (
                             <span className={cn(
                               "font-black text-sm",
-                              record.qty <= getRecordAlertaThreshold(record) ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] font-extrabold animate-pulse" : "text-[#38BDF8]"
+                              (record.alertaDesactivada !== true && record.qty <= getRecordAlertaThreshold(record)) ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] font-extrabold animate-pulse" : "text-[#38BDF8]"
                             )}>{record.qty}</span>
                           )}
                        </td>
