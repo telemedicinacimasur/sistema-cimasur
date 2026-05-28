@@ -9,6 +9,8 @@ export interface Notification {
   recipientRoles: string[]; // ['admin', 'lab', 'crm', 'school', 'gestion']
   recipientUsers?: string[]; // Specific emails or usernames representing tagged workers
   sender: string;
+  senderEmail?: string; // Direct email of the action sender
+  pizarraNoteId?: string; // ID of the note on the Pizarra for direct navigation
   createdAt: any;
   read: boolean;
 }
@@ -25,25 +27,59 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
     }
 
     const senderLower = (notification.sender || '').toLowerCase().trim();
+    const senderEmailLower = (notification.senderEmail || '').toLowerCase().trim();
     const currentUserNameLower = currentUserName.toLowerCase().trim();
     const currentUserEmailLower = (currentUserEmail || currentUser?.email || '').toLowerCase().trim();
     const currentUserDisplayNameLower = currentUser?.displayName ? currentUser.displayName.toLowerCase().trim() : '';
 
-    // Filter out notifications created by the same user
+    // Gather all possible identifiers for the current user
+    const userEmails = [
+      currentUserEmailLower,
+      (currentUser?.email || '').toLowerCase().trim(),
+    ].filter(Boolean);
+
+    const userNames = [
+      currentUserNameLower,
+      (currentUser?.displayName || '').toLowerCase().trim(),
+    ].filter(Boolean);
+
+    // 1. If sender or senderEmail is one of our emails or names, filter out
     if (
-      (senderLower && senderLower === currentUserNameLower) ||
-      (currentUserEmailLower && senderLower === currentUserEmailLower) ||
-      (currentUserDisplayNameLower && senderLower === currentUserDisplayNameLower) ||
-      (notification.message && (
-        notification.message.toLowerCase().includes(`${currentUserDisplayNameLower} realizó`) ||
-        notification.message.toLowerCase().includes(`${currentUserEmailLower} realizó`) ||
-        notification.message.toLowerCase().includes(`${currentUserDisplayNameLower} ha creado`) ||
-        notification.message.toLowerCase().includes(`${currentUserEmailLower} ha creado`) ||
-        notification.message.toLowerCase().includes(`${currentUserDisplayNameLower} comentó`) ||
-        notification.message.toLowerCase().includes(`${currentUserEmailLower} comentó`)
-      ))
+      userEmails.some(email => senderLower === email || senderEmailLower === email) ||
+      userNames.some(name => senderLower === name || senderEmailLower === name)
     ) {
       return false;
+    }
+
+    // 2. If message contains our identifier performing an action, filter out
+    if (notification.message) {
+      const msgLower = notification.message.toLowerCase().trim();
+
+      // Check if message starts with any of our user identifiers
+      const startsWithUser = [
+        ...userEmails,
+        ...userNames
+      ].some(id => msgLower.startsWith(id.toLowerCase()));
+
+      if (startsWithUser) {
+        return false;
+      }
+
+      // Check if message references the user as the actor/author of action
+      const referencesUserAsActor = [
+        ...userEmails,
+        ...userNames
+      ].some(id => 
+        msgLower.includes(`por ${id.toLowerCase()}`) ||
+        msgLower.includes(`creada por ${id.toLowerCase()}`) ||
+        msgLower.includes(`modificada por ${id.toLowerCase()}`) ||
+        msgLower.includes(`comentada por ${id.toLowerCase()}`) ||
+        msgLower.includes(`por: ${id.toLowerCase()}`)
+      );
+
+      if (referencesUserAsActor) {
+        return false;
+      }
     }
 
     // Check if it is a Pizarra or Comment or Reply notification (should reach involved users and admins/lab)
@@ -209,15 +245,31 @@ export const markNotificationAsRead = async (id: string) => {
 };
 
 export const addNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
+  let currentUserEmail = '';
+  try {
+    const local = sessionStorage.getItem('cimasur_user');
+    if (local) {
+      const u = JSON.parse(local);
+      currentUserEmail = u.email || '';
+    }
+  } catch (e) {
+    console.error('Error parsing local user in addNotification:', e);
+  }
+
+  const payload: any = {
+    ...notification,
+    senderEmail: notification.senderEmail || currentUserEmail || (notification.sender && notification.sender.includes('@') ? notification.sender : ''),
+  };
+
   if (isFirebaseReady && db) {
     await addDoc(collection(db, 'notifications'), {
-        ...notification,
+        ...payload,
         read: false,
         createdAt: serverTimestamp()
     });
   } else {
     await localDB.saveToCollection('notifications', {
-        ...notification,
+        ...payload,
         read: false,
         createdAt: new Date().toISOString()
     });

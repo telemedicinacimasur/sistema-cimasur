@@ -80,6 +80,8 @@ export default function PizarraView() {
     null,
   );
   const [replyText, setReplyText] = useState("");
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editingReplyText, setEditingReplyText] = useState("");
 
   const [showArchived, setShowArchived] = useState(false);
   const [showAgreementsModal, setShowAgreementsModal] = useState(false);
@@ -112,6 +114,21 @@ export default function PizarraView() {
       setNotes(allNotes);
       setWorkers(allUsers.filter((u) => u.email !== user?.email));
       setAgreements(allAgreements);
+
+      // Auto-open comment dialog if noteId query parameter is present
+      const noteIdParam = new URLSearchParams(window.location.search).get("noteId");
+      if (noteIdParam) {
+        const found = allNotes.find((n: any) => n.id === noteIdParam);
+        if (found) {
+          setReplyDialogNote(found);
+          try {
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
+          } catch(err) {
+            console.error("Failed to clean up query param history state:", err);
+          }
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -185,6 +202,7 @@ export default function PizarraView() {
           sender: user?.email || "Sistema",
           recipientRoles: ["admin", "manager", "lab", "crm", "school", "gestion"],
           recipientUsers: notifUsers,
+          pizarraNoteId: payload.id,
         });
       } else if (isNew) {
         // Provide an explicit general notification or roles if no target was set
@@ -201,6 +219,7 @@ export default function PizarraView() {
             "gestion",
           ],
           recipientUsers: [],
+          pizarraNoteId: payload.id,
         });
       }
     }
@@ -284,6 +303,7 @@ export default function PizarraView() {
       sender: user?.email || "Sistema",
       recipientRoles: ["admin", "manager", "lab", "crm", "school", "gestion"],
       recipientUsers: notifUsers,
+      pizarraNoteId: note.id,
     });
 
     loadData();
@@ -328,10 +348,38 @@ export default function PizarraView() {
       sender: user?.email || "Sistema",
       recipientRoles: ["admin", "manager", "lab", "crm", "school", "gestion"],
       recipientUsers: notifUsers,
+      pizarraNoteId: note.id,
     });
 
     setReplyText("");
     setReplyDialogNote(updatedNote as NoteRecord);
+    loadData();
+  };
+
+  const handleEditReply = async (note: NoteRecord, replyId: string) => {
+    if (!editingReplyText.trim()) return;
+
+    const updatedRespuestas = (note.respuestas || []).map((reply) => {
+      if (reply.id === replyId) {
+        return {
+          ...reply,
+          texto: editingReplyText.trim(),
+          fecha: new Date().toISOString(),
+        };
+      }
+      return reply;
+    });
+
+    const updatedNote = {
+      ...note,
+      respuestas: updatedRespuestas,
+    };
+
+    await localDB.saveToCollection("pizarra_notes", updatedNote);
+
+    setReplyDialogNote(updatedNote as NoteRecord);
+    setEditingReplyId(null);
+    setEditingReplyText("");
     loadData();
   };
 
@@ -896,15 +944,56 @@ export default function PizarraView() {
                   replyDialogNote.respuestas.map((reply) => (
                     <div
                       key={reply.id}
-                      className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"
+                      className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2"
                     >
-                      <div className="flex justify-between items-center mb-1 text-[10px] font-black uppercase text-slate-500">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500">
                         <span className="text-[#38BDF8]">{reply.autor}</span>
-                        <span>{new Date(reply.fecha).toLocaleString()}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{new Date(reply.fecha).toLocaleString()}</span>
+                          {reply.autorEmail === user?.email && editingReplyId !== reply.id && (
+                            <button
+                              onClick={() => {
+                                setEditingReplyId(reply.id);
+                                setEditingReplyText(reply.texto);
+                              }}
+                              className="text-[#38BDF8] hover:text-[#0ea5e9] transition-colors font-black uppercase text-[9px] border border-[#38BDF8]/25 hover:border-[#38BDF8] px-1.5 py-0.5 rounded bg-sky-50"
+                            >
+                              Editar
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">
-                        {reply.texto}
-                      </p>
+
+                      {editingReplyId === reply.id ? (
+                        <div className="flex flex-col gap-2 mt-1">
+                          <textarea
+                            value={editingReplyText}
+                            onChange={(e) => setEditingReplyText(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-[#38BDF8] resize-none h-16 font-medium"
+                          />
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setEditingReplyId(null);
+                                setEditingReplyText("");
+                              }}
+                              className="px-2 py-1 text-[10px] font-extrabold uppercase bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-md transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => handleEditReply(replyDialogNote, reply.id)}
+                              className="px-2 py-1 text-[10px] font-extrabold uppercase bg-[#38BDF8] hover:bg-[#0ea5e9] text-white rounded-md transition-colors"
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">
+                          {reply.texto}
+                        </p>
+                      )}
                     </div>
                   ))
                 ) : (

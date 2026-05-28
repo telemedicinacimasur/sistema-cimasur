@@ -20,7 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { UserSettingsDialog } from '../../components/UserSettingsDialog';
 import { NotificationsDialog } from '../../components/NotificationsDialog';
-import { subscribeToNotifications, Notification } from '../../lib/notifications';
+import { subscribeToNotifications, Notification as NotificationRecord } from '../../lib/notifications';
 import { BackToTop } from '../../components/BackToTop';
 
 interface MainLayoutProps {
@@ -30,14 +30,14 @@ interface MainLayoutProps {
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
-  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [notifications, setNotifications] = React.useState<NotificationRecord[]>([]);
   const [isMuted, setIsMuted] = React.useState(() => {
     return localStorage.getItem('notifications_muted') === 'true';
   });
   const prevUnreadRef = React.useRef(0);
   
   // Real-time toast "cloud" states
-  const [toastNotification, setToastNotification] = React.useState<Notification | null>(null);
+  const [toastNotification, setToastNotification] = React.useState<NotificationRecord | null>(null);
   const [showToast, setShowToast] = React.useState(false);
   const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -46,6 +46,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const navigate = useNavigate();
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Request browser notification permissions on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
 
   React.useEffect(() => {
     if (user) {
@@ -71,7 +80,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
             toastTimeoutRef.current = setTimeout(() => {
               setShowToast(false);
-            }, 8000); // 8 seconds visible on-screen
+            }, 15000); // 15 seconds visible on-screen (Nube Visual de 15 segundos)
+
+            // Trigger Browser Native Notification (Visible in other tabs & background)
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              try {
+                const browserNotif = new Notification(latestUnread.title, {
+                  body: latestUnread.message,
+                  icon: '/favicon.ico',
+                  tag: latestUnread.id || String(Date.now()),
+                });
+
+                browserNotif.onclick = () => {
+                  window.focus();
+                  setIsNotificationsOpen(true);
+                  browserNotif.close();
+                };
+              } catch (e) {
+                console.error('Browser push warning:', e);
+              }
+            }
           }
         }
         prevUnreadRef.current = newUnread;
@@ -227,7 +255,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {showToast && toastNotification && (
         <div 
           onClick={() => {
-            setIsNotificationsOpen(true);
+            if (toastNotification.pizarraNoteId) {
+              navigate(`/pizarra?noteId=${toastNotification.pizarraNoteId}`);
+            } else {
+              setIsNotificationsOpen(true);
+            }
             setShowToast(false);
           }}
           className="fixed bottom-6 right-6 z-[99999] max-w-sm bg-gradient-to-r from-[#111A2E] to-[#0A0F1D]/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.6)] border-2 border-[#38BDF8]/65 p-5 transform transition-all duration-500 ease-out hover:scale-105 cursor-pointer flex flex-col gap-2.5 animate-in slide-in-from-bottom-5 border-l-8 border-l-[#38BDF8] select-none"

@@ -72,7 +72,7 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
     let route = '/';
     
     if (titleLower.includes('pizarra') || msgLower.includes('pizarra')) {
-      route = '/pizarra';
+      route = notif.pizarraNoteId ? `/pizarra?noteId=${notif.pizarraNoteId}` : '/pizarra';
     } else if (roles.includes('lab') || titleLower.includes('evaluación gota') || titleLower.includes('laboratorio')) {
       route = '/laboratorio';
     } else if (roles.includes('crm') || titleLower.includes('crm') || titleLower.includes('cotización')) {
