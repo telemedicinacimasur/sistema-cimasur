@@ -3742,6 +3742,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   // Sync form area with selected area browser tab is showing
   useEffect(() => {
     setForm(f => ({ ...f, area: selectedArea }));
+    setAlertFilter('all');
   }, [selectedArea]);
 
   const [followups, setFollowups] = useState<any[]>([]);
@@ -3758,6 +3759,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   });
 
   const [showBulkControls, setShowBulkControls] = useState<boolean>(false);
+  const [alertFilter, setAlertFilter] = useState<'all' | 'alert' | 'no_alert'>('all');
 
   const toggleGlobalAlerts = () => {
     const newVal = !globalAlertsMuted;
@@ -3857,11 +3859,17 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     }
   };
 
-  const filteredRecords = inventoryRecords.filter(r => 
-    r.area === selectedArea && 
-    ((r.item || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-     (r.code && r.code.toLowerCase().includes(searchTerm.toLowerCase())))
-  ).sort((a,b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+  const filteredRecords = inventoryRecords.filter(r => {
+    const matchesArea = r.area === selectedArea;
+    const matchesSearch = (r.item || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (r.code && r.code.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (!matchesArea || !matchesSearch) return false;
+
+    const hasAlert = r.alertaDesactivada !== true && Number(r.qty) <= getRecordAlertaThreshold(r);
+    if (alertFilter === 'alert') return hasAlert;
+    if (alertFilter === 'no_alert') return !hasAlert;
+    return true;
+  }).sort((a,b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4250,32 +4258,82 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                 </div>
               </div>
            </div>
-           {showBulkControls && filteredRecords.length > 0 && (
-              <div className="bg-[#111A2E]/60 px-4 py-3 border-b border-[#1E293B] flex-wrap items-center justify-between gap-3 flex">
-                <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#38BDF8] animate-ping"></span>
-                  Acción masiva para los <strong className="text-white font-black">{filteredRecords.length}</strong> insumos del filtro actual:
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleBulkDeactivateAlerts(true)}
-                    className="px-2.5 py-1 rounded bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all"
-                    title="Silenciar alertas para todo el grupo filtrado"
-                  >
-                    <BellOff className="w-3 h-3 text-red-500" /> Desactivar Alertas del Grupo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleBulkDeactivateAlerts(false)}
-                    className="px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all"
-                    title="Activar alertas para todo el grupo filtrado"
-                  >
-                    <Bell className="w-3 h-3 text-emerald-400 animate-bounce" /> Activar Alertas del Grupo
-                  </button>
-                </div>
-              </div>
-            )}
+            {showBulkControls && (inventoryRecords.filter(r => r.area === selectedArea).length > 0) && (
+               <div className="bg-[#111A2E]/60 px-4 py-3 border-b border-[#1E293B] gap-3 flex flex-wrap items-center justify-between">
+                 {/* Alertas filter toggles */}
+                 <div className="flex items-center gap-2.5 flex-wrap">
+                   <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5">
+                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#38BDF8] animate-ping"></span>
+                     Filtro Alertas:
+                   </span>
+                   <div className="flex bg-[#0E1626] p-1 rounded-full border border-slate-700/50 gap-1 shadow-inner">
+                     <button
+                       type="button"
+                       onClick={() => setAlertFilter('all')}
+                       className={cn(
+                         "px-3 py-1 text-[9px] uppercase font-black rounded-full cursor-pointer transition-all",
+                         alertFilter === 'all'
+                           ? "bg-[#1E293B] text-white shadow-sm"
+                           : "text-slate-400 hover:text-white"
+                       )}
+                     >
+                       Todos
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => setAlertFilter('alert')}
+                       className={cn(
+                         "px-3 py-1 text-[9px] uppercase font-black rounded-full cursor-pointer transition-all flex items-center gap-1",
+                         alertFilter === 'alert'
+                           ? "bg-red-500/20 border border-red-500/40 text-red-400 shadow-sm"
+                           : "text-red-400/70 border border-transparent hover:text-red-300 hover:bg-red-500/5"
+                       )}
+                     >
+                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>
+                       Con Alerta (Rojo)
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => setAlertFilter('no_alert')}
+                       className={cn(
+                         "px-3 py-1 text-[9px] uppercase font-black rounded-full cursor-pointer transition-all flex items-center gap-1",
+                         alertFilter === 'no_alert'
+                           ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 shadow-sm"
+                           : "text-emerald-400/70 border border-transparent hover:text-emerald-300 hover:bg-emerald-500/5"
+                       )}
+                     >
+                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                       Sin Alerta
+                     </button>
+                   </div>
+                 </div>
+
+                 {/* Bulk Actions */}
+                 <div className="flex items-center gap-3.5 flex-wrap">
+                   <span className="text-[10px] text-slate-400 font-bold">
+                     Acción masiva para <strong className="text-white font-black">{filteredRecords.length}</strong> insumos de este filtro:
+                   </span>
+                   <div className="flex gap-2">
+                     <button
+                       type="button"
+                       onClick={() => handleBulkDeactivateAlerts(true)}
+                       className="px-2.5 py-1 rounded bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all"
+                       title="Silenciar alertas para todo el grupo filtrado"
+                     >
+                       <BellOff className="w-3 h-3 text-red-500" /> Desactivar Alertas
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => handleBulkDeactivateAlerts(false)}
+                       className="px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all"
+                       title="Activar alertas para todo el grupo filtrado"
+                     >
+                       <Bell className="w-3 h-3 text-emerald-400 animate-bounce" /> Activar Alertas
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             )}
            <div className="overflow-x-auto">
              <table className="w-full text-xs">
                 <thead className="bg-[#111A2E] text-slate-400 text-[10px] uppercase font-black">
