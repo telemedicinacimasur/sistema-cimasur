@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { ChevronLeft, ChevronRight, Edit3, Save, X, Search, FileText, FileSpreadsheet, Download, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit3, Save, X, Search, FileText, FileSpreadsheet, Download, Upload, Eye, EyeOff } from 'lucide-react';
 import { exportExpedienteToPDF } from '../../lib/pdfUtils';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
@@ -45,6 +45,8 @@ export default function ResumenVentasManager() {
   // Chart Windows
   const [frascosScale, setFrascosScale] = useState<'month' | 'quarter' | 'year'>('month');
   const [pesosScale, setPesosScale] = useState<'month' | 'quarter' | 'year'>('month');
+  const [hideFrascos, setHideFrascos] = useState(false);
+  const [hideRecaudacion, setHideRecaudacion] = useState(false);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -632,9 +634,18 @@ export default function ResumenVentasManager() {
         {(viewFilter === 'all' || viewFilter === 'frascos') && (
         <div className="bg-[#1C2541] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h3 className="text-[17px] font-black text-yellow-400 flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> Módulo de Unidades: Frascos
-                </h3>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-[17px] font-black text-yellow-400 flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> Módulo de Unidades: Frascos
+                    </h3>
+                    <button 
+                        onClick={() => setHideFrascos(!hideFrascos)} 
+                        className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700/50 transition"
+                        title={hideFrascos ? "Mostrar datos" : "Ocultar datos"}
+                    >
+                        {hideFrascos ? <EyeOff className="w-4.5 h-4.5 text-sky-400" /> : <Eye className="w-4.5 h-4.5" />}
+                    </button>
+                </div>
                 
                 {(() => {
                     let sum = 0; let count = 0;
@@ -649,13 +660,13 @@ export default function ResumenVentasManager() {
                     const avg = count > 0 ? (sum / count).toFixed(1) : 0;
                     return (
                         <div className="flex bg-[#0D1527] rounded-xl border border-slate-700 overflow-hidden shadow-inner w-full sm:w-auto">
-                            <div className="px-4 py-2 border-r border-slate-700">
+                             <div className="px-4 py-2 border-r border-slate-700">
                                 <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Acumulado</span>
-                                <span className="text-sm font-black text-white">{sum.toLocaleString('es-CL')}</span>
+                                <span className="text-sm font-black text-white">{hideFrascos ? '******' : sum.toLocaleString('es-CL')}</span>
                             </div>
                             <div className="px-4 py-2">
                                 <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Promedio</span>
-                                <span className="text-sm font-black text-yellow-400">{avg}</span>
+                                <span className="text-sm font-black text-yellow-400">{hideFrascos ? '******' : avg}</span>
                             </div>
                         </div>
                     );
@@ -681,7 +692,7 @@ export default function ResumenVentasManager() {
                                     const hasOverride = overrides[`${y}-${idx}`]?.frascos !== undefined && overrides[`${y}-${idx}`]?.frascos !== '';
                                     return (
                                         <td key={y} onDoubleClick={() => openModalFor(y, idx)} className={cn("py-2 px-4 text-center cursor-pointer hover:bg-yellow-400/10 border-r border-slate-800/60 transition-colors", !inRange && "opacity-20")}>
-                                            <span className={cn("font-medium", hasOverride && "text-yellow-400 underline decoration-dotted")}>{val || '-'}</span>
+                                            <span className={cn("font-medium", hasOverride && "text-yellow-400 underline decoration-dotted")}>{hideFrascos ? '***' : (val || '-')}</span>
                                         </td>
                                     );
                                 })}
@@ -696,7 +707,7 @@ export default function ResumenVentasManager() {
                                 filteredMonths.forEach(({ idx: m }) => {
                                     if (isDateInRange(y, m)) totalYear += getFrascos(y, m);
                                 });
-                                return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{totalYear > 0 ? totalYear.toLocaleString('es-CL') : '-'}</td>;
+                                return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{hideFrascos ? '******' : (totalYear > 0 ? totalYear.toLocaleString('es-CL') : '-')}</td>;
                             })}
                         </tr>
                         <tr className="bg-[#0D1527] text-slate-300 font-bold border-b border-slate-800/50">
@@ -706,7 +717,7 @@ export default function ResumenVentasManager() {
                                 const hasOverride = overrides[`${y}-annual`]?.metaFrascosAnual !== undefined && overrides[`${y}-annual`]?.metaFrascosAnual !== '';
                                 return <td key={y} onDoubleClick={() => openMetaAnualModalFor(y)} className="py-2.5 px-4 text-center border-r border-slate-800/50 cursor-pointer hover:bg-yellow-400/10 transition-colors">
                                     <span className={hasOverride ? "text-yellow-400 underline decoration-dotted" : ""}>
-                                        {metaAnual > 0 ? metaAnual.toLocaleString('es-CL') : '-'}
+                                        {hideFrascos ? '******' : (metaAnual > 0 ? metaAnual.toLocaleString('es-CL') : '-')}
                                     </span>
                                 </td>;
                             })}
@@ -721,7 +732,7 @@ export default function ResumenVentasManager() {
                                 const metaAnual = getMetaFrascosAnual(y);
                                 if(totalYear === 0 || metaAnual === 0) return <td key={y} className="py-2.5 px-4 border-r border-slate-800 text-center bg-slate-800/30">-</td>;
                                 const diff = totalYear - metaAnual;
-                                return <td key={y} className={cn("py-2.5 px-4 text-center border-r border-slate-800", diff < 0 ? "text-rose-400 bg-rose-500/5" : "text-green-400 bg-green-500/5")}>{diff > 0 ? '+' : ''}{diff.toLocaleString('es-CL')}</td>;
+                                return <td key={y} className={cn("py-2.5 px-4 text-center border-r border-slate-800", diff < 0 ? "text-rose-400 bg-rose-500/5" : "text-green-400 bg-green-500/5")}>{hideFrascos ? '******' : `${diff > 0 ? '+' : ''}${diff.toLocaleString('es-CL')}`}</td>;
                             })}
                         </tr>
                     </tbody>
@@ -774,9 +785,18 @@ export default function ResumenVentasManager() {
         {(viewFilter === 'all' || viewFilter === 'pesos') && (
         <div className="bg-[#1C2541] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h3 className="text-[17px] font-black text-emerald-400 flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div> Módulo Monetario: Recaudación $
-                </h3>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-[17px] font-black text-emerald-400 flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div> Módulo Monetario: Recaudación $
+                    </h3>
+                    <button 
+                        onClick={() => setHideRecaudacion(!hideRecaudacion)} 
+                        className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700/50 transition"
+                        title={hideRecaudacion ? "Mostrar datos" : "Ocultar datos"}
+                    >
+                        {hideRecaudacion ? <EyeOff className="w-4.5 h-4.5 text-sky-400" /> : <Eye className="w-4.5 h-4.5" />}
+                    </button>
+                </div>
                 
                 {(() => {
                     let sum = 0; let count = 0;
@@ -793,11 +813,11 @@ export default function ResumenVentasManager() {
                         <div className="flex bg-[#0D1527] rounded-xl border border-slate-700 overflow-hidden shadow-inner w-full sm:w-auto">
                             <div className="px-4 py-2 border-r border-slate-700">
                                 <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Acumulado</span>
-                                <span className="text-sm font-black text-white">${sum.toLocaleString('es-CL')}</span>
+                                <span className="text-sm font-black text-white">{hideRecaudacion ? '******' : `$${sum.toLocaleString('es-CL')}`}</span>
                             </div>
                             <div className="px-4 py-2">
                                 <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-widest leading-tight">Total Promedio</span>
-                                <span className="text-sm font-black text-emerald-400">${Math.round(avg).toLocaleString('es-CL')}</span>
+                                <span className="text-sm font-black text-emerald-400">{hideRecaudacion ? '******' : `$${Math.round(avg).toLocaleString('es-CL')}`}</span>
                             </div>
                         </div>
                     );
@@ -824,7 +844,7 @@ export default function ResumenVentasManager() {
                                     return (
                                         <td key={y} onDoubleClick={() => openModalFor(y, idx)} className={cn("py-2 px-4 text-center cursor-pointer hover:bg-emerald-400/10 border-r border-slate-800/60 transition-colors", !inRange && "opacity-20")}>
                                             <span className={cn("font-medium", hasOverride ? "text-yellow-400 border-b border-dashed border-yellow-400" : "text-emerald-300/90")}>
-                                                {val > 0 ? `$${val.toLocaleString('es-CL')}` : '-'}
+                                                {hideRecaudacion ? '******' : (val > 0 ? `$${val.toLocaleString('es-CL')}` : '-')}
                                             </span>
                                         </td>
                                     );
@@ -840,7 +860,7 @@ export default function ResumenVentasManager() {
                                 filteredMonths.forEach(({ idx: m }) => {
                                     if (isDateInRange(y, m)) totalYear += getPesos(y, m);
                                 });
-                                return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{totalYear > 0 ? `$${totalYear.toLocaleString('es-CL')}` : '-'}</td>;
+                                return <td key={y} className="py-2.5 px-4 text-center border-r border-slate-800/50">{hideRecaudacion ? '******' : (totalYear > 0 ? `$${totalYear.toLocaleString('es-CL')}` : '-')}</td>;
                             })}
                         </tr>
                         <tr className="bg-[#0D1527] text-slate-300 font-bold border-b border-slate-800/50">
@@ -850,7 +870,7 @@ export default function ResumenVentasManager() {
                                 const hasOverride = overrides[`${y}-annual`]?.metaPesosAnual !== undefined && overrides[`${y}-annual`]?.metaPesosAnual !== '';
                                 return <td key={y} onDoubleClick={() => openMetaAnualModalFor(y)} className="py-2.5 px-4 text-center border-r border-slate-800/50 cursor-pointer hover:bg-emerald-400/10 transition-colors">
                                     <span className={hasOverride ? "text-emerald-400 underline decoration-dotted" : ""}>
-                                        {metaAnual > 0 ? `$${metaAnual.toLocaleString('es-CL')}` : '-'}
+                                        {hideRecaudacion ? '******' : (metaAnual > 0 ? `$${metaAnual.toLocaleString('es-CL')}` : '-')}
                                     </span>
                                 </td>;
                             })}
@@ -865,7 +885,7 @@ export default function ResumenVentasManager() {
                                 const metaAnual = getMetaPesosAnual(y);
                                 if(totalYear === 0 || metaAnual === 0) return <td key={y} className="py-2.5 px-4 border-r border-slate-800 text-center bg-slate-800/30">-</td>;
                                 const diff = totalYear - metaAnual;
-                                return <td key={y} className={cn("py-2.5 px-4 text-center border-r border-slate-800", diff < 0 ? "text-rose-400 bg-rose-500/5" : "text-green-400 bg-green-500/5")}>{diff > 0 ? '+' : ''}${diff.toLocaleString('es-CL')}</td>;
+                                return <td key={y} className={cn("py-2.5 px-4 text-center border-r border-slate-800", diff < 0 ? "text-rose-400 bg-rose-500/5" : "text-green-400 bg-green-500/5")}>{hideRecaudacion ? '******' : `${diff > 0 ? '+' : ''}$${diff.toLocaleString('es-CL')}`}</td>;
                             })}
                         </tr>
                     </tbody>

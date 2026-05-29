@@ -418,7 +418,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
       <div className="bg-[#152035] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B] overflow-hidden">
         <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  px-6 py-4 flex justify-between items-center">
           <h3 className="text-lg font-bold flex items-center gap-2 text-white">
@@ -512,7 +512,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
     {/* Removed elabModal, it belongs in PreparacionForm */}
 
-    <div className="bg-[#152035] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B] overflow-hidden lg:col-span-2">
+    <div className="bg-[#152035] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B] overflow-hidden lg:col-span-3">
         <div className="p-6 border-b border-[#1E293B] flex justify-between items-center bg-[#152035]">
           <div className="flex items-center gap-4 filter-input-container">
             <h3 className="text-[10px] font-black uppercase text-white tracking-widest">Historial Evaluación</h3>
@@ -591,7 +591,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
                 
                 // Normalizing to handle potential accent/case discrepancies, though data seems to use OK/PENDIENTE
-                const estadoActual = (r.estadoFinal || r.estado || '').toUpperCase();
+                const estadoActual = (r.estadoFinal || 'PENDIENTE').toUpperCase();
                 const matchesEstado = filterEstado === 'Todos' || estadoActual === filterEstado;
                 
                 return matchesSearch && matchesEstado;
@@ -1358,7 +1358,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
             <thead>
               <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  text-left border-b border-[#1E293B] font-black uppercase">
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
-                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">N° Muestra / Refrigerador</th>
+                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">N° Clasificación</th>
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Paciente</th>
                 <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Producto</th>
                 <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
@@ -1371,7 +1371,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
               }).sort((a,b) => (b.fechaFicha || '').localeCompare(a.fechaFicha || '')).map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-medium">{formatDate(r.fechaFicha)}</td>
-                  <td className="p-4 font-mono text-[#38BDF8]">{r.nroMuestra + (r.refrigerador ? ` / ${r.refrigerador}` : '')}</td>
+                  <td className="p-4 font-mono text-[#38BDF8]">{r.nroClasificacion || '---'}</td>
                   <td className="p-4 font-bold">{r.paciente}</td>
                   <td className="p-4">{r.producto}</td>
                   <td className="p-4 text-center">
@@ -4219,7 +4219,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                       ['Insumo', 'Código', 'Stock', 'Área'],
                       data,
                       `inventario_${selectedArea.toLowerCase().replace(/\s+/g, '_')}`,
-                      'l'
+                      'p'
                     );
                   }}
                   className="p-1.5 hover:bg-[#1E293B] rounded text-[#38BDF8]"
@@ -4468,7 +4468,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                       ['Fecha', 'Insumo', 'Cant.', 'Stock Final', 'Motivo'],
                       data,
                       'historial_movimientos_stock',
-                      'l'
+                      'p'
                     );
                   }}
                   className="text-[#38BDF8] hover:text-white flex items-center gap-1 bg-[#152035] px-2 py-1 rounded shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]" 

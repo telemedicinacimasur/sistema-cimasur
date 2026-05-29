@@ -27,9 +27,10 @@ const setupPremiumPage = (
   doc.text(title.toUpperCase(), 14, 15);
   
   if (subtitle && subtitle !== 'Ficha de Registro') {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(subtitle, 14, 21);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(title.includes('PREPARACIÓN GOTAS PURAS') ? 20 : subtitleFontSize);
+    const yPos = title.includes('PREPARACIÓN GOTAS PURAS') ? 22 : 21;
+    doc.text(subtitle, 14, yPos);
   }
 
   return { pageWidth, pageHeight };
@@ -70,8 +71,8 @@ export const exportTableToPDF = (title: string, headers: string[], data: any[][]
     didDrawCell: (data) => {
        // Draw thin subtle border for rows
        if (data.row.section === 'head' || data.row.section === 'body') {
-          doc.setDrawColor(226, 232, 240); // Slate 200
-          doc.setLineWidth(0.1);
+          doc.setDrawColor(120, 120, 120); // Darker slate grey
+          doc.setLineWidth(0.2);
           doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
        }
        // Top border for header
@@ -112,7 +113,7 @@ export const exportExpedienteToPDF = (
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
    const { pageWidth, pageHeight } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
-  let currentY = 25;
+  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 35 : 25;
 
   // Main Fields Table
   const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente' && item.label !== '---');
@@ -144,8 +145,8 @@ export const exportExpedienteToPDF = (
         },
         styles: { fontSize: 7.5, cellPadding: {top: 2, bottom: 2, left: 2, right: 2} },
         didDrawCell: (data) => {
-           doc.setDrawColor(226, 232, 240);
-           doc.setLineWidth(0.1);
+           doc.setDrawColor(120, 120, 120);
+           doc.setLineWidth(0.2);
            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
         }
       });
@@ -165,8 +166,8 @@ export const exportExpedienteToPDF = (
         },
         styles: { fontSize: 8, cellPadding: {top: 3, bottom: 3, left: 2, right: 2} },
         didDrawCell: (data) => {
-           doc.setDrawColor(226, 232, 240);
-           doc.setLineWidth(0.1);
+           doc.setDrawColor(120, 120, 120);
+           doc.setLineWidth(0.2);
            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
         }
       });
@@ -223,8 +224,8 @@ export const exportExpedienteToPDF = (
                doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
            } else {
                if (data.row.section === 'head' || data.row.section === 'body') {
-                  doc.setDrawColor(226, 232, 240);
-                  doc.setLineWidth(0.1);
+                  doc.setDrawColor(120, 120, 120);
+                  doc.setLineWidth(0.2);
                   doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
                }
                if (data.row.section === 'head' && data.row.index === 0) {
@@ -269,7 +270,7 @@ export const viewExpedienteInNewTab = (
   
   const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
-  let currentY = 40;
+  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 45 : 40;
 
   const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente');
   if (filterData.length > 0) {
@@ -287,8 +288,8 @@ export const viewExpedienteInNewTab = (
       },
       styles: { fontSize: 8, cellPadding: {top: 3, bottom: 3, left: 2, right: 2} },
       didDrawCell: (data) => {
-         doc.setDrawColor(226, 232, 240);
-         doc.setLineWidth(0.1);
+         doc.setDrawColor(120, 120, 120);
+         doc.setLineWidth(0.2);
          doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
       }
     });
@@ -324,8 +325,8 @@ export const viewExpedienteInNewTab = (
                doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
            } else {
                if (data.row.section === 'head' || data.row.section === 'body') {
-                  doc.setDrawColor(226, 232, 240);
-                  doc.setLineWidth(0.1);
+                  doc.setDrawColor(120, 120, 120);
+                  doc.setLineWidth(0.2);
                   doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
                }
                if (data.row.section === 'head' && data.row.index === 0) {

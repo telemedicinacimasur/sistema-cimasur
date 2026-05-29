@@ -533,7 +533,7 @@ export default function SalesTiendaMLManager() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column: Form Editor */}
-        <div className="lg:col-span-4 bg-[#152035] rounded-3xl border border-[#1E293B] shadow-xl overflow-hidden h-fit">
+        <div className="lg:col-span-3 bg-[#152035] rounded-3xl border border-[#1E293B] shadow-xl overflow-hidden h-fit">
           <div className="bg-[#1E3A5F] text-white p-5 font-bold flex items-center justify-between">
             <span className="flex items-center gap-2 text-sm uppercase">
               <PlusCircle className="w-5 h-5 text-sky-400" /> 
@@ -804,7 +804,7 @@ export default function SalesTiendaMLManager() {
         </div>
 
         {/* Right Column: Historical Sales List & Filters */}
-        <div className="lg:col-span-8 space-y-5">
+        <div className="lg:col-span-9 space-y-5">
           
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -259,6 +259,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [students, setStudents] = useState<any[]>([]);
+  const [hideMoney, setHideMoney] = useState(false);
 
   const downloadExcelTemplate = () => {
     const headers = [
@@ -488,10 +489,22 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                   onChange={e => setSearchTutor(e.target.value)}
                 />
              </div>
-             <div className="flex items-center gap-3 bg-[#1E293B]/80 px-4 py-1.5 rounded-2xl border border-white/20">
+             <div className="flex items-center gap-3 bg-[#1E293B]/80 px-4 py-1.5 rounded-2xl border border-white/20 font-sans">
                 <div className="flex flex-col">
-                   <span className="text-[8px] font-black uppercase text-blue-400 tracking-widest">Suma Honorarios</span>
-                   <span className="text-[13px] font-black">{filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</span>
+                   <div className="flex items-center gap-1.5 leading-none">
+                      <span className="text-[8px] font-black uppercase text-blue-400 tracking-widest leading-none">Suma Honorarios</span>
+                      <button 
+                         type="button"
+                         onClick={() => setHideMoney(!hideMoney)}
+                         className="text-slate-400 hover:text-white transition p-0.5 rounded hover:bg-[#152035] leading-none"
+                         title={hideMoney ? "Mostrar dinero" : "Ocultar dinero"}
+                      >
+                         {hideMoney ? <EyeOff className="w-3.5 h-3.5 text-sky-400" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                   </div>
+                   <span className="text-[13px] font-black mt-0.5 whitespace-nowrap leading-none">
+                      {hideMoney ? '******' : filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
+                   </span>
                 </div>
              </div>
           </div>
@@ -1367,7 +1380,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
-      <div className="lg:col-span-4 bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden h-fit">
+      <div className="lg:col-span-3 bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden h-fit">
         <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas GESTIÓN</span>
           <div className="flex gap-2">
@@ -1418,7 +1431,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
         </form>
       </div>
 
-      <div className="lg:col-span-8 space-y-4">
+      <div className="lg:col-span-9 space-y-4">
         <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
           <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex justify-between items-center ">
             <div className="flex items-center gap-4">
@@ -1823,7 +1836,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
-      <div className="lg:col-span-4 bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden h-fit">
+      <div className="lg:col-span-3 bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden h-fit">
         <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
           <span className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Registro de Ventas</span>
           <div className="flex gap-2">
@@ -1864,7 +1877,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
         </form>
       </div>
 
-      <div className="lg:col-span-8 space-y-4">
+      <div className="lg:col-span-9 space-y-4">
         <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
           <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex justify-between items-center ">
             <div className="flex items-center gap-4">
