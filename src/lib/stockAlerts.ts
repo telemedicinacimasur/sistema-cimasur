@@ -36,10 +36,21 @@ const hasRecentNotification = async (title: string, message: string): Promise<bo
 };
 
 let isCheckingStock = false;
-export const checkStockAlerts = async (inventory: any[]) => {
+export const checkStockAlerts = async (inventory: any[], force?: boolean) => {
   if (isCheckingStock) return;
-  if (typeof window !== 'undefined' && window.localStorage.getItem('all_stock_alerts_muted') === 'true') {
-    return;
+  if (!inventory || inventory.length === 0) return;
+  
+  if (typeof window !== 'undefined' && !force) {
+    if (window.localStorage.getItem('all_stock_alerts_muted') === 'true') {
+      return;
+    }
+    const now = Date.now();
+    const lastCheck = Number(window.localStorage.getItem('cimasur_last_stock_check_time') || 0);
+    // Limit to at most once every 4 hours (14400000 ms) in background
+    if (now - lastCheck < 14400000) {
+      return;
+    }
+    window.localStorage.setItem('cimasur_last_stock_check_time', String(now));
   }
 
   isCheckingStock = true;
@@ -96,8 +107,19 @@ export const checkStockAlerts = async (inventory: any[]) => {
 };
 
 let isCheckingOrders = false;
-export const checkPendingOrderAlerts = async () => {
+export const checkPendingOrderAlerts = async (force?: boolean) => {
     if (isCheckingOrders) return;
+    
+    if (typeof window !== 'undefined' && !force) {
+        const now = Date.now();
+        const lastCheck = Number(window.localStorage.getItem('cimasur_last_pending_orders_check_time') || 0);
+        // Limit to at most once every 12 hours (43200000 ms) in background
+        if (now - lastCheck < 43200000) {
+            return;
+        }
+        window.localStorage.setItem('cimasur_last_pending_orders_check_time', String(now));
+    }
+
     isCheckingOrders = true;
 
     try {

@@ -146,15 +146,39 @@ export default function SalesTiendaMLManager() {
   const [showProductSummary, setShowProductSummary] = useState(false);
   const [showMontoConsolidado, setShowMontoConsolidado] = useState(true);
 
-  useEffect(() => {
-    loadData();
-    window.addEventListener('db-change', loadData);
-    return () => window.removeEventListener('db-change', loadData);
-  }, []);
+  const [loadRange, setLoadRange] = useState<'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
+    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'mes_actual';
+  });
+
+  const getQueryOptions = () => {
+    if (loadRange === 'historico_completo') return undefined;
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+    
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    
+    if (loadRange === 'mes_actual') {
+      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      return {
+        dateField: 'fecha',
+        startDate: `${currentYear}-${pad(currentMonth + 1)}-01`,
+        endDate: `${currentYear}-${pad(currentMonth + 1)}-${pad(lastDay)}`
+      };
+    } else { // anio_actual
+      return {
+        dateField: 'fecha',
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`
+      };
+    }
+  };
 
   const loadData = async () => {
     try {
-      const sales = await localDB.getCollection('sales_tienda_ml');
+      const options = getQueryOptions();
+      const sales = await localDB.getCollection('sales_tienda_ml', options);
       setRecords(sales);
 
       const customs = await localDB.getCollection('sales_tienda_ml_custom_products');
@@ -163,6 +187,33 @@ export default function SalesTiendaMLManager() {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    loadData();
+    
+    const handleRefresh = () => {
+      loadData();
+    };
+    
+    window.addEventListener('db-change', handleRefresh);
+    window.addEventListener('cimasur-refresh-underdemand', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('db-change', handleRefresh);
+      window.removeEventListener('cimasur-refresh-underdemand', handleRefresh);
+    };
+  }, [loadRange]);
+
+  useEffect(() => {
+    const handleStoreChange = () => {
+      const r = (localStorage.getItem('cimasur_admin_load_range') as any) || 'mes_actual';
+      if (r !== loadRange) {
+        setLoadRange(r);
+      }
+    };
+    const interval = setInterval(handleStoreChange, 1000);
+    return () => clearInterval(interval);
+  }, [loadRange]);
 
   // Merge built-in + custom products based on channel
   const getProductOptions = (vendedor: 'Mercado Libre' | 'Tienda') => {

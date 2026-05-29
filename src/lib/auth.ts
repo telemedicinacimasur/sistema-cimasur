@@ -1,6 +1,6 @@
 import { auth, db, isFirebaseReady } from './firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
 
 export interface UserProfile {
   uid: string;
@@ -155,41 +155,71 @@ if (typeof window !== 'undefined') {
   });
 }
 
+const invalidateCollectionCache = (name: string) => {
+  Object.keys(collectionCache).forEach(key => {
+    if (key === name || key.startsWith(`${name}_`)) {
+      delete collectionCache[key];
+    }
+  });
+};
+
 export const localDB = {
-  getCollection: async (name: string): Promise<any[]> => {
+  clearCache: () => {
+    Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
+  },
+  getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string }): Promise<any[]> => {
     if (isFirebaseReady && db) {
-      if (collectionCache[name]) {
-        return [...collectionCache[name]];
+      const cacheKey = options 
+        ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}` 
+        : name;
+
+      if (collectionCache[cacheKey]) {
+        return [...collectionCache[cacheKey]];
       }
-      if (pendingRequests[name]) {
-        const data = await pendingRequests[name];
+      if (pendingRequests[cacheKey]) {
+        const data = await pendingRequests[cacheKey];
         return [...data];
       }
       
       const fetchPromise = (async () => {
         try {
-          const snapshot = await getDocs(collection(db, name));
+          let qRef: any = collection(db, name);
+          if (options && options.dateField && options.startDate && options.endDate) {
+            qRef = query(
+              collection(db, name),
+              where(options.dateField, '>=', options.startDate),
+              where(options.dateField, '<=', options.endDate)
+            );
+          }
+          const snapshot = await getDocs(qRef);
           const data = snapshot.docs.map(doc => {
-            const docData = doc.data();
+            const docData = doc.data() as any;
             return { ...docData, id: doc.id };
           });
-          collectionCache[name] = data;
+          collectionCache[cacheKey] = data;
           return data;
         } finally {
-          delete pendingRequests[name];
+          delete pendingRequests[cacheKey];
         }
       })();
       
-      pendingRequests[name] = fetchPromise;
+      pendingRequests[cacheKey] = fetchPromise;
       const result = await fetchPromise;
       return [...result];
     } else {
       const res = await fetch(`/api/records/${name}`);
-      return await res.json();
+      let data = await res.json();
+      if (options && options.dateField && options.startDate && options.endDate) {
+        data = data.filter((item: any) => {
+          const val = item[options.dateField!];
+          return val >= options.startDate! && val <= options.endDate!;
+        });
+      }
+      return data;
     }
   },
   saveToCollection: async (name: string, item: any) => {
-    delete collectionCache[name];
+    invalidateCollectionCache(name);
     if (isFirebaseReady && db) {
       if (item.id) {
         await setDoc(doc(db, name, item.id), {
@@ -218,7 +248,7 @@ export const localDB = {
     }
   },
   updateInCollection: async (name: string, id: string, updates: any) => {
-    delete collectionCache[name];
+    invalidateCollectionCache(name);
     if (isFirebaseReady && db) {
       try {
         await setDoc(doc(db, name, id), {
@@ -243,7 +273,7 @@ export const localDB = {
     }
   },
   deleteFromCollection: async (name: string, id: string) => {
-    delete collectionCache[name];
+    invalidateCollectionCache(name);
     console.log(`Debug: Attempting to delete from ${name} with id: ${id}`);
     if (isFirebaseReady && db) {
       await deleteDoc(doc(db, name, id));

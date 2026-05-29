@@ -81,25 +81,98 @@ export default function AdminView() {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      let col = 'quotes';
-      if (view === 'sales') col = 'sales';
-      if (view === 'sales_gestion') col = 'sales_gestion';
-      if (view === 'sales_tienda_ml') col = 'sales_tienda_ml';
-      if (view === 'dte') col = 'dte_records';
-      if (view === 'pet_payments') col = 'pet_payments';
-      if (view === 'school_payments') col = 'school_payments';
-      if (view === 'presupuesto_flujo') col = 'presupuesto_records';
-      const data = await localDB.getCollection(col);
+  const [loadRange, setLoadRange] = useState<'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
+    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'mes_actual';
+  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleLoadRangeChange = (range: 'mes_actual' | 'anio_actual' | 'historico_completo') => {
+    setLoadRange(range);
+    localStorage.setItem('cimasur_admin_load_range', range);
+  };
+
+  const getQueryOptions = (colName: string) => {
+    if (loadRange === 'historico_completo') return undefined;
+    
+    let dateField = 'fecha';
+    if (colName === 'quotes') {
+      dateField = 'fechaElab';
+    } else if (colName === 'school_payments') {
+      dateField = 'fechaPago';
+    }
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+    
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    
+    if (loadRange === 'mes_actual') {
+      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      return {
+        dateField,
+        startDate: `${currentYear}-${pad(currentMonth + 1)}-01`,
+        endDate: `${currentYear}-${pad(currentMonth + 1)}-${pad(lastDay)}`
+      };
+    } else { // anio_actual
+      return {
+        dateField,
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`
+      };
+    }
+  };
+
+  const VIEWS_WITH_DB_LOAD: Record<string, string> = {
+    quotes: 'quotes',
+    sales: 'sales',
+    sales_gestion: 'sales_gestion',
+    dte: 'dte_records',
+    pet_payments: 'pet_payments',
+    school_payments: 'school_payments',
+  };
+
+  const loadData = async (forceRefresh = false) => {
+    if (forceRefresh) {
+      setIsRefreshing(true);
+      localDB.clearCache();
+    }
+    
+    const col = VIEWS_WITH_DB_LOAD[view];
+    if (!col) {
+      if (forceRefresh) {
+        window.dispatchEvent(new Event('cimasur-refresh-underdemand'));
+        setTimeout(() => setIsRefreshing(false), 800);
+      }
+      return;
+    }
+    
+    try {
+      const options = getQueryOptions(col);
+      const data = await localDB.getCollection(col, options);
       setRecords(data);
-    };
+    } catch (error) {
+      console.error("Error loading data in AdminView:", error);
+    } finally {
+      if (forceRefresh) {
+        window.dispatchEvent(new Event('cimasur-refresh-underdemand'));
+        setTimeout(() => setIsRefreshing(false), 600);
+      }
+    }
+  };
+
+  useEffect(() => {
     if (view !== 'menu') {
       loadData();
-      window.addEventListener('db-change', loadData);
+      
+      const handleDbChange = () => {
+        loadData();
+      };
+      
+      window.addEventListener('db-change', handleDbChange);
+      return () => window.removeEventListener('db-change', handleDbChange);
     }
-    return () => window.removeEventListener('db-change', loadData);
-  }, [view]);
+  }, [view, loadRange]);
 
   if (view === 'menu') {
     return (
@@ -226,13 +299,47 @@ export default function AdminView() {
           button[title*="eliminar" i], button[title*="borrar" i], button.text-red-500, button.text-red-400 { display: none !important; }
         `}</style>
       )}
-      <button 
-        onClick={() => setView('menu')}
-        className="flex items-center gap-2 text-slate-400 hover:text-[#38BDF8] transition-colors mb-2 group w-fit"
-      >
-        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-        <span className="text-sm uppercase tracking-widest">Volver al Menú de Administración</span>
-      </button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#152035]/90 border border-[#1E293B] p-4 rounded-3xl shadow-xl backdrop-blur-md">
+        <button 
+          onClick={() => setView('menu')}
+          className="flex items-center gap-2 text-slate-300 hover:text-[#38BDF8] transition-colors group w-fit font-bold uppercase tracking-wider text-xs"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>Volver al Menú de Administración</span>
+        </button>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Optimization Indicator */}
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Filtro de Consulta Activo</span>
+          </div>
+
+          {/* Load Range Selector */}
+          <div className="flex items-center gap-2 bg-[#0F172A] border border-[#1E293B] px-3 py-1.5 rounded-xl">
+            <span className="text-slate-400 text-xs font-black uppercase tracking-wider">Cargar:</span>
+            <select
+              value={loadRange}
+              onChange={e => handleLoadRangeChange(e.target.value as any)}
+              className="bg-transparent text-white text-xs border-none outline-none cursor-pointer font-bold focus:ring-0 focus:outline-none"
+            >
+              <option value="mes_actual" className="bg-[#152035] text-white font-bold">⚡ Mes Actual (Recomendado)</option>
+              <option value="anio_actual" className="bg-[#152035] text-white font-bold">📅 Año Actual</option>
+              <option value="historico_completo" className="bg-[#152035] text-white font-bold">⌛ Histórico Completo</option>
+            </select>
+          </div>
+
+          {/* Refresh Action Button */}
+          <button
+            onClick={() => loadData(true)}
+            disabled={isRefreshing}
+            className={`flex items-center gap-2 px-4 py-1.5 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30 rounded-xl transition-all font-bold text-xs ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Actualizando...' : 'Actualizar Datos'}</span>
+          </button>
+        </div>
+      </div>
 
        {view === 'codigos_y_diluciones' && <CimasurInventoryManager />}
       {view === 'quotes' && <QuoteManager records={records} setRecords={setRecords} />}
