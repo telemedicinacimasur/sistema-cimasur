@@ -145,20 +145,51 @@ export async function addAuditLog(user: UserProfile, action: string, module: str
 }
 
 // Firebase Database Logic
+const collectionCache: Record<string, any[]> = {};
+const pendingRequests: Record<string, Promise<any[]>> = {};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('db-change', () => {
+    // Clear all caches on database changes so views always read fresh updated data
+    Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
+  });
+}
+
 export const localDB = {
   getCollection: async (name: string): Promise<any[]> => {
     if (isFirebaseReady && db) {
-      const snapshot = await getDocs(collection(db, name));
-      return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return { ...data, id: doc.id };
-      });
+      if (collectionCache[name]) {
+        return [...collectionCache[name]];
+      }
+      if (pendingRequests[name]) {
+        const data = await pendingRequests[name];
+        return [...data];
+      }
+      
+      const fetchPromise = (async () => {
+        try {
+          const snapshot = await getDocs(collection(db, name));
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            return { ...docData, id: doc.id };
+          });
+          collectionCache[name] = data;
+          return data;
+        } finally {
+          delete pendingRequests[name];
+        }
+      })();
+      
+      pendingRequests[name] = fetchPromise;
+      const result = await fetchPromise;
+      return [...result];
     } else {
       const res = await fetch(`/api/records/${name}`);
       return await res.json();
     }
   },
   saveToCollection: async (name: string, item: any) => {
+    delete collectionCache[name];
     if (isFirebaseReady && db) {
       if (item.id) {
         await setDoc(doc(db, name, item.id), {
@@ -187,6 +218,7 @@ export const localDB = {
     }
   },
   updateInCollection: async (name: string, id: string, updates: any) => {
+    delete collectionCache[name];
     if (isFirebaseReady && db) {
       try {
         await setDoc(doc(db, name, id), {
@@ -211,6 +243,7 @@ export const localDB = {
     }
   },
   deleteFromCollection: async (name: string, id: string) => {
+    delete collectionCache[name];
     console.log(`Debug: Attempting to delete from ${name} with id: ${id}`);
     if (isFirebaseReady && db) {
       await deleteDoc(doc(db, name, id));
