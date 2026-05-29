@@ -131,33 +131,15 @@ export const checkPendingOrderAlerts = async (force?: boolean) => {
 
         const activeOrders = [];
 
-        // Automatic trimestral cleanup (delete records older than 3 months)
+        // No automatic deletion of tracking orders. We only exclude extremely old ones from active order/alert checks.
         for (const order of orders) {
             if (!order) continue;
             const dateStr = order.fechaEnvio || order.fechaCotiz || order.fecha;
             if (dateStr) {
                 const orderDate = new Date(dateStr);
                 if (orderDate.getTime() > 0 && orderDate < threeMonthsAgo) {
-                    // Deleted automatically!
-                    try {
-                        await localDB.deleteFromCollection('order_tracking', order.id);
-                        
-                        const title = 'Eliminado Automático (Historial de Pedidos)';
-                        const message = `El seguimiento del pedido N° ${order.nroCotiz || 'S/N'} de ${order.cliente || 'Sin Cliente'} fue eliminado automáticamente del sistema al superar el plazo de conservación de 3 meses.`;
-                        
-                        if (!(await hasRecentNotification(title, message))) {
-                            sentThisSession.add(`${title}:${message}`);
-                            await addNotification({
-                                title,
-                                message,
-                                recipientRoles: ['admin', 'lab', 'manager'],
-                                sender: 'Sistema de Limpieza Trimestral'
-                            });
-                        }
-                    } catch (e) {
-                        console.error("Error performing auto-cleanup delete for tracking order:", e);
-                    }
-                    continue; // Skip appending as active
+                    // Skip checking alerts for really old orders to avoid performance overhead, but NEVER delete them.
+                    continue; 
                 }
             }
             activeOrders.push(order);
