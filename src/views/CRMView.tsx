@@ -481,6 +481,10 @@ function CRMRegister() {
 
 function CRMTable({ records, filters, setFilters, onComment }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void }) {
   const { user } = useAuth();
+  const permissions = user?.permissions?.['crm'];
+  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
+  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [newHistory, setNewHistory] = useState('');
@@ -879,6 +883,120 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
           </div>
        </div>
 
+      {selectedIds.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-990 to-slate-900 border border-blue-500/30 p-5 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-400/20 text-[#38BDF8]">
+              <TrendingUp className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Acciones Masivas para Selección</span>
+                <span className="px-2.5 py-0.5 bg-blue-500/30 border border-blue-400 text-[#38BDF8] font-black text-xs rounded-full">{selectedIds.length} seleccionados</span>
+              </h4>
+              <p className="text-xs text-slate-400">Modifica la categoría o traspasa de inmediato a gestión los registros marcados.</p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Cambiar categoría masiva */}
+            <div className="flex items-center gap-2 bg-[#0F172A] border border-[#1E293B] px-3 py-1.5 rounded-xl">
+              <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Nueva Categoría:</span>
+              <select
+                disabled={!canEdit}
+                onChange={async (e) => {
+                  const val = e.target.value;
+                  if (!val) return;
+                  if (window.confirm(`¿Está seguro que desea cambiar a "${val}" la categoría de los ${selectedIds.length} clientes seleccionados?`)) {
+                    try {
+                      for (const id of selectedIds) {
+                        await localDB.updateInCollection('contacts', id, { categoria: val });
+                      }
+                      setSelectedIds([]);
+                      window.dispatchEvent(new Event('db-change'));
+                      alert(`Se actualizó la categoría a "${val}" para los clientes seleccionados.`);
+                    } catch (err) {
+                      console.error(err);
+                      alert('Hubo un error al actualizar las categorías.');
+                    }
+                  }
+                  e.target.value = '';
+                }}
+                className="bg-transparent text-white text-xs border-none outline-none cursor-pointer font-bold focus:ring-0 focus:outline-none"
+              >
+                <option value="" className="bg-[#152035] text-slate-400">Seleccionar...</option>
+                {CATEGORIAS.map(c => (
+                  <option key={c} value={c} className="bg-[#152035] text-white font-bold">{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Traspasar masivo a Gestión */}
+            <button
+              disabled={!canEdit}
+              onClick={async () => {
+                if (window.confirm(`¿Está seguro que desea traspasar de inmediato a Gestión los ${selectedIds.length} clientes seleccionados?`)) {
+                  try {
+                    let count = 0;
+                    for (const id of selectedIds) {
+                      const client = records.find(r => r.id === id);
+                      if (!client) continue;
+                      
+                      if (!client.isGestionCustomer) {
+                        const now = new Date();
+                        const dateStr = now.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        const logHeader = `\n\n--- Sincronización Masiva (${dateStr}) ---`;
+                        const updatedHistory = (client.historialUnificado || '') + logHeader + '\n[Traspaso Masivo] - Sincronizado masivamente a módulo de Gestión.';
+                        
+                        await localDB.updateInCollection('contacts', client.id, {
+                          isGestionCustomer: true,
+                          historialUnificado: updatedHistory
+                        });
+
+                        const gestionRecord = {
+                          fechaIngreso: client.fechaIngreso || new Date().toISOString().split('T')[0],
+                          nombre: client.name,
+                          rut: client.rut,
+                          tipoEmpresa: client.type,
+                          comuna: client.region,
+                          celular: client.phone || '',
+                          email: client.email || '',
+                          categoria: client.categoria,
+                          estado: 'En proceso',
+                          consultora: user?.displayName || user?.email || 'CRM',
+                          observaciones: `Sincronizado masivamente desde CRM Comercial por ${user?.displayName || user?.email}\n\n${updatedHistory}`
+                        };
+                        await localDB.saveToCollection('gestion_records', gestionRecord);
+                        await addAuditLog(user, `Sincronizó cliente ${client.name} a Gestión (Masivo)`, 'CRM');
+                        count++;
+                      }
+                    }
+                    setSelectedIds([]);
+                    window.dispatchEvent(new Event('db-change'));
+                    alert(`Traspaso masivo finalizado. ${count} clientes nuevos fueron agregados a Gestión.`);
+                  } catch (err) {
+                    console.error(err);
+                    alert('Hubo un problema al realizar el traspaso masivo.');
+                  }
+                }
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-750 text-white rounded-xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-lg active:scale-95 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Traspasar a Gestión</span>
+            </button>
+
+            {/* Cancelar Selección */}
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-705 text-slate-300 rounded-xl transition-all font-bold text-xs border border-slate-700 active:scale-95 cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
@@ -923,15 +1041,86 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                       <td className="p-5 text-slate-300">{r.email || '---'}</td>
                       <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || '---'}</td>
                       <td className="p-5">
-                         <span className={cn(
-                           "px-3 py-1 rounded-full font-black text-[9px] uppercase",
-                           r.categoria === 'Platinum' ? "bg-purple-100 text-purple-700" :
-                           r.categoria === 'Oro' ? "bg-amber-100 text-amber-700" :
-                           "bg-[#111A2E] text-slate-200"
-                         )}>{r.categoria}</span>
+                         <select
+                           value={r.categoria}
+                           disabled={!canEdit}
+                           onChange={async (e) => {
+                             const newVal = e.target.value;
+                             try {
+                               await localDB.updateInCollection('contacts', r.id, { categoria: newVal });
+                               window.dispatchEvent(new Event('db-change'));
+                             } catch (err) {
+                               console.error(err);
+                               alert('Error al actualizar la categoría.');
+                             }
+                           }}
+                           className={cn(
+                             "px-2.5 py-1 rounded-full font-black text-[9px] uppercase border cursor-pointer bg-[#0F172A] outline-none text-center focus:ring-1 focus:ring-blue-400 font-bold max-w-[125px] disabled:pointer-events-none disabled:opacity-80",
+                             r.categoria === 'Platinum' ? "bg-purple-950 text-purple-300 border-purple-800/80" :
+                             r.categoria === 'Oro' ? "bg-amber-950 text-amber-300 border-amber-800/80" :
+                             r.categoria === 'Plata' ? "bg-slate-800 text-slate-300 border-slate-600/80" :
+                             r.categoria === 'Bronce' ? "bg-orange-950 text-orange-300 border-orange-850/80" :
+                             "bg-[#111A2E] text-slate-200 border-slate-700/50"
+                           )}
+                         >
+                           {CATEGORIAS.map(cat => (
+                             <option key={cat} value={cat} className="bg-[#152035] text-white">
+                               {cat}
+                             </option>
+                           ))}
+                         </select>
                       </td>
                       <td className="p-5 font-medium text-blue-900">{r.type}</td>
                       <td className="p-5 text-right flex items-center justify-end gap-2">
+                         {r.isGestionCustomer ? (
+                           <span className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-lg font-bold animate-fade-in" title="Cliente registrado en Gestión">
+                             ✓ En Gestión
+                           </span>
+                         ) : (
+                           canEdit && (
+                             <button
+                               onClick={async (e) => {
+                                 e.stopPropagation();
+                                 try {
+                                   const now = new Date();
+                                   const dateStr = now.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                   const logHeader = `\n\n--- Sincronización Rápida (${dateStr}) ---`;
+                                   const updatedHistory = (r.historialUnificado || '') + logHeader + '\n[Traspaso Rápido] - Sincronizado directamente a Gestión desde la lista CRM.';
+                                   
+                                   await localDB.updateInCollection('contacts', r.id, {
+                                     isGestionCustomer: true,
+                                     historialUnificado: updatedHistory
+                                   });
+
+                                   const gestionRecord = {
+                                     fechaIngreso: r.fechaIngreso || new Date().toISOString().split('T')[0],
+                                     nombre: r.name,
+                                     rut: r.rut,
+                                     tipoEmpresa: r.type,
+                                     comuna: r.region,
+                                     celular: r.phone || '',
+                                     email: r.email || '',
+                                     categoria: r.categoria,
+                                     estado: 'En proceso',
+                                     consultora: user?.displayName || user?.email || 'CRM',
+                                     observaciones: `Sincronizado directamente desde CRM Comercial por ${user?.displayName || user?.email}\n\n${updatedHistory}`
+                                   };
+                                   await localDB.saveToCollection('gestion_records', gestionRecord);
+                                   await addAuditLog(user, `Sincronizó cliente ${r.name} a Gestión (Rápido)`, 'CRM');
+                                   window.dispatchEvent(new Event('db-change'));
+                                   alert(`Cliente "${r.name}" traspasado exitosamente a Gestión.`);
+                                 } catch (err) {
+                                   console.error(err);
+                                   alert('Hubo un error al realizar el traspaso directo.');
+                                 }
+                               }}
+                               className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-sky-950 hover:bg-sky-900 text-sky-400 border border-sky-800 hover:border-sky-700 rounded-lg font-bold transition-all whitespace-nowrap active:scale-95 cursor-pointer"
+                               title="Traspasar de inmediato a Gestión sin abrir expediente"
+                             >
+                               <span>⚡ Traspasar</span>
+                             </button>
+                           )
+                         )}
                          <RecordActions 
                            module="crm"
                            onView={() => setSelectedClient(r)}
