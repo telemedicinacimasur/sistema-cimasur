@@ -28,8 +28,8 @@ const setupPremiumPage = (
   
   if (subtitle && subtitle !== 'Ficha de Registro') {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(title.includes('PREPARACIÓN GOTAS PURAS') ? 20 : subtitleFontSize);
-    const yPos = title.includes('PREPARACIÓN GOTAS PURAS') ? 22 : 21;
+    doc.setFontSize(title.includes('PREPARACIÓN GOTAS PURAS') ? 30 : subtitleFontSize);
+    const yPos = title.includes('PREPARACIÓN GOTAS PURAS') ? 24 : 21;
     doc.text(subtitle, 14, yPos);
   }
 
@@ -37,8 +37,7 @@ const setupPremiumPage = (
 };
 
 export const exportTableToPDF = (title: string, headers: string[], data: any[][], fileName: string, orientation: 'p' | 'l' = 'l') => {
-  // Always prefer Landscape for tables to ensure full width
-  const orientationToUse = 'l'; 
+  const orientationToUse = orientation; 
   const doc = new jsPDF({ orientation: orientationToUse });
   const { pageWidth } = setupPremiumPage(doc, orientationToUse, title, 'Reporte de Registros');
   
@@ -113,7 +112,7 @@ export const exportExpedienteToPDF = (
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
    const { pageWidth, pageHeight } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
-  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 35 : 25;
+  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 40 : 25;
 
   // Main Fields Table
   const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente' && item.label !== '---');
@@ -270,7 +269,7 @@ export const viewExpedienteInNewTab = (
   
   const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
-  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 45 : 40;
+  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 48 : 40;
 
   const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente');
   if (filterData.length > 0) {

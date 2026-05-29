@@ -1718,12 +1718,32 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     fecha: new Date().toISOString().split('T')[0],
     documento: '',
     cliente: '',
-    nroFrascos: 0
+    nroFrascos: 0,
+    montoTotal: 0,
+    tipoPago: 'Contado' as 'Contado' | 'Crédito',
+    fechaPago: '',
+    montoAbonado: 0,
+    abonos: [] as { id: string, fecha: string, monto: number }[]
   });
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterTipoPago, setFilterTipoPago] = useState<'Todos' | 'Contado' | 'Crédito'>('Todos');
+  const [newAbonoAmount, setNewAbonoAmount] = useState<number | ''>('');
+  const [newAbonoDate, setNewAbonoDate] = useState(new Date().toISOString().split('T')[0]);
+  const [hideVentaTotal, setHideVentaTotal] = useState(false);
+  const [hideTotalAbonado, setHideTotalAbonado] = useState(false);
+  const [hideSaldoPendiente, setHideSaldoPendiente] = useState(false);
+
+  const getAnioAndMesFromFecha = (fechaStr: string) => {
+    if (!fechaStr) return { anio: '', mes: '' };
+    const d = new Date(fechaStr + 'T12:00:00'); // avoid timezone shifts
+    const anio = d.getFullYear().toString();
+    const mesFormatter = new Intl.DateTimeFormat('es-CL', { month: 'long' });
+    const mes = mesFormatter.format(d);
+    return { anio, mes };
+  };
 
   const downloadExcelTemplate = () => {
     const headers = [
@@ -1765,7 +1785,12 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
             fecha: parseExcelDate(row["Fecha"]),
             documento: doc,
             cliente: safe(row["Cliente"]),
-            nroFrascos: parseInt(safe(row["Frascos"])) || 0
+            nroFrascos: parseInt(safe(row["Frascos"])) || 0,
+            montoTotal: parseInt(safe(row["Monto Total"])) || 0,
+            tipoPago: safe(row["Tipo Pago"]) || 'Contado',
+            fechaPago: safe(row["Fecha Pago"]) || '',
+            montoAbonado: parseInt(safe(row["Monto Abonado"])) || 0,
+            abonos: []
           };
 
           await localDB.saveToCollection('sales', newSale);
@@ -1790,9 +1815,13 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     let match = true;
     if (dateFrom && r.fecha < dateFrom) match = false;
     if (dateTo && r.fecha > dateTo) match = false;
+    if (filterTipoPago !== 'Todos') {
+      const rTipo = r.tipoPago || 'Contado';
+      if (rTipo !== filterTipoPago) match = false;
+    }
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
-      const text = `${r.documento || ''} ${r.cliente || ''} ${r.nroFrascos || ''}`.toLowerCase();
+      const text = `${r.documento || ''} ${r.cliente || ''} ${r.nroFrascos || ''} ${r.tipoPago || 'Contado'}`.toLowerCase();
       if (!text.includes(s)) match = false;
     }
     return match;
@@ -1803,16 +1832,30 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
   });
 
   const totalFrascos = filteredRecords.reduce((sum, r) => sum + (Number(r.nroFrascos) || 0), 0);
+  const totalMonto = filteredRecords.reduce((sum, r) => sum + (Number(r.montoTotal) || 0), 0);
+  const totalAbonado = filteredRecords.reduce((sum, r) => {
+    const isCred = r.tipoPago === 'Crédito';
+    return sum + (isCred ? (Number(r.montoAbonado) || 0) : (Number(r.montoTotal) || 0));
+  }, 0);
+  const totalSaldoPendiente = filteredRecords.reduce((sum, r) => {
+    if (r.tipoPago === 'Crédito') {
+      return sum + Math.max(0, (Number(r.montoTotal) || 0) - (Number(r.montoAbonado) || 0));
+    }
+    return sum;
+  }, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const { anio, mes } = getAnioAndMesFromFecha(form.fecha);
+    const updatedForm = { ...form, anio, mes };
+
     if (editingId) {
-      await localDB.updateInCollection('sales', editingId, form);
+      await localDB.updateInCollection('sales', editingId, updatedForm);
       await addAuditLog(user, `Actualizó Venta Doc: ${form.documento}`, 'Administración');
       setEditingId(null);
       alert('Venta actualizada');
     } else {
-      await localDB.saveToCollection('sales', form);
+      await localDB.saveToCollection('sales', updatedForm);
       await addNotification({
         title: 'Nueva Venta Registrada',
         message: `${user.displayName || user.email} registró venta: ${form.documento} (${form.cliente})`,
@@ -1828,7 +1871,12 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
       fecha: new Date().toISOString().split('T')[0],
       documento: '',
       cliente: '',
-      nroFrascos: 0
+      nroFrascos: 0,
+      montoTotal: 0,
+      tipoPago: 'Contado',
+      fechaPago: '',
+      montoAbonado: 0,
+      abonos: []
     });
     const updated = await localDB.getCollection('sales');
     setRecords(updated);
@@ -1864,35 +1912,288 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
             </button>
           </div>
         </div>
-        <form className="p-6 space-y-4" onSubmit={handleSubmit}>
+        <form className="p-6 space-y-4 font-sans" onSubmit={handleSubmit}>
+          <FormField label="Fecha">
+            <input 
+              type="date" 
+              className="w-full border-b p-2 text-sm bg-transparent text-white cursor-pointer" 
+              value={form.fecha || ''} 
+              onChange={e => setForm({...form, fecha: e.target.value})} 
+            />
+          </FormField>
+          <FormField label="Fact / Boleta">
+            <input 
+              className="w-full border-b p-2 text-sm bg-transparent text-white" 
+              value={form.documento || ''} 
+              onChange={e => setForm({...form, documento: e.target.value})} 
+              required 
+            />
+          </FormField>
+          <FormField label="Cliente">
+            <input 
+              className="w-full border-b p-2 text-sm bg-transparent text-white" 
+              value={form.cliente || ''} 
+              onChange={e => setForm({...form, cliente: e.target.value})} 
+              required 
+            />
+          </FormField>
+          
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Año"><input className="w-full border-b p-2 text-sm" value={form.anio || ''} onChange={e => setForm({...form, anio: e.target.value})} /></FormField>
-            <FormField label="Mes"><input className="w-full border-b p-2 text-sm" value={form.mes || ''} onChange={e => setForm({...form, mes: e.target.value})} /></FormField>
+            <FormField label="N° Frascos">
+              <input 
+                type="number" 
+                className="w-full border-b p-2 text-sm bg-transparent text-white" 
+                value={form.nroFrascos || 0} 
+                onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} 
+              />
+            </FormField>
+            
+            <FormField label="Monto Total ($)">
+              <input 
+                type="number" 
+                placeholder="Monto total"
+                className="w-full border-b p-2 text-sm bg-transparent text-white font-bold text-emerald-400" 
+                value={form.montoTotal || ''} 
+                onChange={e => setForm({...form, montoTotal: parseInt(e.target.value) || 0})} 
+              />
+            </FormField>
           </div>
-          <FormField label="Fecha"><input type="date" className="w-full border-b p-2 text-sm" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormField>
-          <FormField label="Fact / Boleta"><input className="w-full border-b p-2 text-sm" value={form.documento || ''} onChange={e => setForm({...form, documento: e.target.value})} required /></FormField>
-          <FormField label="Cliente"><input className="w-full border-b p-2 text-sm" value={form.cliente || ''} onChange={e => setForm({...form, cliente: e.target.value})} required /></FormField>
-          <FormField label="N° Frascos"><input type="number" className="w-full border-b p-2 text-sm" value={form.nroFrascos || 0} onChange={e => setForm({...form, nroFrascos: parseInt(e.target.value) || 0})} /></FormField>
-          <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-3 rounded font-bold mt-2 hover:bg-opacity-90">GUARDAR VENTA</button>
+
+          <div className="space-y-1">
+            <span className="block text-[10px] uppercase font-black text-slate-400 tracking-wider">Método de Pago:</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setForm({...form, tipoPago: 'Contado'})}
+                className={cn(
+                  "flex-1 py-2 text-xs font-black uppercase rounded border transition-all cursor-pointer",
+                  form.tipoPago === 'Contado'
+                    ? "bg-emerald-600/30 text-emerald-400 border-emerald-500 shadow-lg shadow-emerald-500/10"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700"
+                )}
+              >
+                Contado
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({...form, tipoPago: 'Crédito'})}
+                className={cn(
+                  "flex-1 py-2 text-xs font-black uppercase rounded border transition-all cursor-pointer",
+                  form.tipoPago === 'Crédito'
+                    ? "bg-amber-600/30 text-amber-400 border-amber-500 shadow-lg shadow-amber-500/10"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700"
+                )}
+              >
+                Crédito
+              </button>
+            </div>
+          </div>
+
+          {form.tipoPago === 'Crédito' && (
+            <div className="space-y-4 p-3 border border-amber-500/20 bg-amber-500/5 rounded-xl animate-in slide-in-from-top-2 duration-300">
+              <FormField label="Fecha Límite / Pago Esperado">
+                <input 
+                  type="date" 
+                  className="w-full border-b p-2 text-sm bg-transparent text-white cursor-pointer" 
+                  value={form.fechaPago || ''} 
+                  onChange={e => setForm({...form, fechaPago: e.target.value})} 
+                />
+              </FormField>
+
+              <div className="space-y-2 bg-[#0D1527]/90 p-3 rounded-lg border border-slate-700/60">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-300">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400">Abonos Realizados:</span>
+                  <span className="text-amber-400 font-mono font-bold">${(form.montoAbonado || 0).toLocaleString('es-CL')}</span>
+                </div>
+                
+                {(form.abonos || []).length > 0 ? (
+                  <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                    {(form.abonos || []).map((b, i) => (
+                      <div key={b.id || i} className="flex justify-between items-center text-[10px] bg-slate-800/80 px-2 py-1 rounded border border-slate-700/30">
+                        <span className="text-slate-400 font-semibold">{formatDate(b.fecha)}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-emerald-400">${b.monto.toLocaleString('es-CL')}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const list = (form.abonos || []).filter(item => item.id !== b.id);
+                              const totalAbonos = list.reduce((sum, item) => sum + item.monto, 0);
+                              setForm({
+                                ...form,
+                                abonos: list,
+                                montoAbonado: totalAbonos
+                              });
+                            }}
+                            className="text-rose-400 hover:text-rose-300 font-black text-xs px-1 rounded hover:bg-rose-500/15"
+                            title="Eliminar abono"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-500 italic py-1">Sin abonos registrados.</p>
+                )}
+                
+                <div className="flex gap-1.5 items-end pt-2 border-t border-slate-700/55">
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-[8px] uppercase font-bold text-slate-400">Nuevo Abono:</span>
+                    <input
+                      type="number"
+                      value={newAbonoAmount || ''}
+                      placeholder="$ Monto"
+                      onChange={e => setNewAbonoAmount(parseInt(e.target.value) || '')}
+                      className="w-full text-xs bg-slate-800 border-b border-slate-600 p-1 rounded text-white font-mono"
+                    />
+                  </div>
+                  <div className="w-24 font-mono text-zinc-300">
+                    <span className="block text-[8px] uppercase font-bold text-slate-400">Fecha:</span>
+                    <input
+                      type="date"
+                      value={newAbonoDate}
+                      onChange={e => setNewAbonoDate(e.target.value)}
+                      className="w-full text-[10px] bg-slate-800 border-b border-slate-600 p-1 rounded text-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newAbonoAmount || Number(newAbonoAmount) <= 0) return;
+                      const newAbonoObj = {
+                        id: Date.now().toString(),
+                        fecha: newAbonoDate,
+                        monto: Number(newAbonoAmount)
+                      };
+                      const list = [...(form.abonos || [])];
+                      list.push(newAbonoObj);
+                      
+                      const totalAbonos = list.reduce((sum, item) => sum + item.monto, 0);
+                      
+                      setForm({
+                        ...form,
+                        abonos: list,
+                        montoAbonado: totalAbonos
+                      });
+                      setNewAbonoAmount('');
+                    }}
+                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-2.5 py-1 rounded transition duration-200 cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center pt-2 border-t border-slate-700/50 text-[10px] font-bold">
+                  <span className="text-slate-400 uppercase tracking-wider">Saldo Restante:</span>
+                  <span className={form.montoTotal - (form.montoAbonado || 0) > 0 ? "text-rose-400 font-mono text-xs" : "text-green-400 font-mono text-xs"}>
+                    ${(form.montoTotal - (form.montoAbonado || 0)).toLocaleString('es-CL')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button type="submit" className="w-full bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] py-3 rounded font-bold mt-2 hover:bg-opacity-90 cursor-pointer">
+            {editingId ? 'ACTUALIZAR VENTA' : 'GUARDAR VENTA'}
+          </button>
         </form>
       </div>
 
-      <div className="lg:col-span-9 space-y-4">
+      <div className="lg:col-span-9 space-y-4 font-sans">
+        {/* Statistics and Filter Badges */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-[#152035] p-4 rounded-2xl border border-slate-700/50 shadow flex flex-col justify-between font-sans">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider font-bold">Total Frascos</span>
+            <span className="text-xl font-black text-white mt-1">{totalFrascos.toLocaleString('es-CL')} UND</span>
+          </div>
+          <div className="bg-[#152035] p-4 rounded-2xl border border-slate-700/50 shadow flex flex-col justify-between font-sans">
+            <div className="flex justify-between items-center w-full">
+              <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider font-bold">Venta Total</span>
+              <button 
+                type="button"
+                onClick={() => setHideVentaTotal(!hideVentaTotal)}
+                className="text-slate-400 hover:text-white transition p-0.5 rounded hover:bg-[#1C2541]/50 cursor-pointer"
+                title={hideVentaTotal ? "Mostrar montos" : "Ocultar montos"}
+              >
+                {hideVentaTotal ? <EyeOff className="w-3.5 h-3.5 text-sky-400" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <span className="text-xl font-black text-emerald-400 mt-1">
+              {hideVentaTotal ? '******' : `$${totalMonto.toLocaleString('es-CL')}`}
+            </span>
+          </div>
+          <div className="bg-[#152035] p-4 rounded-2xl border border-slate-700/50 shadow flex flex-col justify-between font-sans">
+            <div className="flex justify-between items-center w-full">
+              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider font-bold">Total Abonado</span>
+              <button 
+                type="button"
+                onClick={() => setHideTotalAbonado(!hideTotalAbonado)}
+                className="text-slate-400 hover:text-white transition p-0.5 rounded hover:bg-[#1C2541]/50 cursor-pointer"
+                title={hideTotalAbonado ? "Mostrar montos" : "Ocultar montos"}
+              >
+                {hideTotalAbonado ? <EyeOff className="w-3.5 h-3.5 text-sky-400" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <span className="text-xl font-black text-amber-400 mt-1">
+              {hideTotalAbonado ? '******' : `$${totalAbonado.toLocaleString('es-CL')}`}
+            </span>
+          </div>
+          <div className="bg-[#152035] p-4 rounded-2xl border border-slate-700/50 shadow flex flex-col justify-between font-sans">
+            <div className="flex justify-between items-center w-full">
+              <span className="text-[10px] font-black uppercase text-rose-400 tracking-wider font-bold">Saldo por Cobrar</span>
+              <button 
+                type="button"
+                onClick={() => setHideSaldoPendiente(!hideSaldoPendiente)}
+                className="text-slate-400 hover:text-white transition p-0.5 rounded hover:bg-[#1C2541]/50 cursor-pointer"
+                title={hideSaldoPendiente ? "Mostrar montos" : "Ocultar montos"}
+              >
+                {hideSaldoPendiente ? <EyeOff className="w-3.5 h-3.5 text-sky-400" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <span className="text-xl font-black text-rose-400 mt-1">
+              {hideSaldoPendiente ? '******' : `$${totalSaldoPendiente.toLocaleString('es-CL')}`}
+            </span>
+          </div>
+        </div>
+
         <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
-          <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex justify-between items-center ">
-            <div className="flex items-center gap-4">
+          <div className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
                <h3 className="font-black text-[10px] uppercase text-white tracking-widest">Detalle de Ventas</h3>
-               <div className="flex items-center gap-2 bg-[#1E293B]/80 px-3 py-1 rounded-full border border-white/20">
-                  <span className="text-[9px] font-black uppercase text-blue-400">Total Fcos:</span>
-                  <span className="text-[11px] font-black">{totalFrascos} UNDS</span>
+               
+               {/* Quick payments filter buttons right next to the excel / stats */}
+               <div className="flex border border-slate-700/80 rounded-lg overflow-hidden bg-[#0D1527] self-center">
+                 <button 
+                   type="button"
+                   onClick={() => setFilterTipoPago('Todos')}
+                   className={cn("px-2.5 py-1 text-[10px] font-bold uppercase transition cursor-pointer", filterTipoPago === 'Todos' ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800")}
+                 >
+                   Todos
+                 </button>
+                 <button 
+                   type="button"
+                   onClick={() => setFilterTipoPago('Contado')}
+                   className={cn("px-2.5 py-1 text-[10px] font-bold uppercase transition border-l border-r border-slate-700 cursor-pointer", filterTipoPago === 'Contado' ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800")}
+                 >
+                   Contado
+                 </button>
+                 <button 
+                   type="button"
+                   onClick={() => setFilterTipoPago('Crédito')}
+                   className={cn("px-2.5 py-1 text-[10px] font-bold uppercase transition cursor-pointer", filterTipoPago === 'Crédito' ? "bg-amber-600 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800")}
+                 >
+                   Crédito
+                 </button>
                </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            
+            <div className="flex items-center gap-2 flex-wrap w-full xl:w-auto xl:justify-end">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 w-28 text-slate-300" 
+                  className="text-xs border border-slate-700 bg-slate-800/80 rounded p-1 w-28 text-white cursor-pointer" 
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                 />
@@ -1901,7 +2202,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
                 <input 
                   type="date" 
-                  className="text-xs border rounded p-1 w-28 text-slate-300" 
+                  className="text-xs border border-slate-700 bg-slate-800/80 rounded p-1 w-28 text-white cursor-pointer" 
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
                 />
@@ -1910,64 +2211,152 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                 <Search className="w-3.5 h-3.5 text-slate-400" />
                 <input 
                   placeholder="Buscar..."
-                  className="text-xs border rounded p-1 w-28 text-slate-300" 
+                  className="text-xs border border-slate-700 bg-slate-800/80 rounded p-1 w-28 text-white" 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
-            <button 
-              onClick={() => {
-                const data = filteredRecords.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
-                data.push(['', '', 'TOTAL', totalFrascos]);
-                exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
-              }}
-              className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1" 
-              title="Descargar PDF"
-            >
-              <Download className="w-3.5 h-3.5" /> PDF
-            </button>
-            <button 
-              onClick={() => {
-                const data = filteredRecords.map(r => [formatDateForExcel(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
-                data.push(['', '', 'TOTAL', totalFrascos]);
-                exportTableToExcel('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas');
-              }}
-              className="text-white bg-emerald-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-emerald-700 flex flex-row items-center gap-1" 
-              title="Descargar Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5"/> Excel
-            </button>
+              <button 
+                onClick={() => {
+                  const data = filteredRecords.map(r => [
+                    formatDate(r.fecha), 
+                    r.documento || '', 
+                    r.cliente || '', 
+                    r.nroFrascos || 0,
+                    r.montoTotal ? `$${r.montoTotal.toLocaleString('es-CL')}` : '$0',
+                    r.tipoPago || 'Contado',
+                    r.tipoPago === 'Crédito' ? `$${(r.montoAbonado || 0).toLocaleString('es-CL')}` : `$${(r.montoTotal || 0).toLocaleString('es-CL')}`,
+                    r.fechaPago ? formatDate(r.fechaPago) : '-'
+                  ]);
+                  data.push(['', '', 'TOTALES', totalFrascos, `$${totalMonto.toLocaleString('es-CL')}`, '', `$${totalAbonado.toLocaleString('es-CL')}`, '']);
+                  exportTableToPDF('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos', 'Monto Total', 'Tipo Pago', 'Abonado', 'Fecha Pago'], data, 'reporte_ventas');
+                }}
+                className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1 cursor-pointer" 
+                title="Descargar PDF"
+              >
+                <Download className="w-3.5 h-3.5" /> PDF
+              </button>
+              <button 
+                onClick={() => {
+                  const data = filteredRecords.map(r => [
+                    formatDateForExcel(r.fecha), 
+                    r.documento || '', 
+                    r.cliente || '', 
+                    r.nroFrascos || 0,
+                    r.montoTotal || 0,
+                    r.tipoPago || 'Contado',
+                    r.tipoPago === 'Crédito' ? (r.montoAbonado || 0) : (r.montoTotal || 0),
+                    r.fechaPago || ''
+                  ]);
+                  data.push(['', '', 'TOTALES', totalFrascos, totalMonto, '', totalAbonado, '']);
+                  exportTableToExcel('Reporte: Ventas', ['Fecha', 'Documento', 'Cliente', 'Frascos', 'Monto Total', 'Tipo Pago', 'Abonado', 'Fecha Pago'], data, 'reporte_ventas');
+                }}
+                className="text-white bg-emerald-600 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-emerald-700 flex flex-row items-center gap-1 cursor-pointer" 
+                title="Descargar Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5"/> Excel
+              </button>
             </div>
           </div>
+          
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-              <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-left border-b font-black  uppercase">
-                <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha</th>
-                  <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Documento</th>
-                  <th className="p-4 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cliente</th>
-                  <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">N° Fcos</th>
-                  <th className="p-4 text-center bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acción</th>
+                <tr className="bg-[#1E3A5F]/80 text-white border-b border-slate-700 hover:bg-[#1D3557] text-left font-bold uppercase">
+                  <th className="p-4">Fecha</th>
+                  <th className="p-4">Documento</th>
+                  <th className="p-4">Cliente</th>
+                  <th className="p-4 text-center">N° Fcos</th>
+                  <th className="p-4 text-right">Monto Total</th>
+                  <th className="p-4 text-center">Tipo Pago</th>
+                  <th className="p-4 text-right">Abonado/Saldo</th>
+                  <th className="p-4">Fecha Pago</th>
+                  <th className="p-4 text-center">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 italic">
-                {filteredRecords.map(r => (
-                  <tr key={r.id}>
-                    <td className="p-4">{formatDate(r.fecha)}</td>
-                    <td className="p-4 font-bold text-white">{r.documento}</td>
-                    <td className="p-4">{r.cliente}</td>
-                    <td className="p-4 text-center font-black">{r.nroFrascos}</td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <RecordActions
-                          module="manager"
-                          onEdit={() => {
-                            setEditingId(r.id);
-                            setForm(r);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                          onDelete={async () => {
-                            if (true) {
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {filteredRecords.map(r => {
+                  const isCredito = r.tipoPago === 'Crédito';
+                  const rMontoTotal = Number(r.montoTotal) || 0;
+                  const rMontoAbonado = isCredito ? (Number(r.montoAbonado) || 0) : rMontoTotal;
+                  const saldoRestante = rMontoTotal - rMontoAbonado;
+                  
+                  return (
+                    <tr key={r.id} className="hover:bg-slate-800/40 transition">
+                      <td className="p-4 font-mono">{formatDate(r.fecha)}</td>
+                      <td className="p-4 font-bold text-white">{r.documento}</td>
+                      <td className="p-4">{r.cliente}</td>
+                      <td className="p-4 text-center font-black">{r.nroFrascos}</td>
+                      <td className="p-4 text-right font-black text-emerald-400">
+                        {hideVentaTotal ? '******' : `$${rMontoTotal.toLocaleString('es-CL')}`}
+                      </td>
+                      <td className="p-4 text-center">
+                        {isCredito ? (
+                          <span className="px-2 py-1 text-[9px] font-black uppercase rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Crédito
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 text-[9px] font-black uppercase rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Contado
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        {isCredito ? (
+                          <div className="flex flex-col items-end group relative cursor-help">
+                            <span className="text-emerald-400 font-bold hover:underline">
+                              {hideTotalAbonado ? '******' : `$${rMontoAbonado.toLocaleString('es-CL')}`}
+                            </span>
+                            <span className={cn("text-[10px] font-semibold mt-0.5", saldoRestante > 0 ? "text-rose-400" : "text-green-400")}>
+                              {hideSaldoPendiente ? '******' : (saldoRestante > 0 ? `Saldo: $${saldoRestante.toLocaleString('es-CL')}` : 'Pagado')}
+                            </span>
+                            
+                            {/* Hover breakdown tooltip window */}
+                            {r.abonos && r.abonos.length > 0 && (
+                              <div className="absolute right-0 bottom-full mb-2 bg-[#0D1527] border border-slate-700/80 rounded-xl p-3 shadow-xl z-20 w-52 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <span className="block text-[9px] uppercase font-black tracking-wider text-slate-400 mb-1.5 border-[#1E293B] border-b pb-1">
+                                  Historial de Abonos
+                                </span>
+                                <div className="space-y-1 text-left max-h-32 overflow-y-auto pr-0.5">
+                                  {r.abonos.map((b: any, idx: number) => (
+                                    <div key={b.id || idx} className="flex justify-between items-center text-[10px]">
+                                      <span className="text-slate-400 font-semibold">{formatDate(b.fecha)}</span>
+                                      <span className="font-bold text-emerald-400">{hideTotalAbonado ? '******' : `$${b.monto.toLocaleString('es-CL')}`}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-[11px]">{hideTotalAbonado ? '******' : 'Pagado'}</span>
+                        )}
+                      </td>
+                      <td className="p-4 font-mono text-[11px]">
+                        {r.fechaPago ? formatDate(r.fechaPago) : <span className="text-slate-600">-</span>}
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <RecordActions
+                            module="manager"
+                            onEdit={() => {
+                              setEditingId(r.id);
+                              setForm({
+                                anio: r.anio || '',
+                                mes: r.mes || '',
+                                fecha: r.fecha || '',
+                                documento: r.documento || '',
+                                cliente: r.cliente || '',
+                                nroFrascos: r.nroFrascos || 0,
+                                montoTotal: r.montoTotal || 0,
+                                tipoPago: r.tipoPago || 'Contado',
+                                fechaPago: r.fechaPago || '',
+                                montoAbonado: r.montoAbonado || 0,
+                                abonos: r.abonos || []
+                              });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            onDelete={async () => {
                               try {
                                 await localDB.deleteFromCollection('sales', r.id);
                                 const updated = await localDB.getCollection('sales');
@@ -1976,13 +2365,13 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                               } catch (err) {
                                 alert('Error al eliminar la venta');
                               }
-                            }
-                          }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                            }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

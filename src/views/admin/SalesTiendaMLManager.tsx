@@ -100,6 +100,7 @@ interface SaleRecord {
   valorCotizacion: number; // Total de la venta
   detalleProductos: string; // Text representation
   productos: SaleItem[];
+  comunaCiudad?: string;
   createdAt?: string;
 }
 
@@ -118,6 +119,7 @@ export default function SalesTiendaMLManager() {
     cliente: '',
     vendedor: 'Tienda' as 'Mercado Libre' | 'Tienda',
     valorCotizacion: 0,
+    comunaCiudad: '',
   });
 
   // Current adding items array
@@ -288,6 +290,7 @@ export default function SalesTiendaMLManager() {
         cliente: '',
         vendedor: form.vendedor, // Keep the last selected seller as preference
         valorCotizacion: 0,
+        comunaCiudad: '',
       });
       setSaleItems([]);
       loadData();
@@ -306,6 +309,7 @@ export default function SalesTiendaMLManager() {
       cliente: r.cliente,
       vendedor: r.vendedor,
       valorCotizacion: r.valorCotizacion || 0,
+      comunaCiudad: r.comunaCiudad || '',
     });
     setSaleItems(r.productos || []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -457,7 +461,7 @@ export default function SalesTiendaMLManager() {
 
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
-      const text = `${r.cliente || ''} ${r.detalleProductos || ''}`.toLowerCase();
+      const text = `${r.cliente || ''} ${r.comunaCiudad || ''} ${r.detalleProductos || ''}`.toLowerCase();
       if (!text.includes(s)) match = false;
     }
 
@@ -635,6 +639,16 @@ export default function SalesTiendaMLManager() {
                   required 
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Comuna / Ciudad</label>
+              <input 
+                placeholder="Ej: Providencia, Temuco, La Serena"
+                className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-lg p-2 text-[10px] font-bold uppercase outline-none focus:border-[#38BDF8]" 
+                value={form.comunaCiudad} 
+                onChange={e => setForm({...form, comunaCiudad: e.target.value})} 
+              />
             </div>
 
             {/* Custom Products creation helper */}
@@ -852,10 +866,11 @@ export default function SalesTiendaMLManager() {
                       const data = filteredRecords.map(r => {
                         const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join('\n') || r.detalleProductos || '';
                         const pricesStr = r.productos?.map(p => formatCurrency(p.precioUnitario)).join('\n') || '';
+                        const clientWithLocation = r.comunaCiudad ? `${r.cliente} (${r.comunaCiudad})` : r.cliente || '';
                         return [
                           formatDate(r.fecha), 
                           r.vendedor, 
-                          r.cliente || '', 
+                          clientWithLocation, 
                           itemsStr,
                           pricesStr,
                           r.nroFrascos || 0, 
@@ -865,7 +880,7 @@ export default function SalesTiendaMLManager() {
                       data.push(['', '', 'TOTAL CONSOLIDADO', '', formatCurrency(listPrecioUnitario), listFrascos, formatCurrency(listCotizacion)]);
                       exportTableToPDF(
                         'Reporte Ventas Tienda y ML', 
-                        ['Fecha', 'Canal', 'Cliente', 'Productos Detalle', 'Precio Unitario ($)', 'Unidades', 'Total de la Venta ($)'], 
+                        ['Fecha', 'Canal', 'Cliente / Comuna', 'Productos Detalle', 'Precio Unitario ($)', 'Unidades', 'Total de la Venta ($)'], 
                         data, 
                         'reporte_ventas_tienda_ml', 
                         'l'
@@ -879,7 +894,7 @@ export default function SalesTiendaMLManager() {
                   <button 
                     onClick={() => {
                       const listPrecioUnitario = filteredRecords.reduce((acc, r) => acc + (r.productos?.reduce((pAcc, p) => pAcc + (p.precioUnitario || 0), 0) || 0), 0);
-                      const headers = ['Año', 'Mes', 'Fecha Exacta', 'Canal Vendedor', 'Cliente', 'Detalle Productos', 'Precio Unitario ($)', 'Total Frascos/Unidades', 'Total de la Venta ($)'];
+                      const headers = ['Año', 'Mes', 'Fecha Exacta', 'Canal Vendedor', 'Cliente', 'Comuna / Ciudad', 'Detalle Productos', 'Precio Unitario ($)', 'Total Frascos/Unidades', 'Total de la Venta ($)'];
                       const data = filteredRecords.map(r => {
                         const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join(', ') || r.detalleProductos || '';
                         const pricesStr = r.productos?.map(p => formatCurrency(p.precioUnitario)).join(', ') || '';
@@ -889,13 +904,14 @@ export default function SalesTiendaMLManager() {
                           formatDate(r.fecha), 
                           r.vendedor, 
                           r.cliente || '', 
+                          r.comunaCiudad || '',
                           itemsStr,
                           pricesStr,
                           r.nroFrascos || 0, 
                           r.valorCotizacion || 0
                         ];
                       });
-                      data.push(['', '', '', '', 'TOTAL CONSOLIDADO', '', listPrecioUnitario, listFrascos, listCotizacion]);
+                      data.push(['', '', '', '', 'TOTAL CONSOLIDADO', '', '', '', listFrascos, listCotizacion]);
                       exportTableToExcel('Ventas Tienda y Mercado Libre', headers, data, 'ventas_tienda_ml_reporte');
                     }}
                     className="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 border border-emerald-500/50 shadow"
@@ -1083,6 +1099,11 @@ export default function SalesTiendaMLManager() {
                       </td>
                       <td className="p-4 max-w-sm">
                         <span className="block font-black text-slate-100 uppercase text-[11px] truncate">{r.cliente}</span>
+                        {r.comunaCiudad && (
+                          <span className="block text-[10px] text-sky-400 font-bold uppercase mt-1">
+                            📍 {r.comunaCiudad}
+                          </span>
+                        )}
                         <div className="mt-1 space-y-1">
                           {r.productos && r.productos.length > 0 ? (
                             r.productos.map((prod, pIdx) => (
@@ -1136,6 +1157,7 @@ export default function SalesTiendaMLManager() {
                                 { label: 'Canal', value: r.vendedor },
                                 { label: 'Fecha', value: formatDate(r.fecha) },
                                 { label: 'Nombre Cliente', value: r.cliente },
+                                { label: 'Comuna / Ciudad', value: r.comunaCiudad || 'No registrada' },
                                 { label: 'Frascos totales', value: `${r.nroFrascos} frascos` },
                                 { label: 'Monto Total Venta', value: formatCurrency(r.valorCotizacion) },
                                 { 
@@ -1151,6 +1173,7 @@ export default function SalesTiendaMLManager() {
                                 { label: 'Canal', value: r.vendedor },
                                 { label: 'Fecha', value: formatDate(r.fecha) },
                                 { label: 'Nombre Cliente', value: r.cliente },
+                                { label: 'Comuna / Ciudad', value: r.comunaCiudad || 'No registrada' },
                                 { label: 'Frascos totales', value: `${r.nroFrascos} frascos` },
                                 { label: 'Monto Total Venta', value: formatCurrency(r.valorCotizacion) },
                                 { 

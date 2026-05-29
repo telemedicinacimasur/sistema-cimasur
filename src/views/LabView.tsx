@@ -4212,11 +4212,13 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
                       r.item,
                       r.code,
                       r.qty,
+                      getRecordAlertaThreshold(r),
+                      r.alertaDesactivada === true ? 'Silenciada' : 'Activa',
                       r.area
                     ]);
                     exportTableToPDF(
                       `Inventario: ${selectedArea}`,
-                      ['Insumo', 'Código', 'Stock', 'Área'],
+                      ['Insumo', 'Código', 'Stock Actual', 'Límite Alerta', 'Estado Alerta', 'Área'],
                       data,
                       `inventario_${selectedArea.toLowerCase().replace(/\s+/g, '_')}`,
                       'p'
