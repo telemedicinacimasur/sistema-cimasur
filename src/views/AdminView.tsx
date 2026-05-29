@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { localDB, localAuth } from '../lib/auth';
 import { cn, formatDate, formatDateTimeChile, formatCurrency, safe, parseExcelDate, formatDateForExcel } from '../lib/utils';
 import { 
@@ -838,6 +838,24 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
   const [searchFilter, setSearchFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
+  const [yearFilter, setYearFilter] = useState('Todos');
+  const [monthFilter, setMonthFilter] = useState('Todos');
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    records.forEach(r => {
+      if (r.anio) {
+        years.add(String(r.anio).trim());
+      }
+    });
+    years.add(new Date().getFullYear().toString());
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [records]);
+
+  const availableMonths = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  ];
 
   const downloadExcelTemplate = () => {
     const headers = [
@@ -959,7 +977,9 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
         r.nroCotiz?.toString().includes(searchFilter);
       const matchesDate = !dateFilter || r.fechaElab === dateFilter;
       const matchesStatus = statusFilter === 'Todos' || r.estado === statusFilter;
-      return matchesSearch && matchesDate && matchesStatus;
+      const matchesYear = yearFilter === 'Todos' || String(r.anio || '').trim() === yearFilter;
+      const matchesMonth = monthFilter === 'Todos' || String(r.mes || '').trim().toLowerCase() === monthFilter.toLowerCase();
+      return matchesSearch && matchesDate && matchesStatus && matchesYear && matchesMonth;
     })
     .sort((a, b) => {
       return (Number(b.nroCotiz) || 0) - (Number(a.nroCotiz) || 0);
@@ -1132,23 +1152,45 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Suma en Pantalla:</span>
                 <span className="text-sm font-black text-white">{filteredRecords.filter(r => r.estado === 'Aprobada').reduce((s, r) => s + (Number(r.undTotal) || 0), 0)} UNDs</span>
              </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Filtros:</span>
               <input 
                 type="date" 
-                className="text-[10px] border rounded p-1 outline-none" 
+                className="text-[10px] border border-slate-705 rounded p-1 outline-none bg-[#0F172A] text-white cursor-pointer" 
                 value={dateFilter}
                 onChange={e => setDateFilter(e.target.value)}
               />
               <select 
-                className="text-[10px] border rounded p-1 outline-none font-bold"
+                className="text-[10px] border border-slate-705 rounded p-1 outline-none font-bold bg-[#0F172A] text-white cursor-pointer"
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
               >
-                <option value="Todos">Todos los Estados</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Aprobada">Aprobada</option>
-                <option value="Anulada">Anulada</option>
+                <option value="Todos" className="bg-[#152035] text-white font-bold">Todos los Estados</option>
+                <option value="Pendiente" className="bg-[#152035] text-white">Pendiente</option>
+                <option value="Aprobada" className="bg-[#152035] text-white">Aprobada</option>
+                <option value="Anulada" className="bg-[#152035] text-white">Anulada</option>
+              </select>
+
+              <select 
+                className="text-[10px] border border-slate-705 rounded p-1 outline-none font-bold bg-[#0F172A] text-white cursor-pointer"
+                value={yearFilter}
+                onChange={e => setYearFilter(e.target.value)}
+              >
+                <option value="Todos" className="bg-[#152035] text-white font-bold">Todos los Años</option>
+                {availableYears.map(y => (
+                  <option key={y} value={y} className="bg-[#152035] text-white">{y}</option>
+                ))}
+              </select>
+
+              <select 
+                className="text-[10px] border border-slate-705 rounded p-1 outline-none font-bold bg-[#0F172A] text-white cursor-pointer"
+                value={monthFilter}
+                onChange={e => setMonthFilter(e.target.value)}
+              >
+                <option value="Todos" className="bg-[#152035] text-white font-bold">Todos los Meses</option>
+                {availableMonths.map(m => (
+                  <option key={m} value={m} className="bg-[#152035] text-white">{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                ))}
               </select>
             </div>
 
