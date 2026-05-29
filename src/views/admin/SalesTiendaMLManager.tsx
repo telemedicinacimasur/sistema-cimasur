@@ -708,7 +708,7 @@ export default function SalesTiendaMLManager() {
                 </div>
 
                 <div className="flex gap-2 items-end">
-                  <div className="w-1/4">
+                  <div className="w-[32%]">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cant</label>
                     <input
                       type="number"
@@ -718,7 +718,7 @@ export default function SalesTiendaMLManager() {
                       onChange={e => setTempQty(parseInt(e.target.value) || 1)}
                     />
                   </div>
-                  <div className="w-2/4">
+                  <div className="w-[38%]">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Precio Un ($)</label>
                     <input
                       type="number"
@@ -728,7 +728,7 @@ export default function SalesTiendaMLManager() {
                       onChange={e => setTempPrice(parseInt(e.target.value) || 0)}
                     />
                   </div>
-                  <div className="w-1/4">
+                  <div className="w-[30%]">
                     <button
                       type="button"
                       onClick={handleAddSaleItem}
@@ -1075,7 +1075,7 @@ export default function SalesTiendaMLManager() {
                     <th className="p-4">Fecha</th>
                     <th className="p-4">Canal</th>
                     <th className="p-4">Cliente / Desglose</th>
-                    <th className="p-4 text-center">Unidades</th>
+                    <th className="p-4 text-center w-32">Cant / Unidades</th>
                     <th className="p-4 text-right">Precio Unitario ($)</th>
                     <th className="p-4 text-right">Total de la Venta ($)</th>
                     <th className="p-4 text-center">Gestión</th>
@@ -1118,7 +1118,7 @@ export default function SalesTiendaMLManager() {
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-center text-white text-[13px] font-mono">
+                      <td className="p-4 text-center text-white text-[13px] font-mono w-32">
                         {r.productos && r.productos.length > 0 ? (
                           <div className="space-y-1.5">
                             {r.productos.map((prod, pIdx) => (
