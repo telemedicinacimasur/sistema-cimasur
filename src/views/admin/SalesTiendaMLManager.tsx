@@ -268,7 +268,12 @@ export default function SalesTiendaMLManager() {
       total: tempQty * tempPrice
     };
 
-    setSaleItems([...saleItems, newItem]);
+    const updatedItems = [...saleItems, newItem];
+    setSaleItems(updatedItems);
+
+    // Auto-calculate and update form valorCotizacion
+    const selectTotal = updatedItems.reduce((acc, current) => acc + current.total, 0);
+    setForm(prev => ({ ...prev, valorCotizacion: selectTotal }));
     
     // Reset temp fields
     setTempProduct('');
@@ -277,7 +282,12 @@ export default function SalesTiendaMLManager() {
   };
 
   const handleRemoveSaleItem = (index: number) => {
-    setSaleItems(saleItems.filter((_, i) => i !== index));
+    const updatedItems = saleItems.filter((_, i) => i !== index);
+    setSaleItems(updatedItems);
+
+    // Auto-calculate and update form valorCotizacion
+    const selectTotal = updatedItems.reduce((acc, current) => acc + current.total, 0);
+    setForm(prev => ({ ...prev, valorCotizacion: selectTotal }));
   };
 
   // Automatic month/year sync when date changes
@@ -608,7 +618,7 @@ export default function SalesTiendaMLManager() {
                 <button
                   type="button"
                   onClick={() => {
-                    setForm(prev => ({ ...prev, vendedor: 'Tienda' }));
+                    setForm(prev => ({ ...prev, vendedor: 'Tienda', valorCotizacion: 0 }));
                     setSaleItems([]);
                   }}
                   className={cn(
@@ -623,7 +633,7 @@ export default function SalesTiendaMLManager() {
                 <button
                   type="button"
                   onClick={() => {
-                    setForm(prev => ({ ...prev, vendedor: 'Mercado Libre' }));
+                    setForm(prev => ({ ...prev, vendedor: 'Mercado Libre', valorCotizacion: 0 }));
                     setSaleItems([]);
                   }}
                   className={cn(
@@ -684,9 +694,9 @@ export default function SalesTiendaMLManager() {
                   type="number"
                   placeholder="Ej: 15200"
                   className="w-full bg-[#111C31] text-white border border-[#1E3A5F]/60 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-[#38BDF8] font-mono" 
-                  value={saleItems.length > 0 ? totalCotizacion : (form.valorCotizacion || '')} 
+                  value={form.vendedor === 'Mercado Libre' ? (form.valorCotizacion || totalCotizacion || '') : (saleItems.length > 0 ? totalCotizacion : (form.valorCotizacion || ''))} 
                   onChange={e => setForm({...form, valorCotizacion: parseInt(e.target.value) || 0})} 
-                  readOnly={saleItems.length > 0}
+                  readOnly={form.vendedor !== 'Mercado Libre' && saleItems.length > 0}
                   required 
                 />
               </div>
