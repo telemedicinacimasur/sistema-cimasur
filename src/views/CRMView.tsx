@@ -198,7 +198,9 @@ function CRMRegister() {
     historialUnificado: '',
     responsable: '',
     intranet: 'No',
-    isGestionCustomer: false
+    isGestionCustomer: false,
+    comoLlego: 'Campañas / Ads',
+    fechaPago: ''
   });
 
   useEffect(() => {
@@ -210,33 +212,60 @@ function CRMRegister() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    await localDB.saveToCollection('contacts', form);
+
+    // Check that we have at least one identifying or contact field
+    if (!form.name && !form.phone && !form.rut) {
+      alert("Por favor, ingrese al menos el Nombre, el Teléfono o el RUT para guardar el cliente.");
+      return;
+    }
+
+    let resolvedName = form.name;
+    let resolvedRut = form.rut;
+
+    if (!resolvedName && form.phone) {
+      resolvedName = `Contacto Fono ${form.phone}`;
+    } else if (!resolvedName) {
+      resolvedName = "Contacto Sin Nombre";
+    }
+
+    if (!resolvedRut) {
+      resolvedRut = "Sin RUT";
+    }
+
+    const finalForm = {
+      ...form,
+      name: resolvedName,
+      rut: resolvedRut,
+      historialUnificado: form.historialUnificado || `Cliente creado manualmente el ${new Date().toLocaleDateString('es-CL')}`
+    };
+
+    await localDB.saveToCollection('contacts', finalForm);
     
-    if (form.isGestionCustomer) {
+    if (finalForm.isGestionCustomer) {
       const gestionRecord = {
-        fechaIngreso: form.fechaIngreso,
-        nombre: form.name,
-        rut: form.rut,
-        tipoEmpresa: form.type,
-        comuna: form.region,
-        celular: form.phone,
-        email: form.email,
-        categoria: form.categoria,
+        fechaIngreso: finalForm.fechaIngreso,
+        nombre: finalForm.name,
+        rut: finalForm.rut,
+        tipoEmpresa: finalForm.type,
+        comuna: finalForm.region,
+        celular: finalForm.phone,
+        email: finalForm.email,
+        categoria: finalForm.categoria,
         estado: 'En proceso',
-        consultora: form.responsable,
-        observaciones: form.historialUnificado
+        consultora: finalForm.responsable,
+        observaciones: `Registro inicial CRM\nOrigen: ${finalForm.comoLlego}\nFecha Pago: ${finalForm.fechaPago || 'No detallada'}\n\n${finalForm.historialUnificado}`
       };
       await localDB.saveToCollection('gestion_records', gestionRecord);
     }
     
     await addNotification({
       title: 'Nuevo Cliente CRM',
-      message: `${user.displayName || user.email} registró a ${form.name}`,
+      message: `${user.displayName || user.email} registró a ${finalForm.name}`,
       recipientRoles: ['admin', 'crm', 'gestion'],
       sender: user.displayName || user.email || 'Sistema'
     });
-    await addAuditLog(user, `Registró Cliente ${form.name}`, 'CRM');
-    alert(`Cliente Guardado en CRM${form.isGestionCustomer ? ' y en Gestión' : ''}`);
+    await addAuditLog(user, `Registró Cliente ${finalForm.name}`, 'CRM');
+    alert(`Cliente Guardado en CRM${finalForm.isGestionCustomer ? ' y en Gestión' : ''}`);
     setForm({ 
       fechaIngreso: new Date().toISOString().split('T')[0],
       name: '',
@@ -249,14 +278,16 @@ function CRMRegister() {
       historialUnificado: '',
       responsable: user.displayName,
       intranet: 'No',
-      isGestionCustomer: false
+      isGestionCustomer: false,
+      comoLlego: 'Campañas / Ads',
+      fechaPago: ''
     });
     window.dispatchEvent(new Event('db-change'));
   };
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente", "Inscrito en Intranet"]
+      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente", "Inscrito en Intranet", "Como Llego", "Fecha de Pago"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -281,22 +312,38 @@ function CRMRegister() {
         let importedCount = 0;
         for (const row of data) {
           const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
+          const phone = safe(row["Teléfono"]);
+          let name = safe(row["Nombre / Razón Social"]);
+          const rut = safe(row["RUT / ID"]);
+
+          if (!name && phone) {
+            name = `Contacto Fono ${phone}`;
+          } else if (!name) {
+            name = "Contacto Sin Nombre";
+          }
+
+          const resolvedRut = rut || "Sin RUT";
 
           const newContact = {
             fechaIngreso: fechaIngreso,
-            name: safe(row["Nombre / Razón Social"]),
-            rut: safe(row["RUT / ID"]),
-            phone: safe(row["Teléfono"]),
+            name: name,
+            rut: resolvedRut,
+            phone: phone,
             email: safe(row["Email"]),
             region: safe(row["Comuna"]) || 'Metropolitana',
             type: safe(row["Tipo de Cliente"]) || 'Farmacia',
             categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
             intranet: safe(row["Inscrito en Intranet"]) || 'No',
-            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')}`,
+            comoLlego: safe(row["Como Llego"]) || safe(row["Canal de Entrada"]) || safe(row["Origen"]) || 'Campañas / Ads',
+            fechaPago: safe(row["Fecha de Pago"]) || safe(row["Fecha Pago"]) || '',
+            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')}` + 
+              (row["Como Llego"] || row["Canal de Entrada"] || row["Origen"] ? ` (Origen: ${row["Como Llego"] || row["Canal de Entrada"] || row["Origen"]})` : '') +
+              (row["Fecha de Pago"] || row["Fecha Pago"] ? ` (Fecha Pago: ${row["Fecha de Pago"] || row["Fecha Pago"]})` : ''),
             responsable: user.displayName || user.email || 'Sistema'
           };
 
-          if (newContact.name && newContact.rut) {
+          // Allow saving as long as there is any identifier (phone, name or rut)
+          if (phone || newContact.name !== "Contacto Sin Nombre" || rut) {
             await localDB.saveToCollection('contacts', newContact);
             importedCount++;
           }
@@ -332,26 +379,40 @@ function CRMRegister() {
         for (const row of data) {
           const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
           const rut = safe(row["RUT / ID"]);
+          const phone = safe(row["Teléfono"]);
 
-          // Check for duplicate in contacts
-          const isDuplicate = existingContacts.some(c => c.rut === rut);
+          // Check for duplicate in contacts (skip check if empty or 'Sin RUT')
+          const isDuplicate = rut && rut !== 'Sin RUT' && rut !== 'S/R' 
+            ? existingContacts.some(c => c.rut === rut) 
+            : false;
 
           if (!isDuplicate) {
+              let name = safe(row["Nombre / Razón Social"]);
+              if (!name && phone) {
+                name = `Contacto Fono ${phone}`;
+              } else if (!name) {
+                name = "Contacto Sin Nombre";
+              }
+
               const newContact = {
                 fechaIngreso: fechaIngreso,
-                name: safe(row["Nombre / Razón Social"]),
-                rut: rut,
-                phone: safe(row["Teléfono"]),
+                name: name,
+                rut: rut || 'Sin RUT',
+                phone: phone,
                 email: safe(row["Email"]),
                 region: safe(row["Comuna"]) || 'Metropolitana',
                 type: safe(row["Tipo de Cliente"]) || 'Farmacia',
                 categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
                 intranet: 'Si',
-                historialUnificado: `Importado desde Intranet el ${new Date().toLocaleDateString('es-CL')}`,
+                comoLlego: safe(row["Como Llego"]) || safe(row["Canal de Entrada"]) || safe(row["Origen"]) || 'Intranet',
+                fechaPago: safe(row["Fecha de Pago"]) || safe(row["Fecha Pago"]) || '',
+                historialUnificado: `Importado desde Intranet el ${new Date().toLocaleDateString('es-CL')}` +
+                  (row["Como Llego"] || row["Canal de Entrada"] || row["Origen"] ? ` (Origen: ${row["Como Llego"] || row["Canal de Entrada"] || row["Origen"]})` : '') +
+                  (row["Fecha de Pago"] || row["Fecha Pago"] ? ` (Fecha Pago: ${row["Fecha de Pago"] || row["Fecha Pago"]})` : ''),
                 responsable: user.displayName || user.email || 'Sistema'
               };
 
-              if (newContact.name && newContact.rut) {
+              if (phone || newContact.name !== "Contacto Sin Nombre" || rut) {
                 await localDB.saveToCollection('intranet_clients', newContact);
                 importedCount++;
               }
@@ -399,20 +460,20 @@ function CRMRegister() {
            />
            <button 
              onClick={downloadExcelTemplate}
-             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             className="text-[10px] bg-emerald-600 hover:bg-emerald-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer"
              title="Descargar Plantilla Excel"
            >
              <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla Excel
            </button>
            <button 
              onClick={() => fileInputRef.current?.click()}
-             className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border-2 border-[#1C2541] hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border-2 border-[#1C2541] hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer"
            >
              <Upload className="w-3.5 h-3.5" /> Importar Datos
            </button>
            <button 
              onClick={() => intranetFileInputRef.current?.click()}
-             className="text-[10px] bg-purple-600 hover:bg-purple-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black"
+             className="text-[10px] bg-purple-600 hover:bg-purple-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer"
            >
              <Upload className="w-3.5 h-3.5" /> Importar Intranet
            </button>
@@ -421,12 +482,12 @@ function CRMRegister() {
       <form className="p-8 space-y-8" onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
            <CRMField label="Fecha Ingreso"><input type="date" className="w-full border-b p-2 text-sm" value={form.fechaIngreso || ''} onChange={e => setForm({...form, fechaIngreso: e.target.value})} /></CRMField>
-           <CRMField label="Nombre / Razón Social"><input className="w-full border-b p-2 text-sm font-bold" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} required /></CRMField>
-           <CRMField label="RUT / ID"><input className="w-full border-b p-2 text-sm" value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} required /></CRMField>
-           <CRMField label="Teléfono"><input className="w-full border-b p-2 text-sm" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} /></CRMField>
+           <CRMField label="Nombre / Razón Social"><input className="w-full border-b p-2 text-sm font-bold" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} placeholder="Opcional si tiene Teléfono" /></CRMField>
+           <CRMField label="RUT / ID"><input className="w-full border-b p-2 text-sm" value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} placeholder="Opcional" /></CRMField>
+           <CRMField label="Teléfono / Celular"><input className="w-full border-b p-2 text-sm font-bold text-emerald-400" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} placeholder="Ej: +56912345678" /></CRMField>
            
            <CRMField label="Email"><input type="email" className="w-full border-b p-2 text-sm" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></CRMField>
-           <CRMField label="Comuna"><input className="w-full border-b p-2 text-sm" value={form.region || ''} onChange={e => setForm({...form, region: e.target.value})} /></CRMField>
+           <CRMField label="Comuna / Ciudad"><input className="w-full border-b p-2 text-sm" value={form.region || ''} onChange={e => setForm({...form, region: e.target.value})} /></CRMField>
            <CRMField label="Tipo de Cliente">
               <select className="w-full border-b p-2 text-sm" value={form.type || ''} onChange={e => setForm({...form, type: e.target.value})}>
                 <option>Farmacia</option><option>Centro Médico</option><option>Empresa</option><option>Independiente</option><option>Otros</option>
@@ -443,8 +504,31 @@ function CRMRegister() {
                 <option value="Si">Si</option>
               </select>
            </CRMField>
-           <CRMField label="Opciones">
-              <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer pt-6">
+
+           <CRMField label="Cómo Llegó (Canal de Origen)">
+              <select className="w-full border-b p-2 text-sm font-bold text-pink-400" value={form.comoLlego || 'Campañas / Ads'} onChange={e => setForm({...form, comoLlego: e.target.value})}>
+                <option value="Campañas / Ads">📢 Campañas / Ads</option>
+                <option value="Instagram">📸 Instagram</option>
+                <option value="Facebook">👥 Facebook</option>
+                <option value="WhatsApp">💬 WhatsApp</option>
+                <option value="Llamada Directa">📞 Llamada Directa</option>
+                <option value="Recomendación">🤝 Recomendación</option>
+                <option value="Página Web">🌐 Página Web</option>
+                <option value="Otro">✏️ Otro</option>
+              </select>
+           </CRMField>
+
+           <CRMField label="Fecha / Detalle de Pago">
+              <input 
+                className="w-full border-b p-2 text-sm font-bold text-amber-400" 
+                placeholder="Ej: Día 5 de cada mes, Al contado" 
+                value={form.fechaPago || ''} 
+                onChange={e => setForm({...form, fechaPago: e.target.value})} 
+              />
+           </CRMField>
+
+           <CRMField label="Opciones de Gestión">
+              <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer pt-4">
                 <input 
                   type="checkbox" 
                   className="rounded"
@@ -470,7 +554,7 @@ function CRMRegister() {
         </div>
 
         <div className="flex justify-end pt-4 border-t border-[#1E293B]">
-           <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-2 border-[#1C2541] px-12 py-4 rounded-2xl font-bold shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2">
+           <button type="submit" className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-2 border-[#1C2541] px-12 py-4 rounded-2xl font-bold shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2 cursor-pointer">
               <Save className="w-5 h-5" /> GUARDAR FICHA CRM
            </button>
         </div>
@@ -493,8 +577,21 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
   const [newCategory, setNewCategory] = useState('');
   const [newIntranet, setNewIntranet] = useState('');
   const [newIsGestionCustomer, setNewIsGestionCustomer] = useState<boolean | null>(null);
+  const [newComoLlego, setNewComoLlego] = useState('Campañas / Ads');
+  const [newFechaPago, setNewFechaPago] = useState('');
   const [activityType, setActivityType] = useState('Nota de Seguimiento');
   const [currentStatus, setCurrentStatus] = useState('En proceso');
+
+  useEffect(() => {
+    if (selectedClient) {
+      setNewName(selectedClient.name || '');
+      setNewRut(selectedClient.rut || '');
+      setNewCategory(selectedClient.categoria || 'Sin categoría');
+      setNewIntranet(selectedClient.intranet || 'No');
+      setNewComoLlego(selectedClient.comoLlego || 'Campañas / Ads');
+      setNewFechaPago(selectedClient.fechaPago || '');
+    }
+  }, [selectedClient]);
 
   const filtered = records
     .filter(r => {
@@ -561,6 +658,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
       email: selectedClient.email,
       categoria: newCategory || selectedClient.categoria,
       intranet: newIntranet || selectedClient.intranet || 'No',
+      comoLlego: newComoLlego || selectedClient.comoLlego || 'Campañas / Ads',
+      fechaPago: newFechaPago || selectedClient.fechaPago || '',
       isGestionCustomer: isGestion,
       historialUnificado: updatedHistory
     });
@@ -591,6 +690,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     setNewRut('');
     setNewCategory('');
     setNewIntranet('');
+    setNewComoLlego('Campañas / Ads');
+    setNewFechaPago('');
     setNewIsGestionCustomer(null);
     window.dispatchEvent(new Event('db-change'));
   };
@@ -604,6 +705,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
       ["Comuna", record.region || "---"],
       ["Tipo", record.type || "---"],
       ["Categoría", record.categoria || "---"],
+      ["Origen / Cómo Llegó", record.comoLlego || "Campañas / Ads"],
+      ["Fecha de Pago", record.fechaPago || "---"],
       ["Intranet", record.intranet || "No"],
       ["Fecha Ingreso", formatDateForExcel(record.fechaIngreso)],
       ["Historial", record.historialUnificado || "---"]
@@ -779,6 +882,34 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                     </select>
                 </CRMField>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <CRMField label="Cómo Llegó (Canal de Origen)">
+                     <select 
+                       className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-bold text-pink-400 outline-none" 
+                       value={newComoLlego || selectedClient.comoLlego || 'Campañas / Ads'} 
+                       onChange={e => setNewComoLlego(e.target.value)}
+                     >
+                       <option value="Campañas / Ads">📢 Campañas / Ads</option>
+                       <option value="Instagram">📸 Instagram</option>
+                       <option value="Facebook">👥 Facebook</option>
+                       <option value="WhatsApp">💬 WhatsApp</option>
+                       <option value="Llamada Directa">📞 Llamada Directa</option>
+                       <option value="Recomendación">🤝 Recomendación</option>
+                       <option value="Página Web">🌐 Página Web</option>
+                       <option value="Otro">✏️ Otro</option>
+                     </select>
+                  </CRMField>
+
+                  <CRMField label="Fecha / Detalle de Pago">
+                     <input 
+                       className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-bold text-amber-400 outline-none" 
+                       placeholder="Ej: Día 10 de cada mes" 
+                       value={newFechaPago} 
+                       onChange={e => setNewFechaPago(e.target.value)} 
+                     />
+                  </CRMField>
+                </div>
+
                 <CRMField label="Opciones">
                   <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer pt-2 group">
                     <input 
@@ -858,11 +989,13 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                   r.categoria,
                   r.type,
                   r.phone || '---',
-                  r.email || '---'
+                  r.email || '---',
+                  r.comoLlego || 'Campañas / Ads',
+                  r.fechaPago || '---'
                 ]);
                 exportTableToPDF(
                   'Reporte: Cartera de Clientes (CRM Comercial)',
-                  ['Nombre/Razón Social', 'RUT', 'Región', 'Categoría', 'Tipo', 'Teléfono', 'Email'],
+                  ['Nombre/Razón Social', 'RUT', 'Región', 'Categoría', 'Tipo', 'Teléfono', 'Email', 'Cómo Llegó', 'Fecha Pago'],
                   data,
                   'cartera_clientes_crm'
                 );
@@ -1035,7 +1168,19 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                              <div className="font-bold text-white">{r.name}</div>
                              <span className="text-[10px] bg-[#111A2E] text-slate-300 font-black px-1.5 rounded" title="Cantidad de registros de actividad">{ (r.historialUnificado || '').split('---').length - 1 }</span>
                           </div>
-                         <div className="text-[10px] text-slate-400 font-mono">{r.rut}</div>
+                         <div className="text-[10px] text-slate-400 font-mono flex flex-wrap items-center gap-1.5 mt-1">
+                           <span>{r.rut}</span>
+                           {r.comoLlego && (
+                             <span className="text-[9px] bg-pink-500/20 text-pink-300 font-black px-1.5 py-0.5 rounded border border-pink-500/20" title="Canal de Origen (Cómo Llegó)">
+                               📢 {r.comoLlego}
+                             </span>
+                           )}
+                           {r.fechaPago && (
+                             <span className="text-[9px] bg-amber-500/20 text-amber-300 font-black px-1.5 py-0.5 rounded border border-amber-500/15" title="Fecha / Detalle de Pago">
+                               📅 {r.fechaPago}
+                             </span>
+                           )}
+                         </div>
                       </td>
                       <td className="p-5 text-slate-400 italic">{r.region}</td>
                       <td className="p-5 text-slate-300">{r.email || '---'}</td>
@@ -1134,6 +1279,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                                { label: 'Tipo', value: r.type },
                                { label: 'Categoría CRM', value: r.categoria },
                                { label: 'Inscrito en Intranet', value: r.intranet || 'No' },
+                               { label: 'Cómo Llegó (Origen)', value: r.comoLlego || 'Campañas / Ads' },
+                               { label: 'Fecha / Detalle Pago', value: r.fechaPago || 'N/A' },
                                { label: 'Fecha de Ingreso', value: formatDate(r.fechaIngreso) || 'N/A' },
                                { label: 'Historial Unificado', value: r.historialUnificado || 'Sin registros preexistentes.' }
                              ];

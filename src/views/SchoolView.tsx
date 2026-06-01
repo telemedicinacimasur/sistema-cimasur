@@ -722,10 +722,12 @@ function StudentManager({ records }: { records: any[] }) {
             clasificacion: updatedProfile.clasificacion || selectedStudent.clasificacion,
             fechaIngreso: updatedProfile.fechaIngreso,
             diplomado: updatedProfile.type,
-            montoTotalPagado: updatedProfile.montoTotalPagado,
-            montoTotalRecibido: updatedProfile.montoTotalRecibido,
+            montoTotalPagado: Number(updatedProfile.montoTotalPagado) || 0,
+            montoTotalRecibido: Number(updatedProfile.montoTotalRecibido) || 0,
             pago: updatedProfile.pago || selectedStudent.pago,
-            observacionesAcademicas: newMerged
+            avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedStudent.avance || 0),
+            observacionesAcademicas: newMerged,
+            unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedStudent.unidadesAcademicas || ''
         };
         await localDB.updateInCollection('students', selectedStudent.id, updates);
         setSelectedStudent({ ...selectedStudent, ...updates });
@@ -1179,17 +1181,25 @@ function TrackingView() {
                 const currentObs = selectedClient[field] || '';
                 const newMerged = (currentObs ? currentObs + '\n\n' : '') + baseUpdateEntry;
 
-                await localDB.updateInCollection(collection, selectedClient.id, {
-                   rut: updatedProfile.rut,
-                   clasificacion: updatedProfile.region,
-                   fecha: updatedProfile.fechaIngreso,
-                   type: updatedProfile.type,
-                   montoTotalPagado: updatedProfile.montoTotalPagado,
-                   montoTotalRecibido: updatedProfile.montoTotalRecibido,
-                   pago: updatedProfile.pago || selectedClient.pago,
-                   [field]: newMerged
-                });
-                setSelectedClient({ ...selectedClient, ...updatedProfile, [field]: newMerged });
+               await localDB.updateInCollection(collection, selectedClient.id, {
+                  rut: updatedProfile.rut,
+                  clasificacion: updatedProfile.region,
+                  fecha: updatedProfile.fechaIngreso,
+                  type: updatedProfile.type,
+                  montoTotalPagado: updatedProfile.montoTotalPagado,
+                  montoTotalRecibido: updatedProfile.montoTotalRecibido,
+                  pago: updatedProfile.pago || selectedClient.pago,
+                  avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedClient.avance || 0),
+                  unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
+                  [field]: newMerged
+               });
+               setSelectedClient({ 
+                  ...selectedClient, 
+                  ...updatedProfile, 
+                  avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedClient.avance || 0),
+                  unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
+                  [field]: newMerged 
+               });
                 alert('Datos base actualizados y registrados en el historial');
              } else {
                 const currentDate = new Date().toLocaleString();
