@@ -96,13 +96,24 @@ export default function LabView() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('gotas-puras')) && (
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('tracking')) && (
             <ModuleCard 
-              title="Evaluación Gotas Puras"
-              desc="Control de estado para elaboración."
-              icon={Beaker}
-              onClick={() => setActiveForm('gotas-puras')}
+              title="Seguimiento de Pedidos"
+              desc="Trazabilidad, Courier y Estados de Envío."
+              icon={ClipboardCheck}
+              onClick={() => setActiveForm('tracking')}
+              featured
               color="indigo"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('stock')) && (
+            <ModuleCard 
+              title="Stock de Insumo Diario"
+              desc="Control de saldos por área de producción."
+              icon={ClipboardList}
+              onClick={() => setActiveForm('stock')}
+              featured
+              color="emerald"
             />
           )}
           {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('elaboracion')) && (
@@ -112,6 +123,25 @@ export default function LabView() {
               icon={FlaskConical}
               onClick={() => setActiveForm('elaboracion')}
               color="emerald"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('magistrales')) && (
+            <ModuleCard 
+              title="Formulación Magistral"
+              desc="Elaboración y composición de fórmulas magistrales."
+              icon={FileText}
+              onClick={() => setActiveForm('magistrales')}
+              featured
+              color="amber"
+            />
+          )}
+          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('gotas-puras')) && (
+            <ModuleCard 
+              title="Evaluación Gotas Puras"
+              desc="Control de estado para elaboración."
+              icon={Beaker}
+              onClick={() => setActiveForm('gotas-puras')}
+              color="indigo"
             />
           )}
           {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('nosodes')) && (
@@ -166,36 +196,6 @@ export default function LabView() {
               icon={Settings}
               onClick={() => setActiveForm('mantenimiento')}
               color="slate"
-            />
-          )}
-          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('stock')) && (
-            <ModuleCard 
-              title="Stock de Insumo Diario"
-              desc="Control de saldos por área de producción."
-              icon={ClipboardList}
-              onClick={() => setActiveForm('stock')}
-              featured
-              color="emerald"
-            />
-          )}
-          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('tracking')) && (
-            <ModuleCard 
-              title="Seguimiento de Pedidos"
-              desc="Trazabilidad, Courier y Estados de Envío."
-              icon={ClipboardCheck}
-              onClick={() => setActiveForm('tracking')}
-              featured
-              color="indigo"
-            />
-          )}
-          {(!user?.allowedSubmodules?.lab || user.allowedSubmodules.lab.includes('magistrales')) && (
-            <ModuleCard 
-              title="Formulación Magistral"
-              desc="Elaboración y composición de fórmulas magistrales."
-              icon={FileText}
-              onClick={() => setActiveForm('magistrales')}
-              featured
-              color="amber"
             />
           )}
         </div>
@@ -5349,6 +5349,48 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
     responsableRevision: ''
   });
 
+  const [selectedElabRecord, setSelectedElabRecord] = useState<any | null>(null);
+  const [elabRecordForm, setElabRecordForm] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    preparador: '',
+    firma: '',
+    observacion: ''
+  });
+
+  const handleOpenElab = (record: any) => {
+    setSelectedElabRecord(record);
+    setElabRecordForm({
+      fecha: record.registroElaboracion?.fecha || new Date().toISOString().split('T')[0],
+      preparador: record.registroElaboracion?.preparador || user?.displayName || user?.email || '',
+      firma: record.registroElaboracion?.firma || '',
+      observacion: record.registroElaboracion?.observacion || ''
+    });
+  };
+
+  const handleSaveElab = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedElabRecord) return;
+    const updatedRecord = {
+      ...selectedElabRecord,
+      registroElaboracion: {
+        fecha: elabRecordForm.fecha,
+        preparador: elabRecordForm.preparador,
+        firma: elabRecordForm.firma,
+        observacion: elabRecordForm.observacion
+      }
+    };
+    await localDB.updateInCollection('lab_records', selectedElabRecord.id, updatedRecord);
+    if (user) await addAuditLog(user, `Registró Elaboración en Fórmula Magistral: ${selectedElabRecord.nroCotizacion}`, 'Laboratorio');
+    
+    // Refresh records
+    const updated = await localDB.getCollection('lab_records');
+    setRecords(updated);
+    window.dispatchEvent(new Event('db-change'));
+    
+    setSelectedElabRecord(null);
+    alert('Registro de elaboración guardado exitosamente');
+  };
+
   useEffect(() => {
     if (user && !editingId) {
       setForm(prev => ({ ...prev, preparador: user.displayName || '' }));
@@ -5660,68 +5702,112 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                     <td className="p-4 uppercase">{r.mvTratante}</td>
                     <td className="p-4 font-black">{r.nroAsignado}</td>
                     <td className="p-4">{formatDate(r.fecha)}</td>
-                    <td className="p-4">{r.preparador}</td>
+                    <td className="p-4">
+                      {r.preparador}
+                      {r.registroElaboracion && (
+                        <div className="text-[10px] text-emerald-400 font-medium not-italic mt-0.5">
+                          ✓ Elab: {r.registroElaboracion.preparador}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-4 text-center">
-                      <RecordActions 
-                        module="lab"
-                        onEdit={() => {
-                          setEditingId(r.id);
-                          setForm(r);
-                          setCompositionRows(r.composition || []);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        onDelete={async () => {
-                          try {
-                            await localDB.deleteFromCollection('lab_records', r.id);
-                            const updated = await localDB.getCollection('lab_records');
-                            setRecords(updated);
-                            window.dispatchEvent(new Event('db-change'));
-                            if (user) await addAuditLog(user, `Eliminó Fórmula Magistral: ${r.nroCotizacion}`, 'Laboratorio');
-                            alert(`Registro ${r.nroCotizacion} eliminado exitosamente`);
-                          } catch (err) {
-                            console.error('Delete Error:', err);
-                            alert('No se pudo eliminar el registro. Intente nuevamente.');
-                          }
-                        }}
-                        onView={() => {
-                          const data = [
-                            { label: 'N° Cotización', value: r.nroCotizacion },
-                            { label: 'MV Tratante', value: r.mvTratante },
-                            { label: 'N° Asignado', value: r.nroAsignado },
-                            { label: 'Fecha', value: formatDate(r.fecha) },
-                            { label: 'Preparador', value: r.preparador },
-                            { label: 'Responsable Revisión', value: r.responsableRevision || '' },
-                            { label: 'Observación', value: r.observacion || '' }
-                          ];
-                          const tables = [
-                            {
-                              title: 'Composición Fórmula Magistral',
-                              headers: ['Composición', 'Código', 'Dilución', 'Lambdas'],
-                              rows: (r.composition || []).map((c: any) => [c.composicion, c.codigo, c.dilucion, c.lambdas])
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenElab(r)}
+                          className={cn(
+                            "px-2.5 py-1 text-[10px] font-black uppercase rounded-xl border transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-sm select-none shrink-0",
+                            r.registroElaboracion
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20 animate-pulse"
+                          )}
+                          title="Registro de Elaboración"
+                        >
+                          <FlaskConical className="w-3 h-3" />
+                          <span>{r.registroElaboracion ? 'Elaborado' : 'Registrar Elab.'}</span>
+                        </button>
+
+                        <RecordActions 
+                          module="lab"
+                          onEdit={() => {
+                            setEditingId(r.id);
+                            setForm(r);
+                            setCompositionRows(r.composition || []);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          onDelete={async () => {
+                            try {
+                              await localDB.deleteFromCollection('lab_records', r.id);
+                              const updated = await localDB.getCollection('lab_records');
+                              setRecords(updated);
+                              window.dispatchEvent(new Event('db-change'));
+                              if (user) await addAuditLog(user, `Eliminó Fórmula Magistral: ${r.nroCotizacion}`, 'Laboratorio');
+                              alert(`Registro ${r.nroCotizacion} eliminado exitosamente`);
+                            } catch (err) {
+                              console.error('Delete Error:', err);
+                              alert('No se pudo eliminar el registro. Intente nuevamente.');
                             }
-                          ];
-                          viewExpedienteInNewTab('Ficha: Fórmula Magistral', data, `magistral_${r.nroCotizacion}`, tables);
-                        }}
-                        onDownload={() => {
-                          const data = [
-                            { label: 'N° Cotización', value: r.nroCotizacion },
-                            { label: 'MV Tratante', value: r.mvTratante },
-                            { label: 'N° Asignado', value: r.nroAsignado },
-                            { label: 'Fecha', value: formatDate(r.fecha) },
-                            { label: 'Preparador', value: r.preparador },
-                            { label: 'Responsable Revisión', value: r.responsableRevision || '' },
-                            { label: 'Observación', value: r.observacion || '' }
-                          ];
-                          const tables = [
-                            {
-                              title: 'Composición Fórmula Magistral',
-                              headers: ['Composición', 'Código', 'Dilución', 'Lambdas'],
-                              rows: (r.composition || []).map((c: any) => [c.composicion, c.codigo, c.dilucion, c.lambdas])
-                            }
-                          ];
-                          exportExpedienteToPDF('Ficha: Fórmula Magistral', data, `magistral_${r.nroCotizacion}`, tables);
-                        }}
-                      />
+                          }}
+                          onView={() => {
+                            const data = [
+                              { label: 'N° Cotización', value: r.nroCotizacion },
+                              { label: 'MV Tratante', value: r.mvTratante },
+                              { label: 'N° Asignado', value: r.nroAsignado },
+                              { label: 'Fecha', value: formatDate(r.fecha) },
+                              { label: 'Responsable Revisión', value: r.responsableRevision || '' }
+                            ];
+                            const tables = [
+                              {
+                                title: 'Composición Fórmula Magistral',
+                                headers: ['Composición', 'Código', 'Dilución', 'Lambdas'],
+                                rows: (r.composition || []).map((c: any) => [c.composicion, c.codigo, c.dilucion, c.lambdas])
+                              },
+                              {
+                                title: 'Registro de Elaboración',
+                                headers: ['FECHA ELAB.', 'NOMBRE PREPARADOR', 'FIRMA (MANUAL)', 'OBSERVACIÓN'],
+                                rows: [
+                                  [
+                                    r.registroElaboracion?.fecha ? formatDate(r.registroElaboracion.fecha) : '---',
+                                    r.registroElaboracion?.preparador || '---',
+                                    r.registroElaboracion?.firma || '---',
+                                    r.registroElaboracion?.observacion || '---'
+                                  ]
+                                ]
+                              }
+                            ];
+                            viewExpedienteInNewTab('Ficha: Fórmula Magistral', data, `magistral_${r.nroCotizacion}`, tables);
+                          }}
+                          onDownload={() => {
+                            const data = [
+                              { label: 'N° Cotización', value: r.nroCotizacion },
+                              { label: 'MV Tratante', value: r.mvTratante },
+                              { label: 'N° Asignado', value: r.nroAsignado },
+                              { label: 'Fecha', value: formatDate(r.fecha) },
+                              { label: 'Responsable Revisión', value: r.responsableRevision || '' }
+                            ];
+                            const tables = [
+                              {
+                                title: 'Composición Fórmula Magistral',
+                                headers: ['Composición', 'Código', 'Dilución', 'Lambdas'],
+                                rows: (r.composition || []).map((c: any) => [c.composicion, c.codigo, c.dilucion, c.lambdas])
+                              },
+                              {
+                                title: 'Registro de Elaboración',
+                                headers: ['FECHA ELAB.', 'NOMBRE PREPARADOR', 'FIRMA (MANUAL)', 'OBSERVACIÓN'],
+                                rows: [
+                                  [
+                                    r.registroElaboracion?.fecha ? formatDate(r.registroElaboracion.fecha) : '---',
+                                    r.registroElaboracion?.preparador || '---',
+                                    r.registroElaboracion?.firma || '---',
+                                    r.registroElaboracion?.observacion || '---'
+                                  ]
+                                ]
+                              }
+                            ];
+                            exportExpedienteToPDF('Ficha: Fórmula Magistral', data, `magistral_${r.nroCotizacion}`, tables);
+                          }}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ));
@@ -5730,6 +5816,94 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
           </table>
         </div>
       </div>
+
+      {selectedElabRecord && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#152035] border border-[#1E293B] rounded-3xl p-8 max-w-lg w-full shadow-2xl relative text-slate-200">
+            <button 
+              type="button"
+              onClick={() => setSelectedElabRecord(null)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="space-y-1 mb-6 font-sans">
+              <h2 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2 text-[#38BDF8]">
+                <FlaskConical className="w-5 h-5" />
+                Registro de Elaboración
+              </h2>
+              <p className="text-[11px] text-slate-400">
+                Fórmula Magistral: <strong className="text-white">{selectedElabRecord.nroCotizacion}</strong> (N° Asignado: {selectedElabRecord.nroAsignado})
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveElab} className="space-y-4 font-sans">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Fecha de Elaboración</label>
+                <input 
+                  type="date" 
+                  required 
+                  className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-white font-semibold text-xs focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8] outline-none" 
+                  value={elabRecordForm.fecha} 
+                  onChange={e => setElabRecordForm({...elabRecordForm, fecha: e.target.value})} 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Nombre del Preparador</label>
+                <input 
+                  type="text"
+                  required 
+                  placeholder="Nombre del preparador"
+                  className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-white font-semibold text-xs focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8] outline-none" 
+                  value={elabRecordForm.preparador} 
+                  onChange={e => setElabRecordForm({...elabRecordForm, preparador: e.target.value})} 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Firma (manual/iniciales)</label>
+                <input 
+                  type="text"
+                  required 
+                  placeholder="Escriba su firma manual o iniciales"
+                  className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-white font-semibold text-xs italic focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8] outline-none" 
+                  value={elabRecordForm.firma} 
+                  onChange={e => setElabRecordForm({...elabRecordForm, firma: e.target.value})} 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Observación</label>
+                <textarea 
+                  placeholder="Observación de la elaboración"
+                  rows={3}
+                  className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-white font-semibold text-xs focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8] outline-none" 
+                  value={elabRecordForm.observacion} 
+                  onChange={e => setElabRecordForm({...elabRecordForm, observacion: e.target.value})} 
+                />
+              </div>
+
+              <div className="flex gap-4 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setSelectedElabRecord(null)} 
+                  className="flex-1 py-3 rounded-xl border border-[#1E293B] text-slate-300 hover:bg-[#1E293B] hover:text-white transition-all font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg uppercase tracking-wider"
+                >
+                  Guardar Registro
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

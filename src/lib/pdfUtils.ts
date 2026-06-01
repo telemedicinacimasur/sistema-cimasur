@@ -20,17 +20,31 @@ const setupPremiumPage = (
   const pageWidth = orientation === 'p' ? 210 : 297;
   const pageHeight = orientation === 'p' ? 297 : 210;
   
-  // Minimal clean title header on top so we know what the document is, but without watermarks, decorative lines or big dates.
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59); // Slate 800
-  doc.text(title.toUpperCase(), 14, 15);
-  
-  if (subtitle && subtitle !== 'Ficha de Registro') {
+  if (title.toUpperCase().includes('FÓRMULA MAGISTRAL') || title.toUpperCase().includes('FORMULA MAGISTRAL')) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139); // Slate 500
+    doc.text('FICHA: FÓRMULA MAGISTRAL', 14, 10);
+    
+    if (subtitle && subtitle !== 'Ficha de Registro') {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(15, 23, 42); // Slate 900 (Deep/dark color)
+      doc.text(subtitle.toUpperCase(), 14, 20);
+    }
+  } else {
+    // Minimal clean title header on top so we know what the document is, but without watermarks, decorative lines or big dates.
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(title.includes('PREPARACIÓN GOTAS PURAS') ? 30 : subtitleFontSize);
-    const yPos = title.includes('PREPARACIÓN GOTAS PURAS') ? 24 : 21;
-    doc.text(subtitle, 14, yPos);
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59); // Slate 800
+    doc.text(title.toUpperCase(), 14, 15);
+    
+    if (subtitle && subtitle !== 'Ficha de Registro') {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(title.includes('PREPARACIÓN GOTAS PURAS') ? 30 : subtitleFontSize);
+      const yPos = title.includes('PREPARACIÓN GOTAS PURAS') ? 24 : 21;
+      doc.text(subtitle, 14, yPos);
+    }
   }
 
   return { pageWidth, pageHeight };
@@ -108,14 +122,17 @@ export const exportExpedienteToPDF = (
   images?: string[] // Optional base64 images to append at the end
 ) => {
   const doc = new jsPDF({ orientation });
-  const productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
+  let productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
+  if (!productItem) {
+    productItem = data.find(i => i.label === 'MV Tratante');
+  }
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
    const { pageWidth, pageHeight } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
-  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 40 : 25;
+  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 40 : (title.includes('Fórmula Magistral') ? 28 : 25);
 
   // Main Fields Table
-  const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente' && item.label !== '---');
+  const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente' && item.label !== 'MV Tratante' && item.label !== '---');
   if (filterData.length > 0) {
     if (title === 'REPORTE ANALÍTICO DE VENTAS' || filterData.length > 4) {
       // Create a 2-column key-value grid (which makes 4 columns total: Label1, Value1, Label2, Value2)
@@ -264,14 +281,17 @@ export const viewExpedienteInNewTab = (
   dateFontSize: number = 9
 ) => {
   const doc = new jsPDF({ orientation });
-  const productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
+  let productItem = data.find(i => i.label === 'Producto' || i.label === 'Paciente');
+  if (!productItem) {
+    productItem = data.find(i => i.label === 'MV Tratante');
+  }
   const mainSubtitle = productItem && productItem.value ? productItem.value : 'Ficha de Registro';
   
   const { pageWidth } = setupPremiumPage(doc, orientation, title, mainSubtitle, subtitleFontSize, cimasurFontSize, titleFontSize, dateFontSize);
   
-  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 48 : 40;
+  let currentY = title.includes('PREPARACIÓN GOTAS PURAS') ? 48 : (title.includes('Fórmula Magistral') ? 32 : 40);
 
-  const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente');
+  const filterData = data.filter(item => item.label && item.label !== 'Producto' && item.label !== 'Paciente' && item.label !== 'MV Tratante');
   if (filterData.length > 0) {
     autoTable(doc, {
       startY: currentY,
