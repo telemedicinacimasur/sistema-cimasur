@@ -273,6 +273,56 @@ export const localDB = {
     }
   },
   deleteFromCollection: async (name: string, id: string) => {
+    if (name === 'trash_bin') {
+      invalidateCollectionCache(name);
+      if (isFirebaseReady && db) {
+        await deleteDoc(doc(db, name, id));
+      } else {
+        await fetch(`/api/records/${name}/${id}`, { method: 'DELETE' });
+      }
+      return;
+    }
+
+    try {
+      let recordToDelete: any = null;
+      if (isFirebaseReady && db) {
+        const docSnap = await getDoc(doc(db, name, id));
+        if (docSnap.exists()) {
+          recordToDelete = { id: docSnap.id, ...docSnap.data() };
+        }
+      } else {
+        const res = await fetch(`/api/records/${name}`);
+        const list = await res.json();
+        recordToDelete = list.find((item: any) => item.id === id);
+      }
+
+      if (recordToDelete) {
+        const trashRecord = {
+          id: `trash_${Date.now()}_${id}`,
+          originalCollection: name,
+          originalId: id,
+          deletedAt: new Date().toISOString(),
+          recordData: recordToDelete
+        };
+        // Re-use saveToCollection without invalidating of the same collection
+        invalidateCollectionCache('trash_bin');
+        if (isFirebaseReady && db) {
+          await setDoc(doc(db, 'trash_bin', trashRecord.id), {
+            ...trashRecord,
+            createdAt: new Date().toISOString()
+          });
+        } else {
+          await fetch('/api/records/trash_bin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...trashRecord, id: trashRecord.id })
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to backup deleted record into trash bin:", e);
+    }
+
     invalidateCollectionCache(name);
     console.log(`Debug: Attempting to delete from ${name} with id: ${id}`);
     if (isFirebaseReady && db) {

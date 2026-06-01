@@ -4569,6 +4569,9 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role];
+  const permissions = user?.permissions?.['lab'];
+  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
+  const canEdit = user?.roles?.includes('admin') || user?.roles?.includes('manager') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [trackingRecords, setTrackingRecords] = useState<any[]>([]);
@@ -4901,6 +4904,55 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     return matchesSituacion && matchesSearch;
   }).sort((a,b) => (b.fechaCotiz || '').localeCompare(a.fechaCotiz || ''));
 
+  const oldTrackingRecordsCount = useMemo(() => {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    return (Array.isArray(trackingRecords) ? trackingRecords : []).filter(r => {
+      const dateStr = r.fechaEnvio || r.fechaCotiz || r.fecha;
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return d.getTime() > 0 && d < threeMonthsAgo;
+    }).length;
+  }, [trackingRecords]);
+
+  const handleCleanupOldTracking = async () => {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const toDelete = (Array.isArray(trackingRecords) ? trackingRecords : []).filter(r => {
+      const dateStr = r.fechaEnvio || r.fechaCotiz || r.fecha;
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return d.getTime() > 0 && d < threeMonthsAgo;
+    });
+
+    if (toDelete.length === 0) {
+      alert("Excelente: No se encontraron registros de seguimiento con más de 3 meses de antigüedad para eliminar.");
+      return;
+    }
+
+    const confirmMessage = `ALERTA DE OPTIMIZACIÓN DE PLATAFORMA:\n\nSe eliminarán de forma permanente los registros antiguos de Seguimiento de Pedidos, Trazabilidad, Courier y Estados de Envío con más de 3 meses de antigüedad.\n\n- Cantidad de registros antiguos detectados: ${toDelete.length}\n\nEsto alivianará las lecturas y mejorará significativamente los tiempos de carga de la plataforma.\n\n⚠️ IMPORTANTE: Bajo ninguna circunstancia se tocará o borrará la información de administración antigua (Cotizaciones, Historial de Ventas, Clientes o Presupuestos). Estos datos permanecen 100% seguros y estables.\n\n¿Desea proceder con la eliminación segura de los ${toDelete.length} registros de seguimiento?`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        let deletedCount = 0;
+        for (const record of toDelete) {
+          if (record.id) {
+            await localDB.deleteFromCollection('order_tracking', record.id);
+            deletedCount++;
+          }
+        }
+        await addAuditLog(user, `Realizó limpieza de ${deletedCount} registros antiguos en Seguimiento de Pedidos/Courier`, 'Laboratorio');
+        const updated = await localDB.getCollection('order_tracking');
+        setTrackingRecords(updated);
+        window.dispatchEvent(new Event('db-change'));
+        alert(`Optimización Exitosa: Se eliminaron ${deletedCount} registros de seguimiento antiguos. El sistema de lecturas se ha alivianado correctamente.`);
+      } catch (err) {
+        console.error("Cleanup error:", err);
+        alert("Ocurrió un error al intentar purgar los registros viejos.");
+      }
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       if (!id) return;
@@ -5101,6 +5153,46 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
           </div>
         </div>
         
+        {/* Panel de Control y Asistente de Optimización de Lectura */}
+        <div className="p-6 bg-gradient-to-r from-blue-950/40 via-slate-900/40 to-slate-950/40 border-b border-[#1E293B] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in slide-in-from-top-3 duration-300">
+          <div className="space-y-1.5 max-w-2xl">
+            <h4 className="text-xs font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Asistente de Optimización de Tiempos de Carga
+            </h4>
+            <p className="text-xs text-white leading-relaxed">
+              El historial de <strong>Seguimiento de Pedidos, Trazabilidad, Courier y Estados de Envío</strong> se puede alivianar de forma segura. Se recomienda borrar registros viejos (superior a 3 meses) para acelerar las lecturas en la plataforma.
+            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
+              <span className="text-emerald-400 font-bold">🔒 Administración Protegida:</span>
+              <span>Las cotizaciones, facturas, clientes y presupuestos históricos antiguos <strong>no se alteran ni eliminan</strong>.</span>
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-stretch md:items-end gap-2 w-full md:w-auto shrink-0 bg-[#0F172A] p-4 rounded-2xl border border-[#1E293B] shadow-inner">
+            <div className="flex justify-between md:justify-end items-center gap-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Antigüedad &gt; 3 meses:</span>
+              <span className={cn(
+                "px-2.5 py-1 text-xs font-black rounded-lg border",
+                oldTrackingRecordsCount > 0 ? "bg-amber-950 text-amber-400 border-amber-800 animate-pulse" : "bg-emerald-950 text-emerald-400 border-emerald-800"
+              )}>
+                {oldTrackingRecordsCount} {oldTrackingRecordsCount === 1 ? 'registro' : 'registros'}
+              </span>
+            </div>
+            
+            <button
+              type="button"
+              disabled={oldTrackingRecordsCount === 0 || !canEdit}
+              onClick={handleCleanupOldTracking}
+              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:from-slate-800 disabled:to-slate-805 disabled:text-slate-500 font-black text-[10px] text-white uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 disabled:pointer-events-none cursor-pointer"
+              title="Limpiar registros de Seguimiento de Pedidos antiguos para alivianar lecturas"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Optimizar Base de Datos (Limpiar &gt; 3 Meses)</span>
+            </button>
+          </div>
+        </div>
+
         <form className="p-8 bg-[#152035] border-b border-[#1E293B]" onSubmit={handleSubmit}>
           <div className="max-w-none mx-auto space-y-6">
             <div className="mb-2">

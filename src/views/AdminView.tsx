@@ -10,6 +10,7 @@ import {
 import { RecordActions } from '../components/RecordActions';
 import { UsersManager } from '../components/settings/UsersManager';
 import { AuditLogManager } from '../components/settings/AuditLogManager';
+import { TrashBinManager } from '../components/settings/TrashBinManager';
 
 export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -84,6 +85,7 @@ export default function AdminView() {
   const [loadRange, setLoadRange] = useState<'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
     return (localStorage.getItem('cimasur_admin_load_range') as any) || 'mes_actual';
   });
+  const [showOptimizer, setShowOptimizer] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleLoadRangeChange = (range: 'mes_actual' | 'anio_actual' | 'historico_completo') => {
@@ -308,35 +310,31 @@ export default function AdminView() {
           <span>Volver al Menú de Administración</span>
         </button>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Optimization Indicator */}
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Filtro de Consulta Activo</span>
-          </div>
-
-          {/* Load Range Selector */}
-          <div className="flex items-center gap-2 bg-[#0F172A] border border-[#1E293B] px-3 py-1.5 rounded-xl">
-            <span className="text-slate-400 text-xs font-black uppercase tracking-wider">Cargar:</span>
-            <select
-              value={loadRange}
-              onChange={e => handleLoadRangeChange(e.target.value as any)}
-              className="bg-transparent text-white text-xs border-none outline-none cursor-pointer font-bold focus:ring-0 focus:outline-none"
-            >
-              <option value="mes_actual" className="bg-[#152035] text-white font-bold">⚡ Mes Actual (Recomendado)</option>
-              <option value="anio_actual" className="bg-[#152035] text-white font-bold">📅 Año Actual</option>
-              <option value="historico_completo" className="bg-[#152035] text-white font-bold">⌛ Histórico Completo</option>
-            </select>
-          </div>
-
-          {/* Refresh Action Button */}
+        {/* Compact Inline performance control */}
+        <div className="flex items-center gap-2 bg-[#0F172A]/80 border border-[#1E293B] px-3 py-1.5 rounded-2xl shadow-inner shrink-0">
+          <Settings className={cn("w-3.5 h-3.5 text-slate-400", isRefreshing ? "animate-spin text-[#38BDF8]" : "")} />
+          
+          <select
+            value={loadRange}
+            onChange={e => handleLoadRangeChange(e.target.value as any)}
+            className="bg-transparent text-[#38BDF8] text-xs font-black border-none outline-none cursor-pointer focus:ring-0 p-0 pr-6 text-right uppercase tracking-wider"
+            title="Seleccionar rango de datos a cargar para optimizar rendimiento"
+          >
+            <option value="mes_actual" className="bg-[#152035] text-white">⚡ Mes actual (rápido)</option>
+            <option value="anio_actual" className="bg-[#152035] text-white">📅 Año actual</option>
+            <option value="historico_completo" className="bg-[#152035] text-white">⌛ Historial completo</option>
+          </select>
+          
+          <div className="w-[1px] h-3.5 bg-[#1E293B]" />
+          
           <button
+            type="button"
             onClick={() => loadData(true)}
             disabled={isRefreshing}
-            className={`flex items-center gap-2 px-4 py-1.5 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30 rounded-xl transition-all font-bold text-xs ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className="p-1 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center shrink-0"
+            title="Actualizar datos (limpia caché local y recarga desde servidor de forma fresca)"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>{isRefreshing ? 'Actualizando...' : 'Actualizar Datos'}</span>
+            <RefreshCw className={cn("w-3 h-3", isRefreshing ? "animate-spin text-[#38BDF8]" : "")} />
           </button>
         </div>
       </div>
@@ -3604,7 +3602,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
 
 function CPanelManager({ records }: { records: any[] }) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'modules'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'modules' | 'trash'>('users');
 
   return (
     <div className="bg-[#152035] rounded-[2.5rem] border border-[#1E293B] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 mt-4 min-h-[600px]">
@@ -3627,7 +3625,8 @@ function CPanelManager({ records }: { records: any[] }) {
           {[
             { id: 'users', label: 'Gestión de Accesos', icon: Users, color: 'text-[#38BDF8]' },
             { id: 'logs', label: 'Traza de Auditoría', icon: ShieldCheck, color: 'text-emerald-600' },
-            { id: 'modules', label: 'Módulos & API', icon: LayoutGrid, color: 'text-amber-600' }
+            { id: 'modules', label: 'Módulos & API', icon: LayoutGrid, color: 'text-amber-600' },
+            { id: 'trash', label: 'Papelera de Reciclaje', icon: Trash2, color: 'text-rose-500' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -3646,6 +3645,7 @@ function CPanelManager({ records }: { records: any[] }) {
        <div className="p-10">
           {activeTab === 'users' && <UsersManager />}
           {activeTab === 'logs' && <AuditLogManager records={records} />}
+          {activeTab === 'trash' && <TrashBinManager />}
           {activeTab === 'modules' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
