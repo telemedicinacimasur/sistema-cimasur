@@ -28,6 +28,43 @@ import { addNotification } from '../lib/notifications';
 
 import { SmartCampaigns } from '../components/crm/SmartCampaigns';
 
+export async function syncToIntranetClientsIfNeeded(contact: any, user?: any) {
+  if (!contact || contact.intranet !== 'Si') return;
+  try {
+    const intranetClients = await localDB.getCollection('intranet_clients');
+    const icName = (contact.name || '').toLowerCase().trim();
+    const icEmail = (contact.email || '').toLowerCase().trim();
+    const icRut = (contact.rut || '').toLowerCase().trim();
+
+    const exists = intranetClients.some((ic: any) => {
+      const nameMatch = icName && (ic.name || '').toLowerCase().trim() === icName;
+      const emailMatch = icEmail && (ic.email || '').toLowerCase().trim() === icEmail;
+      const rutMatch = icRut && icRut !== 'sin rut' && icRut !== 'no' && (ic.rut || '').toLowerCase().trim() === icRut;
+      return nameMatch || emailMatch || rutMatch;
+    });
+
+    if (!exists) {
+      await localDB.saveToCollection('intranet_clients', {
+        fechaIngreso: contact.fechaIngreso || new Date().toISOString().split('T')[0],
+        name: contact.name,
+        rut: contact.rut || 'Sin RUT',
+        phone: contact.phone || '',
+        email: contact.email || '',
+        region: contact.region || 'Metropolitana',
+        type: contact.type || 'Independiente',
+        categoria: contact.categoria || 'Sin compra',
+        intranet: 'Si',
+        comoLlego: contact.comoLlego || 'Ficha CRM',
+        fechaPago: contact.fechaPago || '',
+        historialUnificado: `Registrado automáticamente en base Intranet de forma sincrónica el ${new Date().toLocaleDateString('es-CL')}.`,
+        responsable: user?.displayName || user?.email || contact.responsable || 'Sistema'
+      });
+    }
+  } catch (err) {
+    console.error("Error automatic sync to intranet_clients:", err);
+  }
+}
+
 export default function CRMView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
@@ -63,6 +100,153 @@ export default function CRMView() {
     window.addEventListener('db-change', loadData);
     return () => window.removeEventListener('db-change', loadData);
   }, []);
+
+  const handleImportFromIntranet = async () => {
+    try {
+      const intranetClientsList = await localDB.getCollection('intranet_clients');
+      if (!intranetClientsList || intranetClientsList.length === 0) {
+        alert("No se encontraron Clientes en la base de datos de Intranet para importar. Por favor, importe un archivo Excel en 'Ficha Registro' -> 'Importar Intranet'.");
+        return;
+      }
+
+      const contacts = await localDB.getCollection('contacts');
+      
+      let importedCount = 0;
+      let updatedCount = 0;
+
+      for (const ic of intranetClientsList) {
+        const icName = (ic.name || '').toLowerCase().trim();
+        const icEmail = (ic.email || '').toLowerCase().trim();
+        const icRut = (ic.rut || '').toLowerCase().trim();
+
+        if (!icName && !icEmail && !icRut) continue;
+
+        // Verify duplicates matching Name, Email, or RUT
+        const existingContact = contacts.find(c => {
+          const cName = (c.name || '').toLowerCase().trim();
+          const cEmail = (c.email || '').toLowerCase().trim();
+          const cRut = (c.rut || '').toLowerCase().trim();
+
+          const nameMatch = icName && cName && cName === icName;
+          const emailMatch = icEmail && cEmail && cEmail === icEmail;
+          const rutMatch = icRut && icRut !== 'sin rut' && icRut !== 'no' && cRut && cRut === icRut;
+
+          return nameMatch || emailMatch || rutMatch;
+        });
+
+        if (existingContact) {
+          let needsUpdate = false;
+          const updates: any = {};
+
+          if (existingContact.intranet !== 'Si') {
+            updates.intranet = 'Si';
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            const currentObs = existingContact.historialUnificado || '';
+            updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
+              `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' automáticamente el ${new Date().toLocaleDateString('es-CL')}.`;
+            await localDB.updateInCollection('contacts', existingContact.id, updates);
+            updatedCount++;
+          }
+        } else {
+          const newContact = {
+            fechaIngreso: ic.fechaIngreso || new Date().toISOString().split('T')[0],
+            name: ic.name || 'Contacto de Intranet',
+            rut: ic.rut || 'Sin RUT',
+            phone: ic.phone || '',
+            email: ic.email || '',
+            region: ic.region || 'Metropolitana',
+            type: ic.type || 'Independiente',
+            categoria: 'Sin compra', // Force "Sin compra" to target them in CAMPAIGNS as requested!
+            intranet: 'Si',
+            comoLlego: ic.comoLlego || 'Plataforma / Intranet',
+            fechaPago: ic.fechaPago || '',
+            historialUnificado: `Sincronizado desde plataforma de ventas online Intranet el ${new Date().toLocaleDateString('es-CL')}.`,
+            responsable: user?.displayName || user?.email || 'Sistema',
+            isGestionCustomer: false
+          };
+
+          await localDB.saveToCollection('contacts', newContact);
+          importedCount++;
+        }
+      }
+
+      await addAuditLog(user, `Importó base Intranet: ${importedCount} registrados, ${updatedCount} actualizados`, 'CRM');
+      alert(`Sincronización de Intranet completada con éxito:\n\n- ${importedCount} Clientes nuevos agregados a la Cartera con Categoría "Sin compra" (listos para campañas).\n- ${updatedCount} Clientes existentes actualizados con acceso de Intranet "Sí" (evitando duplicados).`);
+      
+      window.dispatchEvent(new Event('db-change'));
+    } catch (err) {
+      console.error(err);
+      alert('Error en la sincronización desde la plataforma.');
+    }
+  };
+
+  const handleImportSingleFromIntranet = async (ic: any) => {
+    try {
+      const contacts = await localDB.getCollection('contacts');
+      const icName = (ic.name || '').toLowerCase().trim();
+      const icEmail = (ic.email || '').toLowerCase().trim();
+      const icRut = (ic.rut || '').toLowerCase().trim();
+
+      const existingContact = contacts.find(c => {
+        const cName = (c.name || '').toLowerCase().trim();
+        const cEmail = (c.email || '').toLowerCase().trim();
+        const cRut = (c.rut || '').toLowerCase().trim();
+
+        const nameMatch = icName && cName && cName === icName;
+        const emailMatch = icEmail && cEmail && cEmail === icEmail;
+        const rutMatch = icRut && icRut !== 'sin rut' && icRut !== 'no' && cRut && cRut === icRut;
+
+        return nameMatch || emailMatch || rutMatch;
+      });
+
+      if (existingContact) {
+        let needsUpdate = false;
+        const updates: any = {};
+
+        if (existingContact.intranet !== 'Si') {
+          updates.intranet = 'Si';
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          const currentObs = existingContact.historialUnificado || '';
+          updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
+            `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' individualmente el ${new Date().toLocaleDateString('es-CL')}.`;
+          await localDB.updateInCollection('contacts', existingContact.id, updates);
+        }
+        alert(`El cliente "${ic.name}" ya existe en la Cartera de Clientes. Se actualizó su estado en el sistema sin duplicar.`);
+      } else {
+        const newContact = {
+          fechaIngreso: ic.fechaIngreso || new Date().toISOString().split('T')[0],
+          name: ic.name || 'Contacto de Intranet',
+          rut: ic.rut || 'Sin RUT',
+          phone: ic.phone || '',
+          email: ic.email || '',
+          region: ic.region || 'Metropolitana',
+          type: ic.type || 'Independiente',
+          categoria: 'Sin compra', // Force "Sin compra" to target them in CAMPAIGNS!
+          intranet: 'Si',
+          comoLlego: ic.comoLlego || 'Plataforma / Intranet',
+          fechaPago: ic.fechaPago || '',
+          historialUnificado: `Sincronizado individualmente desde plataforma de ventas online Intranet el ${new Date().toLocaleDateString('es-CL')}.`,
+          responsable: user?.displayName || user?.email || 'Sistema',
+          isGestionCustomer: false
+        };
+
+        await localDB.saveToCollection('contacts', newContact);
+        alert(`Cliente "${ic.name}" importado con éxito a Cartera de Clientes con Categoría "Sin compra".`);
+      }
+
+      await addAuditLog(user, `Importó cliente individual de Intranet: ${ic.name}`, 'CRM');
+      window.dispatchEvent(new Event('db-change'));
+    } catch (err) {
+      console.error(err);
+      alert('Error al realizar la importación individual.');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -144,7 +328,13 @@ export default function CRMView() {
       {activeTab === 'register' && <CRMRegister />}
       {activeTab === 'list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
       {activeTab === 'activities' && <CRMActivities />}
-      {activeTab === 'intranet' && <CRMIntranetTable clients={intranetClients} />}
+      {activeTab === 'intranet' && (
+        <CRMIntranetTable 
+          clients={intranetClients} 
+          onImportFromIntranet={handleImportFromIntranet} 
+          onImportSingle={handleImportSingleFromIntranet}
+        />
+      )}
       {activeTab === 'smart' && <SmartCampaigns />}
       {commentTarget && (
         <CommentDialog 
@@ -182,10 +372,23 @@ const REGIONES = [
 
 const CATEGORIAS = ['Sin compra', 'Sin categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
 
+const normalizeCat = (val: any) => {
+  const str = typeof val === 'string' ? val : '';
+  if (!str) return 'sin categoria';
+  const clean = str.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+  if (clean === '' || clean === '---' || clean === 'ninguna' || clean === 'ninguno' || clean === 'sin categoria') {
+    return 'sin categoria';
+  }
+  return clean;
+};
+
 function CRMRegister() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const intranetFileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fechaIngreso: new Date().toISOString().split('T')[0],
     name: '',
@@ -240,6 +443,7 @@ function CRMRegister() {
     };
 
     await localDB.saveToCollection('contacts', finalForm);
+    await syncToIntranetClientsIfNeeded(finalForm, user);
     
     if (finalForm.isGestionCustomer) {
       const gestionRecord = {
@@ -345,6 +549,7 @@ function CRMRegister() {
           // Allow saving as long as there is any identifier (phone, name or rut)
           if (phone || newContact.name !== "Contacto Sin Nombre" || rut) {
             await localDB.saveToCollection('contacts', newContact);
+            await syncToIntranetClientsIfNeeded(newContact, user);
             importedCount++;
           }
         }
@@ -355,85 +560,6 @@ function CRMRegister() {
       } catch (error) {
         console.error("Import Error:", error);
         alert(`Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}. Asegúrese de usar la plantilla correcta y que el archivo no esté abierto.`);
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  const handleIntranetFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
-
-        const existingContacts = await localDB.getCollection('contacts');
-        let importedCount = 0;
-        
-        for (const row of data) {
-          const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
-          const rut = safe(row["RUT / ID"]);
-          const phone = safe(row["Teléfono"]);
-
-          // Check for duplicate in contacts (skip check if empty or 'Sin RUT')
-          const isDuplicate = rut && rut !== 'Sin RUT' && rut !== 'S/R' 
-            ? existingContacts.some(c => c.rut === rut) 
-            : false;
-
-          if (!isDuplicate) {
-              let name = safe(row["Nombre / Razón Social"]);
-              if (!name && phone) {
-                name = `Contacto Fono ${phone}`;
-              } else if (!name) {
-                name = "Contacto Sin Nombre";
-              }
-
-              const newContact = {
-                fechaIngreso: fechaIngreso,
-                name: name,
-                rut: rut || 'Sin RUT',
-                phone: phone,
-                email: safe(row["Email"]),
-                region: safe(row["Comuna"]) || 'Metropolitana',
-                type: safe(row["Tipo de Cliente"]) || 'Farmacia',
-                categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
-                intranet: 'Si',
-                comoLlego: safe(row["Como Llego"]) || safe(row["Canal de Entrada"]) || safe(row["Origen"]) || 'Intranet',
-                fechaPago: safe(row["Fecha de Pago"]) || safe(row["Fecha Pago"]) || '',
-                historialUnificado: `Importado desde Intranet el ${new Date().toLocaleDateString('es-CL')}` +
-                  (row["Como Llego"] || row["Canal de Entrada"] || row["Origen"] ? ` (Origen: ${row["Como Llego"] || row["Canal de Entrada"] || row["Origen"]})` : '') +
-                  (row["Fecha de Pago"] || row["Fecha Pago"] ? ` (Fecha Pago: ${row["Fecha de Pago"] || row["Fecha Pago"]})` : ''),
-                responsable: user.displayName || user.email || 'Sistema'
-              };
-
-              if (phone || newContact.name !== "Contacto Sin Nombre" || rut) {
-                await localDB.saveToCollection('intranet_clients', newContact);
-                importedCount++;
-              }
-          }
-        }
-
-        if (importedCount > 0) {
-          await localDB.saveToCollection('intranet_imports', {
-            fechaImportacion: new Date().toISOString(),
-            responsable: user.displayName || user.email || 'Sistema',
-            cantidadImportada: importedCount,
-            archivoNombre: file.name
-          });
-        }
-
-        await addAuditLog(user, `Importó ${importedCount} clientes desde Intranet`, 'CRM');
-        alert(`Éxito: Se importaron ${importedCount} clientes únicos desde Intranet.`);
-        window.dispatchEvent(new Event('db-change'));
-      } catch (error) {
-        console.error("Import Intranet Error:", error);
-        alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
       }
     };
     reader.readAsBinaryString(file);
@@ -451,13 +577,6 @@ function CRMRegister() {
              accept=".xlsx, .xls"
              onChange={handleFileUpload}
            />
-           <input 
-             type="file" 
-             ref={intranetFileInputRef} 
-             className="hidden" 
-             accept=".xlsx, .xls"
-             onChange={handleIntranetFileUpload}
-           />
            <button 
              onClick={downloadExcelTemplate}
              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer"
@@ -470,12 +589,6 @@ function CRMRegister() {
              className="text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] border-2 border-[#1C2541] hover:bg-[#38BDF8]/30 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer"
            >
              <Upload className="w-3.5 h-3.5" /> Importar Datos
-           </button>
-           <button 
-             onClick={() => intranetFileInputRef.current?.click()}
-             className="text-[10px] bg-purple-600 hover:bg-purple-700 border-2 border-[#1C2541] px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer"
-           >
-             <Upload className="w-3.5 h-3.5" /> Importar Intranet
            </button>
          </div>
       </div>
@@ -601,7 +714,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
       const matchesSearch = name.includes(search) || rut.includes(search);
       const matchesRegion = filters.region === 'Todas' || safe(r.region) === filters.region;
       const matchesType = filters.type === 'Todos' || safe(r.type) === filters.type;
-      const matchesCategoria = filters.categoria === 'Todas' || safe(r.categoria) === filters.categoria;
+      const matchesCategoria = filters.categoria === 'Todas' || normalizeCat(r.categoria) === normalizeCat(filters.categoria);
       const matchesIntranet = filters.intranet === 'Todos' || safe(r.intranet) === filters.intranet;
       return matchesSearch && matchesRegion && matchesType && matchesCategoria && matchesIntranet;
     })
@@ -651,18 +764,29 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     const isGestion = newIsGestionCustomer !== null ? newIsGestionCustomer : !!selectedClient.isGestionCustomer;
     const becameGestion = isGestion && !selectedClient.isGestionCustomer;
 
-    await localDB.updateInCollection('contacts', selectedClient.id, { 
+    const updatedIntranet = newIntranet || selectedClient.intranet || 'No';
+
+    const updatedContact = {
       name: newName || selectedClient.name,
       rut: newRut || selectedClient.rut,
       phone: selectedClient.phone,
       email: selectedClient.email,
       categoria: newCategory || selectedClient.categoria,
-      intranet: newIntranet || selectedClient.intranet || 'No',
+      intranet: updatedIntranet,
       comoLlego: newComoLlego || selectedClient.comoLlego || 'Campañas / Ads',
       fechaPago: newFechaPago || selectedClient.fechaPago || '',
       isGestionCustomer: isGestion,
       historialUnificado: updatedHistory
-    });
+    };
+
+    await localDB.updateInCollection('contacts', selectedClient.id, updatedContact);
+
+    if (updatedIntranet === 'Si') {
+      await syncToIntranetClientsIfNeeded({
+        ...selectedClient,
+        ...updatedContact
+      }, user);
+    }
 
     if (becameGestion) {
       const gestionRecord = {
@@ -1149,6 +1273,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Ingreso</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Categoría</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Tipo</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Intranet</th>
                     <th className="p-5 text-right px-8 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
                  </tr>
               </thead>
@@ -1215,7 +1340,35 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                            ))}
                          </select>
                       </td>
-                      <td className="p-5 font-medium text-blue-900">{r.type}</td>
+                      <td className="p-5 font-medium text-slate-350">{r.type}</td>
+                      <td className="p-5">
+                         <select
+                           value={r.intranet || 'No'}
+                           disabled={!canEdit}
+                           onChange={async (e) => {
+                             const newVal = e.target.value;
+                             try {
+                               await localDB.updateInCollection('contacts', r.id, { intranet: newVal });
+                               if (newVal === 'Si') {
+                                 await syncToIntranetClientsIfNeeded({ ...r, intranet: 'Si' }, user);
+                               }
+                               window.dispatchEvent(new Event('db-change'));
+                             } catch (err) {
+                               console.error(err);
+                               alert('Error al actualizar el estado de Intranet.');
+                             }
+                           }}
+                           className={cn(
+                             "px-2.5 py-1 rounded-full font-black text-[9px] uppercase border cursor-pointer bg-[#0F172A] outline-none text-center focus:ring-1 focus:ring-blue-400 font-bold max-w-[80px] disabled:pointer-events-none disabled:opacity-80 transition-all duration-200",
+                             (r.intranet === 'Si') 
+                               ? "bg-emerald-950 text-emerald-300 border-emerald-800/80" 
+                               : "bg-rose-950 text-rose-300 border-rose-800/80"
+                           )}
+                         >
+                           <option value="Si" className="bg-[#152035] text-white">🟢 Sí</option>
+                           <option value="No" className="bg-[#152035] text-white">🔴 No</option>
+                         </select>
+                      </td>
                       <td className="p-5 text-right flex items-center justify-end gap-2">
                          {r.isGestionCustomer ? (
                            <span className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-lg font-bold animate-fade-in" title="Cliente registrado en Gestión">
@@ -1299,28 +1452,228 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                              } catch (err) {
                                console.error(err);
                                alert('Error al eliminar');
-                             }
-                           }}
-                         />
-                      </td>
-                   </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
-      </div>
+                              }
+                            }}
+                          />
+                       </td>
+                    </tr>
+                  ))}
+               </tbody>
+            </table>
+         </div>
+       </div>
     </div>
   );
 }
 
+function CRMIntranetTable({ 
+  clients, 
+  onImportFromIntranet,
+  onImportSingle
+}: { 
+  clients: any[], 
+  onImportFromIntranet?: () => void,
+  onImportSingle?: (client: any) => void
+}) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-function CRMIntranetTable({ clients }: { clients: any[] }) {
+  const downloadIntranetTemplate = () => {
+    const headers = [
+      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Como Llego", "Fecha de Pago"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Intranet");
+    XLSX.writeFile(wb, "plantilla_importacion_intranet.xlsx");
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const contacts = await localDB.getCollection('contacts');
+        const existingIntranet = await localDB.getCollection('intranet_clients');
+        let newLeadsCount = 0;
+        let crmUpdatedCount = 0;
+
+        for (const row of data) {
+          const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
+          const icName = safe(row["Nombre / Razón Social"]);
+          const icRut = safe(row["RUT / ID"]);
+          const icPhone = safe(row["Teléfono"]);
+          const icEmail = safe(row["Email"]);
+
+          if (!icName && !icEmail && !icRut && !icPhone) continue;
+
+          // Check if it already exists in the MAIN CRM table (contacts)
+          const existingContact = contacts.find((c: any) => {
+            const cName = (c.name || '').toLowerCase().trim();
+            const cEmail = (c.email || '').toLowerCase().trim();
+            const cRut = (c.rut || '').toLowerCase().trim();
+
+            const nameMatch = icName && cName && cName === icName.toLowerCase().trim();
+            const emailMatch = icEmail && cEmail && cEmail === icEmail.toLowerCase().trim();
+            const rutMatch = icRut && icRut.toLowerCase().trim() !== 'sin rut' && icRut.toLowerCase().trim() !== 'no' && cRut && cRut === icRut.toLowerCase().trim();
+
+            return nameMatch || emailMatch || rutMatch;
+          });
+
+          if (existingContact) {
+            // Update existings in CRM immediately with intranet: 'Si'
+            let needsUpdate = false;
+            const updates: any = {};
+
+            if (existingContact.intranet !== 'Si') {
+              updates.intranet = 'Si';
+              needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+              const currentObs = existingContact.historialUnificado || '';
+              updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
+                `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' automáticamente vía importación de plantilla el ${new Date().toLocaleDateString('es-CL')}.`;
+              await localDB.updateInCollection('contacts', existingContact.id, updates);
+              crmUpdatedCount++;
+            }
+          } else {
+            // Save as lead inside intranet_clients (platform clients list only)
+            // Guard against duplicate inside intranet_clients
+            const isDupInIntranet = existingIntranet.some((ic: any) => {
+              const nameMatch = icName && (ic.name || '').toLowerCase().trim() === icName.toLowerCase().trim();
+              const emailMatch = icEmail && (ic.email || '').toLowerCase().trim() === icEmail.toLowerCase().trim();
+              const rutMatch = icRut && icRut.toLowerCase().trim() !== 'sin rut' && (ic.rut || '').toLowerCase().trim() === icRut.toLowerCase().trim();
+              return nameMatch || emailMatch || rutMatch;
+            });
+
+            if (!isDupInIntranet) {
+              const newIntranetClient = {
+                fechaIngreso: fechaIngreso,
+                name: icName || 'Cliente Intranet',
+                rut: icRut || 'Sin RUT',
+                phone: icPhone,
+                email: icEmail,
+                region: safe(row["Comuna"]) || 'Metropolitana',
+                type: 'Independiente',
+                categoria: 'Sin compra', // Target label
+                intranet: 'Si',
+                comoLlego: safe(row["Como Llego"]) || 'Ventas Online Intranet',
+                fechaPago: safe(row["Fecha de Pago"]) || safe(row["Fecha Pago"]) || '',
+                historialUnificado: `Registrado en base Intranet el ${new Date().toLocaleDateString('es-CL')}.`,
+                responsable: user.displayName || user.email || 'Sistema'
+              };
+
+              await localDB.saveToCollection('intranet_clients', newIntranetClient);
+              newLeadsCount++;
+            }
+          }
+        }
+
+        if (newLeadsCount > 0) {
+          await localDB.saveToCollection('intranet_imports', {
+            fechaImportacion: new Date().toISOString(),
+            responsable: user.displayName || user.email || 'Sistema',
+            cantidadImportada: newLeadsCount,
+            archivoNombre: file.name
+          });
+        }
+
+        await addAuditLog(user, `Importó Excel Intranet: ${newLeadsCount} nuevos, ${crmUpdatedCount} actualizados en CRM`, 'CRM');
+        alert(`Importación Comercial Procesada:\n\n- ${crmUpdatedCount} clientes que ya existían en el CRM fueron actualizados con acceso de Intranet "Sí" de manera segura (evitando duplicar).\n- ${newLeadsCount} clientes nuevos fueron agregados a esta Base Intranet listos para posterior traspaso.`);
+        window.dispatchEvent(new Event('db-change'));
+      } catch (error) {
+        console.error("Error importing intranet excel file:", error);
+        alert("Error al procesar el archivo Excel. Asegúrese de que tenga las columnas correctas.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const exportIntranetToExcel = () => {
+    const headers = [
+      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Como Llego", "Fecha de Pago"]
+    ];
+    const data = clients.map(client => [
+      client.fechaIngreso || '',
+      client.name || '',
+      client.rut || '',
+      client.phone || '',
+      client.email || '',
+      client.region || '',
+      client.comoLlego || '',
+      client.fechaPago || ''
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([...headers, ...data]);
+    ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Base_Intranet");
+    XLSX.writeFile(wb, "base_clientes_intranet_comercial.xlsx");
+  };
+
   return (
     <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden animate-in fade-in duration-500">
-      <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold">
+      <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4 font-bold flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
          <span className="flex items-center gap-2">
-           <UserCheck className="w-5 h-5" /> Clientes Importados de Intranet
+            <UserCheck className="w-5 h-5 text-sky-400" /> Base de Clientes en Plataforma Intranet (Venta)
          </span>
+         
+         <div className="flex flex-wrap items-center gap-2">
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             className="hidden" 
+             accept=".xlsx, .xls"
+             onChange={handleImportExcel}
+           />
+           
+           <button
+             type="button"
+             onClick={downloadIntranetTemplate}
+             className="text-[10px] bg-[#111A2E] hover:bg-[#1C2541] border border-slate-600 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer text-slate-200"
+             title="Descargar plantilla Excel optimizada para carga de clientes de Intranet"
+           >
+             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Plantilla Importación
+           </button>
+
+           <button
+             type="button"
+             onClick={() => fileInputRef.current?.click()}
+             className="text-[10px] bg-sky-900/40 hover:bg-sky-900/60 border border-sky-600/80 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer text-sky-250 animate-pulse"
+             title="Cargar archivo Excel de clientes obtenidos por la plataforma para agregarlos a la base local"
+           >
+             <Upload className="w-3.5 h-3.5" /> Importar Intranet Excel
+           </button>
+
+           <button
+             type="button"
+             onClick={exportIntranetToExcel}
+             className="text-[10px] bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors uppercase font-black cursor-pointer text-slate-100"
+             title="Exportar base de datos actual de clientes Intranet a archivo Excel"
+           >
+             <Download className="w-3.5 h-3.5 text-amber-400" /> Exportar Base a Excel
+           </button>
+
+           {onImportFromIntranet && (
+             <button
+               type="button"
+               onClick={onImportFromIntranet}
+               className="text-[10px] bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 border-2 border-[#1C2541] px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-all font-bold uppercase cursor-pointer"
+               title="Mover todos los clientes de Intranet que no están repetidos al CRM Comercial"
+             >
+               <UserCheck className="w-4 h-4 text-emerald-300 animate-bounce" /> Sincronizar todos los clientes al CRM
+             </button>
+           )}
+         </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -1331,6 +1684,8 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
               <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Email</th>
               <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Categoría</th>
               <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Importación</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-center">Traspaso al CRM</th>
+              <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] text-right">Acción</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -1341,11 +1696,22 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
                 <td className="p-5">{ client.email || '---' }</td>
                 <td className="p-5">{ client.categoria }</td>
                 <td className="p-5">{ formatDate(client.fechaIngreso) }</td>
+                <td className="p-5 text-center">
+                  {onImportSingle && (
+                    <button
+                      onClick={() => onImportSingle(client)}
+                      className="px-3 py-1.5 text-[10px] bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 font-bold uppercase rounded-xl transition-all border border-indigo-500/20 text-white cursor-pointer"
+                      title="Importar este cliente individualmente al CRM comercial sin duplicados"
+                    >
+                      Importar al CRM
+                    </button>
+                  )}
+                </td>
                 <td className="p-5 text-right">
                    <RecordActions 
                      module="crm"
                      onDelete={async () => {
-                       await localDB.deleteFromCollection('contacts_intranet', client.id);
+                       await localDB.deleteFromCollection('intranet_clients', client.id);
                        window.dispatchEvent(new Event('db-change'));
                      }}
                    />
@@ -1354,7 +1720,7 @@ function CRMIntranetTable({ clients }: { clients: any[] }) {
             ))}
             {clients.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-400 italic">No hay clientes importados desde Intranet.</td>
+                <td colSpan={7} className="p-8 text-center text-slate-400 italic">No hay clientes importados desde Intranet.</td>
               </tr>
             )}
           </tbody>
@@ -1427,7 +1793,8 @@ function CRMActivities() {
     tipo: 'Campaña Comercial',
     observaciones: '',
     responsable: '',
-    targetCategories: [] as string[]
+    targetCategories: [] as string[],
+    incluirAGestion: false
   });
 
   const loadActivities = async () => {
@@ -1476,7 +1843,47 @@ function CRMActivities() {
             historialUnificado: updatedHistory
           });
         }
-        alert(`Actividad registrada y aplicada automáticamente a ${targetedContacts.length} clientes.`);
+
+        let gestionUpdatedCount = 0;
+        if (form.incluirAGestion) {
+          try {
+            const gestionRecords = await localDB.getCollection('gestion_records');
+            for (const contact of targetedContacts) {
+              const cName = (contact.name || '').toLowerCase().trim();
+              const cEmail = (contact.email || '').toLowerCase().trim();
+              const cRut = (contact.rut || '').toLowerCase().trim();
+
+              const existingGestion = gestionRecords.find((gr: any) => {
+                const grName = (gr.nombre || gr.name || '').toLowerCase().trim();
+                const grEmail = (gr.email || '').toLowerCase().trim();
+                const grRut = (gr.rut || gr.rutID || '').toLowerCase().trim();
+
+                const nameMatch = cName && grName && grName === cName;
+                const emailMatch = cEmail && grEmail && grEmail === cEmail;
+                const rutMatch = cRut && cRut !== 'sin rut' && grRut && grRut === cRut;
+
+                return nameMatch || emailMatch || rutMatch;
+              });
+
+              if (existingGestion) {
+                const logHeader = `\n\n--- Automatización CRM: ${form.campania} ---`;
+                const updatedGestionObs = (existingGestion.observaciones || '') + logHeader + `\n[${form.tipo}] - ${form.observaciones}`;
+                await localDB.updateInCollection('gestion_records', existingGestion.id, {
+                  observaciones: updatedGestionObs
+                });
+                gestionUpdatedCount++;
+              }
+            }
+          } catch (gErr) {
+            console.error("Error updating gestion records:", gErr);
+          }
+        }
+
+        if (form.incluirAGestion) {
+          alert(`Actividad registrada y aplicada automáticamente a ${targetedContacts.length} clientes del CRM.\nAdemás, se incluyó el registro en ${gestionUpdatedCount} fichas de "Gestión" de clientes traspasados.`);
+        } else {
+          alert(`Actividad registrada y aplicada automáticamente a ${targetedContacts.length} clientes del CRM.`);
+        }
       } else {
         alert('Actividad Registrada');
       }
@@ -1488,7 +1895,8 @@ function CRMActivities() {
       tipo: 'Campaña Comercial',
       observaciones: '',
       responsable: user?.displayName || user?.email || '',
-      targetCategories: []
+      targetCategories: [] as string[],
+      incluirAGestion: false
     });
     loadActivities();
     window.dispatchEvent(new Event('db-change'));
@@ -1623,6 +2031,23 @@ function CRMActivities() {
                    {cat}
                  </label>
                ))}
+            </div>
+          </CRMField>
+          <CRMField label="Propagación a Gestión (Opcional)">
+            <div className="bg-[#111A2E] p-4 rounded-xl border border-[#1E293B] flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <span className="block text-xs font-bold text-slate-200">INCLUIR REGISTRO EN MÓDULO DE GESTIÓN</span>
+                <span className="block text-[11px] text-slate-400">Si se activa, el registro se copiará automáticamente al historial de observaciones de cada cliente en "Gestión" (para aquellos clientes con categoría de esta campaña y que ya tengan ficha creada en Gestión).</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  checked={form.incluirAGestion} 
+                  onChange={e => setForm({...form, incluirAGestion: e.target.checked})} 
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-700/80 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
             </div>
           </CRMField>
           <CRMField label="Observaciones y Resultados">
