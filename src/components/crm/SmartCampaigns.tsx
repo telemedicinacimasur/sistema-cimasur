@@ -12,7 +12,7 @@ const CATEGORIAS_SCHOOL = ['Médico Veterinario', 'Técnico', 'No califica', 'Si
 
 // Preloaded template defaults to give immediate utility
 const PRELOADED_TEMPLATES_CRM: Record<string, string> = {
-  'Sin compra': "Hola {{NOMBRE}}, te escribimos de CIMASUR. Vemos que estás registrado en nuestra base pero aún no has programado tus fórmulas magistrales. ¡Queremos ayudarte! Hoy te ofrecemos un 15% de descuento en tu primer pedido de gotas puras o tinturas. ¿Te gustaría cotizar?",
+  'Sin compra': "Estimado/a doctor/a {{NOMBRE}}, le saludamos de CIMASUR. Vemos que su acceso como médico veterinario ha sido aprobado de manera exitosa en nuestra plataforma Intranet. Ponemos a su disposición nuestro laboratorio homeopático para la elaboración de sus recetas magistrales, y para asegurar una excelente bienvenida, le ofrecemos un 15% de descuento exclusivo en su primer pedido de gotas puras, materias primas o tinturas. ¿Le gustaría cotizar sus fórmulas con nosotros hoy?",
   'Sin categoría': "Estimado/a {{NOMBRE}}, te saludamos de parte del equipo CIMASUR. Tenemos nuevos catálogos de diluciones y materias primas listos para entrega inmediata esta semana. ¿Podemos asistirte hoy?",
   'Bronce': "Hola {{NOMBRE}}, agradecemos tu preferencia técnica con CIMASUR. Como cliente BRONCE, tienes acceso a webinars clínicos mensuales gratuitos. Te invitamos a conocer el cronograma de este mes. ¡Hablemos!",
   'Plata': "Estimado/a {{NOMBRE}}, excelente día. Valoramos mucho tu recurrencia en CIMASUR. Queremos contarte que tu cuenta califica para el programa de envíos優先 priorizados. Contáctanos para coordinar tus despachos de esta semana.",
