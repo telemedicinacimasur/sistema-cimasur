@@ -557,6 +557,8 @@ function ContactRegister({ records }: { records: any[] }) {
                      interes: updatedProfile.type,
                      montoTotalPagado: updatedProfile.montoTotalPagado,
                      montoTotalRecibido: updatedProfile.montoTotalRecibido,
+                     pago: updatedProfile.pago || selectedLead.pago,
+                     fechaPago: updatedProfile.fechaPago || selectedLead.fechaPago,
                      unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedLead.unidadesAcademicas || '',
                      historialPagos: updatedProfile.historialPagos || selectedLead.historialPagos || '',
                      observaciones: newMerged
@@ -564,6 +566,8 @@ function ContactRegister({ records }: { records: any[] }) {
                   setSelectedLead({ 
                      ...selectedLead, 
                      ...updatedProfile, 
+                     pago: updatedProfile.pago || selectedLead.pago,
+                     fechaPago: updatedProfile.fechaPago || selectedLead.fechaPago,
                      unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedLead.unidadesAcademicas || '',
                      historialPagos: updatedProfile.historialPagos || selectedLead.historialPagos || '',
                      observaciones: newMerged 
@@ -819,6 +823,7 @@ function StudentManager({ records }: { records: any[] }) {
             montoTotalPagado: Number(updatedProfile.montoTotalPagado) || 0,
             montoTotalRecibido: Number(updatedProfile.montoTotalRecibido) || 0,
             pago: updatedProfile.pago || selectedStudent.pago,
+            fechaPago: updatedProfile.fechaPago || selectedStudent.fechaPago,
             avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedStudent.avance || 0),
             observacionesAcademicas: newMerged,
             unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedStudent.unidadesAcademicas || '',
@@ -1016,6 +1021,7 @@ function StudentManager({ records }: { records: any[] }) {
                  <th className="p-5">Estudiante</th>
                  <th className="p-5">Curso / Diplomado</th>
                  <th className="p-5">Estado Pago</th>
+                 <th className="p-5">Fecha Pago</th>
                  <th className="p-5 text-center">Avance</th>
                  <th className="p-5 text-right">Acciones</th>
               </tr>
@@ -1039,8 +1045,11 @@ function StudentManager({ records }: { records: any[] }) {
                    <td className="p-5">
                       <span className={cn(
                         "px-3 py-1 rounded text-[9px] font-black uppercase border",
-                        safe(s.pago) === 'Al Día' ? "bg-green-50 text-green-700 border-green-100" : "bg-amber-50 text-amber-700 border-amber-100"
+                        safe(s.pago) === 'Al Día' ? "bg-green-50 text-green-700 border-green-100" : (safe(s.pago)?.includes('Pago') ? "bg-blue-50 text-blue-700 border-blue-100" : "bg-amber-50 text-amber-700 border-amber-100")
                       )}>{safe(s.pago) || 'Al Día'}</span>
+                   </td>
+                   <td className="p-5 text-[10px] font-bold text-slate-400">
+                      📅 {s.fechaPago ? formatDate(s.fechaPago) : '---'}
                    </td>
                    <td className="p-5">
                       <div className="flex flex-col items-center gap-1">
@@ -1293,6 +1302,7 @@ function TrackingView() {
                   montoTotalPagado: updatedProfile.montoTotalPagado,
                   montoTotalRecibido: updatedProfile.montoTotalRecibido,
                   pago: updatedProfile.pago || selectedClient.pago,
+                  fechaPago: updatedProfile.fechaPago || selectedClient.fechaPago,
                   avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedClient.avance || 0),
                   unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
                   historialPagos: updatedProfile.historialPagos || selectedClient.historialPagos || '',
@@ -1304,6 +1314,8 @@ function TrackingView() {
                   avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedClient.avance || 0),
                   unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
                   historialPagos: updatedProfile.historialPagos || selectedClient.historialPagos || '',
+                  fechaPago: updatedProfile.fechaPago || selectedClient.fechaPago,
+                  pago: updatedProfile.pago || selectedClient.pago,
                   [field]: newMerged 
                });
                 alert('Datos base actualizados');

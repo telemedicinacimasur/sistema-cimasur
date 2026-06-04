@@ -763,7 +763,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
           {/* RESUMEN FINANCIERO Y ABONO INLINE */}
           <div className="bg-[#121b2d] rounded-2xl border border-[#1e293b]/70 p-6 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400 flex items-center gap-2 border-b border-[#1e293b] pb-3">
-              <CreditCard className="w-4 h-4 text-emerald-400" /> 4. Resumen Arancelar y Control de Pagos
+              <CreditCard className="w-4 h-4 text-emerald-400" /> 3. Resumen Arancelar y Control de Pagos
             </h3>
 
             {/* Mathematical financial dashboard */}
@@ -899,7 +899,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
           {/* COLLAPSED BITÁCORA DE CONTROL / TIMELINE AND WRITING NOTE */}
           <div className="bg-[#121b2d] rounded-2xl border border-[#1e293b]/70 p-6 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-[#38bdf8] flex items-center gap-2 border-b border-[#1e293b] pb-3">
-              <History className="w-4 h-4 text-[#38bdf8]" /> 5. Bitácora Oficial de Control Escolar
+              <History className="w-4 h-4 text-[#38bdf8]" /> 4. Bitácora Oficial de Control Escolar
             </h3>
 
             {/* Input to write new note */}
