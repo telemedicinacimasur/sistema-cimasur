@@ -113,13 +113,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     }
     
     if (!loadedModules || loadedModules.length === 0) {
-      loadedModules = [
-        { id: 1, name: 'Módulo I: Fundamentos Doctrinales de la Homeopatía', duracion: '40 Horas', estado: (selectedClient.avance || 0) >= 20 ? 'Completado' : 'En Curso' },
-        { id: 2, name: 'Módulo II: Organon del Arte de Curar y Posología', duracion: '30 Horas', estado: (selectedClient.avance || 0) >= 40 ? 'Completado' : 'En Curso' },
-        { id: 3, name: 'Módulo III: Farmacia Homeopática y Diluciones Puras', duracion: '50 Horas', estado: (selectedClient.avance || 0) >= 60 ? 'Completado' : 'En Curso' },
-        { id: 4, name: 'Módulo IV: Casuística Veterinaria y Semiología', duracion: '40 Horas', estado: (selectedClient.avance || 0) >= 80 ? 'Completado' : 'En Curso' },
-        { id: 5, name: 'Módulo V: Evaluación Práctica y Protocolo de Certificación', duracion: '20 Horas', estado: (selectedClient.avance || 0) >= 100 ? 'Completado' : 'No Iniciado' },
-      ];
+      loadedModules = [];
     }
     setCourseModules(loadedModules);
     
@@ -178,16 +172,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     const updatedList = [...courseModules, newModuleObj];
     setCourseModules(updatedList);
     setNewModName('');
-    
-    const activityLog = `Se agregó manualmente la unidad de clase: "${newModuleObj.name}" (${newModuleObj.duracion})`;
     await persistModules(updatedList);
-    
-    // Log in timeline
-    await onUpdate({
-      activityType: 'Actualización Académica',
-      newHistory: `[Académico] ${activityLog}`,
-      currentStatus: currentStatus || selectedClient.estado
-    });
   };
 
   const handleDeleteModule = async (moduleId: number) => {
@@ -200,15 +185,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
 
     const updatedList = courseModules.filter(m => m.id !== moduleId);
     setCourseModules(updatedList);
-    
-    const activityLog = `Se eliminó la unidad de clase: "${moduleToDelete.name}"`;
     await persistModules(updatedList);
-
-    await onUpdate({
-      activityType: 'Actualización Académica',
-      newHistory: `[Académico] ${activityLog}`,
-      currentStatus: currentStatus || selectedClient.estado
-    });
   };
 
   const handleUpdateModuleStatus = async (moduleId: number, nextEstado: string) => {
@@ -218,16 +195,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     });
 
     setCourseModules(updatedList);
-    
-    const targetModule = courseModules.find(m => m.id === moduleId);
-    const activityLog = `Unidad "${targetModule?.name}" cambiada a estado: ${nextEstado}`;
     await persistModules(updatedList);
-
-    await onUpdate({
-      activityType: 'Progreso Académico',
-      newHistory: `[Académico] ${activityLog}`,
-      currentStatus: currentStatus || selectedClient.estado
-    });
   };
 
   const handleManualProgressChange = async (val: number) => {
@@ -244,7 +212,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
         ...updatedForm,
         unidadesAcademicas: JSON.stringify(courseModules)
       },
-      newHistory: `[Sistema] Avance manual ajustado a ${progress}%`
+      newHistory: ''
     });
   };
 
@@ -300,7 +268,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     await onUpdate({ 
       isProfileUpdate: true, 
       updatedProfile: updatedForm, 
-      newHistory: `[Pago] ${newHistoryEntry}` 
+      newHistory: '' 
     });
 
     setAddPaymentSuccess(`Abono por ${formatCurrency(parsedMonto)} registrado.`);
@@ -331,12 +299,10 @@ export const Expediente: React.FC<ExpedienteProps> = ({
 
     setEditForm(modifiedForm);
 
-    const progressLog = `Progreso Académico: Módulo #${moduleId} cambiado a ${nextEstado}. Avance total recalculated: ${recalculatedProgression}%`;
-
     await onUpdate({
       isProfileUpdate: true,
       updatedProfile: modifiedForm,
-      newHistory: `[Progreso] ${progressLog}`
+      newHistory: ''
     });
   };
 
@@ -915,11 +881,10 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                   value={currentStatus || selectedClient.estado}
                   onChange={e => setCurrentStatus(e.target.value)}
                 >
+                  <option value="Sin interacción">Estado: Sin interacción</option>
                   <option value="En proceso">Estado: En proceso</option>
-                  <option value="Prospecto VIP">Estado: Prospecto VIP</option>
-                  <option value="Pendiente de Cierre">Estado: Pendiente Cierre</option>
-                  <option value="Matriculado">Estado: Matriculado</option>
                   <option value="Inactivo">Estado: Inactivo</option>
+                  <option value="Matriculado">Estado: Matriculado</option>
                 </select>
               </div>
               <textarea 

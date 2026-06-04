@@ -548,7 +548,7 @@ function ContactRegister({ records }: { records: any[] }) {
                   const currentDate = new Date().toLocaleString();
                   const userStamp = user?.displayName || user?.email || 'Admin';
                   const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
-                  const newMerged = (selectedLead.observaciones ? selectedLead.observaciones + '\n\n' : '') + baseUpdateEntry;
+                  const newMerged = selectedLead.observaciones || '';
 
                   await localDB.updateInCollection('school_leads', selectedLead.id, {
                      rut: updatedProfile.rut,
@@ -560,7 +560,7 @@ function ContactRegister({ records }: { records: any[] }) {
                      observaciones: newMerged
                   });
                   setSelectedLead({ ...selectedLead, ...updatedProfile, observaciones: newMerged });
-                  alert('Datos base de prospecto actualizados y registrados en el historial');
+                  alert('Datos base de prospecto actualizados');
                   return;
                }
 
@@ -796,7 +796,7 @@ function StudentManager({ records }: { records: any[] }) {
         const currentDate = new Date().toLocaleString();
         const userStamp = !!localStorage ? 'Admin' : 'Admin'; // simple fallback
         const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
-        const newMerged = (selectedStudent.observacionesAcademicas ? selectedStudent.observacionesAcademicas + '\n\n' : '') + baseUpdateEntry;
+        const newMerged = selectedStudent.observacionesAcademicas || '';
 
         const updates = {
             name: updatedProfile.name,
@@ -817,7 +817,7 @@ function StudentManager({ records }: { records: any[] }) {
         await localDB.updateInCollection('students', selectedStudent.id, updates);
         setSelectedStudent({ ...selectedStudent, ...updates });
         window.dispatchEvent(new Event('db-change'));
-        alert('Datos base actualizados y registrados en el historial');
+        alert('Datos base actualizados');
         return;
     }
 
@@ -1264,7 +1264,7 @@ function TrackingView() {
                 const userStamp = 'Admin'; // simpler fallback
                 const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
                 const currentObs = selectedClient[field] || '';
-                const newMerged = (currentObs ? currentObs + '\n\n' : '') + baseUpdateEntry;
+                const newMerged = currentObs;
 
                await localDB.updateInCollection(collection, selectedClient.id, {
                   rut: updatedProfile.rut,
@@ -1285,7 +1285,7 @@ function TrackingView() {
                   unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
                   [field]: newMerged 
                });
-                alert('Datos base actualizados y registrados en el historial');
+                alert('Datos base actualizados');
              } else {
                 const currentDate = new Date().toLocaleString();
                 const newEntry = `\n[${currentDate}] Actividad: ${data.activityType}. Obs: ${data.newHistory}`;
