@@ -189,10 +189,36 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
     const mailTo = client.email || '';
     const personalizedText = personalizeMessage(text, client);
     const subject = personalizeMessage(broadcastSubject, client);
-    const mailtoUrl = `mailto:${encodeURIComponent(mailTo)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedText)}`;
+    
+    // Copy the designed HTML or text directly to the clipboard for ease of pasting
+    try {
+      const el = document.createElement('textarea');
+      el.value = personalizedText;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    } catch (e) {
+      console.warn("Clipboard copy failed on iframe environment:", e);
+    }
+
+    const isHtml = personalizedText.includes('<html') || personalizedText.includes('<div') || personalizedText.includes('<!DOCTYPE');
+    const mailtoBody = isHtml 
+      ? `Estimado/a ${client.name || 'Doctor/a'},\n\nHe copiado al portapapeles el diseño elegante completo listo para aplicar en su correo (Gmail, Outlook, etc.). Por favor pulse Ctrl+V o pegar en el cuerpo del correo de envío.\n\nAtte,\nCIMASUR`
+      : personalizedText;
+
+    const mailtoUrl = `mailto:${encodeURIComponent(mailTo)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
     
     setSentStatuses(prev => ({ ...prev, [client.id || client.name]: true }));
-    window.open(mailtoUrl, '_blank');
+    
+    // Safely attempt window.open with a try-catch to avoid crashing on blocked popups/iframes
+    try {
+      window.open(mailtoUrl, '_blank');
+    } catch (err) {
+      console.warn("Failed to open mailto url:", err);
+    }
+
+    alert(`📧 ¡Se copió el diseño completo para ${client.name} al portapapeles y se abrió el gestor de correo!\n\nSimplemente haz clic en "Pegar" (Ctrl+V o Click Derecho > Pegar) en tu correo para colocar la plantilla estilizada con todos sus colores y enlaces.`);
   };
 
   const handleApplyAICardContent = () => {
@@ -613,8 +639,29 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                       {aiResult.contenido}
                    </div>
                 ) : (
-                   <div className="bg-white text-black p-6 rounded-2xl border border-slate-700 max-h-[600px] overflow-y-auto">
-                      <div dangerouslySetInnerHTML={{ __html: aiResult.contenido }} />
+                   <div className="space-y-4 bg-white text-black p-6 rounded-2xl border border-slate-700 max-h-[600px] overflow-y-auto">
+                      <div className="flex justify-end mb-2">
+                         <button
+                           type="button"
+                           onClick={() => {
+                             try {
+                               const el = document.createElement('textarea');
+                               el.value = aiResult.contenido;
+                               document.body.appendChild(el);
+                               el.select();
+                               document.execCommand('copy');
+                               document.body.removeChild(el);
+                               alert("📋 ¡Código HTML de la plantilla copiado al portapapeles con éxito!");
+                             } catch (err) {
+                               alert("No se pudo copiar.");
+                             }
+                           }}
+                           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg uppercase tracking-widest text-[9px] transition-all cursor-pointer shadow-md"
+                         >
+                            <Copy className="w-3.5 h-3.5" /> Copiar HTML de la Plantilla
+                         </button>
+                      </div>
+                      <iframe title="Previsualización de Email Seguro" srcDoc={aiResult.contenido} className="w-full h-[450px] border-0 rounded-xl bg-white" sandbox="allow-same-origin" />
                    </div>
                 )}
              </div>

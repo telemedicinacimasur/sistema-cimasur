@@ -134,6 +134,85 @@ export default function AdminView() {
     school_payments: 'school_payments',
   };
 
+  const syncStudentsToSchoolPayments = async () => {
+    try {
+      const studentsCol = await localDB.getCollection('students');
+      const paymentsCol = await localDB.getCollection('school_payments');
+      
+      let hasChanges = false;
+      
+      for (const student of studentsCol) {
+        if (!student.name) continue;
+        
+        const expectedPayment = {
+          tipo: 'Ingreso Alumno',
+          nombreAlumno: student.name || '',
+          rut: student.rut || '',
+          direccion: student.region || '',
+          email: student.email || '',
+          telefono: student.phone || '',
+          fechaPago: student.fechaFactura || student.fechaIngreso || new Date().toISOString().split('T')[0],
+          montoTotalPagado: Number(student.montoTotalPagado) || 0,
+          montoTotalRecibido: Number(student.montoTotalRecibido) || 0,
+          nroFactura: student.nroFactura || '',
+          fechaFactura: student.fechaFactura || '',
+          observaciones: student.observacionesPago || student.observacionesAcademicas || `Ficha cargada automáticamente de Alumno: ${student.diplomado || 'Diplomado'}`
+        };
+
+        // Match by rut (excluding empty/nulls) or by exact name
+        const matchingPayment = paymentsCol.find((p: any) => 
+          p.tipo === 'Ingreso Alumno' && 
+          ((student.rut && p.rut === student.rut) || p.nombreAlumno === student.name)
+        );
+        
+        if (!matchingPayment) {
+          console.log("Sync Admin: Adding payment for student:", student.name);
+          await localDB.saveToCollection('school_payments', expectedPayment);
+          hasChanges = true;
+        } else {
+          const needsUpdate = 
+            matchingPayment.nombreAlumno !== expectedPayment.nombreAlumno ||
+            (matchingPayment.rut || '') !== expectedPayment.rut ||
+            (matchingPayment.email || '') !== expectedPayment.email ||
+            (matchingPayment.telefono || '') !== expectedPayment.telefono ||
+            Number(matchingPayment.montoTotalPagado) !== expectedPayment.montoTotalPagado ||
+            Number(matchingPayment.montoTotalRecibido) !== expectedPayment.montoTotalRecibido ||
+            (matchingPayment.nroFactura || '') !== expectedPayment.nroFactura ||
+            (matchingPayment.fechaFactura || '') !== expectedPayment.fechaFactura;
+            
+          if (needsUpdate) {
+            console.log("Sync Admin: Updating payment for student:", student.name);
+            await localDB.updateInCollection('school_payments', matchingPayment.id, {
+              ...matchingPayment,
+              ...expectedPayment
+            });
+            hasChanges = true;
+          }
+        }
+      }
+      
+      // Cleanup payments for students that are no longer in active students list
+      for (const payment of paymentsCol) {
+        if (payment.tipo === 'Ingreso Alumno') {
+          const studentExists = studentsCol.some((s: any) => 
+            (s.rut && s.rut === payment.rut) || s.name === payment.nombreAlumno
+          );
+          if (!studentExists) {
+            console.log("Sync Admin: Removing deleted student's payment:", payment.nombreAlumno);
+            await localDB.deleteFromCollection('school_payments', payment.id);
+            hasChanges = true;
+          }
+        }
+      }
+      
+      if (hasChanges) {
+        localDB.clearCache();
+      }
+    } catch (err) {
+      console.error("Error in student synchronization:", err);
+    }
+  };
+
   const loadData = async (forceRefresh = false) => {
     if (forceRefresh) {
       setIsRefreshing(true);
@@ -147,6 +226,11 @@ export default function AdminView() {
         setTimeout(() => setIsRefreshing(false), 800);
       }
       return;
+    }
+    
+    // Auto-sync students with admin school payments before loading the view
+    if (col === 'school_payments') {
+      await syncStudentsToSchoolPayments();
     }
     
     try {
