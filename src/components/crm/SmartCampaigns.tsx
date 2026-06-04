@@ -7,6 +7,20 @@ import {
 import { localDB } from '../../lib/auth';
 import { GoogleGenAI, Type } from "@google/genai";
 
+const normalizeCat = (val: any) => {
+  const str = typeof val === 'string' ? val : '';
+  if (!str) return 'sin categoria';
+  const clean = str.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+  if (clean === '' || clean === '---' || clean === 'ninguna' || clean === 'ninguno' || clean === 'sin categoria') {
+    return 'sin categoria';
+  }
+  return clean;
+};
+
 const CATEGORIAS_CRM = ['Sin compra', 'Sin categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
 const CATEGORIAS_SCHOOL = ['Médico Veterinario', 'Técnico', 'No califica', 'Sin información', 'Otro'];
 
@@ -52,7 +66,7 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
   const [isSavingLog, setIsSavingLog] = useState(false);
 
   useEffect(() => {
-    setSelectedCategory(isSchool ? CATEGORIAS_SCHOOL[0] : CATEGORIAS_CRM[1]);
+    setSelectedCategory(isSchool ? CATEGORIAS_SCHOOL[0] : CATEGORIAS_CRM[0]);
     setAiResult(null);
     setPrompt("");
     setSentStatuses({});
@@ -85,9 +99,10 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
   }, [selectedCategory, isSchool]);
 
   const catClients = useMemo(() => {
+    const targetCat = normalizeCat(selectedCategory);
     return clients.filter(c => {
       const cat = isSchool ? (c.clasificacion || 'Sin información') : (c.categoria || 'Sin categoría');
-      return cat.toLowerCase() === selectedCategory.toLowerCase();
+      return normalizeCat(cat) === targetCat;
     });
   }, [clients, selectedCategory, isSchool]);
 
@@ -280,13 +295,16 @@ export function SmartCampaigns({ isSchool = false }: { isSchool?: boolean }) {
                   </>
                 ) : (
                   <>
-                    <button onClick={() => handleChip("Analiza la categoría 'Sin Compra' y propón una estrategia agresiva de primer descuento (20%) para activarlos esta semana.")} className="px-4 py-1.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[11px] font-bold uppercase hover:bg-rose-500/20 transition-all flex items-center gap-1.5">
+                    <button type="button" onClick={() => handleChip("Analiza la categoría 'Sin Compra' y propón una estrategia de primer descuento para activarlos esta semana.")} className="px-4 py-1.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[11px] font-bold uppercase hover:bg-rose-500/20 transition-all flex items-center gap-1.5">
                        🚨 Activar Sin Compra
                     </button>
-                    <button onClick={() => handleChip("Diseña un plan de upgrade para clientes Bronce y Plata. Ofrece envíos gratis mensuales para forzarlos al tramo Oro.")} className="px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold uppercase hover:bg-emerald-500/20 transition-all flex items-center gap-1.5">
+                    <button type="button" onClick={() => handleChip("Analiza la categoría 'Sin categoría' y propón un plan integral para fidelizarlos, de modo de invitarlos a agendar una videollamada para definir su perfil comercial y motivar su recurrencia.")} className="px-4 py-1.5 rounded-full bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20 text-[11px] font-bold uppercase hover:bg-[#38BDF8]/20 transition-all flex items-center gap-1.5">
+                       🔍 Activar Sin Categoría
+                    </button>
+                    <button type="button" onClick={() => handleChip("Diseña un plan de upgrade para clientes Bronce y Plata. Ofrece envíos gratis mensuales para moverlos al tramo Oro.")} className="px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold uppercase hover:bg-emerald-500/20 transition-all flex items-center gap-1.5">
                        📈 Plan Upgrade (Bronce/Plata)
                     </button>
-                    <button onClick={() => handleChip("Estructura un modelo de retención VIP para Oro y Platinum. Foco en atención prioritaria y asesoría clínica gratuita.")} className="px-4 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold uppercase hover:bg-amber-500/20 transition-all flex items-center gap-1.5">
+                    <button type="button" onClick={() => handleChip("Estructura un modelo de retención VIP para Oro y Platinum coubicando atención prioritaria y asesoría clínica.")} className="px-4 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold uppercase hover:bg-amber-500/20 transition-all flex items-center gap-1.5">
                        💎 Retención Oro/Platinum
                     </button>
                   </>

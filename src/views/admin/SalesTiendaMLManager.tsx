@@ -66,6 +66,7 @@ const TIENDA_PRODUCTS = [
   "Kalium Tic CS",
   "Kit Fin de Año",
   "Kit Modulador Digestivo",
+  "Kit Osteoarticular",
   "Kit Viaje",
   "Maqui CS",
   "Melissa P CS",

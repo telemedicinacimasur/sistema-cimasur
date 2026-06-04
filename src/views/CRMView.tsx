@@ -1479,7 +1479,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                       <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || '---'}</td>
                       <td className="p-5">
                          <select
-                           value={r.categoria}
+                           value={CATEGORIAS.includes(r.categoria) ? r.categoria : 'Sin categoría'}
                            disabled={!canEdit}
                            onChange={async (e) => {
                              const newVal = e.target.value;
