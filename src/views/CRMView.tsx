@@ -28,18 +28,94 @@ import { addNotification } from '../lib/notifications';
 
 import { SmartCampaigns } from '../components/crm/SmartCampaigns';
 
+export function isDuplicateName(nameA: string, nameB: string): boolean {
+  if (!nameA || !nameB) return false;
+  const clean = (s: string) => {
+    return s.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+      .replace(/[^a-z0-9 ]/g, " ") // replace punctuation with spaces
+      .replace(/\s+/g, " ") // collapse spaces
+      .trim();
+  };
+  const cleanA = clean(nameA);
+  const cleanB = clean(nameB);
+  if (!cleanA || !cleanB) return false;
+  if (cleanA === cleanB) return true;
+
+  // Filter out common noise words in South American business registers and titles
+  const noiseWords = new Set(["ltda", "limitada", "spa", "eirl", "e.i.r.l.", "sociedad", "y", "m.", "de", "del", "la", "las", "los", "dr", "dra", "veterinario", "medico"]);
+  const tokensA = cleanA.split(" ").filter(w => w.length > 2 && !noiseWords.has(w));
+  const tokensB = cleanB.split(" ").filter(w => w.length > 2 && !noiseWords.has(w));
+
+  if (tokensA.length === 0 || tokensB.length === 0) return false;
+
+  const fullA = tokensA.join(" ");
+  const fullB = tokensB.join(" ");
+  
+  if (fullB.includes(fullA) || fullA.includes(fullB)) {
+    return true;
+  }
+
+  // Also check if they share a threshold of substantial tokens
+  const setA = new Set(tokensA);
+  const setB = new Set(tokensB);
+  const intersection = [...setA].filter(x => setB.has(x));
+  
+  // If we match 3 or more substantial words
+  if (intersection.length >= 3) {
+    return true;
+  }
+
+  // Or if the shorter set has >= 2 words and all of them match
+  const minLength = Math.min(setA.size, setB.size);
+  if (minLength >= 2 && intersection.length === minLength) {
+    return true;
+  }
+
+  return false;
+}
+
+export function areContactsDuplicate(c1: any, c2: any): boolean {
+  if (!c1 || !c2) return false;
+  
+  // Clean email check helper
+  const cleanEmail = (e: any) => {
+    if (!e) return '';
+    return String(e).toLowerCase().replace(/[,;\s]/g, '').trim();
+  };
+
+  const email1 = cleanEmail(c1.email || c1.Email);
+  const email2 = cleanEmail(c2.email || c2.Email);
+
+  if (email1 && email2 && email1 === email2) return true;
+
+  // Clean RUT helper
+  const cleanRut = (r: any) => {
+    if (!r) return '';
+    const cleanStr = String(r).toUpperCase().replace(/[^0-9K]/g, '').trim();
+    if (cleanStr === '' || cleanStr.includes('SINRUT') || cleanStr === 'NO' || cleanStr === 'SIN') return '';
+    return cleanStr;
+  };
+
+  const rut1 = cleanRut(c1.rut || c1.RUT || c1["RUT / ID"]);
+  const rut2 = cleanRut(c2.rut || c2.RUT || c2["RUT / ID"]);
+
+  if (rut1 && rut2 && rut1 === rut2) return true;
+
+  // Smart Name check
+  const name1 = c1.name || c1.Nombre || c1["Nombre / Razón Social"] || c1["Nombre Completo"] || c1.name;
+  const name2 = c2.name || c2.Nombre || c2["Nombre / Razón Social"] || c2["Nombre Completo"] || c2.name;
+
+  if (isDuplicateName(name1, name2)) return true;
+
+  return false;
+}
+
 export async function syncToIntranetClientsIfNeeded(contact: any, user?: any) {
   if (!contact || contact.intranet !== 'Si') return;
   try {
     const intranetClients = await localDB.getCollection('intranet_clients');
-    const icName = (contact.name || '').toLowerCase().trim();
-    const icEmail = (contact.email || '').toLowerCase().trim();
-
-    const exists = intranetClients.some((ic: any) => {
-      const nameMatch = icName && (ic.name || '').toLowerCase().trim() === icName;
-      const emailMatch = icEmail && (ic.email || '').toLowerCase().trim() === icEmail;
-      return nameMatch || emailMatch;
-    });
+    const exists = intranetClients.some((ic: any) => areContactsDuplicate(ic, contact));
 
     if (!exists) {
       await localDB.saveToCollection('intranet_clients', {
@@ -58,18 +134,12 @@ export async function syncToIntranetClientsIfNeeded(contact: any, user?: any) {
 
 export async function syncIntranetClientToCRM(ic: any, user?: any) {
   if (!ic) return;
+  // GESTION: ONLY APPROVED INTRANET CLIENTS (Veterinario) can be passed to CRM Comercial contacts
+  if (ic.accesoAprobado !== 'Si') return;
+
   try {
     const contacts = await localDB.getCollection('contacts');
-    const icName = (ic.name || '').toLowerCase().trim();
-    const icEmail = (ic.email || '').toLowerCase().trim();
-
-    const existingContact = contacts.find((c: any) => {
-      const cName = (c.name || '').toLowerCase().trim();
-      const cEmail = (c.email || '').toLowerCase().trim();
-      const nameMatch = icName && cName && cName === icName;
-      const emailMatch = icEmail && cEmail && cEmail === icEmail;
-      return nameMatch || emailMatch;
-    });
+    const existingContact = contacts.find((c: any) => areContactsDuplicate(c, ic));
 
     if (existingContact) {
       let needsUpdate = false;
@@ -136,16 +206,85 @@ export default function CRMView() {
   useEffect(() => {
     const loadData = async () => {
       const data = await localDB.getCollection('contacts');
-      setRecords(data);
       const intranetData = await localDB.getCollection('intranet_clients');
-      setIntranetClients(intranetData);
       const importData = await localDB.getCollection('intranet_imports');
+
+      // Proactive cleanup of existing duplicates in contacts list (e.g. Marco Antonio Vilches)
+      let cleanedSomeDuplicates = false;
+      const cleanContactsList = [...data];
+      for (let i = 0; i < cleanContactsList.length; i++) {
+        for (let j = i + 1; j < cleanContactsList.length; j++) {
+          const c1 = cleanContactsList[i];
+          const c2 = cleanContactsList[j];
+          if (c1 && c2 && areContactsDuplicate(c1, c2)) {
+            let keepIndex = i;
+            let removeIndex = j;
+            if ((!c1.rut || c1.rut === 'Sin RUT') && (c2.rut && c2.rut !== 'Sin RUT')) {
+              keepIndex = j;
+              removeIndex = i;
+            } else if (c1.categoria === 'Sin compra' && c2.categoria !== 'Sin compra') {
+              keepIndex = j;
+              removeIndex = i;
+            }
+            
+            const keepContact = cleanContactsList[keepIndex];
+            const removeContact = cleanContactsList[removeIndex];
+            
+            const updates: any = {};
+            let needsUpdate = false;
+            if (removeContact.intranet === 'Si' && keepContact.intranet !== 'Si') {
+              updates.intranet = 'Si';
+              needsUpdate = true;
+            }
+            if (removeContact.phone && !keepContact.phone) {
+              updates.phone = removeContact.phone;
+              needsUpdate = true;
+            }
+            if (removeContact.email && !keepContact.email) {
+              updates.email = removeContact.email;
+              needsUpdate = true;
+            }
+            if (needsUpdate) {
+              await localDB.updateInCollection('contacts', keepContact.id, updates);
+            }
+            
+            await localDB.deleteFromCollection('contacts', removeContact.id);
+            
+            cleanContactsList.splice(removeIndex, 1);
+            if (removeIndex === i) {
+              i--;
+            }
+            cleanedSomeDuplicates = true;
+            break;
+          }
+        }
+      }
+
+      // Automáticamente sincronizar veterinarios aprobados preexistentes al CRM Comercial para corregir discrepancias
+      let didSync = false;
+      for (const ic of intranetData) {
+        if (ic.accesoAprobado === 'Si') {
+          const isDuplicate = cleanContactsList.some((c: any) => areContactsDuplicate(c, ic));
+          if (!isDuplicate) {
+            await syncIntranetClientToCRM(ic, user);
+            didSync = true;
+          }
+        }
+      }
+
+      if (didSync || cleanedSomeDuplicates) {
+        const uContacts = await localDB.getCollection('contacts');
+        setRecords(uContacts);
+      } else {
+        setRecords(cleanContactsList);
+      }
+      setIntranetClients(intranetData);
       setImports(importData);
     };
     loadData();
     window.addEventListener('db-change', loadData);
     return () => window.removeEventListener('db-change', loadData);
-  }, []);
+  }, [user]);
 
   const handleImportFromIntranet = async () => {
     try {
@@ -161,19 +300,13 @@ export default function CRMView() {
       let updatedCount = 0;
 
       for (const ic of intranetClientsList) {
-        const icName = (ic.name || '').toLowerCase().trim();
-        const icEmail = (ic.email || '').toLowerCase().trim();
+        const icName = (ic.name || '').trim();
+        const icEmail = (ic.email || '').trim();
 
         if (!icName && !icEmail) continue;
 
-        // Verify duplicates matching Name or Email in CRM contacts
-        const existingContact = contacts.find(c => {
-          const cName = (c.name || '').toLowerCase().trim();
-          const cEmail = (c.email || '').toLowerCase().trim();
-          const nameMatch = icName && cName && cName === icName;
-          const emailMatch = icEmail && cEmail && cEmail === icEmail;
-          return nameMatch || emailMatch;
-        });
+        // Verify duplicates using smart checking
+        const existingContact = contacts.find(c => areContactsDuplicate(c, ic));
 
         if (existingContact) {
           let needsUpdate = false;
@@ -228,18 +361,13 @@ export default function CRMView() {
   };
 
   const handleImportSingleFromIntranet = async (ic: any) => {
+    if (ic.accesoAprobado !== 'Si') {
+      alert("No se puede traspasar este cliente porque no está aprobado en la Intranet (debe ser Veterinario).");
+      return;
+    }
     try {
       const contacts = await localDB.getCollection('contacts');
-      const icName = (ic.name || '').toLowerCase().trim();
-      const icEmail = (ic.email || '').toLowerCase().trim();
-
-      const existingContact = contacts.find(c => {
-        const cName = (c.name || '').toLowerCase().trim();
-        const cEmail = (c.email || '').toLowerCase().trim();
-        const nameMatch = icName && cName && cName === icName;
-        const emailMatch = icEmail && cEmail && cEmail === icEmail;
-        return nameMatch || emailMatch;
-      });
+      const existingContact = contacts.find(c => areContactsDuplicate(c, ic));
 
       if (existingContact) {
         let needsUpdate = false;
@@ -256,7 +384,7 @@ export default function CRMView() {
             `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' individualmente el ${new Date().toLocaleDateString('es-CL')}.`;
           await localDB.updateInCollection('contacts', existingContact.id, updates);
         }
-        alert(`El cliente "${ic.name}" ya existe en la Cartera de Clientes. Se actualizó su estado en el sistema de manera segura.`);
+        alert(`El cliente "${ic.name}" ya existe en la Cartera de Clientes (se detectó de forma inteligente). Se actualizó su estado en el sistema de manera segura.`);
       } else {
         const newContact = {
           fechaIngreso: ic.fechaIngreso || new Date().toISOString().split('T')[0],
@@ -1517,6 +1645,8 @@ function CRMIntranetTable({
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [existingCRMEmails, setExistingCRMEmails] = useState<Set<string>>(new Set());
+  const [existingCRMNames, setExistingCRMNames] = useState<Set<string>>(new Set());
+  const [crmContacts, setCrmContacts] = useState<any[]>([]);
 
   const permissions = user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
@@ -1526,8 +1656,11 @@ function CRMIntranetTable({
     const checkCRM = async () => {
       try {
         const contacts = await localDB.getCollection('contacts');
+        setCrmContacts(contacts);
         const emails = new Set(contacts.map((c: any) => (c.email || '').toLowerCase().trim()).filter(Boolean));
+        const names = new Set(contacts.map((c: any) => (c.name || '').toLowerCase().trim()).filter(Boolean));
         setExistingCRMEmails(emails);
+        setExistingCRMNames(names);
       } catch (err) {
         console.error(err);
       }
@@ -1577,22 +1710,10 @@ function CRMIntranetTable({
           if (!icName && !icEmail) continue;
 
           // Check if it already exists in the MAIN CRM table (contacts)
-          const existingContact = contacts.find((c: any) => {
-            const cName = (c.name || '').toLowerCase().trim();
-            const cEmail = (c.email || '').toLowerCase().trim();
-            const nameMatch = icName && cName && cName === icName.toLowerCase().trim();
-            const emailMatch = icEmail && cEmail && cEmail === icEmail.toLowerCase().trim();
-            return nameMatch || emailMatch;
-          });
+          const existingContact = contacts.find((c: any) => areContactsDuplicate(c, { name: icName, email: icEmail }));
 
           // Check if it already exists in the intranet_clients database
-          const existingIntranetClient = existingIntranet.find((ic: any) => {
-            const icNameLower = (ic.name || '').toLowerCase().trim();
-            const icEmailLower = (ic.email || '').toLowerCase().trim();
-            const nameMatch = icName && icNameLower && icNameLower === icName.toLowerCase().trim();
-            const emailMatch = icEmail && icEmailLower && icEmailLower === icEmail.toLowerCase().trim();
-            return nameMatch || emailMatch;
-          });
+          const existingIntranetClient = existingIntranet.find((ic: any) => areContactsDuplicate(ic, { name: icName, email: icEmail }));
 
           if (existingContact) {
             // Already in CRM! Check if we need to update their intranet tag to 'Si'
@@ -1771,7 +1892,7 @@ function CRMIntranetTable({
           </thead>
           <tbody className="divide-y divide-slate-200/10">
             {clients.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '')).map(client => {
-              const isTransferred = existingCRMEmails.has((client.email || '').toLowerCase().trim());
+              const isTransferred = crmContacts.some(c => areContactsDuplicate(c, client));
               return (
                 <tr key={client.id} className="hover:bg-[#1E293B]/50 transition-colors">
                   <td className="p-5 font-bold text-white">{ client.name }</td>
