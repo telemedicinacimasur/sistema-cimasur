@@ -235,6 +235,30 @@ function ContactRegister({ records }: { records: any[] }) {
   const [currentStatus, setCurrentStatus] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [phoneWarning, setPhoneWarning] = useState<{type: 'lead' | 'student', match: string} | null>(null);
+
+  useEffect(() => {
+    if (form.phone && form.phone.length >= 7) {
+      const cleanPhone = form.phone.replace(/\D/g, '');
+      const leadMatch = records.find(r => r.phone && r.id !== editingId && r.phone.replace(/\D/g, '') === cleanPhone);
+      
+      if (leadMatch && cleanPhone.length > 5) {
+         setPhoneWarning({ type: 'lead', match: leadMatch.name || 'Lead sin nombre' });
+         return;
+      }
+      
+      localDB.getCollection('students').then(students => {
+         const studentMatch = students.find((s:any) => s.phone && s.phone.replace(/\D/g, '') === cleanPhone);
+         if (studentMatch && cleanPhone.length > 5) {
+            setPhoneWarning({ type: 'student', match: studentMatch.name || 'Alumno sin nombre' });
+         } else {
+            setPhoneWarning(null);
+         }
+      }).catch(() => setPhoneWarning(null));
+    } else {
+      setPhoneWarning(null);
+    }
+  }, [form.phone, records, editingId]);
 
   const filteredRecords = records.filter(r => {
     const name = safe(r.name).toLowerCase();
@@ -249,7 +273,9 @@ function ContactRegister({ records }: { records: any[] }) {
     try {
       const dataToSave = {
         ...form,
-        montoTotalPagado: form.montoTotalPagado === '' ? '' : Number(form.montoTotalPagado),
+        name: form.name.trim() || 'Sin Nombre (Solo WhatsApp)',
+        rut: form.rut.trim() || 'No detallado',
+        montoTotalPagado: form.montoTotalPagado === '' ? 0 : Number(form.montoTotalPagado),
         montoTotalRecibido: form.montoTotalRecibido === '' ? 0 : Number(form.montoTotalRecibido)
       };
 
@@ -475,11 +501,18 @@ function ContactRegister({ records }: { records: any[] }) {
               />
             </div>
             <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
-               <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
-               <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} required /></FormGroup>
-               <FormGroup label="RUT Escrito"><input className="w-full border-b p-2" value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} required /></FormGroup>
+                <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
+               <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" placeholder="Opcional. Ej: Sin Nombre" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} /></FormGroup>
+               <FormGroup label="RUT Escrito"><input className="w-full border-b p-2" placeholder="Opcional." value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} /></FormGroup>
                <FormGroup label="Email"><input type="email" className="w-full border-b p-2" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></FormGroup>
-               <FormGroup label="Teléfono / WhatsApp"><input className="w-full border-b p-2" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} /></FormGroup>
+               <FormGroup label="Teléfono / WhatsApp">
+                  <input className={cn("w-full border-b p-2 font-bold", phoneWarning ? "border-amber-500 text-amber-600 bg-amber-50/50" : "")} placeholder="Requerido. Ej: +569..." value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} required />
+                  {phoneWarning && (
+                      <p className="text-[10px] uppercase font-black text-amber-600 mt-1.5 flex items-center gap-1">
+                          ⚠️ ALERTA: FONO YA INSCRITO CÓMO {phoneWarning.type === 'student' ? 'ALUMNO' : 'LEAD'} ({phoneWarning.match})
+                      </p>
+                  )}
+               </FormGroup>
                
                <FormGroup label="CLASIFICACIÓN PROFESIONAL">
                   <select className="w-full border-b p-2 text-sm font-bold text-[#38BDF8]" value={form.clasificacion || ''} onChange={e => setForm({...form, clasificacion: e.target.value})}>
