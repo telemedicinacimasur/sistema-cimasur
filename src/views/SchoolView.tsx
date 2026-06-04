@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
-import { cn, formatDate, safe, parseExcelDate } from '../lib/utils';
+import { cn, formatDate, safe, parseExcelDate, formatCurrency } from '../lib/utils';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
 import * as XLSX from 'xlsx';
 

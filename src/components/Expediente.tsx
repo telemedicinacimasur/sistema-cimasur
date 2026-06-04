@@ -533,6 +533,34 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                 )}
               </CRMField>
 
+              <CRMField label="Arancel Total (Monto de Venta)">
+                {isEditingData ? (
+                  <input 
+                    type="number"
+                    className="w-full bg-[#152035] border border-[#1e293b]/70 rounded px-2 py-1 text-white text-xs font-bold font-mono outline-none focus:border-sky-500" 
+                    value={editForm.montoTotalPagado ?? 0} 
+                    onChange={e => setEditForm({...editForm, montoTotalPagado: Number(e.target.value)})} 
+                  />
+                ) : (
+                  <span className="text-slate-200 text-xs font-mono font-bold">
+                    {formatCurrency(selectedClient.montoTotalPagado || 0)}
+                  </span>
+                )}
+              </CRMField>
+              <CRMField label="Monto Recibido (Abonado)">
+                {isEditingData ? (
+                  <input 
+                    type="number"
+                    className="w-full bg-[#152035] border border-[#1e293b]/70 rounded px-2 py-1 text-white text-xs font-bold font-mono outline-none focus:border-sky-500" 
+                    value={editForm.montoTotalRecibido ?? 0} 
+                    onChange={e => setEditForm({...editForm, montoTotalRecibido: Number(e.target.value)})} 
+                  />
+                ) : (
+                  <span className="text-emerald-400 text-xs font-mono font-bold">
+                    {formatCurrency(selectedClient.montoTotalRecibido || 0)}
+                  </span>
+                )}
+              </CRMField>
               <CRMField label="Compromiso / Fecha de Pago">
                 {isEditingData ? (
                   <input 
@@ -769,18 +797,33 @@ export const Expediente: React.FC<ExpedienteProps> = ({
             </h3>
 
             {/* Mathematical financial dashboard */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
-                <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider block">Total Recibido (Abonado)</span>
-                <span className="text-base font-black font-mono text-emerald-400 block mt-1">
+                <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider block">Arancel Total</span>
+                <span className="text-xs font-black font-mono text-slate-200 block mt-1">
+                  {formatCurrency(editForm.montoTotalPagado || 0)}
+                </span>
+              </div>
+              <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
+                <span className="text-[8px] font-extrabold uppercase text-indigo-400 tracking-wider block">Total Recibido (Abonos)</span>
+                <span className="text-xs font-black font-mono text-emerald-400 block mt-1">
                   {formatCurrency(editForm.montoTotalRecibido || 0)}
                 </span>
               </div>
               <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
+                <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider block">Saldo Restante</span>
+                <span className={cn(
+                  "text-xs font-black font-mono mt-1 block",
+                  ((editForm.montoTotalPagado || 0) - (editForm.montoTotalRecibido || 0)) > 0 ? "text-amber-400" : "text-emerald-500"
+                )}>
+                  {formatCurrency(Math.max(0, (editForm.montoTotalPagado || 0) - (editForm.montoTotalRecibido || 0)))}
+                </span>
+              </div>
+              <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
                 <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider block">Estado de Cuenta</span>
-                <span className="text-xs font-black uppercase inline-block text-white mt-2">
+                <span className="text-xs font-black uppercase inline-block text-white mt-1">
                   <span className={cn(
-                    "px-2 py-1 rounded text-[9px] font-black uppercase",
+                    "px-2 py-0.5 rounded text-[9px] font-black uppercase inline-block",
                     editForm.pago === 'Al Día' ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
                   )}>{editForm.pago || 'Al Día'}</span>
                 </span>
