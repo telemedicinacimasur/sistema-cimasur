@@ -245,6 +245,28 @@ export const markNotificationAsRead = async (id: string) => {
 };
 
 export const addNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
+  // Filter out any administration submodules notifications requested by the user
+  const titleLower = (notification.title || '').trim().toLowerCase();
+  const messageLower = (notification.message || '').toLowerCase();
+  
+  const isBlockedAdminNotification = 
+    titleLower.startsWith('nueva venta') ||
+    titleLower === 'nuevo dte registrado' ||
+    titleLower === 'nuevo pago veterinario' ||
+    titleLower === 'nuevo alumno matriculado' ||
+    titleLower.includes('resumen de ventas') ||
+    titleLower.includes('saldos escuela') ||
+    titleLower.includes('códigos y diluciones') ||
+    titleLower.includes('codigos y diluciones') ||
+    titleLower.includes('presupuesto y flujo') ||
+    messageLower.includes('school_payments') ||
+    messageLower.includes('saldos escuela');
+
+  if (isBlockedAdminNotification) {
+    console.log("Blocking notification from blocked admin submodule:", notification.title);
+    return;
+  }
+
   let currentUserEmail = '';
   try {
     const local = sessionStorage.getItem('cimasur_user');
