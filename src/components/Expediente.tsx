@@ -65,11 +65,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
   const [editForm, setEditForm] = useState(selectedClient);
   
   // Ledger/Payments synced in dynamic note entries/state
-  const [payments, setPayments] = useState<any[]>([
-    { id: 1, cuota: 'Matrícula Inicial', monto: 120000, fecha: '2026-03-05', documento: 'V-8812', estado: 'Pagado', metodo: 'Transferencia' },
-    { id: 2, cuota: 'Cuota 1 / Ecosistema', monto: 200000, fecha: '2026-04-10', documento: 'F-9204', estado: 'Pagado', metodo: 'Tarjeta de Crédito' },
-    { id: 3, cuota: 'Cuota 2 / Especialidad', monto: 200000, fecha: '2026-05-12', documento: 'V-9311', estado: selectedClient.pago === 'Al Día' ? 'Pagado' : 'Pendiente', metodo: 'Transferencia' },
-  ]);
+  const [payments, setPayments] = useState<any[]>([]);
 
   const [paymentForm, setPaymentForm] = useState({
     cuota: 'Cuota Mensual / Arancel',
@@ -80,13 +76,6 @@ export const Expediente: React.FC<ExpedienteProps> = ({
   });
 
   const [addPaymentSuccess, setAddPaymentSuccess] = useState('');
-
-  // Required academic documents checked off
-  const [documents, setDocuments] = useState<any[]>([
-    { id: 1, nombre: 'Contrato de Admisión Cimasur Firmado', obligatorio: true, cargado: true, file: 'CONTRATO_FIRMADO.pdf' },
-    { id: 2, nombre: 'Copia Cédula de Identidad (Doble Lado)', obligatorio: true, cargado: true, file: 'RUN_VALIDADO.pdf' },
-    { id: 3, nombre: 'Certificado de Título Profesional o de Egreso', obligatorio: true, cargado: selectedClient.type !== 'Lead', file: selectedClient.type !== 'Lead' ? 'CERTIFICADO_TITULO.pdf' : '' },
-  ]);
 
   // Curriculum outline containing list of modules/classes/workshops
   const [courseModules, setCourseModules] = useState<any[]>([]);
@@ -116,13 +105,21 @@ export const Expediente: React.FC<ExpedienteProps> = ({
       loadedModules = [];
     }
     setCourseModules(loadedModules);
-    
-    // Sync document cert status based on regular status
-    setDocuments([
-      { id: 1, nombre: 'Contrato de Admisión Cimasur Firmado', obligatorio: true, cargado: true, file: 'CONTRATO_FIRMADO.pdf' },
-      { id: 2, nombre: 'Copia Cédula de Identidad (Doble Lado)', obligatorio: true, cargado: true, file: 'RUN_VALIDADO.pdf' },
-      { id: 3, nombre: 'Certificado de Título Profesional o de Egreso', obligatorio: true, cargado: selectedClient.type !== 'Lead', file: selectedClient.type !== 'Lead' ? 'CERTIFICADO_TITULO.pdf' : '' },
-    ]);
+
+    // Attempt to read custom historical payments if saved
+    let loadedPayments: any[] = [];
+    if (selectedClient.historialPagos) {
+      try {
+        if (typeof selectedClient.historialPagos === 'string') {
+          loadedPayments = JSON.parse(selectedClient.historialPagos);
+        } else if (Array.isArray(selectedClient.historialPagos)) {
+          loadedPayments = selectedClient.historialPagos;
+        }
+      } catch (err) {
+        console.error('Error parsing loaded historical payments:', err);
+      }
+    }
+    setPayments(loadedPayments);
   }, [selectedClient]);
 
   const handleSaveEdit = async () => {
@@ -131,7 +128,8 @@ export const Expediente: React.FC<ExpedienteProps> = ({
         isProfileUpdate: true, 
         updatedProfile: {
           ...editForm,
-          unidadesAcademicas: JSON.stringify(courseModules)
+          unidadesAcademicas: JSON.stringify(courseModules),
+          historialPagos: JSON.stringify(payments)
         }, 
         newHistory: '' 
       });
@@ -146,7 +144,8 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     const updatedForm = {
       ...editForm,
       avance: finalProg,
-      unidadesAcademicas: JSON.stringify(updatedList)
+      unidadesAcademicas: JSON.stringify(updatedList),
+      historialPagos: JSON.stringify(payments)
     };
     setEditForm(updatedForm);
     await onUpdate({
@@ -237,7 +236,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
 
     const docRef = paymentForm.documento.trim() || `V-${Math.floor(1000 + Math.random() * 9000)}`;
     const newPaymentObj = {
-      id: payments.length + 1,
+      id: payments.length > 0 ? Math.max(...payments.map(p => p.id)) + 1 : 1,
       cuota: paymentForm.cuota,
       monto: parsedMonto,
       fecha: paymentForm.fecha,
@@ -249,18 +248,16 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     const updatedPayments = [newPaymentObj, ...payments];
     setPayments(updatedPayments);
 
-    // Sum up totals
-    const currentReceived = Number(editForm.montoTotalRecibido) || 0;
-    const finalReceived = currentReceived + parsedMonto;
+    // Sum up totals directly from remaining payments
+    const finalReceived = updatedPayments.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
 
-    const newHistoryEntry = `Abono Registrado: Recibo '${paymentForm.cuota}' por ${formatCurrency(parsedMonto)} mediante ${paymentForm.metodo} (Ref: ${docRef})`;
-    
     const updatedForm = {
       ...editForm,
       montoTotalRecibido: finalReceived,
       avance: editForm.avance || 0,
-      pago: 'Al Día',
-      unidadesAcademicas: JSON.stringify(courseModules)
+      pago: editForm.pago,
+      unidadesAcademicas: JSON.stringify(courseModules),
+      historialPagos: JSON.stringify(updatedPayments)
     };
 
     setEditForm(updatedForm);
@@ -271,9 +268,41 @@ export const Expediente: React.FC<ExpedienteProps> = ({
       newHistory: '' 
     });
 
-    setAddPaymentSuccess(`Abono por ${formatCurrency(parsedMonto)} registrado.`);
+    setAddPaymentSuccess(`Pago por ${formatCurrency(parsedMonto)} registrado.`);
     setPaymentForm(prev => ({ ...prev, monto: '200000', documento: '' }));
     setTimeout(() => setAddPaymentSuccess(''), 3000);
+  };
+
+  const handleDeletePayment = async (paymentId: number) => {
+    const paymentToDelete = payments.find(p => p.id === paymentId);
+    if (!paymentToDelete) return;
+
+    if (!confirm(`¿Está seguro de eliminar el pago "${paymentToDelete.cuota}" por ${formatCurrency(paymentToDelete.monto)}?`)) {
+      return;
+    }
+
+    const updatedPayments = payments.filter(p => p.id !== paymentId);
+    setPayments(updatedPayments);
+
+    // Recalculate and sum up totals from remaining payments
+    const finalReceived = updatedPayments.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
+
+    const updatedForm = {
+      ...editForm,
+      montoTotalRecibido: finalReceived,
+      avance: editForm.avance || 0,
+      pago: editForm.pago,
+      unidadesAcademicas: JSON.stringify(courseModules),
+      historialPagos: JSON.stringify(updatedPayments)
+    };
+
+    setEditForm(updatedForm);
+
+    await onUpdate({ 
+      isProfileUpdate: true, 
+      updatedProfile: updatedForm, 
+      newHistory: '' 
+    });
   };
 
   const handleToggleModule = async (moduleId: number, currentEstado: string) => {
@@ -513,7 +542,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                   </span>
                 )}
               </CRMField>
-              <CRMField label="Monto Recibido (Abonado)">
+              <CRMField label="Monto Recibido (Neto en Cuenta)">
                 {isEditingData ? (
                   <input 
                     type="number"
@@ -530,14 +559,14 @@ export const Expediente: React.FC<ExpedienteProps> = ({
               <CRMField label="Compromiso / Fecha de Pago">
                 {isEditingData ? (
                   <input 
-                    className="w-full bg-[#152035] border border-[#1e293b] rounded px-2 py-1 text-white text-xs font-bold outline-none focus:border-sky-500" 
+                    type="date"
+                    className="w-full bg-[#152035] border border-[#1e293b] rounded px-2 py-1 text-white text-xs font-bold font-mono outline-none focus:border-sky-500" 
                     value={editForm.fechaPago || ''} 
-                    placeholder="Ej: Día 5 de cada mes"
                     onChange={e => setEditForm({...editForm, fechaPago: e.target.value})} 
                   />
                 ) : (
                   <span className="text-amber-400 text-xs font-black">
-                    📅 {selectedClient.fechaPago || 'No detallada'}
+                    📅 {selectedClient.fechaPago ? formatDate(selectedClient.fechaPago) : 'No detallada'}
                   </span>
                 )}
               </CRMField>
@@ -726,31 +755,6 @@ export const Expediente: React.FC<ExpedienteProps> = ({
             </div>
           </div>
 
-          {/* CHECKLIST DE DOCUMENTACIÓN INDISPENSABLE */}
-          <div className="bg-[#121b2d] rounded-2xl border border-[#1e293b]/70 p-6 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-[#38bdf8] flex items-center gap-2 border-b border-[#1e293b] pb-3">
-              <FileText className="w-4 h-4 text-[#38bdf8]" /> 3. Documentación Oficial Cargada
-            </h3>
-            <div className="space-y-2">
-              {documents.map((doc) => (
-                <div key={doc.id} className="p-3 bg-[#0f1726]/80 rounded-xl border border-[#1e293b] flex justify-between items-center">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-100">{doc.nombre}</p>
-                    <p className="text-[9px] font-bold font-mono text-slate-400 mt-0.5">
-                      {doc.cargado ? `✓ Archivo cargado: ${doc.file}` : '⌛ Pendiente de carga oficial'}
-                    </p>
-                  </div>
-                  <span className={cn(
-                    "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded",
-                    doc.cargado ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-500"
-                  )}>
-                    {doc.cargado ? 'Verificado' : 'Pendiente'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
         </div>
 
         {/* COLUMN 2: FINANZAS Y BITÁCORA DE CONTROL (lg:col-span-5) */}
@@ -771,28 +775,47 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                 </span>
               </div>
               <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
-                <span className="text-[8px] font-extrabold uppercase text-indigo-400 tracking-wider block">Total Recibido (Abonos)</span>
+                <span className="text-[8px] font-extrabold uppercase text-indigo-400 tracking-wider block">Total Recibido (Neto en Cuenta)</span>
                 <span className="text-xs font-black font-mono text-emerald-400 block mt-1">
                   {formatCurrency(editForm.montoTotalRecibido || 0)}
                 </span>
               </div>
-              <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
-                <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider block">Saldo Restante</span>
-                <span className={cn(
-                  "text-xs font-black font-mono mt-1 block",
-                  ((editForm.montoTotalPagado || 0) - (editForm.montoTotalRecibido || 0)) > 0 ? "text-amber-400" : "text-emerald-500"
-                )}>
-                  {formatCurrency(Math.max(0, (editForm.montoTotalPagado || 0) - (editForm.montoTotalRecibido || 0)))}
-                </span>
-              </div>
+              {['Cuotas', 'Crédito'].includes(editForm.pago || '') && (
+                <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
+                  <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider block">Saldo Restante</span>
+                  <span className={cn(
+                    "text-xs font-black font-mono mt-1 block",
+                    ((editForm.montoTotalPagado || 0) - (editForm.montoTotalRecibido || 0)) > 0 ? "text-amber-400" : "text-emerald-500"
+                  )}>
+                    {formatCurrency(Math.max(0, (editForm.montoTotalPagado || 0) - (editForm.montoTotalRecibido || 0)))}
+                  </span>
+                </div>
+              )}
               <div className="bg-[#10192e] border border-[#1e293b] p-3 rounded-xl">
                 <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider block">Estado de Cuenta</span>
-                <span className="text-xs font-black uppercase inline-block text-white mt-1">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded text-[9px] font-black uppercase inline-block",
-                    editForm.pago === 'Al Día' ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
-                  )}>{editForm.pago || 'Al Día'}</span>
-                </span>
+                {isEditingData ? (
+                  <select 
+                    className="w-full bg-[#152035] border border-[#1e293b]/70 rounded p-1 text-white text-[10px] font-bold outline-none mt-1" 
+                    value={editForm.pago || ''} 
+                    onChange={e => setEditForm({...editForm, pago: e.target.value})}
+                  >
+                    <option value="">Seleccione...</option>
+                    <option value="Pago Webpay">Pago Webpay</option>
+                    <option value="Pago Transferencia">Pago Transferencia</option>
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Cuotas">Cuotas</option>
+                    <option value="Crédito">Crédito</option>
+                    <option value="Al Día">Al Día</option>
+                    <option value="Otros">Otros</option>
+                  </select>
+                ) : (
+                  <span className="text-xs font-black uppercase inline-block text-white mt-1">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[9px] font-black uppercase inline-block",
+                      (editForm.pago === 'Al Día' || editForm.pago?.includes('Pago')) ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
+                    )}>{editForm.pago || 'Al Día'}</span>
+                  </span>
+                )}
               </div>
             </div>
 
@@ -800,21 +823,38 @@ export const Expediente: React.FC<ExpedienteProps> = ({
             <div className="space-y-2 pt-2">
               <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Historial de Cuotas</span>
               <div className="max-h-[160px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1.5">
-                {payments.map((p) => (
-                  <div key={p.id} className="p-2.5 bg-slate-900/60 rounded-lg border border-[#1e293b]/55 flex justify-between items-center text-[11px]">
-                    <div>
-                      <p className="font-extrabold text-slate-200">{p.cuota}</p>
-                      <p className="text-[9px] text-slate-400 font-mono mt-0.5">{formatDate(p.fecha)} • Ref: {p.documento}</p>
+                {payments.length > 0 ? (
+                  payments.map((p) => (
+                    <div key={p.id} className="p-2.5 bg-slate-900/60 rounded-lg border border-[#1e293b]/55 flex justify-between items-center text-[11px]">
+                      <div>
+                        <p className="font-extrabold text-slate-200">{p.cuota}</p>
+                        <p className="text-[9px] text-slate-400 font-mono mt-0.5">{formatDate(p.fecha)} • Ref: {p.documento}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-emerald-400 font-black">{formatCurrency(p.monto)}</span>
+                        <button 
+                          type="button"
+                          onClick={() => handleDeletePayment(p.id)}
+                          className="p-1 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-white/5 cursor-pointer"
+                          title="Eliminar pago"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <span className="font-mono text-emerald-400 font-black">{formatCurrency(p.monto)}</span>
+                  ))
+                ) : (
+                  <div className="p-6 text-center border border-dashed border-[#1e293b]/40 rounded-xl">
+                    <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Sin pagos o cuotas registradas</p>
+                    <p className="text-[8.5px] text-slate-600 uppercase tracking-wider mt-0.5">Use el formulario de abajo para ingresar un pago (neto)</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
             {/* Inline dynamic coupon payment adder */}
             <form onSubmit={handleAddPayment} className="p-3 bg-slate-900/50 rounded-xl border border-[#1e293b] space-y-2.5 pt-3">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Registrar Abono Manual</span>
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">REGISTRADOR DE PAGOS (NETO EN CUENTA)</span>
               {addPaymentSuccess && (
                 <div className="p-2 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg">
                   ✓ {addPaymentSuccess}

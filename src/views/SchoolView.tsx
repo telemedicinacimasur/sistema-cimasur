@@ -557,9 +557,17 @@ function ContactRegister({ records }: { records: any[] }) {
                      interes: updatedProfile.type,
                      montoTotalPagado: updatedProfile.montoTotalPagado,
                      montoTotalRecibido: updatedProfile.montoTotalRecibido,
+                     unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedLead.unidadesAcademicas || '',
+                     historialPagos: updatedProfile.historialPagos || selectedLead.historialPagos || '',
                      observaciones: newMerged
                   });
-                  setSelectedLead({ ...selectedLead, ...updatedProfile, observaciones: newMerged });
+                  setSelectedLead({ 
+                     ...selectedLead, 
+                     ...updatedProfile, 
+                     unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedLead.unidadesAcademicas || '',
+                     historialPagos: updatedProfile.historialPagos || selectedLead.historialPagos || '',
+                     observaciones: newMerged 
+                  });
                   alert('Datos base de prospecto actualizados');
                   return;
                }
@@ -734,6 +742,7 @@ function StudentManager({ records }: { records: any[] }) {
   const [currentStatus, setCurrentStatus] = useState('En proceso');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDiplomado, setFilterDiplomado] = useState('Todos');
+  const [filterPago, setFilterPago] = useState('Todos');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const toggleSelect = (id: string) => {
@@ -812,7 +821,8 @@ function StudentManager({ records }: { records: any[] }) {
             pago: updatedProfile.pago || selectedStudent.pago,
             avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedStudent.avance || 0),
             observacionesAcademicas: newMerged,
-            unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedStudent.unidadesAcademicas || ''
+            unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedStudent.unidadesAcademicas || '',
+            historialPagos: updatedProfile.historialPagos || selectedStudent.historialPagos || ''
         };
         await localDB.updateInCollection('students', selectedStudent.id, updates);
         setSelectedStudent({ ...selectedStudent, ...updates });
@@ -905,10 +915,12 @@ function StudentManager({ records }: { records: any[] }) {
     const term = searchTerm.toLowerCase();
     const matchSearch = name.includes(term) || rut.includes(term);
     const matchDiplomado = filterDiplomado === 'Todos' || (safe(s.diplomado) === filterDiplomado);
-    return matchSearch && matchDiplomado;
+    const matchPago = filterPago === 'Todos' || (safe(s.pago) === filterPago) || (filterPago === 'Al Día' && !s.pago);
+    return matchSearch && matchDiplomado && matchPago;
   });
 
   const allDiplomados = ['Todos', ...Array.from(new Set(records.map(r => r.diplomado).filter(Boolean)))];
+  const allPagos = ['Todos', 'Pago Webpay', 'Pago Transferencia', 'Pendiente', 'Cuotas', 'Crédito', 'Al Día', 'Otros'];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -966,7 +978,14 @@ function StudentManager({ records }: { records: any[] }) {
                 </button>
               )}
               <select 
-                className="px-4 py-2 rounded-2xl border bg-[#152035] focus:outline-none focus:ring-2 focus:ring-blue-100 text-sm font-bold text-slate-200"
+                className="px-4 py-2 rounded-2xl border border-[#1E293B] bg-[#152035] focus:outline-none focus:ring-2 focus:ring-blue-100 text-xs font-bold text-slate-200"
+                value={filterPago}
+                onChange={e => setFilterPago(e.target.value)}
+              >
+                {allPagos.map((p: any) => <option key={p} value={p}>{p === 'Todos' ? 'Estado Cuenta: Todos' : p}</option>)}
+              </select>
+              <select 
+                className="px-4 py-2 rounded-2xl border bg-[#152035] border-[#1E293B] focus:outline-none focus:ring-2 focus:ring-blue-100 text-xs font-bold text-slate-200"
                 value={filterDiplomado}
                 onChange={e => setFilterDiplomado(e.target.value)}
               >
@@ -1266,7 +1285,7 @@ function TrackingView() {
                 const currentObs = selectedClient[field] || '';
                 const newMerged = currentObs;
 
-               await localDB.updateInCollection(collection, selectedClient.id, {
+                await localDB.updateInCollection(collection, selectedClient.id, {
                   rut: updatedProfile.rut,
                   clasificacion: updatedProfile.region,
                   fecha: updatedProfile.fechaIngreso,
@@ -1276,6 +1295,7 @@ function TrackingView() {
                   pago: updatedProfile.pago || selectedClient.pago,
                   avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedClient.avance || 0),
                   unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
+                  historialPagos: updatedProfile.historialPagos || selectedClient.historialPagos || '',
                   [field]: newMerged
                });
                setSelectedClient({ 
@@ -1283,6 +1303,7 @@ function TrackingView() {
                   ...updatedProfile, 
                   avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedClient.avance || 0),
                   unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
+                  historialPagos: updatedProfile.historialPagos || selectedClient.historialPagos || '',
                   [field]: newMerged 
                });
                 alert('Datos base actualizados');
