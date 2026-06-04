@@ -156,7 +156,7 @@ export default function AdminView() {
           montoTotalRecibido: Number(student.montoTotalRecibido) || 0,
           nroFactura: student.nroFactura || '',
           fechaFactura: student.fechaFactura || '',
-          observaciones: student.observacionesPago || student.observacionesAcademicas || `Ficha cargada automáticamente de Alumno: ${student.diplomado || 'Diplomado'}`
+          observaciones: student.observacionesPago || ''
         };
 
         // Match by rut (excluding empty/nulls) or by exact name
@@ -178,7 +178,8 @@ export default function AdminView() {
             Number(matchingPayment.montoTotalPagado) !== expectedPayment.montoTotalPagado ||
             Number(matchingPayment.montoTotalRecibido) !== expectedPayment.montoTotalRecibido ||
             (matchingPayment.nroFactura || '') !== expectedPayment.nroFactura ||
-            (matchingPayment.fechaFactura || '') !== expectedPayment.fechaFactura;
+            (matchingPayment.fechaFactura || '') !== expectedPayment.fechaFactura ||
+            (matchingPayment.observaciones || '') !== expectedPayment.observaciones;
             
           if (needsUpdate) {
             console.log("Sync Admin: Updating payment for student:", student.name);
