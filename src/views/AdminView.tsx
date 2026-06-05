@@ -2735,7 +2735,21 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   const totalPagosProfesores = filteredRecords.filter(r => r.tipo === 'Pago Profesor').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
   const totalGastosMensuales = filteredRecords.filter(r => r.tipo === 'Gasto Mensual').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
   const totalNeto = totalIngresos - totalPagosProfesores - totalGastosMensuales;
-  const faltante = meta - totalNeto;
+  
+  const faltante = meta - totalIngresos;
+
+  const totalCuentaGlobal = records.filter(r => {
+    if (!r.fechaPago) return false;
+    if (yearFilter && yearFilter !== 'Todos' && yearFilter !== '') {
+       const rYear = r.fechaPago.slice(0,4);
+       if (parseInt(rYear) > parseInt(yearFilter)) return false;
+    }
+    return true;
+  }).reduce((sum, r) => {
+    if (r.tipo === 'Ingreso Alumno') return sum + (Number(r.montoTotalRecibido) || 0);
+    if (r.tipo === 'Pago Profesor' || r.tipo === 'Gasto Mensual') return sum - (Number(r.montoTotalRecibido) || 0);
+    return sum;
+  }, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -2834,8 +2848,8 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                      </button>
                   </div>
                   <p className="text-[10px] font-black uppercase text-indigo-300 tracking-widest">Total en Cuenta</p>
-                  <p className={`text-2xl font-black ${totalNeto < 0 ? 'text-rose-400' : 'text-indigo-400'} mt-1 leading-none italic ${!showCuenta ? 'blur-sm select-none opacity-50' : ''}`}>
-                    {showCuenta ? formatCurrency(totalNeto) : '$ *.*.*'}
+                  <p className={`text-2xl font-black ${totalCuentaGlobal < 0 ? 'text-rose-400' : 'text-indigo-400'} mt-1 leading-none italic ${!showCuenta ? 'blur-sm select-none opacity-50' : ''}`}>
+                    {showCuenta ? formatCurrency(totalCuentaGlobal) : '$ *.*.*'}
                   </p>
                </div>
             </div>
