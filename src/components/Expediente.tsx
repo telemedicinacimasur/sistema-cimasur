@@ -570,6 +570,20 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                   </span>
                 )}
               </CRMField>
+              <CRMField label="Observación Pago / Cobranza">
+                {isEditingData ? (
+                  <input 
+                    type="text"
+                    className="w-full bg-[#152035] border border-[#1e293b] rounded px-2 py-1 text-white text-xs font-bold outline-none focus:border-sky-500" 
+                    value={editForm.observacionesPago || ''} 
+                    onChange={e => setEditForm({...editForm, observacionesPago: e.target.value})} 
+                  />
+                ) : (
+                  <span className="text-slate-300 text-xs font-bold block min-h-[20px]">
+                    {selectedClient.observacionesPago || 'Sin observaciones.'}
+                  </span>
+                )}
+              </CRMField>
             </div>
 
             {/* Custom school system fields inside leads profile screen */}
@@ -896,37 +910,15 @@ export const Expediente: React.FC<ExpedienteProps> = ({
             </form>
           </div>
 
-          {/* COLLAPSED BITÁCORA DE CONTROL / TIMELINE AND WRITING NOTE */}
+          {/* COLLAPSED REGISTRO DE ACTIVIDAD / TIMELINE AND WRITING NOTE */}
           <div className="bg-[#121b2d] rounded-2xl border border-[#1e293b]/70 p-6 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-[#38bdf8] flex items-center gap-2 border-b border-[#1e293b] pb-3">
-              <History className="w-4 h-4 text-[#38bdf8]" /> 4. Bitácora Oficial de Control Escolar
+              <History className="w-4 h-4 text-[#38bdf8]" /> 4. Registro de Actividad
             </h3>
 
             {/* Input to write new note */}
             <div className="space-y-2 bg-[#0f1726]/60 border border-[#1e293b] p-3 rounded-xl">
               <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Agregar Nueva Ficha de Seguimiento</span>
-              <div className="flex gap-2">
-                <select 
-                  className="bg-[#14203a] border border-[#1e293b] rounded p-1 text-[10px] font-bold text-slate-200 outline-none"
-                  value={activityType}
-                  onChange={e => setActivityType(e.target.value)}
-                >
-                  <option>Nota de Seguimiento</option>
-                  <option>Llamada Telefónica</option>
-                  <option>Reunión Presencial</option>
-                  <option>Actualización Administrativa</option>
-                </select>
-                <select 
-                  className="bg-[#14203a] border border-[#1e293b] rounded p-1 text-[10px] font-bold text-slate-200 outline-none"
-                  value={currentStatus || selectedClient.estado}
-                  onChange={e => setCurrentStatus(e.target.value)}
-                >
-                  <option value="Sin interacción">Estado: Sin interacción</option>
-                  <option value="En proceso">Estado: En proceso</option>
-                  <option value="Inactivo">Estado: Inactivo</option>
-                  <option value="Matriculado">Estado: Matriculado</option>
-                </select>
-              </div>
               <textarea 
                 className="w-full text-xs font-semibold bg-[#10192e] border border-[#1e293b] rounded-lg p-2.5 h-20 text-slate-200 resize-none outline-none focus:border-sky-500 leading-normal" 
                 value={newHistory}
@@ -937,13 +929,13 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                 onClick={submitNote}
                 className="w-full py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold uppercase text-[10px] tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition shadow"
               >
-                <Save className="w-3.5 h-3.5" /> Registrar en Bitácora
+                <Save className="w-3.5 h-3.5" /> Registrar Actividad
               </button>
             </div>
 
             {/* Official historic log visualization */}
             <div className="space-y-4 pt-1">
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block">Registro Cronológico Escolar</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block">Registro Cronológico</span>
               
               <div className="max-h-[240px] overflow-y-auto custom-scrollbar space-y-3 pr-1.5">
                 {parsedHistoryEntries.length > 0 ? (

@@ -42,6 +42,7 @@ import { Expediente } from '../components/Expediente';
 
 import { addNotification } from '../lib/notifications';
 import { SmartCampaigns } from '../components/crm/SmartCampaigns';
+import { syncStudentsToSchoolPayments } from '../lib/syncUtils';
 
 export default function SchoolView() {
   const { user } = useAuth();
@@ -55,94 +56,12 @@ export default function SchoolView() {
   const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities' | 'commercial'>('register');
   const [data, setData] = useState<any[]>([]);
 
-  const syncStudentsToSchoolPayments = async () => {
-    try {
-      const studentsCol = await localDB.getCollection('students');
-      const paymentsCol = await localDB.getCollection('school_payments');
-      
-      let hasChanges = false;
-      
-      for (const student of studentsCol) {
-        if (!student.name) continue;
-        
-        const expectedPayment = {
-          tipo: 'Ingreso Alumno',
-          nombreAlumno: student.name || '',
-          rut: student.rut || '',
-          direccion: student.region || '',
-          email: student.email || '',
-          telefono: student.phone || '',
-          fechaPago: student.fechaFactura || student.fechaIngreso || new Date().toISOString().split('T')[0],
-          montoTotalPagado: Number(student.montoTotalPagado) || 0,
-          montoTotalRecibido: Number(student.montoTotalRecibido) || 0,
-          nroFactura: student.nroFactura || '',
-          fechaFactura: student.fechaFactura || '',
-          observaciones: student.observacionesPago || ''
-        };
-
-        // Match by rut (excluding empty/nulls) or by exact name
-        const matchingPayment = paymentsCol.find((p: any) => 
-          p.tipo === 'Ingreso Alumno' && 
-          ((student.rut && p.rut === student.rut) || p.nombreAlumno === student.name)
-        );
-        
-        if (!matchingPayment) {
-          console.log("Sync School: Adding payment for student:", student.name);
-          await localDB.saveToCollection('school_payments', expectedPayment);
-          hasChanges = true;
-        } else {
-          const needsUpdate = 
-            matchingPayment.nombreAlumno !== expectedPayment.nombreAlumno ||
-            (matchingPayment.rut || '') !== expectedPayment.rut ||
-            (matchingPayment.email || '') !== expectedPayment.email ||
-            (matchingPayment.telefono || '') !== expectedPayment.telefono ||
-            Number(matchingPayment.montoTotalPagado) !== expectedPayment.montoTotalPagado ||
-            Number(matchingPayment.montoTotalRecibido) !== expectedPayment.montoTotalRecibido ||
-            (matchingPayment.nroFactura || '') !== expectedPayment.nroFactura ||
-            (matchingPayment.fechaFactura || '') !== expectedPayment.fechaFactura ||
-            (matchingPayment.observaciones || '') !== expectedPayment.observaciones;
-            
-          if (needsUpdate) {
-            console.log("Sync School: Updating payment for student:", student.name);
-            await localDB.updateInCollection('school_payments', matchingPayment.id, {
-              ...matchingPayment,
-              ...expectedPayment
-            });
-            hasChanges = true;
-          }
-        }
-      }
-      
-      // Cleanup payments for students that are no longer in active students list
-      for (const payment of paymentsCol) {
-        if (payment.tipo === 'Ingreso Alumno') {
-          const studentExists = studentsCol.some((s: any) => 
-            (s.rut && s.rut === payment.rut) || s.name === payment.nombreAlumno
-          );
-          if (!studentExists) {
-            console.log("Sync School: Removing deleted student's payment:", payment.nombreAlumno);
-            await localDB.deleteFromCollection('school_payments', payment.id);
-            hasChanges = true;
-          }
-        }
-      }
-      
-      if (hasChanges) {
-        localDB.clearCache();
-      }
-    } catch (err) {
-      console.error("Error in student synchronization:", err);
-    }
-  };
-
   useEffect(() => {
     const loadData = async () => {
       const colName = activeView === 'students' ? 'students' : 'school_leads';
-      
       if (activeView === 'students') {
         await syncStudentsToSchoolPayments();
       }
-
       const result = await localDB.getCollection(colName);
       setData(result);
     };
@@ -592,6 +511,7 @@ function ContactRegister({ records }: { records: any[] }) {
                      montoTotalRecibido: updatedProfile.montoTotalRecibido,
                      pago: updatedProfile.pago || selectedLead.pago,
                      fechaPago: updatedProfile.fechaPago || selectedLead.fechaPago,
+                     observacionesPago: typeof updatedProfile.observacionesPago !== 'undefined' ? updatedProfile.observacionesPago : selectedLead.observacionesPago,
                      unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedLead.unidadesAcademicas || '',
                      historialPagos: updatedProfile.historialPagos || selectedLead.historialPagos || '',
                      observaciones: newMerged
@@ -601,6 +521,7 @@ function ContactRegister({ records }: { records: any[] }) {
                      ...updatedProfile, 
                      pago: updatedProfile.pago || selectedLead.pago,
                      fechaPago: updatedProfile.fechaPago || selectedLead.fechaPago,
+                     observacionesPago: typeof updatedProfile.observacionesPago !== 'undefined' ? updatedProfile.observacionesPago : selectedLead.observacionesPago,
                      unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedLead.unidadesAcademicas || '',
                      historialPagos: updatedProfile.historialPagos || selectedLead.historialPagos || '',
                      observaciones: newMerged 
@@ -857,6 +778,7 @@ function StudentManager({ records }: { records: any[] }) {
             montoTotalRecibido: Number(updatedProfile.montoTotalRecibido) || 0,
             pago: updatedProfile.pago || selectedStudent.pago,
             fechaPago: updatedProfile.fechaPago || selectedStudent.fechaPago,
+            observacionesPago: typeof updatedProfile.observacionesPago !== 'undefined' ? updatedProfile.observacionesPago : selectedStudent.observacionesPago,
             avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedStudent.avance || 0),
             observacionesAcademicas: newMerged,
             unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedStudent.unidadesAcademicas || '',
@@ -1336,6 +1258,7 @@ function TrackingView() {
                   montoTotalRecibido: updatedProfile.montoTotalRecibido,
                   pago: updatedProfile.pago || selectedClient.pago,
                   fechaPago: updatedProfile.fechaPago || selectedClient.fechaPago,
+                  observacionesPago: typeof updatedProfile.observacionesPago !== 'undefined' ? updatedProfile.observacionesPago : selectedClient.observacionesPago,
                   avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedClient.avance || 0),
                   unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
                   historialPagos: updatedProfile.historialPagos || selectedClient.historialPagos || '',
@@ -1348,6 +1271,7 @@ function TrackingView() {
                   unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedClient.unidadesAcademicas || '',
                   historialPagos: updatedProfile.historialPagos || selectedClient.historialPagos || '',
                   fechaPago: updatedProfile.fechaPago || selectedClient.fechaPago,
+                  observacionesPago: typeof updatedProfile.observacionesPago !== 'undefined' ? updatedProfile.observacionesPago : selectedClient.observacionesPago,
                   pago: updatedProfile.pago || selectedClient.pago,
                   [field]: newMerged 
                });

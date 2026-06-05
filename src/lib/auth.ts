@@ -1,6 +1,7 @@
 import { auth, db, isFirebaseReady } from './firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
+import { syncStudentsToSchoolPayments } from './syncUtils';
 
 export interface UserProfile {
   uid: string;
@@ -227,12 +228,18 @@ export const localDB = {
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }, { merge: true });
+        if (name === 'students') {
+          syncStudentsToSchoolPayments().catch(console.error);
+        }
         return { ...item };
       }
       const docRef = await addDoc(collection(db, name), {
         ...item,
         createdAt: new Date().toISOString()
       });
+      if (name === 'students') {
+        syncStudentsToSchoolPayments().catch(console.error);
+      }
       return { id: docRef.id, ...item };
     } else {
       const id = item.id || `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -243,6 +250,9 @@ export const localDB = {
       });
       if (!response.ok) {
         throw new Error(`Failed to save to ${name}: ${response.statusText}`);
+      }
+      if (name === 'students') {
+        syncStudentsToSchoolPayments().catch(console.error);
       }
       return { ...item, id };
     }
@@ -255,6 +265,9 @@ export const localDB = {
           ...updates,
           updatedAt: new Date().toISOString()
         }, { merge: true });
+        if (name === 'students') {
+          syncStudentsToSchoolPayments().catch(console.error);
+        }
       } catch (error) {
         console.error(`Firebase update error in ${name}/${id}:`, error);
         throw error;
@@ -269,6 +282,9 @@ export const localDB = {
         const errorText = await response.text();
         console.error(`API update error in ${name}/${id}:`, response.status, errorText);
         throw new Error(`Failed to update ${id} in ${name}: Status ${response.status} - ${errorText}`);
+      }
+      if (name === 'students') {
+        syncStudentsToSchoolPayments().catch(console.error);
       }
     }
   },
@@ -328,6 +344,9 @@ export const localDB = {
     if (isFirebaseReady && db) {
       await deleteDoc(doc(db, name, id));
       console.log(`Debug: Deleted (Firebase) from ${name} with id: ${id}`);
+      if (name === 'students') {
+        syncStudentsToSchoolPayments().catch(console.error);
+      }
     } else {
       const response = await fetch(`/api/records/${name}/${id}`, { method: 'DELETE' });
       if (!response.ok) {
@@ -335,6 +354,9 @@ export const localDB = {
         throw new Error(`Failed to delete ${id} from ${name}: ${response.statusText}`);
       }
       console.log(`Debug: Deleted (API) from ${name} with id: ${id}`);
+      if (name === 'students') {
+        syncStudentsToSchoolPayments().catch(console.error);
+      }
     }
   }
 };
