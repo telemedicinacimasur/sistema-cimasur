@@ -2539,12 +2539,33 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   const { user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [monthFilter, setMonthFilter] = useState('Todos');
-  const [yearFilter, setYearFilter] = useState('Todos');
+  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [meta, setMeta] = useState(5000000);
+  const [meta, setMeta] = useState(() => {
+    const saved = localStorage.getItem(`cimasur_school_meta_${new Date().getFullYear()}`);
+    return saved ? parseInt(saved, 10) : 50000000; // Increased to 50 million as it's an annual meta
+  });
   const [isEditingMeta, setIsEditingMeta] = useState(false);
+  
+  // Effect to load meta when year filter changes
+  useEffect(() => {
+    if (yearFilter && yearFilter !== 'Todos') {
+      const saved = localStorage.getItem(`cimasur_school_meta_${yearFilter}`);
+      if (saved) setMeta(parseInt(saved, 10));
+    }
+  }, [yearFilter]);
+
+  // Handle meta change and save to localStorage
+  const handleMetaChange = (newMeta: number) => {
+    setMeta(newMeta);
+    if (yearFilter && yearFilter !== 'Todos') {
+      localStorage.setItem(`cimasur_school_meta_${yearFilter}`, newMeta.toString());
+    } else {
+      localStorage.setItem(`cimasur_school_meta_Todos`, newMeta.toString());
+    }
+  };
   
   // Individual visibility states for metrics
   const [showMeta, setShowMeta] = useState(false);
@@ -2741,7 +2762,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                       type="number" 
                       className="text-2xl font-black bg-[#152035] border-b border-indigo-500 outline-none w-full text-white mt-1" 
                       value={meta} 
-                      onChange={e => setMeta(Number(e.target.value))}
+                      onChange={e => handleMetaChange(Number(e.target.value))}
                       onBlur={() => setIsEditingMeta(false)}
                       autoFocus
                     />

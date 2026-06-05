@@ -18,7 +18,7 @@ export const syncStudentsToSchoolPayments = async () => {
           direccion: student.region || '',
           email: student.email || '',
           telefono: student.phone || '',
-          fechaPago: student.fechaFactura || student.fechaIngreso || new Date().toISOString().split('T')[0],
+          fechaPago: student.fechaPago || student.fechaFactura || student.fechaIngreso || new Date().toISOString().split('T')[0],
           montoTotalPagado: Number(student.montoTotalPagado) || 0,
           montoTotalRecibido: Number(student.montoTotalRecibido) || 0,
           nroFactura: student.nroFactura || '',
@@ -47,6 +47,7 @@ export const syncStudentsToSchoolPayments = async () => {
             (matchingPayment.rut || '') !== expectedPayment.rut ||
             (matchingPayment.email || '') !== expectedPayment.email ||
             (matchingPayment.telefono || '') !== expectedPayment.telefono ||
+            (matchingPayment.fechaPago || '') !== (expectedPayment.fechaPago || '') ||
             Number(matchingPayment.montoTotalPagado) !== expectedPayment.montoTotalPagado ||
             Number(matchingPayment.montoTotalRecibido) !== expectedPayment.montoTotalRecibido ||
             (matchingPayment.nroFactura || '') !== expectedPayment.nroFactura ||
