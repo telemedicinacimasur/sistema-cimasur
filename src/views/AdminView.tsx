@@ -54,7 +54,8 @@ import {
   AlertCircle,
   FlaskConical,
   Activity,
-  Database
+  Database,
+  Landmark
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
@@ -2550,6 +2551,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   const [showAcumulado, setShowAcumulado] = useState(false);
   const [showGastos, setShowGastos] = useState(false);
   const [showFaltante, setShowFaltante] = useState(false);
+  const [showCuenta, setShowCuenta] = useState(false);
 
   const downloadExcelTemplate = () => {
     const headers = [
@@ -2717,7 +2719,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Dashboard de Métricas Escuela */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
          <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6 rounded-[2rem] border border-[#1E293B] shadow-xl overflow-hidden relative group">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#1E293B]/30 rounded-full blur-2xl group-hover:bg-[#1E293B]/80 transition-all" />
             <div className="relative z-10 flex flex-col justify-between h-full">
@@ -2754,60 +2756,91 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
 
          <div className="bg-emerald-600 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#1E293B]/80 rounded-full blur-2xl group-hover:bg-[#152035]/20 transition-all" />
-            <div className="relative z-10">
-               <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-[#152035]/20 w-max rounded-2xl text-white">
-                     <TrendingUp className="w-5 h-5" />
+            <div className="relative z-10 h-full flex flex-col justify-between">
+               <div>
+                  <div className="flex items-center justify-between mb-4">
+                     <div className="p-2 bg-[#152035]/20 w-max rounded-2xl text-white">
+                        <TrendingUp className="w-5 h-5" />
+                     </div>
+                     <button onClick={() => setShowAcumulado(!showAcumulado)} className="text-white/50 hover:text-white transition-colors">
+                        {showAcumulado ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                     </button>
                   </div>
-                  <button onClick={() => setShowAcumulado(!showAcumulado)} className="text-white/50 hover:text-white transition-colors">
-                     {showAcumulado ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <p className="text-[10px] font-black uppercase text-emerald-100 tracking-widest">Ingresos Alumnos</p>
+                  <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showAcumulado ? 'blur-sm select-none opacity-50' : ''}`}>
+                    {showAcumulado ? formatCurrency(totalIngresos) : '$ *.*.*'}
+                  </p>
                </div>
-               <p className="text-[10px] font-black uppercase text-emerald-100 tracking-widest">Ingresos Netos Reales</p>
-               <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showAcumulado ? 'blur-sm select-none opacity-50' : ''}`}>
-                 {showAcumulado ? formatCurrency(totalNeto) : '$ *.*.*'}
-               </p>
                <div className={`mt-3 flex items-center gap-2 ${!showAcumulado ? 'blur-sm opacity-50' : ''}`}>
                   <div className="h-1.5 flex-1 bg-[#152035]/20 rounded-full overflow-hidden">
-                     <div className="h-full bg-emerald-300" style={{ width: `${Math.min(100, (totalNeto/meta)*100)}%` }} />
+                     <div className="h-full bg-emerald-300" style={{ width: `${Math.min(100, (totalIngresos/meta)*100)}%` }} />
                   </div>
-                  <span className="text-[10px] font-black text-emerald-100 italic">{Math.round((totalNeto/meta)*100)}%</span>
+                  <span className="text-[10px] font-black text-emerald-100 italic">{Math.round((totalIngresos/meta)*100)}%</span>
                </div>
             </div>
          </div>
 
          <div className="bg-orange-500 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#1E293B]/80 rounded-full blur-2xl group-hover:bg-[#152035]/20 transition-all" />
-            <div className="relative z-10">
-               <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-[#152035]/20 w-max rounded-2xl text-white">
-                     <DollarSign className="w-5 h-5" />
+            <div className="relative z-10 h-full flex flex-col justify-between">
+               <div>
+                  <div className="flex items-center justify-between mb-4">
+                     <div className="p-2 bg-[#152035]/20 w-max rounded-2xl text-white">
+                        <DollarSign className="w-5 h-5" />
+                     </div>
+                     <button onClick={() => setShowGastos(!showGastos)} className="text-white/50 hover:text-white transition-colors">
+                        {showGastos ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                     </button>
                   </div>
-                  <button onClick={() => setShowGastos(!showGastos)} className="text-white/50 hover:text-white transition-colors">
-                     {showGastos ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <p className="text-[10px] font-black uppercase text-orange-50 tracking-widest">Gastos / Inversión</p>
+                  <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showGastos ? 'blur-sm select-none opacity-50' : ''}`}>
+                    {showGastos ? formatCurrency(totalPagosProfesores + totalGastosMensuales) : '$ *.*.*'}
+                  </p>
                </div>
-               <p className="text-[10px] font-black uppercase text-orange-50 tracking-widest">Gastos / Inversión</p>
-               <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showGastos ? 'blur-sm select-none opacity-50' : ''}`}>
-                 {showGastos ? formatCurrency(totalPagosProfesores + totalGastosMensuales) : '$ *.*.*'}
-               </p>
+            </div>
+         </div>
+
+         <div className="bg-[#152035] p-6 rounded-[2rem] border border-indigo-500/30 shadow-[0_4px_20px_rgba(99,102,241,0.15)] relative overflow-hidden group">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl transition-all" />
+            <div className="relative z-10 h-full flex flex-col justify-between">
+               <div>
+                  <div className="flex items-center justify-between mb-4">
+                     <div className="p-2 bg-indigo-500/20 w-max rounded-2xl text-indigo-400">
+                        <Landmark className="w-5 h-5" />
+                     </div>
+                     <button onClick={() => setShowCuenta(!showCuenta)} className="text-slate-400 hover:text-white transition-colors">
+                        {showCuenta ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                     </button>
+                  </div>
+                  <p className="text-[10px] font-black uppercase text-indigo-300 tracking-widest">Total en Cuenta</p>
+                  <p className={`text-2xl font-black ${totalNeto < 0 ? 'text-rose-400' : 'text-indigo-400'} mt-1 leading-none italic ${!showCuenta ? 'blur-sm select-none opacity-50' : ''}`}>
+                    {showCuenta ? formatCurrency(totalNeto) : '$ *.*.*'}
+                  </p>
+               </div>
             </div>
          </div>
 
          <div className="bg-[#152035] p-6 rounded-[2rem] border border-[#1E293B] shadow-xl relative overflow-hidden group">
-            <div className="relative z-10">
-               <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-[#111A2E] w-max rounded-2xl text-slate-400 group-hover:bg-[#111A2E] group-hover:text-indigo-500 transition-all">
-                     <AlertCircle className="w-5 h-5" />
+            <div className="relative z-10 h-full flex flex-col justify-between">
+               <div>
+                  <div className="flex items-center justify-between mb-4">
+                     <div className="p-2 bg-[#111A2E] w-max rounded-2xl text-slate-400 group-hover:bg-[#111A2E] group-hover:text-amber-400 transition-all">
+                        <AlertCircle className="w-5 h-5" />
+                     </div>
+                     <button onClick={() => setShowFaltante(!showFaltante)} className="text-slate-400 hover:text-white transition-colors">
+                        {showFaltante ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                     </button>
                   </div>
-                  <button onClick={() => setShowFaltante(!showFaltante)} className="text-slate-400 hover:text-white transition-colors">
-                     {showFaltante ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Estado de la Meta</p>
+                  <p className={`text-2xl font-black mt-1 leading-none italic ${!showFaltante ? 'blur-sm select-none opacity-50 text-white' : (faltante > 0 ? 'text-white' : 'text-amber-400')}`}>
+                    {showFaltante ? (faltante > 0 ? formatCurrency(faltante) : '¡META CUMPLIDA! ✨') : '$ *.*.*'}
+                  </p>
+                  {showFaltante && faltante <= 0 && (
+                     <p className="text-[10px] font-bold text-amber-500 mt-2 uppercase tracking-wide">
+                        Superávit: +{formatCurrency(Math.abs(faltante))}
+                     </p>
+                  )}
                </div>
-               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Diferencia para Meta</p>
-               <p className={`text-2xl font-black text-white mt-1 leading-none italic ${!showFaltante ? 'blur-sm select-none opacity-50' : ''}`}>
-                 {showFaltante ? (faltante > 0 ? formatCurrency(faltante) : 'META CUMPLIDA! ✨') : '$ *.*.*'}
-               </p>
             </div>
          </div>
       </div>
