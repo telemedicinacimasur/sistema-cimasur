@@ -368,7 +368,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   const [dateEnd, setDateEnd] = useState('');
   const [searchTutor, setSearchTutor] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
-  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [filterYear, setFilterYear] = useState('');
   const [students, setStudents] = useState<any[]>([]);
   const [hideMoney, setHideMoney] = useState(false);
 
@@ -2537,8 +2537,8 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [monthFilter, setMonthFilter] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()));
-  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
+  const [monthFilter, setMonthFilter] = useState('Todos');
+  const [yearFilter, setYearFilter] = useState('Todos');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -2652,11 +2652,14 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
 
     // Month/Year filter only if range is not set
     if (!dateFrom && !dateTo) {
-      const rDate = new Date(r.fechaPago + 'T00:00:00');
-      if (!isNaN(rDate.getTime())) {
-        const rMonth = new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(rDate);
-        const rYear = rDate.getFullYear().toString();
-        if (rMonth.toLowerCase() !== monthFilter.toLowerCase() || rYear !== yearFilter) return false;
+      if (monthFilter !== 'Todos' || (yearFilter !== 'Todos' && yearFilter !== '')) {
+        const rDate = new Date(r.fechaPago + 'T00:00:00');
+        if (!isNaN(rDate.getTime())) {
+          const rMonth = new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(rDate);
+          const rYear = rDate.getFullYear().toString();
+          if (monthFilter !== 'Todos' && rMonth.toLowerCase() !== monthFilter.toLowerCase()) return false;
+          if (yearFilter !== 'Todos' && yearFilter !== '' && rYear !== yearFilter) return false;
+        }
       }
     }
     
@@ -2829,12 +2832,13 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
           <div className="space-y-1">
              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Mes</label>
              <select className="p-2 border border-[#1E293B] rounded-2xl text-sm outline-none bg-[#152035]" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}>
+                <option value="Todos">TODOS</option>
                 {['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'].map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
              </select>
           </div>
           <div className="space-y-1">
              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Año</label>
-             <input type="number" className="p-2 border border-[#1E293B] rounded-2xl text-sm outline-none w-20 bg-[#152035]" value={yearFilter} onChange={e => setYearFilter(e.target.value)} />
+             <input type="text" className="p-2 border border-[#1E293B] rounded-2xl text-sm outline-none w-24 bg-[#152035]" value={yearFilter} onChange={e => setYearFilter(e.target.value)} placeholder="Año o Todos" />
           </div>
           <div className="flex gap-2">
              <div className="flex items-center bg-[#111A2E] rounded-2xl p-1">
