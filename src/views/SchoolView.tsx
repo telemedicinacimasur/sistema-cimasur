@@ -500,7 +500,7 @@ function ContactRegister({ records }: { records: any[] }) {
                   const currentDate = new Date().toLocaleString();
                   const userStamp = user?.displayName || user?.email || 'Admin';
                   const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
-                  const newMerged = selectedLead.observaciones || '';
+                  const newMerged = data.newHistory ? (selectedLead.observaciones || '') + `\n[${currentDate}] - ${userStamp}\n${data.newHistory}` : (selectedLead.observaciones || '');
 
                   await localDB.updateInCollection('school_leads', selectedLead.id, {
                      rut: updatedProfile.rut,
@@ -763,7 +763,8 @@ function StudentManager({ records }: { records: any[] }) {
         const currentDate = new Date().toLocaleString();
         const userStamp = !!localStorage ? 'Admin' : 'Admin'; // simple fallback
         const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
-        const newMerged = selectedStudent.observacionesAcademicas || '';
+        const currentObs = selectedStudent.observacionesAcademicas || '';
+        const newMerged = data.newHistory ? currentObs + `\n[${currentDate}] - ${userStamp}\n${data.newHistory}` : currentObs;
 
         const updates = {
             name: updatedProfile.name,
@@ -1008,10 +1009,10 @@ function StudentManager({ records }: { records: any[] }) {
                    </td>
                    <td className="p-5">
                       <div className="flex flex-col items-center gap-1">
-                         <div className="w-24 h-1.5 bg-[#111A2E] rounded-full overflow-hidden">
-                            <div className="h-full bg-[#152035] rounded-full" style={{ width: `${s.avance || 0}%` }} />
+                         <div className="w-24 h-1.5 bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                            <div className="h-full bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)]" style={{ width: `${s.avance || 0}%` }} />
                          </div>
-                         <span className="text-[9px] font-bold text-slate-400">{s.avance || 0}%</span>
+                         <span className="text-[10px] font-black text-emerald-400">{s.avance || 0}%</span>
                       </div>
                    </td>
                    <td className="p-5 text-right">
@@ -1247,7 +1248,7 @@ function TrackingView() {
                 const userStamp = 'Admin'; // simpler fallback
                 const baseUpdateEntry = `\n[${currentDate}] - ${userStamp}\n▶ Actualización de datos base: ` + Object.keys(updatedProfile).map(k => `${k}: ${updatedProfile[k]}`).join(', ');
                 const currentObs = selectedClient[field] || '';
-                const newMerged = currentObs;
+                const newMerged = data.newHistory ? currentObs + `\n[${currentDate}] - ${userStamp}\n${data.newHistory}` : currentObs;
 
                 await localDB.updateInCollection(collection, selectedClient.id, {
                   rut: updatedProfile.rut,

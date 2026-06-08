@@ -211,7 +211,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
         ...updatedForm,
         unidadesAcademicas: JSON.stringify(courseModules)
       },
-      newHistory: ''
+      newHistory: `ACTUALIZACIÓN DE AVANCE: Se ha registrado un avance académico del ${progress}% (Recalculado por unidades)`
     });
   };
 
@@ -639,7 +639,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                   max="100" 
                   className="flex-1 accent-emerald-500 cursor-pointer h-1.5 bg-slate-900 rounded-lg appearance-none"
                   value={editForm.avance || 0}
-                  onChange={e => handleManualProgressChange(parseInt(e.target.value) || 0)}
+                  onChange={e => setEditForm({...editForm, avance: parseInt(e.target.value) || 0})}
                 />
 
                 {/* Direct Numeric Input Box */}
@@ -650,10 +650,29 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                     max="100" 
                     className="w-full bg-transparent text-white font-black font-mono text-sm outline-none text-center"
                     value={editForm.avance || 0}
-                    onChange={e => handleManualProgressChange(parseInt(e.target.value) || 0)}
+                    onChange={e => setEditForm({...editForm, avance: parseInt(e.target.value) || 0})}
                   />
                   <span className="text-[10px] text-[#64748b] font-black ml-0.5">%</span>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const progress = Math.max(0, Math.min(100, Math.round(editForm.avance || 0)));
+                    await onUpdate({
+                      isProfileUpdate: true,
+                      updatedProfile: {
+                        ...editForm,
+                        avance: progress,
+                        unidadesAcademicas: JSON.stringify(courseModules)
+                      },
+                      newHistory: `ACTUALIZACIÓN DE AVANCE: Se ha registrado un avance académico del ${progress}%`
+                    });
+                  }}
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] uppercase font-black tracking-widest rounded-lg shadow-lg cursor-pointer transition-colors"
+                >
+                  Registrar Avance
+                </button>
               </div>
 
               {/* Progress bar and hints */}
