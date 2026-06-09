@@ -2191,51 +2191,53 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                   <p className="text-[10px] text-slate-500 italic py-1">Sin abonos registrados.</p>
                 )}
                 
-                <div className="flex gap-1.5 items-end pt-2 border-t border-slate-700/55">
-                  <div className="flex-1 min-w-0">
-                    <span className="block text-[8px] uppercase font-bold text-slate-400">Nuevo Abono:</span>
-                    <input
-                      type="number"
-                      value={newAbonoAmount || ''}
-                      placeholder="$ Monto"
-                      onChange={e => setNewAbonoAmount(parseInt(e.target.value) || '')}
-                      className="w-full text-xs bg-slate-800 border-b border-slate-600 p-1 rounded text-white font-mono"
-                    />
-                  </div>
-                  <div className="w-24 font-mono text-zinc-300">
-                    <span className="block text-[8px] uppercase font-bold text-slate-400">Fecha:</span>
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-700/55">
+                  <div className="w-full font-mono text-zinc-300">
+                    <span className="block text-[8px] uppercase font-bold text-slate-400 mb-1">Fecha del Abono:</span>
                     <input
                       type="date"
                       value={newAbonoDate}
                       onChange={e => setNewAbonoDate(e.target.value)}
-                      className="w-full text-[10px] bg-slate-800 border-b border-slate-600 p-1 rounded text-white"
+                      className="w-full text-[10px] bg-[#0E1522] border-b border-slate-600 p-1.5 rounded text-white"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newAbonoAmount || Number(newAbonoAmount) <= 0) return;
-                      const newAbonoObj = {
-                        id: Date.now().toString(),
-                        fecha: newAbonoDate,
-                        monto: Number(newAbonoAmount)
-                      };
-                      const list = [...(form.abonos || [])];
-                      list.push(newAbonoObj);
-                      
-                      const totalAbonos = list.reduce((sum, item) => sum + item.monto, 0);
-                      
-                      setForm({
-                        ...form,
-                        abonos: list,
-                        montoAbonado: totalAbonos
-                      });
-                      setNewAbonoAmount('');
-                    }}
-                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-2.5 py-1 rounded transition duration-200 cursor-pointer"
-                  >
-                    +
-                  </button>
+                  <div className="flex gap-1.5 items-end">
+                    <div className="flex-1 min-w-0">
+                      <span className="block text-[8px] uppercase font-bold text-slate-400 mb-1">Nuevo Abono:</span>
+                      <input
+                        type="number"
+                        value={newAbonoAmount || ''}
+                        placeholder="$ Monto"
+                        onChange={e => setNewAbonoAmount(parseInt(e.target.value) || '')}
+                        className="w-full text-[11px] bg-[#0E1522] border-b border-slate-600 p-1.5 rounded text-white font-mono"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newAbonoAmount || Number(newAbonoAmount) <= 0) return;
+                        const newAbonoObj = {
+                          id: Date.now().toString(),
+                          fecha: newAbonoDate,
+                          monto: Number(newAbonoAmount)
+                        };
+                        const list = [...(form.abonos || [])];
+                        list.push(newAbonoObj);
+                        
+                        const totalAbonos = list.reduce((sum, item) => sum + item.monto, 0);
+                        
+                        setForm({
+                          ...form,
+                          abonos: list,
+                          montoAbonado: totalAbonos
+                        });
+                        setNewAbonoAmount('');
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-500 shadow-md text-white font-bold text-xs px-4 h-[30px] rounded transition duration-200 cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="flex justify-between items-center pt-2 border-t border-slate-700/50 text-[10px] font-bold">
