@@ -26,9 +26,28 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+export const normalizeProductName = (name: string): string => {
+  if (!name) return '';
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+  
+  // Normalize any variation of "arnica cs" (excluding the alcohol tincture E.F.D.)
+  // like "arnica cs salina", "CIMASUR - ARNICA CS CONTROL NATURAL ARTROSIS PERROS Y GATOS", etc.
+  if (
+    lower.includes('arnica') && 
+    lower.includes('cs') && 
+    !lower.includes('etanol') && 
+    !lower.includes('e.f.d.')
+  ) {
+    return "ARNICA CS";
+  }
+  
+  return trimmed;
+};
+
 // Lists of built-in products
 const MERCADO_LIBRE_PRODUCTS = [
-  "ARNICA CS Salina",
+  "ARNICA CS",
   "MELISSA P CS SALINA",
   "BEILSCHMIEDIA CS SALINA",
   "CALOSTRUM CS SALINA",
@@ -45,7 +64,7 @@ const MERCADO_LIBRE_PRODUCTS = [
 const TIENDA_PRODUCTS = [
   "Acqua Maris CS Salina",
   "allium s cs Salina",
-  "Arnica CS Salina",
+  "ARNICA CS",
   "Beilschmiedia CS Salina",
   "Calostrum CS Salina",
   "Cina CS Salina",
@@ -180,10 +199,32 @@ export default function SalesTiendaMLManager() {
     try {
       const options = getQueryOptions();
       const sales = await localDB.getCollection('sales_tienda_ml', options);
-      setRecords(sales);
+      
+      const normalizedSales = sales.map((sale: any) => {
+        if (sale.productos && Array.isArray(sale.productos)) {
+          const updatedProductos = sale.productos.map((prod: any) => ({
+            ...prod,
+            nombre: normalizeProductName(prod.nombre)
+          }));
+          return {
+            ...sale,
+            productos: updatedProductos,
+            detalleProductos: updatedProductos.map((item: any) => `${item.cantidad}x ${item.nombre}`).join('\n')
+          };
+        }
+        return sale;
+      });
+      
+      setRecords(normalizedSales);
 
       const customs = await localDB.getCollection('sales_tienda_ml_custom_products');
-      setCustomProducts(customs.map(c => c.nombre).filter(Boolean));
+      const normalizedCustoms = customs
+        .map(c => c.nombre)
+        .filter(Boolean)
+        .map(name => normalizeProductName(name));
+      
+      const uniqueCustoms = Array.from(new Set(normalizedCustoms));
+      setCustomProducts(uniqueCustoms);
     } catch (err) {
       console.error(err);
     }
@@ -263,7 +304,7 @@ export default function SalesTiendaMLManager() {
     }
 
     const newItem: SaleItem = {
-      nombre: tempProduct,
+      nombre: normalizeProductName(tempProduct),
       cantidad: tempQty,
       precioUnitario: tempPrice,
       total: tempQty * tempPrice
@@ -441,7 +482,7 @@ export default function SalesTiendaMLManager() {
 
           if (prodName) {
             groupedSales[groupKey].items.push({
-              nombre: prodName,
+              nombre: normalizeProductName(prodName),
               cantidad: qty,
               precioUnitario: price,
               total: itemTotal
