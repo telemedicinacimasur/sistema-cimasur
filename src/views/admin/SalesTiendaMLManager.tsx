@@ -31,14 +31,15 @@ export const normalizeProductName = (name: string): string => {
   const trimmed = name.trim();
   const lower = trimmed.toLowerCase();
   
-  // Normalize any variation of "arnica cs" (excluding the alcohol tincture E.F.D.)
-  // like "arnica cs salina", "CIMASUR - ARNICA CS CONTROL NATURAL ARTROSIS PERROS Y GATOS", etc.
-  if (
-    lower.includes('arnica') && 
-    lower.includes('cs') && 
-    !lower.includes('etanol') && 
-    !lower.includes('e.f.d.')
-  ) {
+  // Normalize E.F.D. Etanol line first to avoid collisions
+  if (lower.includes('etanol')) {
+    if (lower.includes('arnica')) return "E.F.D. A – Arnica CS – Etanol";
+    if (lower.includes('fuchsia')) return "E.F.D. D – Fuchsia CS – Etanol";
+    if (lower.includes('dandelion')) return "E.F.D. E – Dandelion CS – Etanol";
+  }
+
+  // Normalize any variation of "arnica" (excluding the alcohol tincture processed above)
+  if (lower.includes('arnica') && !lower.includes('e.f.d.')) {
     return "ARNICA CS";
   }
 
@@ -50,6 +51,102 @@ export const normalizeProductName = (name: string): string => {
   ) {
     return "KIT OSTEOARTICULAR CS SALINA";
   }
+
+  // Normalize any variation of "Melissa P CS"
+  if (lower.includes('melissa')) {
+    return "MELISSA P CS SALINA";
+  }
+
+  // Normalize any variation of "Calostrum" or "Calostro"
+  if (lower.includes('calostrum') || lower.includes('calostro')) {
+    return "CALOSTRUM CS SALINA";
+  }
+
+  // Normalize Beilschmiedia
+  if (lower.includes('beilschmiedia')) {
+    return "BEILSCHMIEDIA CS SALINA";
+  }
+
+  // Normalize Cocculus
+  if (lower.includes('cocculus')) {
+    return "COCCULUS CS SALINA";
+  }
+
+  // Normalize Echinac A
+  if (lower.includes('echinac')) {
+    return "ECHINAC A CS SALINA";
+  }
+
+  // Normalize Maqui
+  if (lower.includes('maqui')) {
+    return "MAQUI CS SALINA";
+  }
+
+  // Normalize Muces
+  if (lower.includes('muces')) {
+    return "MUCES CS SALINA";
+  }
+
+  // Normalize Kit Modulador Digestivo
+  if (lower.includes('modulador') || lower.includes('digestivo')) {
+    return "KIT MODULADOR DIGESTIVO CS SALINA";
+  }
+
+  // Normalize Kit Viaje
+  if (lower.includes('viaje')) {
+    return "KIT VIAJE CS SALINA";
+  }
+
+  // Normalize Kit Fin de Año
+  if (lower.includes('fin de año') || lower.includes('fin de ano') || lower.includes('fin de año')) {
+    return "KIN FIN DE AÑO CS SALINA";
+  }
+
+  // Normalize Acqua Maris
+  if (lower.includes('acqua maris') || lower.includes('acquamaris')) {
+    return "Acqua Maris CS Salina";
+  }
+
+  // Normalize Allium S
+  if (lower.includes('allium')) {
+    return "allium s cs Salina";
+  }
+
+  // Normalize Cina
+  if (lower.includes('cina')) {
+    return "Cina CS Salina";
+  }
+
+  // Normalize Daucus
+  if (lower.includes('daucus')) {
+    return "Daucus CS Salina";
+  }
+
+  // Normalize Kalium Tic
+  if (lower.includes('kalium') || lower.includes('tic cs')) {
+    return "Kalium Tic CS";
+  }
+
+  // Normalize Neem
+  if (lower.includes('neem')) {
+    return "Neem CS";
+  }
+
+  // Normalize Sarsaparrilla
+  if (lower.includes('sarsa') || lower.includes('zarza')) {
+    return "Sarsaparrilla CS";
+  }
+
+  // Normalize E.F. lines
+  if (lower.includes('aprende')) return "E.F. Aprende CS";
+  if (lower.includes('cambios')) return "E.F. Cambios Cs";
+  if (lower.includes('energia') || lower.includes('energía')) return "E.F. Energia CS";
+  if (lower.includes('libre')) return "E.F. Libre CS";
+  if (lower.includes('lider') || lower.includes('líder')) return "E.F. Lider CS";
+  if (lower.includes('miedos')) return "E.F. Miedos CS";
+  if (lower.includes('rescue')) return "E.F. Rescue Remedy CS";
+  if (lower.includes('senior')) return "E.F. Senior CS";
+  if (lower.includes('serenidad')) return "E.F. Serenidad CS";
   
   return trimmed;
 };
@@ -75,7 +172,7 @@ const TIENDA_PRODUCTS = [
   "allium s cs Salina",
   "ARNICA CS",
   "Beilschmiedia CS Salina",
-  "Calostrum CS Salina",
+  "CALOSTRUM CS SALINA",
   "Cina CS Salina",
   "Daucus CS Salina",
   "E.F. Aprende CS",
@@ -97,7 +194,7 @@ const TIENDA_PRODUCTS = [
   "KIT OSTEOARTICULAR CS SALINA",
   "Kit Viaje",
   "Maqui CS",
-  "Melissa P CS",
+  "MELISSA P CS SALINA",
   "Muces CS",
   "Neem CS",
   "Sarsaparrilla CS"
@@ -590,7 +687,7 @@ export default function SalesTiendaMLManager() {
     
     filteredRecords.forEach(r => {
       (r.productos || []).forEach(item => {
-        const key = item.nombre;
+        const key = normalizeProductName(item.nombre);
         if (!counts[key]) {
           counts[key] = { qty: 0, total: 0 };
         }
@@ -976,7 +1073,7 @@ export default function SalesTiendaMLManager() {
                     onClick={() => {
                       const listPrecioUnitario = filteredRecords.reduce((acc, r) => acc + (r.productos?.reduce((pAcc, p) => pAcc + (p.precioUnitario || 0), 0) || 0), 0);
                       const data = filteredRecords.map(r => {
-                        const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join('\n') || r.detalleProductos || '';
+                        const itemsStr = r.productos?.map(p => `${p.cantidad}x ${normalizeProductName(p.nombre)}`).join('\n') || r.detalleProductos || '';
                         const pricesStr = r.productos?.map(p => formatCurrency(p.precioUnitario)).join('\n') || '';
                         const clientWithLocation = r.comunaCiudad ? `${r.cliente} (${r.comunaCiudad})` : r.cliente || '';
                         return [
@@ -1008,7 +1105,7 @@ export default function SalesTiendaMLManager() {
                       const listPrecioUnitario = filteredRecords.reduce((acc, r) => acc + (r.productos?.reduce((pAcc, p) => pAcc + (p.precioUnitario || 0), 0) || 0), 0);
                       const headers = ['Año', 'Mes', 'Fecha Exacta', 'Canal Vendedor', 'Cliente', 'Comuna / Ciudad', 'Detalle Productos', 'Precio Unitario ($)', 'Total Frascos/Unidades', 'Total de la Venta ($)'];
                       const data = filteredRecords.map(r => {
-                        const itemsStr = r.productos?.map(p => `${p.cantidad}x ${p.nombre}`).join(', ') || r.detalleProductos || '';
+                        const itemsStr = r.productos?.map(p => `${p.cantidad}x ${normalizeProductName(p.nombre)}`).join(', ') || r.detalleProductos || '';
                         const pricesStr = r.productos?.map(p => formatCurrency(p.precioUnitario)).join(', ') || '';
                         return [
                           r.anio, 
@@ -1220,7 +1317,7 @@ export default function SalesTiendaMLManager() {
                           {r.productos && r.productos.length > 0 ? (
                             r.productos.map((prod, pIdx) => (
                               <div key={pIdx} className="text-[10px] text-slate-300 flex items-center gap-1.5 uppercase font-medium">
-                                <span className="text-amber-500">🎯</span> {prod.nombre}
+                                <span className="text-amber-500">🎯</span> {normalizeProductName(prod.nombre)}
                               </div>
                             ))
                           ) : (
@@ -1274,7 +1371,7 @@ export default function SalesTiendaMLManager() {
                                 { label: 'Monto Total Venta', value: formatCurrency(r.valorCotizacion) },
                                 { 
                                   label: 'Detalle de Productos', 
-                                  value: itemsList.map(item => `${item.cantidad}x ${item.nombre} (${formatCurrency(item.precioUnitario)} c/u)`).join('\n') 
+                                  value: itemsList.map(item => `${item.cantidad}x ${normalizeProductName(item.nombre)} (${formatCurrency(item.precioUnitario)} c/u)`).join('\n') 
                                 }
                               ];
                               viewExpedienteInNewTab(`Expediente Especial Venta: ${r.cliente}`, data, `detalles_venta_${r.cliente}`);
@@ -1290,7 +1387,7 @@ export default function SalesTiendaMLManager() {
                                 { label: 'Monto Total Venta', value: formatCurrency(r.valorCotizacion) },
                                 { 
                                   label: 'Detalle de Productos', 
-                                  value: itemsList.map(item => `${item.cantidad}x ${item.nombre} (${formatCurrency(item.precioUnitario)} c/u)`).join('\n') 
+                                  value: itemsList.map(item => `${item.cantidad}x ${normalizeProductName(item.nombre)} (${formatCurrency(item.precioUnitario)} c/u)`).join('\n') 
                                 }
                               ];
                               exportExpedienteToPDF(`Expediente Especial Venta: ${r.cliente}`, data, `detalles_venta_${r.cliente}`);
