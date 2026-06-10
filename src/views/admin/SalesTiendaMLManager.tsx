@@ -41,6 +41,15 @@ export const normalizeProductName = (name: string): string => {
   ) {
     return "ARNICA CS";
   }
+
+  // Normalize any variation of "Cimasur - Kit Geriátrico Osteoarticular Cs", "Kit Osteoarticular"
+  if (
+    (lower.includes('kit') && lower.includes('osteo')) ||
+    (lower.includes('kit') && lower.includes('geri')) ||
+    lower.includes('osteoarticular')
+  ) {
+    return "KIT OSTEOARTICULAR CS SALINA";
+  }
   
   return trimmed;
 };
@@ -85,7 +94,7 @@ const TIENDA_PRODUCTS = [
   "Kalium Tic CS",
   "Kit Fin de Año",
   "Kit Modulador Digestivo",
-  "Kit Osteoarticular",
+  "KIT OSTEOARTICULAR CS SALINA",
   "Kit Viaje",
   "Maqui CS",
   "Melissa P CS",
@@ -793,7 +802,7 @@ export default function SalesTiendaMLManager() {
               {/* Temp product item selection builder */}
               <div className="space-y-3 p-3 bg-[#111C31] rounded-xl border border-slate-800">
                 <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Seleccionar Producto</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nombre del Producto</label>
                   <input
                     type="text"
                     list="product-list-options"
@@ -809,8 +818,19 @@ export default function SalesTiendaMLManager() {
                   </datalist>
                 </div>
 
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Precio Un ($)</label>
+                  <input
+                    type="number"
+                    placeholder="Precio..."
+                    className="w-full bg-[#0A111F] text-slate-200 text-[10px] font-bold rounded p-2 border border-slate-700 font-mono outline-none"
+                    value={tempPrice}
+                    onChange={e => setTempPrice(parseInt(e.target.value) || 0)}
+                  />
+                </div>
+
                 <div className="flex gap-2 items-end">
-                  <div className="w-[32%]">
+                  <div className="flex-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cant</label>
                     <input
                       type="number"
@@ -820,17 +840,7 @@ export default function SalesTiendaMLManager() {
                       onChange={e => setTempQty(parseInt(e.target.value) || 1)}
                     />
                   </div>
-                  <div className="w-[38%]">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Precio Un ($)</label>
-                    <input
-                      type="number"
-                      placeholder="Precio..."
-                      className="w-full bg-[#0A111F] text-slate-200 text-[10px] font-bold rounded p-2 border border-slate-700 font-mono outline-none"
-                      value={tempPrice}
-                      onChange={e => setTempPrice(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="w-[30%]">
+                  <div className="w-[30%] text-zinc-300">
                     <button
                       type="button"
                       onClick={handleAddSaleItem}
