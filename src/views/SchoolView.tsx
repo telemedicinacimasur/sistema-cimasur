@@ -44,6 +44,54 @@ import { addNotification } from '../lib/notifications';
 import { SmartCampaigns } from '../components/crm/SmartCampaigns';
 import { syncStudentsToSchoolPayments } from '../lib/syncUtils';
 
+interface EstadoAcademicoInputProps {
+  studentId: string;
+  initialValue: string;
+}
+
+const EstadoAcademicoInput = ({ studentId, initialValue }: EstadoAcademicoInputProps) => {
+  const [val, setVal] = useState(initialValue || 'En proceso');
+
+  useEffect(() => {
+    setVal(initialValue || 'En proceso');
+  }, [initialValue]);
+
+  const handleSave = async (selectedVal: string) => {
+    await localDB.updateInCollection('students', studentId, { estadoAcademico: selectedVal });
+    window.dispatchEvent(new Event('db-change'));
+  };
+
+  const normalizedVal = (val || '').toLowerCase();
+  const isPendiente = normalizedVal.includes('pendiente');
+  const isTerminado = normalizedVal.includes('terminada') || normalizedVal.includes('terminado') || normalizedVal.includes('modulo terminado') || normalizedVal.includes('módulo terminado') || normalizedVal.includes('acceso terminado');
+  const isEnProceso = !isPendiente && !isTerminado;
+
+  let selectVal = "En proceso";
+  if (isPendiente) selectVal = "Pendiente";
+  else if (isTerminado) selectVal = "Terminado";
+
+  return (
+    <select 
+      value={selectVal}
+      onChange={(e) => {
+        const newVal = e.target.value;
+        setVal(newVal);
+        handleSave(newVal);
+      }}
+      className={cn(
+        "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border bg-[#152033] text-center w-28 outline-none cursor-pointer transition-colors",
+        isPendiente ? "text-amber-400 border-amber-500/20 bg-amber-950/20" :
+        isTerminado ? "text-emerald-400 border-emerald-500/20 bg-emerald-950/20" :
+        "text-sky-400 border-sky-500/20 bg-sky-950/20"
+      )}
+    >
+      <option value="Pendiente" className="bg-[#152033] text-amber-400">🟡 Pendiente</option>
+      <option value="En proceso" className="bg-[#152033] text-sky-400">🔵 En proceso</option>
+      <option value="Terminado" className="bg-[#152033] text-emerald-400">💚 Terminado</option>
+    </select>
+  );
+};
+
 export default function SchoolView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
@@ -701,6 +749,7 @@ function StudentManager({ records }: { records: any[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDiplomado, setFilterDiplomado] = useState('Todos');
   const [filterPago, setFilterPago] = useState('Todos');
+  const [filterEstadoAcademico, setFilterEstadoAcademico] = useState('Todos');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const toggleSelect = (id: string) => {
@@ -781,6 +830,7 @@ function StudentManager({ records }: { records: any[] }) {
             fechaPago: updatedProfile.fechaPago || selectedStudent.fechaPago,
             observacionesPago: typeof updatedProfile.observacionesPago !== 'undefined' ? updatedProfile.observacionesPago : selectedStudent.observacionesPago,
             avance: typeof updatedProfile.avance !== 'undefined' ? (parseInt(updatedProfile.avance) || 0) : (selectedStudent.avance || 0),
+            estadoAcademico: updatedProfile.estadoAcademico || selectedStudent.estadoAcademico || 'En proceso',
             observacionesAcademicas: newMerged,
             unidadesAcademicas: updatedProfile.unidadesAcademicas || selectedStudent.unidadesAcademicas || '',
             historialPagos: updatedProfile.historialPagos || selectedStudent.historialPagos || ''
@@ -805,6 +855,7 @@ function StudentManager({ records }: { records: any[] }) {
         avance: parseInt(selectedStudent.avance) || 0,
         clasificacion: selectedStudent.clasificacion,
         diplomado: selectedStudent.diplomado,
+        estadoAcademico: selectedStudent.estadoAcademico || 'En proceso',
         observacionesAcademicas: newNotes
     };
 
@@ -873,11 +924,29 @@ function StudentManager({ records }: { records: any[] }) {
   const filteredRecords = (Array.isArray(records) ? records : []).filter(s => {
     const name = safe(s.name).toLowerCase();
     const rut = safe(s.rut).toLowerCase();
+    const diplomado = safe(s.diplomado).toLowerCase();
+    const estadoAcademicoStr = safe(s.estadoAcademico || 'En proceso').toLowerCase();
     const term = searchTerm.toLowerCase();
-    const matchSearch = name.includes(term) || rut.includes(term);
+    const matchSearch = name.includes(term) || rut.includes(term) || diplomado.includes(term) || estadoAcademicoStr.includes(term);
     const matchDiplomado = filterDiplomado === 'Todos' || (safe(s.diplomado) === filterDiplomado);
     const matchPago = filterPago === 'Todos' || (safe(s.pago) === filterPago) || (filterPago === 'Al Día' && !s.pago);
-    return matchSearch && matchDiplomado && matchPago;
+
+    const matchEstadoAcademico = (() => {
+      if (filterEstadoAcademico === 'Todos') return true;
+      const valLower = (s.estadoAcademico || 'En proceso').toLowerCase();
+      if (filterEstadoAcademico === 'Pendiente') {
+        return valLower.includes('pendiente');
+      }
+      if (filterEstadoAcademico === 'En proceso') {
+        return valLower.includes('en proceso') || valLower === '';
+      }
+      if (filterEstadoAcademico === 'Terminado') {
+        return valLower.includes('terminado') || valLower.includes('terminada') || valLower.includes('termino');
+      }
+      return false;
+    })();
+
+    return matchSearch && matchDiplomado && matchPago && matchEstadoAcademico;
   });
 
   const allDiplomados = ['Todos', ...Array.from(new Set(records.map(r => r.diplomado).filter(Boolean)))];
@@ -896,11 +965,12 @@ function StudentManager({ records }: { records: any[] }) {
                     s.rut || '---',
                     s.diplomado || 'Diplomado Homeopatía',
                     s.pago || 'Al Día',
-                    `${s.avance || 0}%`
+                    `${s.avance || 0}%`,
+                    s.estadoAcademico || 'En proceso'
                   ]);
                   exportTableToExcel(
                     'Reporte: Alumnos',
-                    ['Estudiante', 'RUT', 'Curso / Diplomado', 'Estado Pago', 'Avance'],
+                    ['Estudiante', 'RUT', 'Curso / Diplomado', 'Estado Pago', 'Avance', 'Estado Académico'],
                     data,
                     'lista_alumnos'
                   );
@@ -916,11 +986,12 @@ function StudentManager({ records }: { records: any[] }) {
                     s.name,
                     s.diplomado || 'Diplomado Homeopatía',
                     s.pago || 'Al Día',
-                    `${s.avance || 0}%`
+                    `${s.avance || 0}%`,
+                    s.estadoAcademico || 'En proceso'
                   ]);
                   exportTableToPDF(
                     'Reporte: Base General de Alumnos',
-                    ['Estudiante', 'Curso / Diplomado', 'Estado Pago', 'Avance'],
+                    ['Estudiante', 'Curso / Diplomado', 'Estado Pago', 'Avance', 'Estado Académico'],
                     data,
                     'lista_alumnos'
                   );
@@ -952,11 +1023,22 @@ function StudentManager({ records }: { records: any[] }) {
               >
                 {allDiplomados.map((d: any) => <option key={d} value={d}>{d}</option>)}
               </select>
+              <select 
+                className="px-4 py-2 rounded-2xl border bg-[#152035] border-[#1E293B] focus:outline-none focus:ring-2 focus:ring-blue-100 text-xs font-bold text-slate-200"
+                value={filterEstadoAcademico}
+                onChange={e => setFilterEstadoAcademico(e.target.value)}
+              >
+                <option value="Todos">Académico: Todos</option>
+                <option value="Pendiente">🟡 Pendiente</option>
+                <option value="En proceso">🔵 En proceso</option>
+                <option value="Terminado">💚 Terminado</option>
+              </select>
+
               <div className="relative w-full md:w-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
                 <input 
                   className="pl-10 pr-4 py-2 border rounded-full text-xs w-full md:w-64 bg-[#152035] outline-none focus:ring-2 focus:ring-blue-100" 
-                  placeholder="Buscar por Nombre o RUT..." 
+                  placeholder="Buscar por Nombre, RUT o Curso..." 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -979,6 +1061,7 @@ function StudentManager({ records }: { records: any[] }) {
                  <th className="p-5">Estado Pago</th>
                  <th className="p-5">Fecha Pago</th>
                  <th className="p-5 text-center">Avance</th>
+                 <th className="p-5 text-center">Estado Académico</th>
                  <th className="p-5 text-right">Acciones</th>
               </tr>
            </thead>
@@ -1015,6 +1098,9 @@ function StudentManager({ records }: { records: any[] }) {
                          <span className="text-[10px] font-black text-emerald-400">{s.avance || 0}%</span>
                       </div>
                    </td>
+                   <td className="p-5 text-center">
+                      <EstadoAcademicoInput studentId={s.id} initialValue={s.estadoAcademico || ''} />
+                   </td>
                    <td className="p-5 text-right">
                        <div className="flex items-center justify-end gap-3">
                          <button 
@@ -1023,6 +1109,7 @@ function StudentManager({ records }: { records: any[] }) {
                                  { label: 'Nombre', value: s.name },
                                  { label: 'RUT', value: s.rut },
                                  { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
+                                 { label: 'Estado Académico', value: s.estadoAcademico || 'En proceso' },
                                  { label: 'Estado Pago', value: s.pago || 'Al Día' },
                                  { label: 'Avance', value: (s.avance || 0).toString() + '%' },
                                  { label: 'Ficha Académica', value: s.observacionesAcademicas || '' }
@@ -1040,6 +1127,7 @@ function StudentManager({ records }: { records: any[] }) {
                                  { label: 'Nombre', value: s.name },
                                  { label: 'RUT', value: s.rut },
                                  { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
+                                 { label: 'Estado Académico', value: s.estadoAcademico || 'En proceso' },
                                  { label: 'Estado Pago', value: s.pago || 'Al Día' },
                                  { label: 'Avance', value: (s.avance || 0).toString() + '%' }
                                ];

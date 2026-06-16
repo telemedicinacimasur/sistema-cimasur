@@ -505,6 +505,34 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                 )}
               </CRMField>
 
+              <CRMField label="Estado Académico">
+                {isEditingData ? (
+                  <select 
+                    className="w-full bg-[#152035] border border-[#1e293b] rounded p-1 text-white text-xs font-bold outline-none cursor-pointer" 
+                    value={(() => {
+                      const valLower = (editForm.estadoAcademico || '').toLowerCase();
+                      if (valLower.includes('pendiente')) return 'Pendiente';
+                      if (valLower.includes('terminado') || valLower.includes('terminada') || valLower.includes('modulo terminado') || valLower.includes('módulo terminado') || valLower.includes('acceso terminado')) return 'Terminado';
+                      return 'En proceso';
+                    })()} 
+                    onChange={e => setEditForm({...editForm, estadoAcademico: e.target.value})}
+                  >
+                    <option value="Pendiente">🟡 Pendiente</option>
+                    <option value="En proceso">🔵 En proceso</option>
+                    <option value="Terminado">💚 Terminado</option>
+                  </select>
+                ) : (
+                  <span className={cn(
+                    "text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded border inline-block",
+                    (selectedClient.estadoAcademico || '').toLowerCase().includes('pendiente') ? "text-amber-400 border-amber-500/30 bg-amber-950/20" :
+                    (selectedClient.estadoAcademico || '').toLowerCase().includes('terminada') || (selectedClient.estadoAcademico || '').toLowerCase().includes('terminado') || (selectedClient.estadoAcademico || '').toLowerCase().includes('modulo terminado') || (selectedClient.estadoAcademico || '').toLowerCase().includes('módulo terminado') || (selectedClient.estadoAcademico || '').toLowerCase().includes('acceso terminado') ? "text-emerald-400 border-emerald-500/30 bg-emerald-950/20" :
+                    "text-sky-400 border-sky-500/30 bg-sky-950/20"
+                  )}>
+                    {selectedClient.estadoAcademico || 'En proceso'}
+                  </span>
+                )}
+              </CRMField>
+
               <CRMField label="Cómo llegó (Canal de Origen)">
                 {isEditingData ? (
                   <select 
