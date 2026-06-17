@@ -23,7 +23,8 @@ export const syncStudentsToSchoolPayments = async () => {
           montoTotalRecibido: Number(student.montoTotalRecibido) || 0,
           nroFactura: student.nroFactura || '',
           fechaFactura: student.fechaFactura || '',
-          observaciones: student.observacionesPago || ''
+          observaciones: student.observacionesPago || '',
+          historialPagos: student.historialPagos || ''
         };
 
         // Match by studentId, or fallback to exact name + phone if rut is generic
@@ -52,7 +53,8 @@ export const syncStudentsToSchoolPayments = async () => {
             Number(matchingPayment.montoTotalRecibido) !== expectedPayment.montoTotalRecibido ||
             (matchingPayment.nroFactura || '') !== expectedPayment.nroFactura ||
             (matchingPayment.fechaFactura || '') !== expectedPayment.fechaFactura ||
-            (matchingPayment.observaciones || '') !== expectedPayment.observaciones;
+            (matchingPayment.observaciones || '') !== expectedPayment.observaciones ||
+            (matchingPayment.historialPagos || '') !== expectedPayment.historialPagos;
             
           if (needsUpdate) {
             console.log("Global Sync: Updating payment for student:", student.name);

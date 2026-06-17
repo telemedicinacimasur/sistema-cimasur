@@ -55,7 +55,8 @@ import {
   FlaskConical,
   Activity,
   Database,
-  Landmark
+  Landmark,
+  ChevronDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
@@ -2733,6 +2734,52 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
     }
   };
 
+  const handleUpdateRowPayments = async (recordId: string, updatedPayments: any[]) => {
+    const record = records.find(r => r.id === recordId);
+    if (!record) return;
+
+    const finalReceived = updatedPayments.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
+
+    // Update in school_payments
+    await localDB.updateInCollection('school_payments', recordId, {
+      montoTotalRecibido: finalReceived,
+      historialPagos: JSON.stringify(updatedPayments)
+    });
+
+    // Update matching student in school list to synchronize they both show identical ledger entries
+    const studentsCol = await localDB.getCollection('students');
+    if (record.studentId) {
+      const student = studentsCol.find((s: any) => s.id === record.studentId);
+      if (student) {
+        await localDB.updateInCollection('students', student.id, {
+          montoTotalRecibido: finalReceived,
+          historialPagos: JSON.stringify(updatedPayments)
+        });
+      }
+    } else {
+      const student = studentsCol.find((s: any) => {
+        const rutValido = s.rut && s.rut.trim() !== '' && s.rut !== 'No detallado' && s.rut !== 'Sin RUT';
+        if (rutValido && s.rut === record.rut) return true;
+        return s.name === record.nombreAlumno;
+      });
+      if (student) {
+        await localDB.updateInCollection('students', student.id, {
+          montoTotalRecibido: finalReceived,
+          historialPagos: JSON.stringify(updatedPayments)
+        });
+      }
+    }
+
+    // Force clear localDB cache to ensure fresh read
+    localDB.clearCache();
+    window.dispatchEvent(new Event('db-change'));
+
+    await addAuditLog(user!, `Actualizó abonos/pagos de ${record.nombreAlumno || 'Alumno'}. Nuevo total recibido: ${formatCurrency(finalReceived)}`, 'Administración');
+
+    const updated = await localDB.getCollection('school_payments');
+    setRecords(updated);
+  };
+
   const totalIngresos = filteredRecords.filter(r => r.tipo === 'Ingreso Alumno').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
   const totalPagosProfesores = filteredRecords.filter(r => r.tipo === 'Pago Profesor').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
   const totalGastosMensuales = filteredRecords.filter(r => r.tipo === 'Gasto Mensual').reduce((sum, r) => sum + (Number(r.montoTotalRecibido) || 0), 0);
@@ -3032,7 +3079,123 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
                         </td>
                         <td className="p-3 text-right">{formatCurrency(r.montoTotalPagado)}</td>
                         <td className="p-3 text-right font-black text-emerald-600">+{formatCurrency(r.montoTotalRecibido)}</td>
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center sm:min-w-[200px]">
+                          {(() => {
+                            const pList = (() => {
+                              if (!r.historialPagos) return [];
+                              try {
+                                return typeof r.historialPagos === 'string' ? JSON.parse(r.historialPagos) : r.historialPagos;
+                              } catch (e) {
+                                return [];
+                              }
+                            })();
+
+                            return (
+                              <details className="group text-left border border-indigo-500/30 rounded-lg bg-[#111a2e]/90 p-1.5 mb-2 max-w-[200px] mx-auto text-[10px]">
+                                <summary className="cursor-pointer select-none font-black uppercase text-slate-300 flex justify-between items-center outline-none list-none">
+                                  <span className="flex items-center gap-1">
+                                    <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
+                                    Abonos/Otros
+                                  </span>
+                                  <span className="text-[9px] font-mono font-black text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                                    {pList.length}
+                                  </span>
+                                </summary>
+                                <div className="mt-1.5 space-y-1.5 border-t border-slate-700/40 pt-1.5 max-h-[160px] overflow-y-auto custom-scrollbar">
+                                  {pList.map((p: any, idx: number) => (
+                                    <div key={p.id || idx} className="p-1.5 rounded bg-slate-900/80 border border-slate-700/30 flex justify-between items-center gap-1 text-[9px]">
+                                      <div className="truncate">
+                                        <div className="font-extrabold text-slate-200 truncate">{p.cuota || 'Abono'}</div>
+                                        <div className="text-[8px] text-slate-400 font-mono">{formatDate(p.fecha)}</div>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-mono text-emerald-400 font-bold">{formatCurrency(p.monto)}</span>
+                                        <button
+                                          type="button"
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (confirm(`¿Eliminar este abono/pago de ${formatCurrency(p.monto)}?`)) {
+                                              const updated = pList.filter((x: any, xIdx: number) => {
+                                                if (x.id && p.id) {
+                                                  return x.id?.toString() !== p.id?.toString();
+                                                }
+                                                return xIdx !== idx;
+                                              });
+                                              await handleUpdateRowPayments(r.id, updated);
+                                            }
+                                          }}
+                                          className="text-red-400 hover:text-red-300 p-0.5 cursor-pointer"
+                                          title="Eliminar"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  
+                                  {/* Formulario rápido para agregar abono/otro */}
+                                  <div className="p-1.5 bg-slate-950/60 rounded border border-indigo-500/20 space-y-1 font-sans">
+                                    <div className="text-[8px] font-black uppercase text-indigo-400">Agregar Registro</div>
+                                    <input 
+                                      type="text"
+                                      placeholder="Concepto (ej: Matrícula)"
+                                      id={`cuota-new-${r.id}`}
+                                      className="w-full bg-[#10192e] border border-slate-700 text-white rounded p-1 text-[9px] outline-none font-sans"
+                                    />
+                                    <div className="flex gap-1">
+                                      <input 
+                                        type="number"
+                                        placeholder="Monto"
+                                        id={`monto-new-${r.id}`}
+                                        className="w-full bg-[#10192e] border border-slate-700 text-white rounded p-1 text-[9px] font-mono outline-none"
+                                      />
+                                      <select 
+                                        id={`tipo-new-${r.id}`}
+                                        className="bg-[#10192e] border border-slate-700 text-white rounded p-0.5 text-[8px] outline-none cursor-pointer"
+                                      >
+                                        <option value="Abono">Abono</option>
+                                        <option value="Otros">Otros</option>
+                                      </select>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const cuotaEl = document.getElementById(`cuota-new-${r.id}`) as HTMLInputElement;
+                                        const montoEl = document.getElementById(`monto-new-${r.id}`) as HTMLInputElement;
+                                        const tipoEl = document.getElementById(`tipo-new-${r.id}`) as HTMLSelectElement;
+                                        
+                                        const cuotaVal = cuotaEl?.value.trim() || 'Abono / Cuota';
+                                        const montoVal = Number(montoEl?.value) || 0;
+                                        const tipoVal = tipoEl?.value || 'Abono';
+                                        
+                                        if (montoVal <= 0) {
+                                          alert('Ingrese un monto válido.');
+                                          return;
+                                        }
+                                        
+                                        const newPObj = {
+                                          id: pList.length > 0 ? Math.max(...pList.map((p: any) => Number(p.id) || 0)) + 1 : 1,
+                                          cuota: cuotaVal,
+                                          monto: montoVal,
+                                          fecha: new Date().toISOString().split('T')[0],
+                                          metodo: tipoVal
+                                        };
+                                        
+                                        await handleUpdateRowPayments(r.id, [...pList, newPObj]);
+                                        
+                                        if (cuotaEl) cuotaEl.value = '';
+                                        if (montoEl) montoEl.value = '';
+                                      }}
+                                      className="w-full py-1 bg-indigo-600 text-white font-bold rounded uppercase text-[8px] hover:bg-indigo-500 text-center cursor-pointer"
+                                    >
+                                      + Añadir
+                                    </button>
+                                  </div>
+                                </div>
+                              </details>
+                            );
+                          })()}
                           <RecordActions module="manager" onEdit={() => { setEditingId(r.id); setForm({...r}); }} onDelete={() => handleDelete(r.id)} />
                         </td>
                       </tr>

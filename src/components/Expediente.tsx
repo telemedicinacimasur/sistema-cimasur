@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, Save, History, ArrowRight, Edit3, X, User, Target, CreditCard, 
   Activity, MapPin, Phone, Mail, Calendar, TrendingUp, Check, Upload, 
-  Award, AlertCircle, Plus, Percent, ShieldCheck, Download, Trash2, Sliders
+  Award, AlertCircle, Plus, Percent, ShieldCheck, Download, Trash2, Sliders,
+  ChevronDown, Edit
 } from 'lucide-react';
 import { cn, formatDate, formatCurrency } from '../lib/utils';
 import { localDB } from '../lib/auth';
@@ -76,6 +77,16 @@ export const Expediente: React.FC<ExpedienteProps> = ({
   });
 
   const [addPaymentSuccess, setAddPaymentSuccess] = useState('');
+  const [isExtraCharge, setIsExtraCharge] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editPaymentForm, setEditPaymentForm] = useState({
+    cuota: '',
+    monto: '',
+    fecha: '',
+    documento: '',
+    metodo: 'Otros',
+    isExtra: false
+  });
 
   // Curriculum outline containing list of modules/classes/workshops
   const [courseModules, setCourseModules] = useState<any[]>([]);
@@ -242,7 +253,8 @@ export const Expediente: React.FC<ExpedienteProps> = ({
       fecha: paymentForm.fecha,
       documento: docRef,
       estado: 'Pagado',
-      metodo: paymentForm.metodo
+      metodo: paymentForm.metodo,
+      isExtra: isExtraCharge
     };
 
     const updatedPayments = [newPaymentObj, ...payments];
@@ -251,11 +263,17 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     // Sum up totals directly from remaining payments
     const finalReceived = updatedPayments.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
 
+    let finalTotalArancel = Number(editForm.montoTotalPagado) || 0;
+    if (isExtraCharge) {
+      finalTotalArancel += parsedMonto;
+    }
+
     const updatedForm = {
       ...editForm,
+      montoTotalPagado: finalTotalArancel,
       montoTotalRecibido: finalReceived,
       avance: editForm.avance || 0,
-      pago: editForm.pago,
+      pago: editForm.pago || 'Al Día',
       unidadesAcademicas: JSON.stringify(courseModules),
       historialPagos: JSON.stringify(updatedPayments)
     };
@@ -265,33 +283,45 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     await onUpdate({ 
       isProfileUpdate: true, 
       updatedProfile: updatedForm, 
-      newHistory: '' 
+      newHistory: `REGISTRO DE PAGO: Se agregó el pago "${paymentForm.cuota}" por ${formatCurrency(parsedMonto)} (Ref: ${docRef}).${isExtraCharge ? " (Añadido como Nuevo Caso Clínico / Extra)" : ""}`
     });
 
     setAddPaymentSuccess(`Pago por ${formatCurrency(parsedMonto)} registrado.`);
-    setPaymentForm(prev => ({ ...prev, monto: '200000', documento: '' }));
+    setPaymentForm(prev => ({ 
+      ...prev, 
+      cuota: 'Cuota Mensual / Arancel', 
+      monto: '200000', 
+      documento: '' 
+    }));
+    setIsExtraCharge(false);
     setTimeout(() => setAddPaymentSuccess(''), 3000);
   };
 
-  const handleDeletePayment = async (paymentId: number) => {
-    const paymentToDelete = payments.find(p => p.id === paymentId);
+  const handleDeletePayment = async (paymentId: any) => {
+    const paymentToDelete = payments.find(p => p.id?.toString() === paymentId?.toString());
     if (!paymentToDelete) return;
 
     if (!confirm(`¿Está seguro de eliminar el pago "${paymentToDelete.cuota}" por ${formatCurrency(paymentToDelete.monto)}?`)) {
       return;
     }
 
-    const updatedPayments = payments.filter(p => p.id !== paymentId);
+    const updatedPayments = payments.filter(p => p.id?.toString() !== paymentId?.toString());
     setPayments(updatedPayments);
 
     // Recalculate and sum up totals from remaining payments
     const finalReceived = updatedPayments.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
 
+    let finalTotalArancel = Number(editForm.montoTotalPagado) || 0;
+    if (paymentToDelete.isExtra) {
+      finalTotalArancel = Math.max(0, finalTotalArancel - (Number(paymentToDelete.monto) || 0));
+    }
+
     const updatedForm = {
       ...editForm,
+      montoTotalPagado: finalTotalArancel,
       montoTotalRecibido: finalReceived,
       avance: editForm.avance || 0,
-      pago: editForm.pago,
+      pago: editForm.pago || 'Al Día',
       unidadesAcademicas: JSON.stringify(courseModules),
       historialPagos: JSON.stringify(updatedPayments)
     };
@@ -301,7 +331,70 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     await onUpdate({ 
       isProfileUpdate: true, 
       updatedProfile: updatedForm, 
-      newHistory: '' 
+      newHistory: `ELIMINACIÓN DE PAGO: Se eliminó el pago de "${paymentToDelete.cuota}" por ${formatCurrency(paymentToDelete.monto)}.${paymentToDelete.isExtra ? " (Se descontó del Arancel Total)" : ""}` 
+    });
+  };
+
+  const handleStartEditPayment = (p: any) => {
+    setEditingPaymentId(p.id);
+    setEditPaymentForm({
+      cuota: p.cuota || '',
+      monto: (p.monto || '').toString(),
+      fecha: p.fecha || new Date().toISOString().split('T')[0],
+      documento: p.documento || '',
+      metodo: p.metodo || 'Otros',
+      isExtra: !!p.isExtra
+    });
+  };
+
+  const handleSavePaymentEdit = async (paymentId: string) => {
+    const updatedPayments = payments.map(p => {
+      if (p.id === paymentId) {
+        return {
+          ...p,
+          cuota: editPaymentForm.cuota,
+          monto: Number(editPaymentForm.monto) || 0,
+          fecha: editPaymentForm.fecha,
+          documento: editPaymentForm.documento,
+          metodo: editPaymentForm.metodo,
+          isExtra: editPaymentForm.isExtra
+        };
+      }
+      return p;
+    });
+
+    setPayments(updatedPayments);
+
+    const finalReceived = updatedPayments.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
+
+    let finalTotalArancel = Number(editForm.montoTotalPagado) || 0;
+    const oldP = payments.find(p => p.id === paymentId);
+    if (oldP) {
+      if (oldP.isExtra) {
+        finalTotalArancel = Math.max(0, finalTotalArancel - (Number(oldP.monto) || 0));
+      }
+      if (editPaymentForm.isExtra) {
+        finalTotalArancel += (Number(editPaymentForm.monto) || 0);
+      }
+    }
+
+    const updatedForm = {
+      ...editForm,
+      montoTotalPagado: finalTotalArancel,
+      montoTotalRecibido: finalReceived,
+      avance: editForm.avance || 0,
+      pago: editForm.pago || 'Al Día',
+      unidadesAcademicas: JSON.stringify(courseModules),
+      historialPagos: JSON.stringify(updatedPayments)
+    };
+
+    setEditForm(updatedForm);
+    setEditingPaymentId(null);
+
+    await onUpdate({
+      isProfileUpdate: true,
+      updatedProfile: updatedForm,
+      newHistory: `EDICIÓN DE PAGO: Se modificó el pago "${editPaymentForm.cuota}" por ${formatCurrency(Number(editPaymentForm.monto) || 0)}.`
     });
   };
 
@@ -880,47 +973,154 @@ export const Expediente: React.FC<ExpedienteProps> = ({
               </div>
             </div>
 
-            {/* Brief list of Ledger */}
+            {/* Collapsible Ledger / Abono/Otros */}
             <div className="space-y-2 pt-2">
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Historial de Cuotas</span>
-              <div className="max-h-[160px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1.5">
-                {payments.length > 0 ? (
-                  payments.map((p) => (
-                    <div key={p.id} className="p-2.5 bg-slate-900/60 rounded-lg border border-[#1e293b]/55 flex justify-between items-center text-[11px]">
-                      <div>
-                        <p className="font-extrabold text-slate-200">{p.cuota}</p>
-                        <p className="text-[9px] text-slate-400 font-mono mt-0.5">{formatDate(p.fecha)} • Ref: {p.documento}</p>
+              <details className="group border border-[#1e293b]/85 rounded-xl bg-slate-900/40 p-3 overflow-hidden transition-all duration-300" open>
+                <summary className="text-[10px] font-black uppercase text-slate-300 cursor-pointer select-none flex justify-between items-center list-none outline-none">
+                  <span className="flex items-center gap-1.5 leading-none">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    Abono / Otros
+                  </span>
+                  <span className="text-[10px] text-sky-400 group-open:hidden uppercase font-black tracking-wider border border-sky-500/20 px-2 py-0.5 rounded bg-sky-950/20">Ver Detalles ({payments.length})</span>
+                  <span className="text-[10px] text-slate-500 hidden group-open:inline uppercase font-black tracking-wider border border-[#1e293b] px-2 py-0.5 rounded bg-[#10192e]">Ocultar</span>
+                </summary>
+                
+                <div className="mt-3 max-h-[220px] overflow-y-auto custom-scrollbar space-y-2 pr-1 border-t border-[#1e293b]/50 pt-3">
+                  {payments.length > 0 ? (
+                    payments.map((p) => (
+                      <div key={p.id} className="p-2.5 bg-slate-900/60 rounded-lg border border-[#1e293b]/55 text-[11px] space-y-2 transition-all">
+                        {editingPaymentId === p.id ? (
+                          /* EDITING INLINE FORM */
+                          <div className="space-y-2 pt-1 font-sans">
+                            <div className="text-[9px] font-black text-amber-500 uppercase tracking-wider">Modificar Transacción</div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <input 
+                                type="text"
+                                className="bg-[#10192e] text-white border border-[#1e293b] rounded p-1.5 text-[10px] font-bold outline-none"
+                                value={editPaymentForm.cuota}
+                                onChange={e => setEditPaymentForm({...editPaymentForm, cuota: e.target.value})}
+                                placeholder="Concepto"
+                              />
+                              <input 
+                                type="number"
+                                className="bg-[#10192e] text-white border border-[#1e293b] rounded p-1.5 text-[10px] font-bold font-mono outline-none"
+                                value={editPaymentForm.monto}
+                                onChange={e => setEditPaymentForm({...editPaymentForm, monto: e.target.value})}
+                                placeholder="Monto"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <input 
+                                type="text"
+                                className="bg-[#10192e] text-white border border-[#1e293b] rounded p-1.5 text-[10px] font-bold outline-none"
+                                value={editPaymentForm.documento}
+                                onChange={e => setEditPaymentForm({...editPaymentForm, documento: e.target.value})}
+                                placeholder="Ref / Boleta"
+                              />
+                              <select
+                                className="bg-[#10192e] text-white border border-[#1e293b] rounded p-1.5 text-[10px] font-bold cursor-pointer outline-none"
+                                value={editPaymentForm.isExtra ? "extra" : "standard"}
+                                onChange={e => setEditPaymentForm({...editPaymentForm, isExtra: e.target.value === 'extra'})}
+                              >
+                                <option value="standard">📉 Abono</option>
+                                <option value="extra">📈 Otros</option>
+                              </select>
+                            </div>
+                            <div className="flex justify-end gap-1.5 pt-1">
+                              <button 
+                                type="button" 
+                                onClick={() => setEditingPaymentId(null)}
+                                className="px-2 py-1 bg-slate-800 text-[9px] uppercase font-black text-slate-400 rounded hover:bg-slate-700 cursor-pointer"
+                              >
+                                Cancelar
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => handleSavePaymentEdit(p.id)}
+                                className="px-2.5 py-1 bg-emerald-600 text-[9px] uppercase font-black text-white rounded hover:bg-emerald-500 cursor-pointer"
+                              >
+                                Confirmar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* VIEW MODE */
+                          <div className="flex justify-between items-center gap-2">
+                            <div className="min-w-0">
+                              <p className="font-extrabold text-slate-200 truncate">
+                                {p.cuota}
+                                {p.isExtra && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 text-[8px] font-black bg-indigo-500/25 text-indigo-300 border border-indigo-500/35 rounded uppercase tracking-wider block sm:inline-block">
+                                    Extra
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{formatDate(p.fecha)} • Ref: {p.documento}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-mono text-emerald-400 font-black whitespace-nowrap">{formatCurrency(p.monto)}</span>
+                              <div className="flex items-center gap-1">
+                                <button 
+                                  type="button"
+                                  onClick={() => handleStartEditPayment(p)}
+                                  className="p-1 text-slate-500 hover:text-amber-400 transition-colors rounded hover:bg-white/5 cursor-pointer"
+                                  title="Editar pago"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleDeletePayment(p.id)}
+                                  className="p-1 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-white/5 cursor-pointer"
+                                  title="Eliminar pago"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-emerald-400 font-black">{formatCurrency(p.monto)}</span>
-                        <button 
-                          type="button"
-                          onClick={() => handleDeletePayment(p.id)}
-                          className="p-1 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-white/5 cursor-pointer"
-                          title="Eliminar pago"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center border border-dashed border-[#1e293b]/40 rounded-xl">
+                      <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Sin pagos o cuotas registradas</p>
+                      <p className="text-[8.5px] text-slate-600 uppercase tracking-wider mt-0.5 animate-pulse">Use el formulario de abajo para ingresar un pago (neto)</p>
                     </div>
-                  ))
-                ) : (
-                  <div className="p-6 text-center border border-dashed border-[#1e293b]/40 rounded-xl">
-                    <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Sin pagos o cuotas registradas</p>
-                    <p className="text-[8.5px] text-slate-600 uppercase tracking-wider mt-0.5">Use el formulario de abajo para ingresar un pago (neto)</p>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </details>
             </div>
 
             {/* Inline dynamic coupon payment adder */}
             <form onSubmit={handleAddPayment} className="p-3 bg-slate-900/50 rounded-xl border border-[#1e293b] space-y-2.5 pt-3">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">REGISTRADOR DE PAGOS (NETO EN CUENTA)</span>
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block font-sans">REGISTRADOR DE PAGOS (NETO EN CUENTA)</span>
               {addPaymentSuccess && (
-                <div className="p-2 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg">
+                <div className="p-2 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg animate-pulse">
                   ✓ {addPaymentSuccess}
                 </div>
               )}
+              
+              <div className="space-y-1">
+                <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Concepto / Tipo de Abono</label>
+                <select
+                  className="w-full bg-[#10192e] border border-[#1e293b] rounded p-2 text-white text-xs outline-none focus:border-emerald-500 cursor-pointer"
+                  value={isExtraCharge ? "extra" : "standard"}
+                  onChange={e => {
+                    const isExtra = e.target.value === "extra";
+                    setIsExtraCharge(isExtra);
+                    if (isExtra) {
+                      setPaymentForm(prev => ({ ...prev, cuota: 'Nuevo Caso Clínico / Diplomado Adicional' }));
+                    } else {
+                      setPaymentForm(prev => ({ ...prev, cuota: 'Cuota Mensual / Arancel' }));
+                    }
+                  }}
+                >
+                  <option value="standard">📉 Abono (Reduce saldo restante)</option>
+                  <option value="extra">📈 Otros (Suma al Arancel Total)</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <input 
                   type="text" 
