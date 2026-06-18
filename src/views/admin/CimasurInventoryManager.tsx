@@ -10,15 +10,16 @@ type MainTab = 'SALINA CS' | 'ETANOL CS' | 'ADE CS' | 'DILUCIONES CIMASUR' | 'GO
 type SubModule = 'dashboard' | 'codigos' | 'DILUCIONES CIMASUR' | 'GOTAS PURAS' | 'ALTAS DILUCIONES' | 'NOSODES CLIENTES' | 'FÓRMULAS MAGISTRALES' | 'EC DR. CONEJEROS';
 
 const BASE_CATEGORIES = [
-  'TODOS',
-  'Oftálmicos',
-  'Esencias Florales',
-  'Fórmula Magistral',
-  'Productos Simples',
-  'Nosodes Simples',
-  'Complejos C100/C200',
-  'Packs Especiales',
-  'Productos Base/Avanzado'
+  "TODOS",
+  "Complejo Base",
+  "Complejo Avanzado",
+  "Especialidad",
+  "Sales de Schussler",
+  "Exóticos",
+  "productos a Solicitud",
+  "Paquetes Terapeuticos (KIT)",
+  "Esencias florales",
+  "Oftálmica"
 ];
 
 const GENERIC_CATEGORIES = [
@@ -31,6 +32,15 @@ const GENERIC_CATEGORIES = [
   'Esencia Floral',
   'Producto Simple',
   'Nosode Simple',
+  'Complejo Base',
+  'Complejo Avanzado',
+  'Especialidad',
+  'Sales de Schussler',
+  'Exóticos',
+  'productos a Solicitud',
+  'Paquetes Terapeuticos (KIT)',
+  'Esencias florales',
+  'Oftálmica'
 ];
 
 const PREFIX_MAP: Record<string, string> = {
@@ -56,7 +66,7 @@ export default function CimasurInventoryManager() {
   const { user } = useAuth();
   const [activeModule, setActiveModule] = useState<SubModule>('dashboard');
   const [activeTab, setActiveTab] = useState<MainTab>('SALINA CS');
-  const [activeCategory, setActiveCategory] = useState<string>('Oftálmicos');
+  const [activeCategory, setActiveCategory] = useState<string>('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<string>('menor_mayor');
   
@@ -69,9 +79,10 @@ export default function CimasurInventoryManager() {
       codigo_barras: '',
       nombre_producto: '',
       solucion: '',
-      categoria_tipo: 'Oftálmicos',
+      categoria_tipo: 'Oftálmica',
       fecha: '',
-      doctor: ''
+      doctor: '',
+      precio: 0
   });
 
   const isBaseModule = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(activeTab);
@@ -237,6 +248,7 @@ export default function CimasurInventoryManager() {
       codigo_barras: isGeneric ? 'GENÉRICO' : form.codigo_barras,
       base_master: currentBase,
       type: 'inventory',
+      precio: form.precio !== undefined ? Number(form.precio) : 0,
       [editingId ? 'updatedAt' : 'createdAt']: new Date().toISOString(),
       [editingId ? 'ultimaModificacionPor' : 'creadoPor']: user?.displayName || 'Admin'
     };
@@ -253,10 +265,11 @@ export default function CimasurInventoryManager() {
       codigo_barras: '', 
       nombre_producto: '', 
       solucion: '', 
-      categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmicos' : activeCategory, 
+      categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory, 
       fecha: '', 
       doctor: '',
-      base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab
+      base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab,
+      precio: 0
     });
     loadData();
   };
@@ -267,9 +280,10 @@ export default function CimasurInventoryManager() {
       codigo_barras: r.codigo_barras || '',
       nombre_producto: r.nombre_producto || '',
       solucion: r.solucion || '',
-      categoria_tipo: r.categoria_tipo || 'Oftálmicos',
+      categoria_tipo: r.categoria_tipo || 'Oftálmica',
       fecha: r.fecha || '',
-      doctor: r.doctor || ''
+      doctor: r.doctor || '',
+      precio: r.precio !== undefined ? Number(r.precio) : 0
     });
     setShowModal(true);
   };
@@ -289,21 +303,28 @@ export default function CimasurInventoryManager() {
 
   const getHeadersForTab = (tab: MainTab) => {
     switch(tab) {
-      case 'MATRIZ COMPLETA': return ['CÓDIGO', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA', 'BASE MASTER'];
+      case 'MATRIZ COMPLETA': return ['CÓDIGO', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA', 'BASE MASTER', 'PRECIO'];
       case 'DILUCIONES CIMASUR': return ['CÓDIGO', 'IDENTIFICACIÓN', 'DILUCIONES / ACTUALIZACIÓN'];
       case 'GOTAS PURAS': return ['CÓDIGO', 'PRODUCTO']; // Removed SOLUCIÓN
       case 'ALTAS DILUCIONES': return ['CÓDIGO', 'PRODUCTO', 'DILUCIÓN'];
       case 'NOSODES CLIENTES': return ['CÓDIGO NC', 'MUESTRA Y POTENCIA', 'FECHA', 'DOCTOR(A)'];
       case 'FÓRMULAS MAGISTRALES': return ['CÓDIGO FM', 'FÓRMULA', 'OBSERVACIÓN'];
       case 'EC DR. CONEJEROS': return ['CÓDIGO EC', 'PRODUCTO', 'DILUCIÓN'];
-      default: return ['CÓDIGO BARRA', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA'];
+      default: return ['CÓDIGO BARRA', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA', 'PRECIO'];
     }
   };
 
   const getRowForTab = (r: any, tab: MainTab) => {
+    const formatPrice = (val: any) => {
+      if (val === undefined || val === null || val === '') return '---';
+      const num = Number(val);
+      if (isNaN(num)) return val;
+      return `$${num.toLocaleString('es-CL')}`;
+    };
+
     switch(tab) {
       case 'MATRIZ COMPLETA':
-        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion), safe(r.categoria_tipo), safe(r.base_master)];
+        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion), safe(r.categoria_tipo), safe(r.base_master), formatPrice(r.precio)];
       case 'DILUCIONES CIMASUR': 
         return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
       case 'GOTAS PURAS': 
@@ -321,7 +342,8 @@ export default function CimasurInventoryManager() {
           safe(r.codigo_barras),
           safe(r.nombre_producto),
           safe(r.solucion),
-          isBaseModule ? safe(r.categoria_tipo) : '---'
+          isBaseModule ? safe(r.categoria_tipo) : '---',
+          formatPrice(r.precio)
         ];
     }
   };
@@ -398,13 +420,16 @@ export default function CimasurInventoryManager() {
             importedCat = 'Productos Base/Avanzado';
           }
 
+          const pr = row['PRECIO'] || row['Precio'] || row['precio'] || row['VALOR'] || row['valor'];
+
           validRows.push({
             cd: cd.trim(),
             nm: nm.trim(),
             sol: safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['OBSERVACIÓN'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || ''),
             cat: importedCat,
             fec: safe(row['FECHA']),
-            doc: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR'])
+            doc: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR']),
+            precio: pr !== undefined ? Number(pr) : 0
           });
         }
 
@@ -425,6 +450,7 @@ export default function CimasurInventoryManager() {
              fecha: r.fec,
              doctor: r.doc,
              base_master: activeTab,
+             precio: r.precio,
              type: 'inventory',
              createdAt: new Date().toISOString(),
              creadoPor: user?.displayName || 'Admin'
@@ -451,7 +477,7 @@ export default function CimasurInventoryManager() {
     setActiveModule(mod);
     if (mod === 'codigos') {
       setActiveTab('SALINA CS');
-      setActiveCategory('Oftálmicos');
+      setActiveCategory('TODOS');
     } else if (mod !== 'dashboard') {
       setActiveTab(mod as MainTab);
     }
@@ -569,18 +595,21 @@ export default function CimasurInventoryManager() {
             )}
 
             {(isBaseModule || isMatrixView) && (
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                <button
-                  onClick={() => setActiveCategory('TODOS')}
-                  className={cn(
-                    "px-4 py-2 rounded-2xl text-[10px] uppercase tracking-widest font-bold transition-all whitespace-nowrap flex items-center justify-center",
-                    activeCategory === 'TODOS' 
-                      ? "bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 shadow-[0_0_15px_rgba(56,189,248,0.2)]" 
-                      : "bg-[#111A2E] text-slate-400 hover:bg-[#1E293B] border border-[#1E293B]"
-                  )}
-                >
-                  TODOS
-                </button>
+              <div className="flex flex-wrap gap-2 mb-4 p-2 bg-[#111a2e]/90 rounded-2xl border border-[#1E293B] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                {BASE_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={cn(
+                      "px-3.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap flex items-center justify-center cursor-pointer",
+                      activeCategory === cat 
+                        ? "bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 shadow-[0_0_15px_rgba(56,189,248,0.2)]" 
+                        : "bg-[#152035] text-slate-400 hover:bg-[#1E293B] border border-[#1E293B]/40 hover:text-white"
+                    )}
+                  >
+                    {cat.toUpperCase()}
+                  </button>
+                ))}
               </div>
             )}
 
@@ -633,10 +662,11 @@ export default function CimasurInventoryManager() {
                         codigo_barras: '', 
                         nombre_producto: '', 
                         solucion: '', 
-                        categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmicos' : activeCategory, 
+                        categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory, 
                         fecha: '', 
                         doctor: '',
-                        base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab
+                        base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab,
+                        precio: 0
                       });
                       setShowModal(true); 
                   }} 
@@ -647,7 +677,7 @@ export default function CimasurInventoryManager() {
               </div>
             </div>
           </div>
-
+ 
           <div className="flex flex-col flex-1 min-h-0">
             <div className="bg-[#152035] border border-[#1E293B] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex-1 overflow-hidden flex flex-col">
             <div className="overflow-y-auto max-h-[550px] scrollbar-thin">
@@ -666,11 +696,22 @@ export default function CimasurInventoryManager() {
                       const rowVals = getRowForTab(r, activeTab);
                       return (
                       <tr key={r.id || i} className="hover:bg-[#1E293B] group transition-all duration-300">
-                        {rowVals.map((val, idx) => (
-                           <td key={idx} className={`p-4 text-xs ${idx === 0 ? 'font-mono font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : idx === 1 ? 'font-bold text-sm' : 'text-slate-300'} border-r border-[#1E293B]`}>
-                             {val || '---'}
-                           </td>
-                        ))}
+                        {rowVals.map((val, idx) => {
+                          const isPrice = (isBaseModule || isMatrixView) && idx === rowVals.length - 1;
+                          return (
+                            <td key={idx} className={`p-4 text-xs border-r border-[#1E293B] ${
+                              idx === 0 
+                                ? 'font-mono font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' 
+                                : idx === 1 
+                                ? 'font-bold text-sm text-white' 
+                                : isPrice 
+                                ? 'font-mono font-extrabold text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-black'
+                                : 'text-slate-300'
+                            }`}>
+                              {val || '---'}
+                            </td>
+                          );
+                        })}
                         <td className="p-4 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button onClick={() => handleEdit(r)} className="p-1.5 text-slate-400 hover:text-[#38BDF8] bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border rounded-md hover:border-[#38BDF8]/50 transition-all cursor-pointer" title="Editar">
@@ -734,12 +775,24 @@ export default function CimasurInventoryManager() {
               {(isBaseModule || activeTab === 'MATRIZ COMPLETA') && (
                 <FormField label="Categoría">
                   <select 
-                    className="w-full border-b border-[#1E293B] p-2 text-sm font-bold outline-none"
-                    value={form.categoria_tipo}
+                    className="w-full bg-[#152035] border-b border-[#1E293B] focus:border-[#38BDF8] p-2 text-sm font-bold text-white outline-none cursor-pointer"
+                    value={form.categoria_tipo || 'Oftálmica'}
                     onChange={e => setForm({...form, categoria_tipo: e.target.value})}
                   >
                     {BASE_CATEGORIES.filter(c => c !== 'TODOS').map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
+                </FormField>
+              )}
+
+              {(isBaseModule || activeTab === 'MATRIZ COMPLETA') && (
+                <FormField label="Precio ($)">
+                  <input
+                    type="number"
+                    className="w-full bg-[#152035] border-b border-[#1E293B] focus:border-[#38BDF8] p-2 text-sm font-bold text-white outline-none"
+                    placeholder="Ej. 15000"
+                    value={form.precio !== undefined ? form.precio : ''}
+                    onChange={e => setForm({...form, precio: e.target.value === '' ? '' : Number(e.target.value)})}
+                  />
                 </FormField>
               )}
 

@@ -27,6 +27,7 @@ import { CommentDialog } from '../components/CommentDialog';
 import { addNotification } from '../lib/notifications';
 
 import { SmartCampaigns } from '../components/crm/SmartCampaigns';
+import { ClubSocialManager } from '../components/crm/ClubSocialManager';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -190,7 +191,7 @@ export default function CRMView() {
   const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
   const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
 
-  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'intranet' | 'smart'>('register');
+  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'intranet' | 'smart' | 'club'>('register');
   const [records, setRecords] = useState<any[]>([]);
   const [intranetClients, setIntranetClients] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
@@ -489,6 +490,17 @@ export default function CRMView() {
               Motor Comercial
             </button>
           )}
+          {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('smart')) && (
+            <button 
+              onClick={() => setActiveTab('club')}
+              className={cn(
+                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                activeTab === 'club' ? "border-b-2 border-pink-500 text-pink-400 font-extrabold" : "text-slate-400 hover:text-slate-300"
+              )}
+            >
+              Club Social Cimasur 👑
+            </button>
+          )}
         </div>
       </div>
 
@@ -503,6 +515,7 @@ export default function CRMView() {
         />
       )}
       {activeTab === 'smart' && <SmartCampaigns />}
+      {activeTab === 'club' && <ClubSocialManager />}
       {commentTarget && (
         <CommentDialog 
            isOpen={!!commentTarget} 
