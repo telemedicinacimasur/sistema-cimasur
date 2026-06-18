@@ -29,64 +29,74 @@ const TIERS_DEFAULT = [
     name: 'Sin categoría',
     min: 0,
     max: 499999,
-    color: 'border-slate-300 bg-slate-100 text-black',
+    color: 'border-slate-300 bg-slate-50 text-slate-900 shadow-md',
     badge: 'bg-slate-200 text-slate-900 border-slate-300',
     benefits: [
-      'Acceso general a catálogos online',
-      'Boletín técnico mensual por correo'
+      'Acceso general a catálogos online de CIMASUR',
+      'Boletín técnico mensual por correo electrónico'
     ]
   },
   {
     name: 'Bronce',
     min: 500000,
     max: 1999999,
-    color: 'border-amber-300 bg-amber-100 text-black',
-    badge: 'bg-amber-200 text-amber-900 border-amber-300',
+    color: 'border-amber-300 bg-amber-50/90 text-amber-950 shadow-md',
+    badge: 'bg-amber-100 text-amber-900 border-amber-300',
     benefits: [
-      'Acceso general a catálogos online',
-      'Boletín técnico mensual por correo',
-      'Acceso gratuito a 1 Webinar Clínico al mes',
-      'Descuento de bienvenida del 5% en primer pedido'
+      'Descuento por volumen en Productos Base (**)',
+      'Invitación a todos los eventos gratuitos en línea (con prioridad para visitas a Laboratorio y Capacitaciones)',
+      'Soporte técnico vía Google Form o WhatsApp',
+      'Boletín informativo digital trimestral vía email (SI)'
     ]
   },
   {
     name: 'Plata',
     min: 2000000,
     max: 4999999,
-    color: 'border-indigo-300 bg-indigo-100 text-black',
-    badge: 'bg-indigo-200 text-indigo-900 border-indigo-300',
+    color: 'border-blue-200 bg-blue-50/95 text-blue-950 shadow-md',
+    badge: 'bg-blue-100 text-blue-900 border-blue-200',
     benefits: [
-      'Acceso gratuito a todos los Webinars Clínicos',
-      'Envíos de productos priorizados de laboratorio',
-      'Soporte técnico preferente vía WhatsApp',
-      'Descuento del 3% en nosodes simples'
+      'Descuento por volumen en Productos Base y Avanzados (**)',
+      '3 despachos gratuitos anuales vía Blue Express en compras superiores a $300.000.-',
+      '5 muestras gratis de productos promocionales anuales',
+      '1 artefacto de promoción gratis (minivitrinas/stickers u otro) anual',
+      'Invitación a todos los eventos gratuitos en línea',
+      'Soporte técnico vía Google Form o WhatsApp',
+      'Boletín informativo digital trimestral vía email (SI)'
     ]
   },
   {
     name: 'Oro',
     min: 5000000,
     max: 11999999,
-    color: 'border-yellow-300 bg-yellow-100 text-black',
-    badge: 'bg-yellow-200 text-yellow-900 border-yellow-300',
+    color: 'border-yellow-300 bg-yellow-50/95 text-yellow-950 shadow-md',
+    badge: 'bg-yellow-100 text-yellow-904 border-yellow-305',
     benefits: [
-      'Acceso gratuito a todos los Webinars Clínicos',
-      'Envíos priorizados sin costo administrativo',
-      'Atención prioritaria y directa del Laboratorio Jefe',
-      'Descuento fijo del 5% permanente en fórmulas magistrales y nosodes'
+      'Descuento por volumen en Productos Base, Avanzados, Especialidades y Esencias Florales',
+      '3 despachos gratuitos anuales vía Blue Express (solicitados previamente)',
+      '10 muestras gratis anuales y acceso anticipado con 10% extra de descuento en nuevos productos',
+      'Permite devolución y reposición según Política de Reposición de Productos CIMASUR',
+      '1 Vademécum gratuito por actualización + 1 artefacto de promoción gratis anual',
+      'Invitación a todos los eventos gratuitos en línea',
+      'Soporte prioritario online por chat WhatsApp',
+      'Boletín informativo digital trimestral vía email (SI)'
     ]
   },
   {
     name: 'Platinum',
     min: 12000000,
     max: Infinity,
-    color: 'border-purple-300 bg-purple-100 text-black',
-    badge: 'bg-purple-200 text-purple-90 border-purple-300',
+    color: 'border-purple-300 bg-purple-50/95 text-purple-950 shadow-md',
+    badge: 'bg-purple-100 text-purple-90 border-purple-200',
     benefits: [
-      'Beneficios Gold incluidos',
-      'Despacho gratuito de inmediato sin monto mínimo de compra',
-      'Asesoría técnica priorizada 24/7 con canal de línea rápida',
-      'Descuento del 10% permanente en preparaciones complejas',
-      'Invitación exclusiva VIP a Congresos Médicos y Cursos de Especialización'
+      'Descuento por volumen en Todos los productos de la línea (*)',
+      'Despacho SIN COSTO en todos los envíos vía Blue Express',
+      '20 muestras gratis anuales y acceso anticipado con 10% extra de descuento en nuevos productos',
+      'Permite devolución y reposición según Política de Reposición de Productos CIMASUR',
+      '2 Vademécum gratuitos por actualización + 2 artefactos de promoción gratis anuales',
+      'Invitación a todos los eventos gratuitos en línea',
+      'Soporte prioritario online por chat WhatsApp',
+      'Boletín informativo digital trimestral vía email (SI)'
     ]
   }
 ];
@@ -420,15 +430,28 @@ export function ClubSocialManager() {
       {/* DYNAMIC COLLAPSIBLE TIERS & BENEFITS EDITOR PANEL */}
       {showSettings && (
         <div className="bg-[#152035] rounded-3xl p-6 border-2 border-pink-500/30 shadow-2xl space-y-4 animate-in slide-in-from-top-4 duration-300">
-          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-slate-800 pb-3 gap-3">
             <div>
               <span className="text-[10px] font-mono font-black text-pink-400 uppercase tracking-widest">MOTOR DE REGLAS DE NEGOCIO CIMASUR</span>
               <h3 className="text-base font-black text-white uppercase tracking-tight mt-1">Configurador de Límites de Ventas y Beneficios</h3>
               <p className="text-slate-400 text-[11px] mt-0.5">Define los montos de entrada para cada categoría de socio y actualiza la lista de beneficios que se desbloquean en tiempo real.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("¿Estás seguro de restablecer todos los niveles y beneficios a la lista de beneficios oficial de CIMASUR? Se sobrescribirá cualquier cambio personalizado.")) {
+                    setEditTiersConfig(JSON.parse(JSON.stringify(TIERS_DEFAULT)));
+                    setActiveSettingsTab(0);
+                  }
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 text-[10px] px-3 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 rounded-xl font-black uppercase tracking-wider transition-all cursor-pointer"
+              >
+                <Award className="w-3.5 h-3.5 text-yellow-400" />
+                Restablecer a Beneficios Oficiales 🏆
+              </button>
             </div>
             <button
               onClick={() => setShowSettings(false)}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors text-xs font-bold"
+              className="p-2 px-3 self-end sm:self-auto rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors text-xs font-black uppercase tracking-widest cursor-pointer"
             >
               Cerrar ✕
             </button>
@@ -640,6 +663,85 @@ export function ClubSocialManager() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* SECCIÓN OFICIAL DE REQUISITOS Y CONDICIONES DEL CLUB */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0D1527] p-6 rounded-3xl border border-slate-800 shadow-xl animate-in fade-in duration-300">
+        
+        {/* COLUMNA 1: REQUISITOS PARA PERTENECER AL CLUB */}
+        <div className="bg-[#152035]/50 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
+            <span className="p-1 px-2 text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-lg font-black font-mono">REGISTRO</span>
+            <h4 className="text-xs font-black text-white uppercase tracking-wider">Requisitos para Ser Parte del Club</h4>
+          </div>
+          
+          <ul className="space-y-3">
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-black flex items-center justify-center shrink-0">1</span>
+              <div>
+                <span className="text-xs font-extrabold text-slate-200 block uppercase tracking-tight">Antigüedad Comercial</span>
+                <span className="text-[11px] text-slate-400 leading-normal">Haber registrado compras continuas durante una antigüedad mínima de 6 meses.</span>
+              </div>
+            </li>
+
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-black flex items-center justify-center shrink-0">2</span>
+              <div>
+                <span className="text-xs font-extrabold text-slate-200 block uppercase tracking-tight">Intranet Corporativa</span>
+                <span className="text-[11px] text-slate-400 leading-normal">Ser un usuario activo de la Intranet CIMASUR.</span>
+              </div>
+            </li>
+
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-pink-500/15 border border-pink-500/30 text-pink-400 font-mono text-xs font-black flex items-center justify-center shrink-0">3</span>
+              <div className="flex-1">
+                <span className="text-xs font-extrabold text-slate-200 block uppercase tracking-tight">Formulario de Inscripción Oficial</span>
+                <span className="text-[11px] text-slate-400 leading-normal block mb-2 font-medium">Completar el proceso formal rellenando el formulario oficial habilitado en línea:</span>
+                <a 
+                  href="https://forms.gle/EdjuUipUedDPVnSy7" 
+                  target="_blank" 
+                  rel="noreferrer noopener"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1E3A5F] hover:bg-[#254C7B] text-sky-100 border border-sky-400/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md cursor-pointer hover:scale-[1.02]"
+                >
+                  Rellenar Formulario de Inscripción
+                  <ArrowUpRight className="w-3.5 h-3.5 text-sky-300" />
+                </a>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        {/* COLUMNA 2: REGULACION Y NOTAS COMERCIALES */}
+        <div className="bg-[#152035]/50 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
+            <span className="p-1 px-2 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg font-black font-mono">NOTAS</span>
+            <h4 className="text-xs font-black text-white uppercase tracking-wider">Notas al Pie y Condiciones de Compra</h4>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-3 bg-[#0D1527] rounded-xl border border-slate-800/80">
+              <span className="text-[10px] font-mono font-black text-amber-400 uppercase tracking-widest block mb-1">(*) DESCUENTOS POR VOLUMEN</span>
+              <p className="text-[11px] text-slate-350 leading-relaxed font-semibold">
+                El beneficio de descuento por volumen que se aplicará dependerá directamente del volumen real de compra facturado. <strong className="text-amber-300 font-extrabold">Los descuentos no son acumulables</strong>, aplicándose siempre de manera automática el de mayor porcentaje o valor para el cliente.
+              </p>
+            </div>
+
+            <div className="p-3 bg-[#0D1527] rounded-xl border border-slate-800/80">
+              <span className="text-[10px] font-mono font-black text-rose-400 uppercase tracking-widest block mb-1">(**) EXCLUSIONES DE DESCUENTOS</span>
+              <p className="text-[11px] text-slate-350 leading-relaxed font-semibold">
+                Los descuentos especiales de las categorías de socios <strong className="text-rose-400 font-extrabold">no aplican para los siguientes productos</strong>:
+              </p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {['ADE', 'Tópicos', 'Oftálmicos', 'Altas Diluciones', 'Inyectables', 'Fuera de Vademécum'].map((ex, exIdx) => (
+                  <span key={exIdx} className="px-2 py-1 rounded bg-rose-950/40 text-rose-300 border border-rose-905/30 font-mono text-[9px] font-black uppercase">
+                    {ex}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* CORE INTERACTIVE INTERFACE */}
