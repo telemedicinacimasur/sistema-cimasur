@@ -135,14 +135,40 @@ export const Expediente: React.FC<ExpedienteProps> = ({
 
   const handleSaveEdit = async () => {
     try {
+      const salesVal = Number(editForm.compraAnual) || 0;
+      
+      // Auto-update category value locally
+      let derivedCategory = "Sin categoría";
+      if (salesVal >= 12000000) derivedCategory = "Platinum";
+      else if (salesVal >= 5000000) derivedCategory = "Oro";
+      else if (salesVal >= 2000000) derivedCategory = "Plata";
+      else if (salesVal >= 500000) derivedCategory = "Bronce";
+
+      let salesObj = { v2024: 0, v2025: 0, v2026: 0 };
+      if (selectedClient.clubVentasDetail) {
+        try {
+          salesObj = typeof selectedClient.clubVentasDetail === 'string' 
+            ? JSON.parse(selectedClient.clubVentasDetail) 
+            : selectedClient.clubVentasDetail;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      salesObj.v2026 = salesVal;
+
+      const updatedProfile = {
+        ...editForm,
+        compraAnual: salesVal,
+        categoria: derivedCategory,
+        clubVentasDetail: JSON.stringify(salesObj),
+        unidadesAcademicas: JSON.stringify(courseModules),
+        historialPagos: JSON.stringify(payments)
+      };
+
       await onUpdate({ 
         isProfileUpdate: true, 
-        updatedProfile: {
-          ...editForm,
-          unidadesAcademicas: JSON.stringify(courseModules),
-          historialPagos: JSON.stringify(payments)
-        }, 
-        newHistory: '' 
+        updatedProfile: updatedProfile, 
+        newHistory: `\n[Actualización de Datos] - Compra Anual registrada en $${salesVal.toLocaleString('es-CL')} (Categoría: ${derivedCategory})` 
       });
       setIsEditingData(false);
     } catch (e) {
@@ -677,17 +703,26 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                   </span>
                 )}
               </CRMField>
-              <CRMField label="Compromiso / Fecha de Pago">
+              <CRMField label="Compra Anual Acumulada ($)">
                 {isEditingData ? (
                   <input 
-                    type="date"
-                    className="w-full bg-[#152035] border border-[#1e293b] rounded px-2 py-1 text-white text-xs font-bold font-mono outline-none focus:border-sky-500" 
-                    value={editForm.fechaPago || ''} 
-                    onChange={e => setEditForm({...editForm, fechaPago: e.target.value})} 
+                    type="number"
+                    className="w-full bg-[#152035] border border-[#1e293b] rounded px-2 py-1 text-white text-xs font-bold outline-none focus:border-sky-500" 
+                    value={editForm.compraAnual ?? 0} 
+                    onChange={e => {
+                      const val = Number(e.target.value) || 0;
+                      // Auto-update category value locally
+                      let catName = "Sin categoría";
+                      if (val >= 12000000) catName = "Platinum";
+                      else if (val >= 5000000) catName = "Oro";
+                      else if (val >= 2000000) catName = "Plata";
+                      else if (val >= 500000) catName = "Bronce";
+                      setEditForm({...editForm, compraAnual: val, categoria: catName});
+                    }} 
                   />
                 ) : (
-                  <span className="text-amber-400 text-xs font-black">
-                    📅 {selectedClient.fechaPago ? formatDate(selectedClient.fechaPago) : 'No detallada'}
+                  <span className="text-amber-400 text-xs font-black flex items-center gap-1.5">
+                    💰 ${Number(selectedClient.compraAnual || 0).toLocaleString('es-CL')}
                   </span>
                 )}
               </CRMField>

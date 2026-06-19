@@ -169,7 +169,7 @@ export async function syncIntranetClientToCRM(ic: any, user?: any) {
         categoria: 'Sin compra',
         intranet: 'Si',
         comoLlego: 'Plataforma Intranet',
-        fechaPago: '',
+        fechaPago: 'Mensual',
         historialUnificado: `Sincronizado automáticamente desde plataforma de ventas online Intranet (Acceso Aprobado: Veterinario/Compra) el ${new Date().toLocaleDateString('es-CL')}.`,
         responsable: user?.displayName || user?.email || 'Sistema',
         isGestionCustomer: false
@@ -339,7 +339,7 @@ export default function CRMView() {
               categoria: 'Sin compra', // Force "Sin compra" to trigger purchase campaigns!
               intranet: 'Si',
               comoLlego: 'Plataforma Intranet',
-              fechaPago: '',
+              fechaPago: 'Mensual',
               historialUnificado: `Sincronizado automáticamente (Veterinario aprobado en Intranet) el ${new Date().toLocaleDateString('es-CL')}.`,
               responsable: user?.displayName || user?.email || 'Sistema',
               isGestionCustomer: false
@@ -398,7 +398,7 @@ export default function CRMView() {
           categoria: 'Sin compra', // Force "Sin compra" to start purchase campaigns!
           intranet: 'Si',
           comoLlego: 'Plataforma Intranet',
-          fechaPago: '',
+          fechaPago: 'Mensual',
           historialUnificado: `Sincronizado individualmente desde Intranet el ${new Date().toLocaleDateString('es-CL')}.`,
           responsable: user?.displayName || user?.email || 'Sistema',
           isGestionCustomer: false
@@ -566,6 +566,68 @@ const normalizeCat = (val: any) => {
   return clean;
 };
 
+const getTiersList = () => {
+  const saved = localStorage.getItem('cimasur_club_tiers_config');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 5) {
+        return parsed.map((item: any, idx: number) => ({
+          ...item,
+          min: Number(item.min) || 0,
+          max: (item.max === null || item.max === "Infinity" || idx === 4) ? Infinity : Number(item.max),
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return [
+    { name: 'Sin categoría', min: 0, max: 499999, benefits: ['Acceso general a catálogos online Cimasur', 'Boletín técnico mensual por email'] },
+    { name: 'Bronce', min: 500000, max: 1999999, benefits: ['Descuento por volumen en Productos Base (**)', 'Invitación a eventos gratuitos en línea', 'Soporte técnico básico vía WhatsApp'] },
+    { name: 'Plata', min: 2000000, max: 4999999, benefits: ['Descuentos por volumen avanzados', '3 despachos gratuitos anuales', '5 muestras gratis anuales'] },
+    { name: 'Oro', min: 5000000, max: 11999999, benefits: ['Soporte prioritario online WhatsApp', 'Descuento en todas las especialidades', 'Devoluciones y reposiciones permitidas'] },
+    { name: 'Platinum', min: 12000000, max: Infinity, benefits: ['Descuento de distribuidor premium', 'Envío SIN COSTO ilimitado', '20 muestras de productos gratis anuales'] }
+  ];
+};
+
+const getTierForSales = (sales: number) => {
+  const list = getTiersList();
+  for (const t of list) {
+    if (sales >= t.min && sales <= t.max) {
+      return t;
+    }
+  }
+  return list[0];
+};
+
+const getClientAnnualSales2026 = (client: any): number => {
+  if (!client) return 0;
+  if (client.compraAnual !== undefined && client.compraAnual !== null && client.compraAnual !== '') {
+    return Number(client.compraAnual) || 0;
+  }
+  if (client.clubVentasDetail) {
+    try {
+      const parsed = typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail;
+      if (parsed && typeof parsed.v2026 === 'number') {
+        return parsed.v2026;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  if (client.ventas && typeof client.ventas.v2026 === 'number') {
+    return client.ventas.v2026;
+  }
+  // Fallback based on category
+  const cat = normalizeCat(client.categoria || 'Sin categoría');
+  if (cat.includes('platinum')) return 12000000;
+  if (cat.includes('oro')) return 5000000;
+  if (cat.includes('plata')) return 2000000;
+  if (cat.includes('bronce')) return 500000;
+  return 0;
+};
+
 function CRMRegister() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -583,7 +645,7 @@ function CRMRegister() {
     intranet: 'No',
     isGestionCustomer: false,
     comoLlego: 'Campañas / Ads',
-    fechaPago: ''
+    compraAnual: 0
   });
 
   useEffect(() => {
@@ -615,10 +677,14 @@ function CRMRegister() {
       resolvedRut = "Sin RUT";
     }
 
+    const calculatedTier = getTierForSales(Number(form.compraAnual || 0));
+    
     const finalForm = {
       ...form,
+      categoria: calculatedTier.name, // Auto-derive matching category!
       name: resolvedName,
       rut: resolvedRut,
+      clubVentasDetail: JSON.stringify({ v2024: 0, v2025: 0, v2026: Number(form.compraAnual || 0) }),
       historialUnificado: form.historialUnificado || `Cliente creado manualmente el ${new Date().toLocaleDateString('es-CL')}`
     };
 
@@ -637,7 +703,7 @@ function CRMRegister() {
         categoria: finalForm.categoria,
         estado: 'En proceso',
         consultora: finalForm.responsable,
-        observaciones: `Registro inicial CRM\nOrigen: ${finalForm.comoLlego}\nFecha Pago: ${finalForm.fechaPago || 'No detallada'}\n\n${finalForm.historialUnificado}`
+        observaciones: `Registro inicial CRM\nOrigen: ${finalForm.comoLlego}\nCompra Anual: $${(form.compraAnual || 0).toLocaleString('es-CL')}\nCategoría Club Social: ${finalForm.categoria}\n\n${finalForm.historialUnificado}`
       };
       await localDB.saveToCollection('gestion_records', gestionRecord);
     }
@@ -660,18 +726,18 @@ function CRMRegister() {
       type: 'Farmacia',
       categoria: 'Sin categoría',
       historialUnificado: '',
-      responsable: user.displayName,
+      responsable: user?.displayName || '',
       intranet: 'No',
       isGestionCustomer: false,
       comoLlego: 'Campañas / Ads',
-      fechaPago: ''
+      compraAnual: 0
     });
     window.dispatchEvent(new Event('db-change'));
   };
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente", "Inscrito en Intranet", "Como Llego", "Fecha de Pago"]
+      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente", "Inscrito en Intranet", "Como Llego", "Compra Anual"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -707,6 +773,10 @@ function CRMRegister() {
           }
 
           const resolvedRut = rut || "Sin RUT";
+          const parsedCompra = Number(safe(row["Compra Anual"]) || safe(row["Compra Anual 2026"]) || safe(row["Ventas Anuales"]) || safe(row["Monto de Compra"])) || 0;
+          const calculatedCategory = getTierForSales(parsedCompra).name;
+          const categoryFromFile = safe(row["Categoría de Cliente"]);
+          const finalCategory = categoryFromFile && CATEGORIAS.includes(categoryFromFile) ? categoryFromFile : calculatedCategory;
 
           const newContact = {
             fechaIngreso: fechaIngreso,
@@ -716,13 +786,14 @@ function CRMRegister() {
             email: safe(row["Email"]),
             region: safe(row["Comuna"]) || 'Metropolitana',
             type: safe(row["Tipo de Cliente"]) || 'Farmacia',
-            categoria: safe(row["Categoría de Cliente"]) || 'Sin categoría',
+            categoria: finalCategory,
             intranet: safe(row["Inscrito en Intranet"]) || 'No',
             comoLlego: safe(row["Como Llego"]) || safe(row["Canal de Entrada"]) || safe(row["Origen"]) || 'Campañas / Ads',
-            fechaPago: safe(row["Fecha de Pago"]) || safe(row["Fecha Pago"]) || '',
+            compraAnual: parsedCompra,
+            clubVentasDetail: JSON.stringify({ v2024: 0, v2025: 0, v2026: parsedCompra }),
             historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')}` + 
               (row["Como Llego"] || row["Canal de Entrada"] || row["Origen"] ? ` (Origen: ${row["Como Llego"] || row["Canal de Entrada"] || row["Origen"]})` : '') +
-              (row["Fecha de Pago"] || row["Fecha Pago"] ? ` (Fecha Pago: ${row["Fecha de Pago"] || row["Fecha Pago"]})` : ''),
+              ` (Compra Anual: $${parsedCompra.toLocaleString('es-CL')}, Categoría: ${finalCategory})`,
             responsable: user.displayName || user.email || 'Sistema'
           };
 
@@ -811,12 +882,17 @@ function CRMRegister() {
               </select>
            </CRMField>
 
-           <CRMField label="Fecha / Detalle de Pago">
+           <CRMField label="Compra Anual Acumulada ($)">
               <input 
-                className="w-full border-b p-2 text-sm font-bold text-amber-400" 
-                placeholder="Ej: Día 5 de cada mes, Al contado" 
-                value={form.fechaPago || ''} 
-                onChange={e => setForm({...form, fechaPago: e.target.value})} 
+                type="number"
+                className="w-full border-b p-2 text-sm font-black bg-[#152035] text-amber-300 outline-none" 
+                placeholder="Ej: 700000" 
+                value={form.compraAnual || ''} 
+                onChange={e => {
+                  const val = Number(e.target.value) || 0;
+                  const calculatedTier = getTierForSales(val);
+                  setForm({ ...form, compraAnual: val, categoria: calculatedTier.name });
+                }}
               />
            </CRMField>
 
@@ -871,7 +947,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
   const [newIntranet, setNewIntranet] = useState('');
   const [newIsGestionCustomer, setNewIsGestionCustomer] = useState<boolean | null>(null);
   const [newComoLlego, setNewComoLlego] = useState('Campañas / Ads');
-  const [newFechaPago, setNewFechaPago] = useState('');
+  const [newCompraAnual, setNewCompraAnual] = useState<number>(0);
   const [activityType, setActivityType] = useState('Nota de Seguimiento');
   const [currentStatus, setCurrentStatus] = useState('En proceso');
 
@@ -882,7 +958,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
       setNewCategory(selectedClient.categoria || 'Sin categoría');
       setNewIntranet(selectedClient.intranet || 'No');
       setNewComoLlego(selectedClient.comoLlego || 'Campañas / Ads');
-      setNewFechaPago(selectedClient.fechaPago || '');
+      setNewCompraAnual(getClientAnnualSales2026(selectedClient));
     }
   }, [selectedClient]);
 
@@ -946,15 +1022,34 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 
     const updatedIntranet = newIntranet || selectedClient.intranet || 'No';
 
+    let salesObj = { v2024: 0, v2025: 0, v2026: 0 };
+    const savedVentasStr = selectedClient.clubVentasDetail;
+    if (savedVentasStr) {
+      try {
+        salesObj = typeof savedVentasStr === 'string' ? JSON.parse(savedVentasStr) : savedVentasStr;
+      } catch (e) {
+        console.error('Error parsing sales history:', e);
+      }
+    } else if (selectedClient.ventas) {
+      salesObj = { ...selectedClient.ventas };
+    }
+    salesObj.v2026 = Number(newCompraAnual);
+
+    // Auto-calculate the category based on purchases
+    const calculatedTier = getTierForSales(Number(newCompraAnual));
+    // If the category was manually modified to a different value in the UI dropdown, respect it; otherwise fallback to auto-calculated tier
+    const finalCategory = (newCategory && newCategory !== selectedClient.categoria) ? newCategory : calculatedTier.name;
+
     const updatedContact = {
       name: newName || selectedClient.name,
       rut: newRut || selectedClient.rut,
       phone: selectedClient.phone,
       email: selectedClient.email,
-      categoria: newCategory || selectedClient.categoria,
+      categoria: finalCategory,
       intranet: updatedIntranet,
       comoLlego: newComoLlego || selectedClient.comoLlego || 'Campañas / Ads',
-      fechaPago: newFechaPago || selectedClient.fechaPago || '',
+      compraAnual: Number(newCompraAnual),
+      clubVentasDetail: JSON.stringify(salesObj),
       isGestionCustomer: isGestion,
       historialUnificado: updatedHistory
     };
@@ -995,7 +1090,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
     setNewCategory('');
     setNewIntranet('');
     setNewComoLlego('Campañas / Ads');
-    setNewFechaPago('');
+    setNewCompraAnual(0);
     setNewIsGestionCustomer(null);
     window.dispatchEvent(new Event('db-change'));
   };
@@ -1010,7 +1105,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
       ["Tipo", record.type || "---"],
       ["Categoría", record.categoria || "---"],
       ["Origen / Cómo Llegó", record.comoLlego || "Campañas / Ads"],
-      ["Fecha de Pago", record.fechaPago || "---"],
+      ["Compra Anual Acumulada ($)", getClientAnnualSales2026(record)],
       ["Intranet", record.intranet || "No"],
       ["Fecha Ingreso", formatDateForExcel(record.fechaIngreso)],
       ["Historial", record.historialUnificado || "---"]
@@ -1204,12 +1299,18 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                      </select>
                   </CRMField>
 
-                  <CRMField label="Fecha / Detalle de Pago">
+                  <CRMField label="Compra Anual Acumulada ($)">
                      <input 
-                       className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-bold text-amber-400 outline-none" 
-                       placeholder="Ej: Día 10 de cada mes" 
-                       value={newFechaPago} 
-                       onChange={e => setNewFechaPago(e.target.value)} 
+                       type="number"
+                       className="w-full border-b bg-[#152035] border-[#1E293B] p-3 text-sm font-black text-amber-300 outline-none" 
+                       placeholder="Ej: 700000" 
+                       value={newCompraAnual || ''} 
+                       onChange={e => {
+                         const val = Number(e.target.value) || 0;
+                         setNewCompraAnual(val);
+                         const recommendedTier = getTierForSales(val);
+                         setNewCategory(recommendedTier.name);
+                       }} 
                      />
                   </CRMField>
                 </div>
@@ -1225,6 +1326,80 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                     <span className="font-bold group-hover:text-[#38BDF8] transition-colors">Es Cliente de Gestión</span>
                   </label>
                 </CRMField>
+
+                {/* Simulador de Categorías Club Social Cimasur 👑 */}
+                <div className="mt-4 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-amber-500/10 pb-2">
+                    <span className="text-xs font-black text-amber-400 tracking-wider flex items-center gap-1.5 uppercase">
+                      👑 Simulador Club Cimasur
+                    </span>
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/35 px-2 py-0.5 rounded-full font-black uppercase">
+                      Categoría: {newCategory || 'Sin categoría'}
+                    </span>
+                  </div>
+                  
+                  {(() => {
+                    const activeTiers = getTiersList();
+                    const currentSales = Number(newCompraAnual || 0);
+                    const currentTierIndex = activeTiers.findIndex(t => t.name.toLowerCase() === (newCategory || 'Sin categoría').toLowerCase());
+                    const nextTier = currentTierIndex !== -1 && currentTierIndex < activeTiers.length - 1 
+                      ? activeTiers[currentTierIndex + 1] 
+                      : null;
+                    
+                    if (!nextTier) {
+                      return (
+                        <div className="text-xs text-emerald-400 font-bold bg-emerald-950/30 p-2.5 rounded border border-emerald-500/20 text-center">
+                          🎉 ¡Nivel Máximo Platinum alcanzado! El cliente cuenta con todos los privilegios exclusivos de Cimasur.
+                        </div>
+                      );
+                    }
+                    
+                    const neededSales = nextTier.min;
+                    const remaining = Math.max(0, neededSales - currentSales);
+                    const percentage = Math.min(100, Math.max(0, (currentSales / neededSales) * 100));
+                    
+                    return (
+                      <div className="space-y-3">
+                        <div className="space-y-1 bg-[#091124] p-3 rounded-lg border border-[#1E293B]">
+                          <div className="flex justify-between text-[11px] text-slate-300 font-bold">
+                            <span>Progreso para categoría {nextTier.name}</span>
+                            <span>{percentage.toFixed(0)}%</span>
+                          </div>
+                          <div className="w-full bg-[#0D1527] h-2 rounded-full overflow-hidden border border-[#1E293B] mt-1">
+                            <div className="bg-amber-400 h-full rounded-full transition-all duration-300" style={{ width: `${percentage}%` }} />
+                          </div>
+                          <span className="text-[10px] text-slate-400 block mt-1.5 font-semibold">
+                            Meta anual: ${neededSales.toLocaleString('es-CL')} | Actual: ${currentSales.toLocaleString('es-CL')}
+                          </span>
+                        </div>
+                        
+                        <div className="bg-[#091124] p-3 rounded-lg border border-[#1E293B] space-y-2 text-xs">
+                          {remaining > 0 ? (
+                            <p className="text-slate-200 leading-relaxed font-medium">
+                              Si compra <span className="text-amber-300 font-black">${remaining.toLocaleString('es-CL')}</span> adicionales durante el año, puede subir a la categoría <span className="text-amber-400 font-black uppercase">{nextTier.name}</span>.
+                            </p>
+                          ) : (
+                            <p className="text-emerald-400 font-bold font-mono">
+                              ✓ ¡Excelente! Se ha superado el mínimo e ingresable al nivel {nextTier.name}.
+                            </p>
+                          )}
+                          
+                          <div className="border-t border-[#1E293B] pt-2 space-y-1">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Beneficios del nivel {nextTier.name}:</p>
+                            <ul className="text-[11px] text-slate-300 space-y-1 pl-1">
+                              {(nextTier.benefits || []).map((b, idx) => (
+                                <li key={idx} className="flex items-start gap-1">
+                                  <span className="text-amber-400 font-black">✓</span>
+                                  <span>{b}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
 
                 <div className="pt-4 border-t border-[#1E293B]">
                   <p className="text-[10px] text-slate-400 text-center italic">Utilice el botón "Registrar" junto a los datos para guardar los cambios.</p>
@@ -1295,11 +1470,11 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                   r.phone || '---',
                   r.email || '---',
                   r.comoLlego || 'Campañas / Ads',
-                  r.fechaPago || '---'
+                  `$${getClientAnnualSales2026(r).toLocaleString('es-CL')}`
                 ]);
                 exportTableToPDF(
                   'Reporte: Cartera de Clientes (CRM Comercial)',
-                  ['Nombre/Razón Social', 'RUT', 'Región', 'Categoría', 'Tipo', 'Teléfono', 'Email', 'Cómo Llegó', 'Fecha Pago'],
+                  ['Nombre/Razón Social', 'RUT', 'Región', 'Categoría', 'Tipo', 'Teléfono', 'Email', 'Cómo Llegó', 'Compra Anual'],
                   data,
                   'cartera_clientes_crm'
                 );
@@ -1481,8 +1656,8 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                              </span>
                            )}
                            {r.fechaPago && (
-                             <span className="text-[9px] bg-amber-500/20 text-amber-300 font-black px-1.5 py-0.5 rounded border border-amber-500/15" title="Fecha / Detalle de Pago">
-                               📅 {r.fechaPago}
+                             <span className="text-[9px] bg-[#0284C7]/20 text-[#38BDF8] font-black px-1.5 py-0.5 rounded border border-[#0284C7]/20" title="Frecuencia / Ciclo de Compra">
+                               💰 Compra Anual: ${getClientAnnualSales2026(r).toLocaleString('es-CL')}
                              </span>
                            )}
                          </div>
@@ -1613,7 +1788,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                                { label: 'Categoría CRM', value: r.categoria },
                                { label: 'Inscrito en Intranet', value: r.intranet || 'No' },
                                { label: 'Cómo Llegó (Origen)', value: r.comoLlego || 'Campañas / Ads' },
-                               { label: 'Fecha / Detalle Pago', value: r.fechaPago || 'N/A' },
+                               { label: 'Compra Anual Acumulada ($)', value: `$${getClientAnnualSales2026(r).toLocaleString('es-CL')}` },
                                { label: 'Fecha de Ingreso', value: formatDate(r.fechaIngreso) || 'N/A' },
                                { label: 'Historial Unificado', value: r.historialUnificado || 'Sin registros preexistentes.' }
                              ];

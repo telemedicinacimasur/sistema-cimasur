@@ -4,8 +4,23 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+let computedFilename = '';
+try {
+  computedFilename = fileURLToPath(import.meta.url);
+} catch (e) {
+  // CommonJS fallback
+}
+
+let computedDirname = '';
+try {
+  computedDirname = computedFilename ? path.dirname(computedFilename) : process.cwd();
+} catch (e) {
+  // CommonJS fallback
+}
+
+// Global fallback if not defined by the imports
+const __filename = computedFilename || (typeof (globalThis as any).__filename !== 'undefined' ? (globalThis as any).__filename : '');
+const __dirname = computedDirname || (typeof (globalThis as any).__dirname !== 'undefined' ? (globalThis as any).__dirname : process.cwd());
 
 async function startServer() {
   const app = express();

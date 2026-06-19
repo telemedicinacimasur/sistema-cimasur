@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { localDB, localAuth } from '../lib/auth';
 import { syncStudentsToSchoolPayments } from '../lib/syncUtils';
-import { cn, formatDate, formatDateTimeChile, formatCurrency, safe, parseExcelDate, formatDateForExcel } from '../lib/utils';
+import { cn, formatDate, formatDateTimeChile, formatCurrency, safe, parseExcelDate, formatDateForExcel, parseCurrency, findRowValue } from '../lib/utils';
 import { 
   exportTableToPDF, 
   exportRecordToPDF, 
@@ -1393,21 +1393,30 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
         const currentRecords = await localDB.getCollection('sales_gestion');
 
         for (const row of data) {
-          const doc = safe(row["Documento"]);
+          const docRaw = findRowValue(row, ["Documento", "N° Documento", "Boleta", "Factura", "N° Factura", "N° Boleta", "Nro Documento", "Dcto", "N° Dcto"]);
+          const doc = safe(docRaw);
           if (!doc) continue;
 
           // Check if already exists
           if (currentRecords.some(r => safe(r.documento) === doc)) continue;
 
+          const rawAnio = findRowValue(row, ["Año", "Anio", "Year"]);
+          const rawMes = findRowValue(row, ["Mes", "Month"]);
+          const rawFecha = findRowValue(row, ["Fecha", "Date", "Fecha Venta"]);
+          const rawCliente = findRowValue(row, ["Cliente", "Razón Social", "Nombre", "Empresa"]);
+          const rawFrascos = findRowValue(row, ["Frascos", "Frasco", "N° Frascos", "Nro Frascos", "Cantidad", "Cant"]);
+          const rawDetalle = findRowValue(row, ["Detalle Productos", "Detalle", "Productos", "Producto", "Descripción"]);
+          const rawValor = findRowValue(row, ["Valor Cotización", "Valor Cotizacion", "Cotización", "Valor", "Monto"]);
+
           const newSale = {
-            anio: safe(row["Año"]) || new Date().getFullYear().toString(),
-            mes: safe(row["Mes"]) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
-            fecha: parseExcelDate(row["Fecha"]),
+            anio: safe(rawAnio) || new Date().getFullYear().toString(),
+            mes: safe(rawMes) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+            fecha: parseExcelDate(rawFecha),
             documento: doc,
-            cliente: safe(row["Cliente"]),
-            nroFrascos: parseInt(safe(row["Frascos"])) || 0,
-            detalleProductos: safe(row["Detalle Productos"]) || '',
-            valorCotizacion: parseInt(safe(row["Valor Cotización"])) || 0
+            cliente: safe(rawCliente),
+            nroFrascos: parseCurrency(rawFrascos),
+            detalleProductos: safe(rawDetalle) || '',
+            valorCotizacion: parseCurrency(rawValor)
           };
 
           await localDB.saveToCollection('sales_gestion', newSale);
@@ -1902,7 +1911,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Año", "Mes", "Fecha", "Documento", "Cliente", "Frascos"]
+      ["Año", "Mes", "Fecha", "Documento", "Cliente", "Frascos", "Monto Total", "Tipo Pago", "Monto Abonado", "Fecha Pago"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -1928,23 +1937,34 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
         const currentRecords = await localDB.getCollection('sales');
 
         for (const row of data) {
-          const doc = safe(row["Documento"]);
+          const docRaw = findRowValue(row, ["Documento", "N° Documento", "Boleta", "Factura", "N° Factura", "N° Boleta", "Nro Documento", "Dcto", "N° Dcto"]);
+          const doc = safe(docRaw);
           if (!doc) continue;
 
           // Check if already exists
           if (currentRecords.some(r => safe(r.documento) === doc)) continue;
 
+          const rawAnio = findRowValue(row, ["Año", "Anio", "Year"]);
+          const rawMes = findRowValue(row, ["Mes", "Month"]);
+          const rawFecha = findRowValue(row, ["Fecha", "Date", "Fecha Venta"]);
+          const rawCliente = findRowValue(row, ["Cliente", "Razón Social", "Nombre", "Empresa"]);
+          const rawFrascos = findRowValue(row, ["Frascos", "Frasco", "N° Frascos", "Nro Frascos", "Cantidad", "Cant"]);
+          const rawMontoTotal = findRowValue(row, ["Monto Total", "Total", "Monto", "Valor", "Monto Total ($)", "Valor total", "Valor Venta"]);
+          const rawTipoPago = findRowValue(row, ["Tipo Pago", "Método Pago", "Forma Pago", "Método de Pago", "Tipo de Pago", "Condición", "Condición de Pago"]);
+          const rawFechaPago = findRowValue(row, ["Fecha Pago", "Fecha de Pago", "Fecha Límite", "Plazo Pago"]);
+          const rawMontoAbonado = findRowValue(row, ["Monto Abonado", "Abonado", "Abono", "Monto Abonado ($)", "Abonado ($)"]);
+
           const newSale = {
-            anio: safe(row["Año"]) || new Date().getFullYear().toString(),
-            mes: safe(row["Mes"]) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
-            fecha: parseExcelDate(row["Fecha"]),
+            anio: safe(rawAnio) || new Date().getFullYear().toString(),
+            mes: safe(rawMes) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+            fecha: parseExcelDate(rawFecha),
             documento: doc,
-            cliente: safe(row["Cliente"]),
-            nroFrascos: parseInt(safe(row["Frascos"])) || 0,
-            montoTotal: parseInt(safe(row["Monto Total"])) || 0,
-            tipoPago: safe(row["Tipo Pago"]) || 'Contado',
-            fechaPago: safe(row["Fecha Pago"]) || '',
-            montoAbonado: parseInt(safe(row["Monto Abonado"])) || 0,
+            cliente: safe(rawCliente),
+            nroFrascos: parseCurrency(rawFrascos),
+            montoTotal: parseCurrency(rawMontoTotal),
+            tipoPago: safe(rawTipoPago) || 'Contado',
+            fechaPago: safe(rawFechaPago) || '',
+            montoAbonado: parseCurrency(rawMontoAbonado),
             abonos: []
           };
 

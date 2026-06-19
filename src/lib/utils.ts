@@ -123,3 +123,86 @@ export function safe(val: any) {
   }
   return String(val);
 }
+
+export function parseCurrency(val: any): number {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') {
+    return Math.round(val);
+  }
+  const str = String(val).trim();
+  if (!str) return 0;
+
+  // Remove currency symbols, units and spaces (like $, CLP, €, etc.)
+  let cleaned = str.replace(/[^0-9.,-]/g, '');
+
+  const firstComma = cleaned.indexOf(',');
+  const lastComma = cleaned.lastIndexOf(',');
+  const firstDot = cleaned.indexOf('.');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  if (firstComma !== -1 && firstDot !== -1) {
+    if (firstComma < firstDot) {
+      // US style: 1,250.75 -> thousands are comma, decimals are dot
+      const integerPart = cleaned.split('.')[0];
+      cleaned = integerPart.replace(/,/g, '');
+    } else {
+      // Spanish/Chilean style: 1.250,75 -> thousands are dot, decimals are comma
+      const integerPart = cleaned.split(',')[0];
+      cleaned = integerPart.replace(/\./g, '');
+    }
+  } else if (firstComma !== -1) {
+    // Only commas
+    const parts = cleaned.split(',');
+    if (parts.length > 2) {
+      // Multiple commas (e.g. 1,250,000) -> they are thousands separators
+      cleaned = cleaned.replace(/,/g, '');
+    } else {
+      // Single comma
+      const afterComma = parts[1];
+      if (afterComma.length === 2) {
+        // e.g. 1250,50 -> comma is decimal
+        cleaned = parts[0];
+      } else {
+        // e.g. 1,250 or 12,500 -> comma is thousands
+        cleaned = cleaned.replace(/,/g, '');
+      }
+    }
+  } else if (firstDot !== -1) {
+    // Only dots
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      // Multiple dots (e.g. 1.250.000) -> they are thousands separators
+      cleaned = cleaned.replace(/\./g, '');
+    } else {
+      // Single dot
+      const afterDot = parts[1];
+      if (afterDot.length === 2) {
+        // e.g. 1250.80 -> dot is decimal
+        cleaned = parts[0];
+      } else {
+        // e.g. 1.250 or 12.500 -> dot is thousands
+        cleaned = cleaned.replace(/\./g, '');
+      }
+    }
+  }
+
+  const finalCleaned = cleaned.replace(/[^\d-]/g, '');
+  const parsed = parseInt(finalCleaned, 10);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+export function findRowValue(row: any, keys: string[]): any {
+  if (!row || typeof row !== 'object') return undefined;
+  for (const key of keys) {
+    if (row[key] !== undefined) return row[key];
+    
+    const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (const rowKey of Object.keys(row)) {
+      if (rowKey.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey) {
+        return row[rowKey];
+      }
+    }
+  }
+  return undefined;
+}
+
