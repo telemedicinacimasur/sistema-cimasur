@@ -166,6 +166,8 @@ export function ClubSocialManager() {
 
   // Simulated addition or dynamic play with category bounds
   const [simExtraVentas, setSimExtraVentas] = useState(0);
+  const [campaignTargetTier, setCampaignTargetTier] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   
   // Individual sales inputs
   const [editSales, setEditSales] = useState<ClientVentas>({ v2024: 0, v2025: 0, v2026: 0 });
@@ -233,8 +235,17 @@ export function ClubSocialManager() {
       setEditSales({ ...selectedClient.ventas });
       setSimExtraVentas(0);
       setIsEditingSales(false);
+      setCopiedMessageId(null);
+      
+      // Auto-set the campaign target tier to the next tier
+      const currentTierIndex = tiersList.findIndex(t => t.name.toLowerCase() === (selectedClient.categoria || 'Sin categoría').toLowerCase());
+      if (currentTierIndex !== -1 && currentTierIndex < tiersList.length - 1) {
+        setCampaignTargetTier(tiersList[currentTierIndex + 1].name);
+      } else {
+        setCampaignTargetTier('Oro'); // fallback
+      }
     }
-  }, [selectedClientId, selectedClient]);
+  }, [selectedClientId, selectedClient, tiersList]);
 
   // Derived calculations for clients
   const enrichedClients = useMemo(() => {
@@ -1166,6 +1177,184 @@ export function ClubSocialManager() {
                       )}
                     </div>
                   </div>
+                </div>
+
+                {/* PLAN DE ACELERACIÓN Y CAMPAÑAS DE FIDELIZACIÓN (TÁCTICA COMERCIAL) */}
+                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-amber-400" />
+                      <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">
+                        Plan de Aceleración y Campañas de Fidelización 🎯
+                      </h4>
+                    </div>
+                    <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded p-1 px-1.5 font-bold uppercase">
+                      Tácticas Comerciales
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Usa esta herramienta comercial para diseñar cuotas de compras mensuales y coordinar promociones especiales de incentivo rápido ("Fast-Track 3 días") para escalar de categoría al cliente.
+                  </p>
+
+                  {/* SELECT TARGET TIER FOR THE CAMPAIGN */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">1. Seleccionar Categoría Objetivo para la Campaña:</span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {tiersList.map(tier => {
+                        // Skip "Sin categoría"
+                        if (tier.name === 'Sin categoría') return null;
+                        
+                        const isSelected = campaignTargetTier === tier.name;
+                        return (
+                          <button
+                            key={tier.name}
+                            type="button"
+                            onClick={() => setCampaignTargetTier(tier.name)}
+                            className={`p-2 rounded-xl text-xs font-black border transition-all text-center cursor-pointer ${
+                              isSelected
+                                ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md shadow-amber-500/5"
+                                : "bg-[#0D1527] text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700"
+                            }`}
+                          >
+                            {tier.name === 'Platinum' ? 'Platinum 🏆' :
+                             tier.name === 'Oro' ? 'Oro 🥇' :
+                             tier.name === 'Plata' ? 'Plata 🥈' :
+                             tier.name === 'Bronce' ? 'Bronce 🥉' : tier.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const selectedTierForCampaign = tiersList.find(t => t.name === campaignTargetTier) || tiersList[1]; // fallback to Bronce
+                    const neededForTier = selectedTierForCampaign.min;
+                    const remForTier = Math.max(0, neededForTier - simulatedVentas2026);
+                    const isAlreadyReached = simulatedVentas2026 >= neededForTier;
+                    
+                    const curMonthIdx = new Date().getMonth(); // 0 is Jan, 5 is June
+                    const remainingMonths = Math.max(1, 12 - curMonthIdx); // remaining months in calendar year
+
+                    const monthlyQuota = remForTier / remainingMonths;
+                    
+                    // Generate WhatsApp copywriting message
+                    const limitDate = new Date();
+                    limitDate.setDate(limitDate.getDate() + 3);
+                    const limitDateString = limitDate.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+                    
+                    const waMessage = `¡Hola *${selectedClient.name}*! Le saluda Fernanda Contreras de Cimasur. 🌟\n\n` +
+                      `Queremos felicitarlo por sus compras este año y contarle que se encuentra súper cerca de subir a nuestra destacada categoría *${selectedTierForCampaign.name}* en el Club Social Cimasur.\n\n` +
+                      `Para que comience a disfrutar de todos los beneficios exclusivos de manera INMEDIATA (como: ${selectedTierForCampaign.benefits.slice(0, 2).join(', ')}), hemos preparado una campaña especial de *Subida Express "Fast-Track 3 Días"*: \n\n` +
+                      `⚡ *La Promoción:* Si aprueba o realiza compras especiales por un monto total de *\n` +
+                      `$${remForTier.toLocaleString('es-CL')}* en las próximas 72 horas (plazo hasta el ${limitDateString}), ¡le activaremos de inmediato y para todo el resto del año el nivel *${selectedTierForCampaign.name}* con todos sus privilegios directos!\n\n` +
+                      `¿Le gustaría coordinar hoy un pedido especial con nosotros para aprovechar esta oportunidad única? ¡Quedamos muy atentos!`;
+
+                    return (
+                      <div className="space-y-4">
+                        {/* CALCULATOR OF GOALS */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {/* MONTHLY PLAN FOR REMAINING YEAR */}
+                          <div className="p-3.5 bg-[#0D1527] rounded-xl border border-slate-800 space-y-1">
+                            <span className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-wider block">Plan Mensual Proyectado (2026):</span>
+                            <div className="text-xs font-bold text-slate-200">
+                              {isAlreadyReached ? (
+                                <span className="text-emerald-400 font-black flex items-center gap-1">✓ Categoría ya alcanzada</span>
+                              ) : (
+                                <>
+                                  Monto de Compra: <span className="text-indigo-400 font-black text-sm">${monthlyQuota.toLocaleString('es-CL', { maximumFractionDigits: 0 })} / mes</span>
+                                </>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 block font-medium leading-normal">
+                              Requerido durante <span className="text-slate-300 font-bold">{remainingMonths} meses restantes</span> para calificar el próximo año.
+                            </span>
+                          </div>
+
+                          {/* ACCELERATION TRIGER FOR CURRENT WEEK */}
+                          <div className="p-3.5 bg-[#0D1527] rounded-xl border border-slate-800 space-y-1">
+                            <span className="text-[9px] text-pink-400 font-extrabold uppercase tracking-wider block">Oportunidad de Cierre Express (3 Días):</span>
+                            <div className="text-xs font-bold text-slate-200">
+                              {isAlreadyReached ? (
+                                <span className="text-emerald-400 font-black">✓ Requisitos cumplidos</span>
+                              ) : (
+                                <>
+                                  Facturación requerida: <span className="text-pink-400 font-black text-sm">${remForTier.toLocaleString('es-CL')} t/ahora</span>
+                                </>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 block font-medium leading-normal">
+                              Incentivo comercial para activar de inmediato categoría temporal en este mes.
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* DETAILED TRIGGER CAMPAIGN BOX */}
+                        {!isAlreadyReached ? (
+                          <div className="bg-[#0D1527] rounded-2xl border border-pink-500/20 p-4 space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-[10px] text-pink-400 font-black tracking-widest uppercase flex items-center gap-1">
+                                <span className="w-2 h-2 bg-pink-500 rounded-full animate-ping" />
+                                Campaña: "Fast-Track 3 Días a {selectedTierForCampaign.name}"
+                              </span>
+                              <span className="text-[9px] font-black uppercase text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                Límite: {limitDateString}
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-slate-300 leading-relaxed">
+                              Copia este mensaje promocional redactado a la medida del cliente y envíaselo por WhatsApp. Es una táctica de alto impacto comercial para forzar pedidos especiales de fin de mes.
+                            </p>
+
+                            {/* TEXT BOX COPYWRITING */}
+                            <div className="relative">
+                              <textarea
+                                readOnly
+                                value={waMessage}
+                                className="w-full h-36 text-xs text-slate-300 bg-[#152035] p-3 rounded-lg border border-slate-800 outline-none font-sans leading-relaxed resize-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(waMessage);
+                                  setCopiedMessageId(selectedClient.id + '-' + selectedTierForCampaign.name);
+                                  setTimeout(() => setCopiedMessageId(null), 3000);
+                                }}
+                                className="absolute right-2 bottom-3 p-1.5 px-3 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-[10px] font-black uppercase shadow-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedMessageId === (selectedClient.id + '-' + selectedTierForCampaign.name) ? (
+                                  <>✓ ¡Copiado!</>
+                                ) : (
+                                  <>Copiar para WhatsApp 💬</>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* TRIGGER INTEGRATION SUCCESS ACTION */}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-[#152035]/50 p-3 rounded-xl border border-slate-800">
+                              <p className="text-[10px] text-slate-400 leading-normal flex-1 font-medium">
+                                ¿El cliente aceptó la propuesta de campaña? Pulsa este botón para registrar la compra de inmediato y hacerlo subir de categoría temporal:
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSimExtraVentas(prev => prev + remForTier);
+                                  alert(`¡Excelente! Se ha registrado el éxito de la campaña táctica para ${selectedClient.name}. Se le adicionó una compra de $${remForTier.toLocaleString('es-CL')} simulada para subir hoy mismo a la categoría ${selectedTierForCampaign.name}. Recuerda aplicar los cambios abajo.`);
+                                }}
+                                className="p-2 px-3 bg-[#111A2E] hover:bg-pink-900/30 text-pink-400 border border-pink-500/20 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1 justify-center whitespace-nowrap"
+                              >
+                                <Plus className="w-3.5 h-3.5" /> Registrar Éxito de Campaña
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 font-bold text-xs rounded-xl text-center">
+                            🎉 ¡Excelente! Jessica Wenzel califica plenamente para {selectedTierForCampaign.name} con las compras actuales o simuladas de este año. No requiere campaña de aceleración para este nivel.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* DETAILS OF BENEFITS DELIVERED */}

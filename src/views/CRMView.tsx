@@ -950,6 +950,9 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
   const [newCompraAnual, setNewCompraAnual] = useState<number>(0);
   const [activityType, setActivityType] = useState('Nota de Seguimiento');
   const [currentStatus, setCurrentStatus] = useState('En proceso');
+  
+  const [crmCampaignTargetTier, setCrmCampaignTargetTier] = useState<string | null>(null);
+  const [crmCopiedMessageId, setCrmCopiedMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedClient) {
@@ -959,6 +962,15 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
       setNewIntranet(selectedClient.intranet || 'No');
       setNewComoLlego(selectedClient.comoLlego || 'Campañas / Ads');
       setNewCompraAnual(getClientAnnualSales2026(selectedClient));
+      setCrmCopiedMessageId(null);
+      
+      const activeTiers = getTiersList();
+      const currentTierIndex = activeTiers.findIndex(t => t.name.toLowerCase() === (selectedClient.categoria || 'Sin categoría').toLowerCase());
+      if (currentTierIndex !== -1 && currentTierIndex < activeTiers.length - 1) {
+        setCrmCampaignTargetTier(activeTiers[currentTierIndex + 1].name);
+      } else {
+        setCrmCampaignTargetTier('Oro'); // default fallback
+      }
     }
   }, [selectedClient]);
 
@@ -1395,6 +1407,120 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                               ))}
                             </ul>
                           </div>
+                        </div>
+
+                        {/* PLAN DE ACELERACIÓN Y CAMPAÑA DE MARKETING (SIDEBAR) */}
+                        <div className="p-3 bg-[#091124] rounded-lg border border-[#1E293B] space-y-3">
+                          <div className="flex items-center gap-1.5 border-b border-[#1E293B] pb-1.5">
+                            <span className="text-[10px] font-black text-amber-400 tracking-wider uppercase">
+                              🎯 Campaña & Plan de Aceleración
+                            </span>
+                          </div>
+
+                          {/* Target Category selector */}
+                          <div className="space-y-1">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase">Categoría Objetivo:</span>
+                            <div className="grid grid-cols-4 gap-1">
+                              {activeTiers.filter(t => t.name !== 'Sin categoría').map(t => {
+                                const isSel = crmCampaignTargetTier === t.name;
+                                return (
+                                  <button
+                                    key={t.name}
+                                    type="button"
+                                    onClick={() => setCrmCampaignTargetTier(t.name)}
+                                    className={`py-1 rounded text-[9px] font-bold border text-center transition-all cursor-pointer ${
+                                      isSel 
+                                        ? "bg-amber-400/20 text-amber-300 border-amber-500/30" 
+                                        : "bg-[#0D1527] text-slate-400 border-slate-800 hover:text-slate-300"
+                                    }`}
+                                  >
+                                    {t.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {(() => {
+                            const campaignTier = activeTiers.find(t => t.name === crmCampaignTargetTier) || targetTier;
+                            const neededVal = campaignTier.min;
+                            const remVal = Math.max(0, neededVal - currentSales);
+                            const alreadyGot = currentSales >= neededVal;
+                            
+                            const curMonth = new Date().getMonth();
+                            const remMonths = Math.max(1, 12 - curMonth);
+                            const quota = remVal / remMonths;
+
+                            // Limit Date for fast track
+                            const limitDate = new Date();
+                            limitDate.setDate(limitDate.getDate() + 3);
+                            const limitDateStr = limitDate.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+
+                            const waMsgText = `¡Hola *${selectedClient.name}*! Le saluda Fernanda Contreras de Cimasur. 🌟\n\n` +
+                              `Queremos felicitarlo por sus compras este año y contarle que se encuentra súper cerca de subir a nuestra destacada categoría *${campaignTier.name}* en el Club Social Cimasur.\n\n` +
+                              `Para que comience a disfrutar de todos los beneficios exclusivos como: ${campaignTier.benefits.slice(0, 2).join(', ')} de manera INMEDIATA, hemos preparado una campaña de *Subida Express "Fast-Track 3 Días"*: \n\n` +
+                              `⚡ *La Promoción:* Si realiza compras especiales por un total de *\n` +
+                              `$${remVal.toLocaleString('es-CL')}* en las próximas 72 horas (plazo hasta el ${limitDateStr}), ¡le activaremos de inmediato y para todo el resto del año el nivel *${campaignTier.name}* con todos sus privilegios directos!\n\n` +
+                              `¿Le gustaría coordinar hoy un pedido especial con nosotros para aprovechar esta oportunidad única? ¡Quedamos muy atentos!`;
+
+                            return (
+                              <div className="space-y-2">
+                                <div className="p-2 bg-[#0D1527] rounded border border-slate-800 space-y-1">
+                                  <div className="text-[10px] text-slate-300 leading-snug">
+                                    {alreadyGot ? (
+                                      <span className="text-emerald-400 font-bold">✓ ¡Categoría ya superada hoy!</span>
+                                    ) : (
+                                      <>
+                                        Plan de Compras: <strong className="text-indigo-300">${quota.toLocaleString('es-CL', { maximumFractionDigits: 0 })} / mes</strong> durante {remMonths} meses.
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {!alreadyGot && (
+                                  <div className="p-2 bg-[#0D1527] border border-pink-500/10 rounded space-y-2 text-[11px]">
+                                    <div className="flex justify-between items-center text-[9px] text-pink-400 font-bold">
+                                      <span>⚡ FAST-TRACK 3 DÍAS</span>
+                                      <span>Falta: ${remVal.toLocaleString('es-CL')}</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                                      Ofrece activar temporalmente la categoría ya mismo si compra el faltante en 3 días.
+                                    </p>
+
+                                    <div className="relative mt-1">
+                                      <textarea
+                                        readOnly
+                                        value={waMsgText}
+                                        className="w-full h-24 text-[9px] text-slate-400 bg-[#152035] p-2 rounded outline-none font-sans leading-normal resize-none"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(waMsgText);
+                                          setCrmCopiedMessageId(selectedClient.id + '-' + campaignTier.name);
+                                          setTimeout(() => setCrmCopiedMessageId(null), 3000);
+                                        }}
+                                        className="absolute right-1 bottom-1 text-[8px] bg-pink-600 hover:bg-pink-700 text-white font-black uppercase p-1 px-2 rounded tracking-wider cursor-pointer"
+                                      >
+                                        {crmCopiedMessageId === (selectedClient.id + '-' + campaignTier.name) ? "¡Copiado! ✓" : "Copiar 💬"}
+                                      </button>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setNewCompraAnual(prev => prev + remVal);
+                                        alert(`Campaña Simulación: Se añadieron $${remVal.toLocaleString('es-CL')} a las compras de ${selectedClient.name} para completar su meta de ${campaignTier.name}. Guarde los cambios pulsando "Registrar" abajo para consolidar la categoría.`);
+                                      }}
+                                      className="w-full mt-1.5 p-1 bg-slate-900 hover:bg-pink-950/20 text-slate-300 hover:text-pink-400 font-bold text-[9px] uppercase tracking-wider rounded border border-slate-800 transition-all cursor-pointer text-center"
+                                    >
+                                      + Auto-completar Meta en Simulación
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
