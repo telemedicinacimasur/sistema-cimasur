@@ -1341,20 +1341,20 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                   {(() => {
                     const activeTiers = getTiersList();
                     const currentSales = Number(newCompraAnual || 0);
-                    const currentTierIndex = activeTiers.findIndex(t => t.name.toLowerCase() === (newCategory || 'Sin categoría').toLowerCase());
-                    const nextTier = currentTierIndex !== -1 && currentTierIndex < activeTiers.length - 1 
-                      ? activeTiers[currentTierIndex + 1] 
-                      : null;
                     
-                    if (!nextTier) {
+                    // Normalizar y obtener la categoría actualmente seleccionada en el formulario
+                    const selectedCategoryName = newCategory || selectedClient.categoria || 'Sin categoría';
+                    const targetTier = activeTiers.find(t => t.name.toLowerCase() === selectedCategoryName.toLowerCase()) || activeTiers[0];
+                    
+                    if (targetTier.name.toLowerCase() === 'sin categoría' || targetTier.name.toLowerCase() === 'sin compra') {
                       return (
-                        <div className="text-xs text-emerald-400 font-bold bg-emerald-950/30 p-2.5 rounded border border-emerald-500/20 text-center">
-                          🎉 ¡Nivel Máximo Platinum alcanzado! El cliente cuenta con todos los privilegios exclusivos de Cimasur.
+                        <div className="text-xs text-slate-300 font-bold bg-[#091124] p-3 rounded-lg border border-[#1E293B] text-center">
+                          Esta cuenta no requiere un mínimo de compras para permanecer en "{selectedCategoryName}".
                         </div>
                       );
                     }
                     
-                    const neededSales = nextTier.min;
+                    const neededSales = targetTier.min;
                     const remaining = Math.max(0, neededSales - currentSales);
                     const percentage = Math.min(100, Math.max(0, (currentSales / neededSales) * 100));
                     
@@ -1362,32 +1362,32 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                       <div className="space-y-3">
                         <div className="space-y-1 bg-[#091124] p-3 rounded-lg border border-[#1E293B]">
                           <div className="flex justify-between text-[11px] text-slate-300 font-bold">
-                            <span>Progreso para categoría {nextTier.name}</span>
+                            <span>Progreso para categoría {targetTier.name}</span>
                             <span>{percentage.toFixed(0)}%</span>
                           </div>
                           <div className="w-full bg-[#0D1527] h-2 rounded-full overflow-hidden border border-[#1E293B] mt-1">
                             <div className="bg-amber-400 h-full rounded-full transition-all duration-300" style={{ width: `${percentage}%` }} />
                           </div>
                           <span className="text-[10px] text-slate-400 block mt-1.5 font-semibold">
-                            Meta anual: ${neededSales.toLocaleString('es-CL')} | Actual: ${currentSales.toLocaleString('es-CL')}
+                            Meta para {targetTier.name}: ${neededSales.toLocaleString('es-CL')} | Actual: ${currentSales.toLocaleString('es-CL')}
                           </span>
                         </div>
                         
                         <div className="bg-[#091124] p-3 rounded-lg border border-[#1E293B] space-y-2 text-xs">
                           {remaining > 0 ? (
                             <p className="text-slate-200 leading-relaxed font-medium">
-                              Si compra <span className="text-amber-300 font-black">${remaining.toLocaleString('es-CL')}</span> adicionales durante el año, puede subir a la categoría <span className="text-amber-400 font-black uppercase">{nextTier.name}</span>.
+                              Si compra <span className="text-amber-300 font-black">${remaining.toLocaleString('es-CL')}</span> adicionales durante el año, puede alcanzar la categoría <span className="text-amber-400 font-black uppercase">{targetTier.name}</span>.
                             </p>
                           ) : (
-                            <p className="text-emerald-400 font-bold font-mono">
-                              ✓ ¡Excelente! Se ha superado el mínimo e ingresable al nivel {nextTier.name}.
+                            <p className="text-emerald-400 font-bold flex items-center gap-1">
+                              <span>✓ ¡Excelente! Ya cumplió con el mínimo de ${neededSales.toLocaleString('es-CL')} para la categoría {targetTier.name} durante este año.</span>
                             </p>
                           )}
                           
                           <div className="border-t border-[#1E293B] pt-2 space-y-1">
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Beneficios del nivel {nextTier.name}:</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Beneficios del nivel {targetTier.name}:</p>
                             <ul className="text-[11px] text-slate-300 space-y-1 pl-1">
-                              {(nextTier.benefits || []).map((b, idx) => (
+                              {(targetTier.benefits || []).map((b, idx) => (
                                 <li key={idx} className="flex items-start gap-1">
                                   <span className="text-amber-400 font-black">✓</span>
                                   <span>{b}</span>
