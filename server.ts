@@ -281,6 +281,62 @@ async function startServer() {
     }
   });
 
+  app.post('/api/ai/generate-support-message', async (req, res) => {
+    console.log('API call: POST /api/ai/generate-support-message');
+    try {
+      const { clientName, categoria, clinica, type } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
+      }
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: `Eres un redactor creativo de marketing y fidelización clínica para la prestigiosa farmacia homeopática veterinaria CIMASUR de Chile.
+Genera un único mensaje muy corto, inspirador, motivacional y de apoyo ("Mensaje de Apoyo") para colocarlo de fondo en una postal de reconocimiento que se descargará y enviará al veterinario.
+
+Información sobre el destinatario:
+- Médico Veterinario: ${clientName}
+- Categoría dentro del Club: ${categoria}
+- Clínica: ${clinica || 'Socio Veterinario Autorizado'}
+- Motivo del saludo: ${type} (ej. ascenso de categoría de compras, reactivación de cuenta inactiva comercial, felicitación o constancia por su excelente trayectoria o beneficios magistrales exclusivos).
+
+Reglas obligatorias:
+1. El mensaje debe ser breve, cálido, inspirador y sumamente profesional.
+2. Debe estar en español neutro o chileno formal.
+3. El límite estricto de extensión es de 130 caracteres reales, para que quepa de principio a fin en una sola línea o dos líneas cortas de diseño gráfico.
+4. Devuelve UNICAMENTE el formato JSON solicitado sin etiquetas adicionales de markdown.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              message: { type: Type.STRING }
+            },
+            required: ["message"]
+          }
+        }
+      });
+
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Error al generar el mensaje con IA' });
+    }
+  });
+
   // Integración con Vite para Desarrollo
   if (process.env.NODE_ENV !== 'production') {
     console.log('Iniciando middleware de Vite...');
