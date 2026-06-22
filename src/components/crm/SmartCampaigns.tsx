@@ -5,7 +5,6 @@ import {
   MessageSquare, Mail, Share2, CheckCircle, FileText, Check, Copy
 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
-import { GoogleGenAI, Type } from "@google/genai";
 
 const normalizeCat = (val: any) => {
   const str = typeof val === 'string' ? val : '';

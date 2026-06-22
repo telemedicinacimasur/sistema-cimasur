@@ -1949,6 +1949,17 @@ function CRMIntranetTable({
   const [existingCRMEmails, setExistingCRMEmails] = useState<Set<string>>(new Set());
   const [existingCRMNames, setExistingCRMNames] = useState<Set<string>>(new Set());
   const [crmContacts, setCrmContacts] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredClients = React.useMemo(() => {
+    if (!searchTerm.trim()) return clients;
+    const term = searchTerm.toLowerCase().trim();
+    return clients.filter((client: any) => {
+      const name = (client.name || '').toLowerCase();
+      const email = (client.email || '').toLowerCase();
+      return name.includes(term) || email.includes(term);
+    });
+  }, [clients, searchTerm]);
 
   const permissions = user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
@@ -2112,7 +2123,7 @@ function CRMIntranetTable({
     const headers = [
       ["Nombre", "Email", "Fecha Registro", "Acceso Aprobado"]
     ];
-    const data = clients.map(client => [
+    const data = filteredClients.map(client => [
       client.name || '',
       client.email || '',
       client.fechaIngreso || '',
@@ -2180,6 +2191,28 @@ function CRMIntranetTable({
            )}
          </div>
       </div>
+
+      {/* Live Search Engine / Buscador */}
+      <div className="bg-[#0f192b] p-4 border-b border-[#1E293B] flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="relative w-full md:max-w-md">
+          <input
+            type="text"
+            placeholder="Buscar clientes por nombre o email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-[#152035] pl-10 pr-4 py-2.5 text-xs text-white rounded-xl border border-[#1E293B] focus:outline-none focus:border-sky-500 transition-colors placeholder-slate-400"
+          />
+          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+        </div>
+        <div className="text-[11px] text-slate-400 font-bold font-mono">
+          {searchTerm ? (
+            <span>Coincidencias: <span className="text-sky-400">{filteredClients.length}</span> de <span className="text-slate-300">{clients.length}</span> total</span>
+          ) : (
+            <span>Total registros: <span className="text-slate-350">{clients.length}</span></span>
+          )}
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead>
@@ -2193,7 +2226,7 @@ function CRMIntranetTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/10">
-            {clients.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '')).map(client => {
+            {filteredClients.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '')).map(client => {
               const isTransferred = crmContacts.some(c => areContactsDuplicate(c, client));
               return (
                 <tr key={client.id} className="hover:bg-[#1E293B]/50 transition-colors">
@@ -2264,9 +2297,11 @@ function CRMIntranetTable({
                 </tr>
               );
             })}
-            {clients.length === 0 && (
+            {filteredClients.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-slate-400 italic">No hay clientes importados desde Intranet.</td>
+                <td colSpan={6} className="p-8 text-center text-slate-400 italic">
+                  {searchTerm ? `No se encontraron clientes para la búsqueda "${searchTerm}"` : 'No hay clientes importados desde Intranet.'}
+                </td>
               </tr>
             )}
           </tbody>
