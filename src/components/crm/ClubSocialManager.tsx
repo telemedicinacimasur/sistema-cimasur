@@ -126,6 +126,51 @@ const PRESET_TEMPLATES: Record<string, string> = {
   riesgo_alto: "🚨 Alerta de Soporte - CIMASUR\n\nEstimado/a doctor/a {{NOMBRE}},\n\nNuestros reportes automatizados de Business Intelligence han emitido una alerta de riesgo crítico: sus compras en el ciclo actual han caído en más de un 50% respecto al año pasado, registrando solo {{VENTAS}} acumulados.\n\nSu estatus actual es {{CATEGORIA}}. Para evitar la pérdida de sus precios preferenciales y el beneficio de {{BENEFICIO}}, le extendemos un plazo de gracia de 30 días para colocar pedidos de reposición.\n\nEstamos para apoyarle y queremos conocer si requiere facilidades especiales con sus fórmulas homeopáticas magistrales. ¡Conversemos!\n\nAtte,\nContacto Directo CIMASUR."
 };
 
+const SEGMENT_GUIDE: Record<string, { title: string; desc: string; importance: string; action: string }> = {
+  Todas: {
+    title: 'Análisis Global de Cartera',
+    desc: 'Engloba a todos los médicos veterinarios importados en la plataforma sin distinción de crecimiento.',
+    importance: 'Monitorear la masa total de facturación consolidada de CIMASUR Chile.',
+    action: 'Mantener comunicación técnica constante, avisando de seminarios e integraciones.'
+  },
+  Crecieron: {
+    title: 'Socio de Alto Rendimiento (Aumentaron Compras)',
+    desc: 'Médicos cuyo nivel de compra acumulado en el ciclo 2026 actual supera al de 2025.',
+    importance: 'Representan cuentas sanas en expansión que confían plenamente en nuestros preparados homeopáticos.',
+    action: 'Ofrecer upgrade inmediato de nivel, entregar beneficios prémium de inmediato y dar prioridad en despacho.'
+  },
+  Disminuyeron: {
+    title: 'Alerta de Contracción (Redujeron compras)',
+    desc: 'Médicos con nivel de facturación actual inferior al registrado en el ciclo pasado.',
+    importance: 'Riesgo de abandono silencioso o que estén encargando recetas a la competencia directa.',
+    action: 'Visita presencial o telefónica de nuestro asesor comercial, ofrecer incentivo o vademécum especial.'
+  },
+  Estables: {
+    title: 'Comportamiento Estable y Fiel',
+    desc: 'Clientes que mantienen un ritmo y volumen de compra regular en ambos periodos anuales.',
+    importance: 'Sostienen la base comercial de facturación fija de CIMASUR.',
+    action: 'Agradecer su fidelidad y promover la incorporación de nuevas fórmulas magistrales en su recetario.'
+  },
+  Dormidos: {
+    title: 'Clientes Dormidos (Compra 2025, $0 en 2026)',
+    desc: 'Médicos que compraron con normalidad en 2025, pero registran compras cero ($0) en 2026.',
+    importance: 'Gravedad Extrema. El cliente ha suspendido el contacto, probablemente por quejas o cambio de clínica.',
+    action: 'Enviar el comunicado técnico de "Recuperación de Cuenta Dormida" con estatus Oro promocional preventivo.'
+  },
+  Perdidos: {
+    title: 'Cuentas Perdidas (Inactivos desde 2024)',
+    desc: 'Clientes con facturación registrada en 2024 pero compras cero en 2025 y 2026.',
+    importance: 'Relación rota a largo plazo. Cuentas antiguas pasivas.',
+    action: 'Lanzar un relanzamiento técnico de línea de diluciones homeopáticas e invitarlos a reactivarse gratis.'
+  },
+  'Riesgo Alto': {
+    title: 'Riesgo Crítico de Fuga (Desplome de Ventas > 50%)',
+    desc: 'Cuentas con compras activas pero con un retroceso de facturación superior a la mitad (50%).',
+    importance: 'Fuga inminente de recetas. Alerta prioritaria en el panel de control del consultor de CIMASUR.',
+    action: 'Aplicar ampliación de plazo de gracia extendido, llamada telefónica inmediata de la jefatura comercial.'
+  }
+};
+
 export function ClubSocialManager() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [clients, setClients] = useState<ClubClient[]>([]);
@@ -148,6 +193,10 @@ export function ClubSocialManager() {
   // Simulator values
   const [simulatedVentas, setSimulatedVentas] = useState<number>(1500000);
   const [campaignRecipients, setCampaignRecipients] = useState<ClubClient[]>([]);
+  
+  // Multi-client Analysis & Comparison State
+  const [selectedClientIdsForAnalysis, setSelectedClientIdsForAnalysis] = useState<string[]>([]);
+  const [showMultiClientAnalysis, setShowMultiClientAnalysis] = useState<boolean>(false);
   
   // Filter settings for tables
   const [clientSearch, setClientSearch] = useState<string>('');
@@ -816,6 +865,32 @@ export function ClubSocialManager() {
     });
   }, [enrichedClients, clientSearch, clientCategoryFilter]);
 
+  const handleToggleAnalyzeClient = (clientId: string) => {
+    setSelectedClientIdsForAnalysis(prev => {
+      const isCurrentlySelected = prev.includes(clientId);
+      let nextList: string[];
+      if (isCurrentlySelected) {
+        nextList = prev.filter(id => id !== clientId);
+      } else {
+        nextList = [...prev, clientId];
+      }
+      return nextList;
+    });
+  };
+
+  const handleSelectAllFilteredForComparison = () => {
+    const allIds = filteredClientList.map(c => c.id);
+    setSelectedClientIdsForAnalysis(allIds);
+    if (allIds.length > 0) {
+      setShowMultiClientAnalysis(true);
+    }
+  };
+
+  const handleClearSelectedForComparison = () => {
+    setSelectedClientIdsForAnalysis([]);
+    setShowMultiClientAnalysis(false);
+  };
+
   return (
     <div className="bg-[#0b1324] text-white min-h-screen rounded-2xl border border-slate-800 shadow-2xl overflow-hidden font-sans">
       
@@ -1109,44 +1184,213 @@ export function ClubSocialManager() {
                         <option value="Todas">Todas las categorías</option>
                         {tiersList.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
                       </select>
+
+                      {/* Multi-selection triggers */}
+                      <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 border-t border-slate-800/60 font-bold">
+                        <span>Selección para Comparar:</span>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={handleSelectAllFilteredForComparison}
+                            className="bg-[#0b1324] px-1.5 py-0.5 rounded border border-slate-700 hover:text-white hover:border-slate-500 transition-colors cursor-pointer"
+                          >
+                            ✓ Todos ({filteredClientList.length})
+                          </button>
+                          <button 
+                            onClick={handleClearSelectedForComparison}
+                            className="bg-[#0b1324] px-1.5 py-0.5 rounded border border-slate-700 hover:text-white hover:border-slate-500 transition-colors cursor-pointer"
+                          >
+                            ✕ Limpiar
+                          </button>
+                        </div>
+                      </div>
+
+                      {selectedClientIdsForAnalysis.length > 0 && (
+                        <button
+                          onClick={() => setShowMultiClientAnalysis(true)}
+                          className="w-full py-2 bg-gradient-to-r from-sky-600 to-[#3b82f6] hover:from-sky-700 hover:to-blue-700 text-white text-[11px] font-black rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all cursor-pointer"
+                        >
+                          <span>📈</span>
+                          <span>Abrir Comparador ({selectedClientIdsForAnalysis.length} Socios)</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* RENDERED LIST */}
                     <div className="bg-[#0f172a] rounded-xl border border-slate-800 max-h-[380px] overflow-y-auto divide-y divide-slate-800">
-                      {filteredClientList.map(c => (
-                        <div 
-                          key={c.id}
-                          onClick={() => {
-                            setSelectedClientId(c.id);
-                            setIsEditingClient(false);
-                          }}
-                          className={`p-3 text-left cursor-pointer transition-all ${selectedClientId === c.id ? 'bg-[#1e2e4a] border-l-4 border-sky-400' : 'hover:bg-[#121c2f]'}`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <span className="text-xs font-bold block text-white truncate max-w-[130px]">{c.name}</span>
-                            <span className={`text-[9px] px-2 py-0.5 rounded border ${
-                              c.calculatedTier.name.includes('Platinum') ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                              c.calculatedTier.name.includes('Oro') ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                              c.calculatedTier.name.includes('Plata') ? 'bg-sky-500/10 text-sky-450 border-sky-500/20' :
-                              'bg-slate-800 text-slate-400 border-slate-700'
-                            }`}>
-                              {c.calculatedTier.name}
-                            </span>
+                      {filteredClientList.map(c => {
+                        const isSelectedForAnalysis = selectedClientIdsForAnalysis.includes(c.id);
+                        return (
+                          <div 
+                            key={c.id}
+                            onClick={() => {
+                              setSelectedClientId(c.id);
+                              setIsEditingClient(false);
+                            }}
+                            className={`p-3 text-left cursor-pointer transition-all flex items-start gap-2.5 ${selectedClientId === c.id ? 'bg-[#1e2e4a] border-l-4 border-sky-400' : 'hover:bg-[#121c2f]'}`}
+                          >
+                            <input 
+                              type="checkbox"
+                              checked={isSelectedForAnalysis}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => handleToggleAnalyzeClient(c.id)}
+                              className="mt-1 accent-sky-450 rounded border-slate-650 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-1">
+                                <span className="text-xs font-bold block text-white truncate max-w-[120px]">{c.name}</span>
+                                <span className={`text-[9px] px-2 py-0.5 rounded border leading-none shrink-0 ${
+                                  c.calculatedTier.name.includes('Platinum') ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                  c.calculatedTier.name.includes('Oro') ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
+                                  c.calculatedTier.name.includes('Plata') ? 'bg-sky-500/10 text-sky-450 border-sky-500/20' :
+                                  'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}>
+                                  {c.calculatedTier.name}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-[#94a3b8] block mt-0.5 truncate">{c.clinica || 'Sin clínica registrada'}</span>
+                              <span className="text-[9px] font-mono text-emerald-400 block mt-1">2026: ${c.ventas.v2026.toLocaleString('es-CL')}</span>
+                            </div>
                           </div>
-                          <span className="text-[10px] text-[#94a3b8] block mt-0.5">{c.clinica || 'Sin clínica registrada'}</span>
-                          <span className="text-[9px] font-mono text-emerald-400 block mt-1">2026: ${c.ventas.v2026.toLocaleString('es-CL')}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {filteredClientList.length === 0 && (
                         <div className="p-8 text-center text-slate-500 italic text-xs">Sin registros de coincidencia.</div>
                       )}
                     </div>
                   </div>
 
-                  {/* RIGHT COLUMN: DETAILED INTERACTIVE VIEW */}
+                  {/* RIGHT COLUMN: DETAILED INTERACTIVE VIEW OR MULTI-CLIENT COMPARISON */}
                   <div className="md:col-span-3">
-                    {selectedClient ? (
-                      <div className="bg-[#0f1b35] rounded-xl border border-slate-800 p-5 space-y-5">
+                    {showMultiClientAnalysis && selectedClientIdsForAnalysis.length > 0 ? (
+                      /* COMPREHENSIVE MULTI-CLIENT COMPARATIVE DASHBOARD */
+                      <div className="bg-[#0f1b35] rounded-xl border border-emerald-500/30 p-5 space-y-5 text-left">
+                        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                          <div>
+                            <span className="text-[9px] text-[#38bdf8] font-extrabold block tracking-wider uppercase">MÓDULO DE COMPARACIÓN CRM</span>
+                            <h3 className="text-md font-black text-white flex items-center gap-1.5">
+                              📈 Analizador y Comparador Multi-Socio ({selectedClientIdsForAnalysis.length} seleccionados)
+                            </h3>
+                          </div>
+                          <button 
+                            onClick={() => setShowMultiClientAnalysis(false)}
+                            className="px-3 py-1 bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold rounded-lg text-[10px] cursor-pointer"
+                          >
+                            ✕ Ver Ficha Individual
+                          </button>
+                        </div>
+
+                        {(() => {
+                          const listForAnalysis = enrichedClients.filter(ec => selectedClientIdsForAnalysis.includes(ec.id));
+                          if (listForAnalysis.length === 0) {
+                            return <div className="text-center p-8 text-slate-500 italic">No hay socios seleccionados para comparar.</div>;
+                          }
+
+                          const total2024 = listForAnalysis.reduce((sum, c) => sum + (c.ventas?.v2024 || 0), 0);
+                          const total2025 = listForAnalysis.reduce((sum, c) => sum + (c.ventas?.v2025 || 0), 0);
+                          const total2026 = listForAnalysis.reduce((sum, c) => sum + (c.ventas?.v2026 || 0), 0);
+                          const avg2026 = total2026 / listForAnalysis.length;
+
+                          return (
+                            <div className="space-y-5">
+                              {/* Group STAT cards */}
+                              <div className="grid grid-cols-3 gap-3">
+                                <div className="bg-[#0b1324] p-3 rounded-xl border border-slate-800 text-center">
+                                  <span className="text-[9px] text-slate-500 block uppercase font-bold">Consolidado 2025</span>
+                                  <span className="text-xs font-mono font-black text-slate-350">${total2025.toLocaleString('es-CL')}</span>
+                                </div>
+                                <div className="bg-[#0b1324] p-3 rounded-xl border border-emerald-950/40 text-center">
+                                  <span className="text-[9px] text-[#38bdf8] block uppercase font-bold">Consolidado 2026</span>
+                                  <span className="text-xs font-mono font-black text-emerald-400">${total2026.toLocaleString('es-CL')}</span>
+                                </div>
+                                <div className="bg-[#0b1324] p-3 rounded-xl border border-slate-800 text-center">
+                                  <span className="text-[9px] text-slate-500 block uppercase font-bold">Promedio por Socio</span>
+                                  <span className="text-xs font-mono font-bold text-sky-400">${Math.round(avg2026).toLocaleString('es-CL')}</span>
+                                </div>
+                              </div>
+
+                              {/* Simple side-by-side compare progress chart */}
+                              <div className="bg-[#0d1527] p-4 rounded-xl border border-slate-800 space-y-3">
+                                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest block">Gráfico Comparativo de Venta Acumulada Ciclo 2021-2026</span>
+                                <div className="space-y-3">
+                                  {listForAnalysis.map(c => {
+                                    const maxSales = Math.max(...listForAnalysis.map(item => item.ventas?.v2026 || 100000), 12000000);
+                                    const percent = Math.min(100, Math.max(8, ((c.ventas?.v2026 || 0) / maxSales) * 100));
+
+                                    return (
+                                      <div key={c.id} className="space-y-1">
+                                        <div className="flex justify-between text-[11px]">
+                                          <span className="font-bold text-slate-200 truncate max-w-[150px]">{c.name}</span>
+                                          <span className="font-mono text-emerald-400 font-bold">
+                                            ${c.ventas?.v2026.toLocaleString('es-CL')}{' '}
+                                            <span className="text-slate-500 text-[9px]">({c.categoria})</span>
+                                          </span>
+                                        </div>
+                                        <div className="w-full bg-[#121c31] h-3 rounded-lg overflow-hidden flex">
+                                          <div className={`h-full rounded-lg transition-all ${
+                                            c.categoria.includes('Platinum') ? 'bg-gradient-to-r from-purple-600 to-indigo-500' :
+                                            c.categoria.includes('Oro') ? 'bg-gradient-to-r from-yellow-500 to-amber-600' :
+                                            'bg-gradient-to-r from-sky-500 to-emerald-500'
+                                          }`} style={{ width: `${percent}%` }}></div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Side-by-side Comparative details table */}
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-[10px] bg-[#0b1324] rounded-xl overflow-hidden border border-slate-800">
+                                  <thead>
+                                    <tr className="bg-[#121c30] text-slate-400 font-bold uppercase border-b border-slate-800 text-[8px] font-mono">
+                                      <th className="p-2.5">Médico / Especialidad</th>
+                                      <th className="p-2.5 text-right">Venta 2024</th>
+                                      <th className="p-2.5 text-right">Venta 2025</th>
+                                      <th className="p-2.5 text-right text-emerald-400">Venta 2026</th>
+                                      <th className="p-2.5 text-center">Nivel</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-800">
+                                    {listForAnalysis.map(c => (
+                                      <tr key={c.id} className="hover:bg-slate-900/40">
+                                        <td className="p-2.5 font-bold text-white truncate max-w-[130px]">{c.name}</td>
+                                        <td className="p-2.5 text-right font-mono text-slate-400">${c.ventas?.v2024.toLocaleString('es-CL')}</td>
+                                        <td className="p-2.5 text-right font-mono text-slate-350">${c.ventas?.v2025.toLocaleString('es-CL')}</td>
+                                        <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold">${c.ventas?.v2026.toLocaleString('es-CL')}</td>
+                                        <td className="p-2.5 text-center">
+                                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-black/35 text-slate-300 border border-slate-750">
+                                            {c.categoria}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* Multi-Socio Campaign Actions bridge */}
+                              <div className="bg-[#1e1e38]/40 p-4 rounded-xl border border-[#38bdf8]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-left">
+                                <div className="flex-1">
+                                  <span className="text-[#38bdf8] font-bold block mb-0.5">🚀 Enviar Lote al Motor Masivo</span>
+                                  <p className="text-[10.5px] text-slate-400">Crea una plantilla automática y un correo electrónico personalizado o enlace de WhatsApp para estos {listForAnalysis.length} veterinarios.</p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setCampaignRecipients(listForAnalysis);
+                                    setActiveTab('campaigns');
+                                    alert(`Se han exportado los ${listForAnalysis.length} clientes bajo análisis actual al módulo de Campañas Masivas.`);
+                                  }}
+                                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 font-bold text-white rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer shrink-0"
+                                >
+                                  <Send className="w-3.5 h-3.5" /> Enviar este Set a Campañas 💬
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : selectedClient ? (
+                      <div className="bg-[#0f1b35] rounded-xl border border-slate-800 p-5 space-y-5 text-left">
                         
                         {/* Header card with category status */}
                         <div className="flex justify-between items-start border-b border-slate-800 pb-4">
@@ -1493,6 +1737,28 @@ export function ClubSocialManager() {
                     </div>
                   </div>
 
+                  {/* DYNAMIC SEGMENT EXPLANATORY CARD */}
+                  {(() => {
+                    const guide = SEGMENT_GUIDE[segGrowth] || SEGMENT_GUIDE['Todas'];
+                    return (
+                      <div className="bg-slate-900/60 p-4 rounded-xl border border-[#38bdf8]/20 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-left animate-fadeIn">
+                        <div className="md:col-span-2 space-y-1">
+                          <span className="text-[10px] text-sky-400 font-extrabold uppercase tracking-wide block">🧬 ¿QUÉ SIGNIFICA ESTE SEGMENTO COMERCIAL?</span>
+                          <h4 className="text-sm font-black text-white">{guide.title}</h4>
+                          <p className="text-slate-300 text-[11px] leading-relaxed">{guide.desc}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Relevancia Estratégica:</span>
+                          <p className="text-slate-350 text-[11px] leading-relaxed italic">{guide.importance}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-[#38bdf8] font-bold uppercase block">Acción de Negocio Sugerida:</span>
+                          <p className="text-slate-200 text-[11px] leading-relaxed font-semibold">{guide.action}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* RESULTS GRID */}
                   <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-4">
                     <div className="flex justify-between items-center text-xs">
@@ -1699,6 +1965,71 @@ export function ClubSocialManager() {
                           </div>
                         </div>
                       )}
+
+                      {/* Explanatory callout for simulated delivery */}
+                      {campaignTriggered && !isSending && (
+                        <div className="bg-[#101b33] p-4 rounded-xl border border-emerald-500/20 text-xs text-left space-y-2">
+                          <span className="text-emerald-400 font-black flex items-center gap-1">ℹ️ ¿Qué significa "Envío completado"?</span>
+                          <p className="text-slate-300 leading-relaxed text-[11px]">
+                            El sistema ha procesado la automatización CRM. CIMASUR ha registrado el lote de campaña en auditoría central y ha guardado un reporte permanente en la **Bitácora Unificada** de cada médico destinatario. Puedes verificarlo abriendo su ficha individual en la pestaña Cartera de Clientes.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* CLIENT CORREO & WHATSAPP DIRECT LINKS DISPATCHER */}
+                      {campaignRecipients.length > 0 && (
+                        <div className="bg-[#101b33] rounded-xl border border-indigo-500/20 p-4 space-y-4 text-left">
+                          <div className="space-y-1">
+                            <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest block">✈️ CONEXIÓN DE ENVÍO DIRECTO CON TU CUENTA</span>
+                            <h4 className="text-sm font-black text-white">Canales de Despacho Local e Individual</h4>
+                            <p className="text-slate-400 text-[10.5px] leading-relaxed">
+                              El envío masivo automático registra e inicia la acción comercial. Si prefieres un trato 100% manual e individual usando tu propio correo oficial o WhatsApp Web, haz clic en los siguientes enlaces pre-formateados para cada destinatario:
+                            </p>
+                          </div>
+
+                          <div className="space-y-3.5 max-h-80 overflow-y-auto divide-y divide-slate-800 pr-1">
+                            {campaignRecipients.map((recipient) => {
+                              const ec = enrichedClients.find(item => item.id === recipient.id);
+                              const formattedText = replaceMessageVariables(messageTemplate, ec);
+                              const subject = `Estatus Comercial y Beneficios CIMASUR - ${ec?.name || recipient.name}`;
+                              
+                              const mailtoUrl = `mailto:${encodeURIComponent(recipient.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(formattedText)}`;
+                              
+                              const cleanPhone = (recipient.phone || '').replace(/\D/g, '');
+                              const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(formattedText)}`;
+
+                              return (
+                                <div key={recipient.id} className="pt-3.5 first:pt-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <span className="text-xs font-black text-white block truncate">{recipient.name}</span>
+                                    <span className="text-[10px] text-slate-400 block truncate">{recipient.clinica || 'Sin clínica'} — {recipient.email}</span>
+                                    {recipient.phone && <span className="text-[9px] text-[#38bdf8] block mt-0.5">WhatsApp: {recipient.phone}</span>}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 shrink-0">
+                                    <a
+                                      href={mailtoUrl}
+                                      className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-bold rounded-lg text-[9px] flex items-center gap-1 cursor-pointer"
+                                      title="Componer correo en Outlook o Gmail local"
+                                    >
+                                      ✉️ Abrir mi Gmail / Mail
+                                    </a>
+                                    {recipient.phone && (
+                                      <a
+                                        href={whatsappUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold rounded-lg text-[9px] flex items-center gap-1 cursor-pointer"
+                                      >
+                                        💬 WhatsApp Directo
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                   </div>
@@ -1872,14 +2203,34 @@ export function ClubSocialManager() {
                         </div>
 
                         {selectedClient ? (
-                          <button
-                            type="button"
-                            onClick={handleDownloadPostcard}
-                            className="w-full py-3 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 font-black text-white text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
-                          >
-                            <Download className="w-4 h-4" />
-                            <span>Descargar Pieza en PNG</span>
-                          </button>
+                          <div className="space-y-3">
+                            <button
+                              type="button"
+                              onClick={handleDownloadPostcard}
+                              className="w-full py-3 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 font-black text-white text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Descargar Pieza en PNG</span>
+                            </button>
+
+                            <div className="bg-[#0b1324] p-3.5 rounded-xl border border-slate-800 space-y-2.5 text-[11px] text-left">
+                              <span className="text-yellow-400 font-extrabold block">💡 ¿CÓMO USAR ESTA PIEZA GRÁFICA?</span>
+                              <ul className="list-disc list-inside space-y-1.5 text-slate-300 leading-relaxed">
+                                <li>Haz clic en <strong>"Descargar Pieza en PNG"</strong> para guardar la imagen HD en tu equipo.</li>
+                                <li>Adjúntala en tus mensajes de WhatsApp o correos de <strong>CIMASUR</strong>.</li>
+                                <li>Funciona como una credencial especial de socio, incrementando el compromiso del veterinario.</li>
+                              </ul>
+                              
+                              <a 
+                                href={`https://wa.me/${(selectedClient.telefono || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Estimado/a ${selectedClient.name}, te escribo de CIMASUR para enviarte este saludo por tu excelente trayectoria magistral veterinaria.`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex w-full justify-center items-center gap-1.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold rounded-lg text-[10px]"
+                              >
+                                💬 Abrir Chat del Socio & Adjuntar
+                              </a>
+                            </div>
+                          </div>
                         ) : (
                           <div className="p-3 bg-red-500/10 text-red-400 text-center rounded text-xs">Debe seleccionar un cliente del módulo 2 para renderizar.</div>
                         )}
