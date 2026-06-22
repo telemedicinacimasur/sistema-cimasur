@@ -182,6 +182,185 @@ export function ClubSocialManager() {
   const [editSales2026, setEditSales2026] = useState(0);
   const [newNote, setNewNote] = useState('');
 
+  // Import annual sales state
+  const [showSalesImportModal, setShowSalesImportModal] = useState<boolean>(false);
+  const [salesImportText, setSalesImportText] = useState<string>('');
+  const [colMapping, setColMapping] = useState({
+    rutIdx: 0,
+    v2024Idx: 1, // 0-based index, -1 for none
+    v2025Idx: 2,
+    v2026Idx: 3,
+  });
+  
+  interface VisualImportRow {
+    rutOriginal: string;
+    rutNormalized: string;
+    v2024: number;
+    v2025: number;
+    v2026: number;
+    clientName?: string;
+    found: boolean;
+    clientId?: string;
+  }
+  
+  const [salesImportResults, setSalesImportResults] = useState<{
+    totalRows: number;
+    matched: number;
+    unmatched: number;
+    details: VisualImportRow[];
+  } | null>(null);
+
+  // Normalization helper for RUTs
+  const normalizeRUTForImport = (val: string): string => {
+    if (!val) return '';
+    return val.replace(/[^0-9kK]/g, '').toLowerCase();
+  };
+
+  const handlePreviewImport = () => {
+    if (!salesImportText.trim()) {
+      setSalesImportResults(null);
+      return;
+    }
+
+    const lines = salesImportText.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length === 0) {
+      setSalesImportResults(null);
+      return;
+    }
+
+    // Heuristically detect delimiter
+    const firstLine = lines[0];
+    let delimiter = '\t'; // Default tab
+    if (firstLine.includes(';')) delimiter = ';';
+    else if (firstLine.includes(',')) delimiter = ',';
+    else if (firstLine.includes('|')) delimiter = '|';
+
+    const details: VisualImportRow[] = [];
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+
+    const clientMap = new Map<string, ClubClient>();
+    clients.forEach(c => {
+      const norm = normalizeRUTForImport(c.rut);
+      if (norm) {
+        clientMap.set(norm, c);
+      }
+    });
+
+    // Detect if first line is headers
+    const looksLikeHeader = (cols: string[]) => {
+      return cols.some(col => {
+        const c = col.toLowerCase();
+        return c.includes('rut') || c.includes('name') || c.includes('nombre') || c.includes('venta') || c.includes('monto') || c.includes('clien') || c.includes('202') || c.includes('factura');
+      });
+    };
+
+    const hasHeader = looksLikeHeader(firstLine.split(delimiter));
+    const startIdx = hasHeader ? 1 : 0;
+
+    for (let i = startIdx; i < lines.length; i++) {
+      const line = lines[i];
+      const cols = line.split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
+      if (cols.length === 0 || !cols[0]) continue;
+
+      const rutOriginal = cols[colMapping.rutIdx] || '';
+      const rutNormalized = normalizeRUTForImport(rutOriginal);
+
+      if (!rutNormalized) continue;
+
+      const v2024 = colMapping.v2024Idx !== -1 && colMapping.v2024Idx < cols.length
+        ? (parseFloat((cols[colMapping.v2024Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
+        : 0;
+      const v2025 = colMapping.v2025Idx !== -1 && colMapping.v2025Idx < cols.length
+        ? (parseFloat((cols[colMapping.v2025Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
+        : 0;
+      const v2026 = colMapping.v2026Idx !== -1 && colMapping.v2026Idx < cols.length
+        ? (parseFloat((cols[colMapping.v2026Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
+        : 0;
+
+      const matchedClient = clientMap.get(rutNormalized);
+      if (matchedClient) {
+        matchedCount++;
+        details.push({
+          rutOriginal,
+          rutNormalized,
+          v2024,
+          v2025,
+          v2026,
+          clientName: matchedClient.name,
+          found: true,
+          clientId: matchedClient.id
+        });
+      } else {
+        unmatchedCount++;
+        details.push({
+          rutOriginal,
+          rutNormalized,
+          v2024,
+          v2025,
+          v2026,
+          found: false
+        });
+      }
+    }
+
+    setSalesImportResults({
+      totalRows: details.length,
+      matched: matchedCount,
+      unmatched: unmatchedCount,
+      details
+    });
+  };
+
+  useEffect(() => {
+    handlePreviewImport();
+  }, [salesImportText, colMapping, clients]);
+
+  const handleExecuteSalesImport = async () => {
+    if (!salesImportResults || salesImportResults.details.length === 0) {
+      alert("No hay registros válidos para importar.");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      let importedCount = 0;
+
+      for (const row of salesImportResults.details) {
+        if (!row.found || !row.clientId) continue;
+
+        const originalClient = clients.find(c => c.id === row.clientId);
+        if (!originalClient) continue;
+
+        const updatedSales: ClientVentas = {
+          v2024: row.v2024,
+          v2025: row.v2025,
+          v2026: row.v2026
+        };
+
+        const autoTier = getTierBySales(updatedSales.v2026, tiersList);
+
+        await localDB.updateInCollection('contacts', row.clientId, {
+          clubVentasDetail: JSON.stringify(updatedSales),
+          categoria: autoTier.name
+        });
+
+        importedCount++;
+      }
+
+      window.dispatchEvent(new Event('db-change'));
+      setSalesImportText('');
+      setSalesImportResults(null);
+      setShowSalesImportModal(false);
+      alert(`¡Importación exitosa! Se actualizaron las ventas de ${importedCount} clientes según su RUT.`);
+    } catch (err) {
+      console.error("Error executing sales import", err);
+      alert("Ocurrió un error al procesar la importación.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   // Load clients and sync with Database changes
   const loadData = async () => {
     try {
@@ -887,7 +1066,26 @@ export function ClubSocialManager() {
 
               {/* ----------------- SUBTAB 2: CLIENTES & FICHAS ----------------- */}
               {activeTab === 'clients' && (
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div className="space-y-4">
+                  {/* Actions Row */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#101a30] p-4 rounded-xl border border-slate-800">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-sky-400" /> Administración de Fichas del Club
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Busca socios, ajusta montos manuales o importa planillas masivas de facturación anual.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowSalesImportModal(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all border border-emerald-500/20"
+                    >
+                      <Download className="w-4 h-4" /> Importar Ventas Anuales
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                   
                   {/* LEFT COLUMN: CLIENT LIST EQUIPMENT WITH SEARCH */}
                   <div className="md:col-span-2 space-y-4">
@@ -1126,7 +1324,8 @@ export function ClubSocialManager() {
                   </div>
 
                 </div>
-              )}
+              </div>
+            )}
 
               {/* ----------------- SUBTAB 3: CLUB CATEGORIAS & CONFIGURATION ----------------- */}
               {activeTab === 'club_config' && (
@@ -1866,6 +2065,230 @@ export function ClubSocialManager() {
         </div>
 
       </div>
+
+      {/* SALES IMPORT MODAL OVERLAY */}
+      {showSalesImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0e192f] border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-[#122240]">
+              <div className="flex items-center gap-3 text-left">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-sm font-black text-white">Importador Inteligente de Ventas Anuales</h3>
+                  <p className="text-[11px] text-slate-400">Pega datos desde Excel o CSV para sincronizar las compras de tus clientes</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowSalesImportModal(false);
+                  setSalesImportText('');
+                  setSalesImportResults(null);
+                }}
+                className="text-slate-400 hover:text-white text-xs px-2.5 py-1.5 bg-[#0b1324] rounded-lg border border-slate-800 cursor-pointer"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              
+              {/* Instructions */}
+              <div className="bg-sky-500/10 border border-sky-500/25 p-3.5 rounded-xl text-xs space-y-2 leading-relaxed text-sky-200 text-left">
+                <p className="font-bold flex items-center gap-1">
+                  💡 ¿Cómo funciona la importación de ventas?
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-[11px] text-sky-300">
+                  <li>Copia tus columnas directamente desde Excel o Sheets.</li>
+                  <li>Las columnas deben contener el <strong className="text-white">RUT</strong> del cliente, seguido de las ventas de cada año.</li>
+                  <li>Si un RUT existe pero no aparece con ventas en algún año, su valor para ese año quedará en <strong className="text-white">0</strong>.</li>
+                  <li>Usa los selectores inferiores para mapear el número de columna correspondiente a cada dato.</li>
+                </ol>
+              </div>
+
+              {/* Paste Textarea */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs text-slate-350 font-bold block">Pega el contenido tabulado de tu planilla aquí:</label>
+                <textarea
+                  value={salesImportText}
+                  onChange={(e) => setSalesImportText(e.target.value)}
+                  placeholder="Ejemplo de copiado de Excel (RUT / 2024 / 2025 / 2026):&#10;12.345.678-9&#9;1200000&#9;2300000&#9;3500000&#10;9.876.543-2&#9;0&#9;450000&#9;120000"
+                  className="w-full h-32 bg-[#090f1d] p-3 rounded-xl border border-slate-705 text-xs text-white resize-none font-mono focus:outline-none focus:border-sky-500 placeholder-slate-600 focus:ring-1 focus:ring-sky-500"
+                ></textarea>
+              </div>
+
+              {salesImportText.trim() && (
+                <div className="space-y-4 text-left">
+                  
+                  {/* Column Configuration Selector */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#111f38] p-3 rounded-xl border border-slate-800">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 font-bold block">Columna RUT:</label>
+                      <select 
+                        value={colMapping.rutIdx} 
+                        onChange={(e) => setColMapping(prev => ({ ...prev, rutIdx: Number(e.target.value) }))}
+                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
+                      >
+                        <option value={0}>Columna 1</option>
+                        <option value={1}>Columna 2</option>
+                        <option value={2}>Columna 3</option>
+                        <option value={3}>Columna 4</option>
+                        <option value={4}>Columna 5</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 font-bold block">Ventas 2024:</label>
+                      <select 
+                        value={colMapping.v2024Idx} 
+                        onChange={(e) => setColMapping(prev => ({ ...prev, v2024Idx: Number(e.target.value) }))}
+                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
+                      >
+                        <option value={-1}>Ninguna (Queda en 0)</option>
+                        <option value={0}>Columna 1</option>
+                        <option value={1}>Columna 2</option>
+                        <option value={2}>Columna 3</option>
+                        <option value={3}>Columna 4</option>
+                        <option value={4}>Columna 5</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 font-bold block">Ventas 2025:</label>
+                      <select 
+                        value={colMapping.v2025Idx} 
+                        onChange={(e) => setColMapping(prev => ({ ...prev, v2025Idx: Number(e.target.value) }))}
+                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
+                      >
+                        <option value={-1}>Ninguna (Queda en 0)</option>
+                        <option value={0}>Columna 1</option>
+                        <option value={1}>Columna 2</option>
+                        <option value={2}>Columna 3</option>
+                        <option value={3}>Columna 4</option>
+                        <option value={4}>Columna 5</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-emerald-400 font-bold block">Ventas 2026 (Actual cierre):</label>
+                      <select 
+                        value={colMapping.v2026Idx} 
+                        onChange={(e) => setColMapping(prev => ({ ...prev, v2026Idx: Number(e.target.value) }))}
+                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
+                      >
+                        <option value={-1}>Ninguna (Queda en 0)</option>
+                        <option value={0}>Columna 1</option>
+                        <option value={1}>Columna 2</option>
+                        <option value={2}>Columna 3</option>
+                        <option value={3}>Columna 4</option>
+                        <option value={4}>Columna 5</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Live Parsed Preview */}
+                  {salesImportResults && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-355 text-slate-300 flex items-center gap-1">
+                          📋 Vista previa interpretada ({salesImportResults.totalRows} filas detectadas)
+                        </span>
+                        <div className="flex items-center gap-4 text-[11px] font-mono">
+                          <span className="text-emerald-400">✓ Encontrados en DB: {salesImportResults.matched}</span>
+                          <span className="text-slate-450 text-slate-400">✗ No Encontrados: {salesImportResults.unmatched}</span>
+                        </div>
+                      </div>
+
+                      {/* Preview Table */}
+                      <div className="bg-[#0b1324] border border-slate-800 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                        <table className="w-full text-left text-xs text-slate-300">
+                          <thead className="sticky top-0 bg-[#070b15] border-b border-slate-800 text-[10px] text-slate-400 uppercase font-bold">
+                            <tr>
+                              <th className="p-2.5">RUT Planilla</th>
+                              <th className="p-2.5">Socio Encontrado</th>
+                              <th className="p-2.5">Ciclo 2024</th>
+                              <th className="p-2.5">Ciclo 2025</th>
+                              <th className="p-2.5 text-emerald-400">Ciclo 2026</th>
+                              <th className="p-2.5 text-right">Estatus</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
+                            {salesImportResults.details.map((row, rIdx) => (
+                              <tr key={rIdx} className={row.found ? "hover:bg-slate-800/40" : "bg-rose-500/5 opacity-50 text-slate-500 hover:bg-rose-500/10"}>
+                                <td className="p-2.5">{row.rutOriginal || '---'}</td>
+                                <td className="p-2.5 font-sans">
+                                  {row.found ? (
+                                    <span className="text-slate-200 font-semibold">{row.clientName}</span>
+                                  ) : (
+                                    <span className="text-slate-500 italic">RUT no registrado</span>
+                                  )}
+                                </td>
+                                <td className="p-2.5">${row.v2024.toLocaleString('es-CL')}</td>
+                                <td className="p-2.5">${row.v2025.toLocaleString('es-CL')}</td>
+                                <td className="p-2.5 text-emerald-400 font-extrabold">${row.v2026.toLocaleString('es-CL')}</td>
+                                <td className="p-2.5 text-right">
+                                  {row.found ? (
+                                    <span className="bg-emerald-500/10 text-emerald-400 text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/20">Vinculado</span>
+                                  ) : (
+                                    <span className="bg-slate-850 text-slate-450 text-[9px] px-1.5 py-0.5 rounded border border-slate-800">Ignorado</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-5 border-t border-slate-850 bg-[#0d162a] flex justify-between items-center text-left">
+              <span className="text-[11px] text-slate-400 italic font-medium">
+                {salesImportResults && salesImportResults.matched > 0 
+                  ? `Se actualizarán ${salesImportResults.matched} cuentas de socios. Los niveles VIP se re-calcularán según el año 2026.`
+                  : "Por favor, ingresa los datos de compras anuales con RUT correspondiente."
+                }
+              </span>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSalesImportModal(false);
+                    setSalesImportText('');
+                    setSalesImportResults(null);
+                  }}
+                  className="px-4 py-2 bg-slate-800 text-xs text-slate-300 font-bold hover:bg-slate-700 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteSalesImport}
+                  disabled={!salesImportResults || salesImportResults.matched === 0 || isSending}
+                  className={`px-5 py-2 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    !salesImportResults || salesImportResults.matched === 0 || isSending
+                      ? "bg-slate-800 text-slate-500 cursor-not-allowed border-slate-750"
+                      : "bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-500/10"
+                  }`}
+                >
+                  {isSending ? (
+                    <>Cargando...</>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" /> Importar e Integrar Ventas
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
