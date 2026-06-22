@@ -169,6 +169,44 @@ export function ClubSocialManager() {
   const [campaignTargetTier, setCampaignTargetTier] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   
+  // Segment classification states and automated campaign runners
+  const [activeSegmentTab, setActiveSegmentTab] = useState<'subieron' | 'bajaron' | 'sinModificacion'>('subieron');
+  const [copiedAutomationId, setCopiedAutomationId] = useState<string | null>(null);
+  const [selectedSubAutomation, setSelectedSubAutomation] = useState<string>('wa_congratulations');
+  const [selectedDownAutomation, setSelectedDownAutomation] = useState<string>('fast_track_promo');
+  const [selectedSameAutomation, setSelectedSameAutomation] = useState<string>('stimulus_promo');
+  const [bulkProcessing, setBulkProcessing] = useState<boolean>(false);
+  
+  // Checkbox multi-select state for each segment to give granular and simultaneous control
+  const [selectedSubieronIds, setSelectedSubieronIds] = useState<string[]>([]);
+  const [selectedBajaronIds, setSelectedBajaronIds] = useState<string[]>([]);
+  const [selectedEstablesIds, setSelectedEstablesIds] = useState<string[]>([]);
+
+  // Customizable live template states for campaigns
+  const [templateSubCongrat, setTemplateSubCongrat] = useState<string>(
+    "¡Hola *{{NOMBRE}}*! Te saluda el equipo de Cimasur. 🏆\\n\\nNos complace informarte que debido a tu excelente volumen de compras este año (${{COMPRAS_2026}}), has ascendido de categoría en el Club Social Cimasur al nivel *{{CATEGORIA_NUEVA}}*.\\n\\nEsto te otorga de inmediato beneficios corporativos exclusivos. ¡Muchas gracias por tu valiosa confianza!"
+  );
+  const [templateSubInvite, setTemplateSubInvite] = useState<string>(
+    "Estimado/a *{{NOMBRE}}*, excelente día de parte de CIMASUR. 🌟\\n\\nComo nuevo miembro del nivel *{{CATEGORIA_NUEVA}}*, queremos invitarte a coordinar tus despachos de la semana de forma prioritaria con nuestro centro logístico.\\n\\nContáctanos aquí para informarte detalladamente sobre tus descuentos especiales aplicados a materias primas e inyectables base."
+  );
+
+  const [templateDownRecovery, setTemplateDownRecovery] = useState<string>(
+    "¡Hola *{{NOMBRE}}*! Te saluda Fernanda Contreras de Cimasur. 🚨\\n\\nEsperamos te encuentres excelente. Al revisar tu cuenta en el Club Social, notamos una leve disminución en tus compras anuales para retener tu nivel *{{CATEGORIA_PREVIA}}*.\\n\\nPor ello, te habilitamos una campaña de *Recuperación Fast-Track*: si coordinas compras especiales por *${{BRECHA}}* en las próximas 72 horas, ¡tu categoría quedará totalmente protegida para el resto del año!"
+  );
+  const [templateDownGrace, setTemplateDownGrace] = useState<string>(
+    "Estimado/a *{{NOMBRE}}*, un placer saludarte de Cimasur. 🛡️\\n\\nQueremos informarte que hemos activado para tu cuenta un *Periodo de Gracia Comercial de 90 Días*. Esto mantendrá congelados tus beneficios del nivel *{{CATEGORIA_PREVIA}}* de forma preventiva.\\n\\nQueremos que tu negocio siga creciendo con nosotros de la mano de nuestro laboratorio magistral."
+  );
+
+  const [templateSameStimulus, setTemplateSameStimulus] = useState<string>(
+    "¡Hola *{{NOMBRE}}*! Te saluda Fernanda Contreras de Cimasur. ⚡\\n\\nAnalizando tus consumos anuales, observamos que tu cuenta está sumamente estable en el nivel *{{CATEGORIA_ACTUAL}}*.\\n\\nPara apoyar el crecimiento de tu clínica, te activamos un *Cupón Excepcional de Reactivación con un 5% de Descuento adicional* en tu próximo pedido si lo programamos en las próximas 72 horas. ¿Te cotizamos algo hoy?"
+  );
+  const [templateSameSurvey, setTemplateSameSurvey] = useState<string>(
+    "Estimado/a doctor/a *{{NOMBRE}}*, un cordial saludo de CIMASUR. 💬\\n\\nBuscando darte el mejor servicio técnico, quisiéramos consultarte: ¿Cómo ha sido tu experiencia con nuestras fórmulas y despachos este semestre? Tu opinión nos ayuda a optimizar tus beneficios comerciales en tu categoría *{{CATEGORIA_ACTUAL}}*."
+  );
+
+  // Maintain processed (clicked/sent) status state for this session to alleviate workload status tracking
+  const [sessionProcessedIds, setSessionProcessedIds] = useState<string[]>([]);
+  
   // Individual sales inputs
   const [editSales, setEditSales] = useState<ClientVentas>({ v2024: 0, v2025: 0, v2026: 0 });
   const [isEditingSales, setIsEditingSales] = useState(false);
@@ -310,6 +348,148 @@ export function ClubSocialManager() {
       return matchesSearch && matchesCat && matchesDirection;
     });
   }, [enrichedClients, search, filterCategory, filterDirection]);
+
+  // Classification of clients according to 2025 vs 2026 performance & tiers
+  const classifiedGroups = useMemo(() => {
+    const subieron: any[] = [];
+    const bajaron: any[] = [];
+    const sinModificacion: any[] = [];
+
+    enrichedClients.forEach(c => {
+      const idx2025 = tiersList.findIndex(t => t.name.toLowerCase() === c.calculatedTierPrev.toLowerCase());
+      const idx2026 = tiersList.findIndex(t => t.name.toLowerCase() === c.calculatedTier.toLowerCase());
+
+      const isUnchangedSales = c.v2026 === c.v2025;
+      
+      if (idx2026 > idx2025) {
+        subieron.push({
+          ...c,
+          prevTier: c.calculatedTierPrev,
+          newTier: c.calculatedTier,
+          diffSales: c.v2026 - c.v2025,
+          percentChange: c.v2025 > 0 ? ((c.v2026 - c.v2025) / c.v2025) * 100 : 100
+        });
+      } else if (idx2026 < idx2025) {
+        bajaron.push({
+          ...c,
+          prevTier: c.calculatedTierPrev,
+          newTier: c.calculatedTier,
+          diffSales: c.v2025 - c.v2026,
+          percentChange: c.v2025 > 0 ? ((c.v2025 - c.v2026) / c.v2025) * 100 : 0
+        });
+      } else if (isUnchangedSales) {
+        sinModificacion.push({
+          ...c,
+          tier: c.categoria,
+          stableSales: c.v2026
+        });
+      }
+    });
+
+    return { subieron, bajaron, sinModificacion };
+  }, [enrichedClients, tiersList]);
+
+  // Synchronize default multi-selections on load or change of categories
+  useEffect(() => {
+    setSelectedSubieronIds(classifiedGroups.subieron.map(c => c.id));
+    setSelectedBajaronIds(classifiedGroups.bajaron.map(c => c.id));
+    setSelectedEstablesIds(classifiedGroups.sinModificacion.map(c => c.id));
+  }, [classifiedGroups.subieron.length, classifiedGroups.bajaron.length, classifiedGroups.sinModificacion.length]);
+
+  // Real bulk action updates in localDB
+  const handleBulkUpgrade = async () => {
+    const selectedClientsList = classifiedGroups.subieron.filter(c => selectedSubieronIds.includes(c.id));
+    if (selectedClientsList.length === 0) {
+      alert("Por favor, selecciona al menos un cliente con la casilla (checkbox) para ejecutar su ascenso.");
+      return;
+    }
+    setBulkProcessing(true);
+    try {
+      let count = 0;
+      for (const c of selectedClientsList) {
+        if (c.categoria.toLowerCase() !== c.newTier.toLowerCase()) {
+          const currentObs = c.historialUnificado || '';
+          const updateMsg = `\n\n--- Automatización Comercial (${new Date().toLocaleDateString('es-CL')}) ---\n` +
+                            `🎉 Sincronización Automática por Lote: Cliente promovido a la categoría ${c.newTier} por incremento en facturación anual 2025 -> 2026.`;
+          
+          await localDB.updateInCollection('contacts', c.id, {
+            categoria: c.newTier,
+            historialUnificado: currentObs + updateMsg
+          });
+          count++;
+        }
+      }
+      window.dispatchEvent(new Event('db-change'));
+      alert(`¡Sincronización Completada! Se han promovido ${count} cliente(s) seleccionados a sus categorías superiores correspondientes.`);
+    } catch (e) {
+      console.error(e);
+      alert("Error al ejecutar ascenso masivo.");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkGracePeriod = async () => {
+    const selectedClientsList = classifiedGroups.bajaron.filter(c => selectedBajaronIds.includes(c.id));
+    if (selectedClientsList.length === 0) {
+      alert("Por favor, selecciona al menos un cliente con la casilla (checkbox) para aplicar periodo de gracia.");
+      return;
+    }
+    if (!window.confirm(`¿Confirmas extender 90 días de periodo de gracia comercial y congelar la categoría anterior para los ${selectedClientsList.length} cliente(s) seleccionados?`)) {
+      return;
+    }
+    setBulkProcessing(true);
+    try {
+      let count = 0;
+      for (const c of selectedClientsList) {
+        const currentObs = c.historialUnificado || '';
+        const updateMsg = `\n\n--- Automatización Comercial (${new Date().toLocaleDateString('es-CL')}) ---\n` +
+                          `🚨 Extensión de Gracia por Lote: Se activó un periodo de gracia comercial de 90 días congelando la categoría '${c.prevTier}' temporalmente. Se le exhortará comercialmente a solventar la brecha comercial de $${(c.diffSales || 0).toLocaleString('es-CL')}.`;
+        
+        await localDB.updateInCollection('contacts', c.id, {
+          categoria: c.prevTier,
+          historialUnificado: currentObs + updateMsg
+        });
+        count++;
+      }
+      window.dispatchEvent(new Event('db-change'));
+      alert(`¡Protección de Gracia Aplicada! Se protegió la categoría anterior para ${count} cliente(s) seleccionados con alertas automáticas registradas en su historial.`);
+    } catch (e) {
+      console.error(e);
+      alert("Error al aplicar gracia masiva.");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkInactivityTask = async () => {
+    const selectedClientsList = classifiedGroups.sinModificacion.filter(c => selectedEstablesIds.includes(c.id));
+    if (selectedClientsList.length === 0) {
+      alert("Por favor, selecciona al menos un cliente con la casilla (checkbox) para registrar alertas.");
+      return;
+    }
+    setBulkProcessing(true);
+    try {
+      let count = 0;
+      for (const c of selectedClientsList) {
+        const currentObs = c.historialUnificado || '';
+        const updateMsg = `\n\n--- Automatización Comercial (${new Date().toLocaleDateString('es-CL')}) ---\n` +
+                          `🤖 Alerta de Inactividad de Facturación (Por Lote): Se ha programado un contacto comercial de estímulo para reactivar compras. Monto de compras plano en $${(c.stableSales || 0).toLocaleString('es-CL')}.`;
+        
+        await localDB.updateInCollection('contacts', c.id, {
+          historialUnificado: currentObs + updateMsg
+        });
+        count++;
+      }
+      window.dispatchEvent(new Event('db-change'));
+      alert(`¡Seguimiento Programado! Se registró una alerta de inactividad comercial en el historial de ${count} de los cliente(s) seleccionados de forma automática.`);
+    } catch (e) {
+      console.error(e);
+      alert("Error al programar seguimientos.");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
 
   // Interactive calculations for SELECTED client (including simulated values)
   const simulatedVentas2026 = useMemo(() => {
@@ -753,6 +933,552 @@ export function ClubSocialManager() {
           </div>
         </div>
 
+      </div>
+
+      {/* 🤖 AUTOMATION CENTER & CLIENT SEGMENTS STATUS COCKPIT */}
+      <div className="bg-[#152035] rounded-3xl p-6 border-2 border-[#1E3A5F]/40 shadow-2xl space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="p-1 px-2.5 rounded bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> INTELIGENCIA COMERCIAL ACTIVA
+              </span>
+              <span className="p-1 px-2.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[9px] font-black uppercase tracking-wider">
+                Análisis 2025 → 2026
+              </span>
+            </div>
+            <h3 className="text-lg font-black text-white uppercase tracking-tight italic flex items-center gap-2">
+              🤖 Cabina de Clasificación de Comportamiento & Automatizaciones
+            </h3>
+            <p className="text-slate-400 text-xs mt-1 font-medium leading-relaxed">
+              Monitoreo automático de desempeño. El sistema ha clasificado a los clientes que subieron, bajaron o mantuvieron estables sus compras anuales con tácticas de marketing listas para ser despachadas.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase">Segmento Activo:</span>
+            <div className="inline-flex rounded-xl bg-[#0D1527] p-1 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setActiveSegmentTab('subieron')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  activeSegmentTab === 'subieron'
+                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Subieron 📈 ({classifiedGroups.subieron.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSegmentTab('bajaron')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  activeSegmentTab === 'bajaron'
+                    ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Bajaron 📉 ({classifiedGroups.bajaron.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSegmentTab('sinModificacion')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  activeSegmentTab === 'sinModificacion'
+                    ? "bg-slate-800 text-slate-300 border border-slate-700"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Estables ➖ ({classifiedGroups.sinModificacion.length})
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* WORKSPACE ACCORDING TO SELECTED SEGMENT */}
+        {(() => {
+          // Determine active list, selected state, tactics and templates based on active tab
+          let segmentList: any[] = [];
+          let selectedIds: string[] = [];
+          let setSelectedIds: React.Dispatch<React.SetStateAction<string[]>> = () => {};
+          let activeTactic = "";
+          let setActiveTactic: React.Dispatch<React.SetStateAction<string>> = () => {};
+          let activeTemplateText = "";
+          let setActiveTemplateText: (v: string) => void = () => {};
+          let isDatabaseTactic = false;
+          let currentSegmentTitle = "";
+          let currentSegmentDesc = "";
+          let currentSegmentThemeColor = "";
+          
+          if (activeSegmentTab === 'subieron') {
+            segmentList = classifiedGroups.subieron;
+            selectedIds = selectedSubieronIds;
+            setSelectedIds = setSelectedSubieronIds;
+            activeTactic = selectedSubAutomation;
+            setActiveTactic = setSelectedSubAutomation;
+            isDatabaseTactic = activeTactic === 'update_db_ascent';
+            activeTemplateText = activeTactic === 'wa_congratulations' ? templateSubCongrat : templateSubInvite;
+            setActiveTemplateText = (text) => {
+              if (activeTactic === 'wa_congratulations') setTemplateSubCongrat(text);
+              if (activeTactic === 'wa_custom_invite') setTemplateSubInvite(text);
+            };
+            currentSegmentTitle = "Clientes con Ascenso Comercial";
+            currentSegmentDesc = "Socios corporativos que incrementaron sus consumos en 2026, listos para ser promovidos y fidelizados.";
+            currentSegmentThemeColor = "emerald";
+          } else if (activeSegmentTab === 'bajaron') {
+            segmentList = classifiedGroups.bajaron;
+            selectedIds = selectedBajaronIds;
+            setSelectedIds = setSelectedBajaronIds;
+            activeTactic = selectedDownAutomation;
+            setActiveTactic = setSelectedDownAutomation;
+            isDatabaseTactic = activeTactic === 'extend_grace_90';
+            activeTemplateText = activeTactic === 'fast_track_promo' ? templateDownRecovery : templateDownGrace;
+            setActiveTemplateText = (text) => {
+              if (activeTactic === 'fast_track_promo') setTemplateDownRecovery(text);
+              if (activeTactic === 'wa_grace_notify') setTemplateDownGrace(text);
+            };
+            currentSegmentTitle = "Clientes con Baja en Facturación";
+            currentSegmentDesc = "Socios con brechas que corren el riesgo de degradación. Acciones para congelar estatus o exigir recuperación.";
+            currentSegmentThemeColor = "rose";
+          } else {
+            segmentList = classifiedGroups.sinModificacion;
+            selectedIds = selectedEstablesIds;
+            setSelectedIds = setSelectedEstablesIds;
+            activeTactic = selectedSameAutomation;
+            setActiveTactic = setSelectedSameAutomation;
+            isDatabaseTactic = activeTactic === 'register_alert_in';
+            activeTemplateText = activeTactic === 'stimulus_promo' ? templateSameStimulus : templateSameSurvey;
+            setActiveTemplateText = (text) => {
+              if (activeTactic === 'stimulus_promo') setTemplateSameStimulus(text);
+              if (activeTactic === 'wa_survey_co') setTemplateSameSurvey(text);
+            };
+            currentSegmentTitle = "Clientes Estables de Consumo Plano";
+            currentSegmentDesc = "Socios sin variación anual. Propensos a la inactividad que requieren cupones de estímulo rápidos.";
+            currentSegmentThemeColor = "slate";
+          }
+
+          const isAllSelected = segmentList.length > 0 && selectedIds.length === segmentList.length;
+          const handleToggleSelectAll = () => {
+            if (isAllSelected) {
+              setSelectedIds([]);
+            } else {
+              setSelectedIds(segmentList.map(c => c.id));
+            }
+          };
+
+          const handleToggleRow = (id: string) => {
+            if (selectedIds.includes(id)) {
+              setSelectedIds(selectedIds.filter(x => x !== id));
+            } else {
+              setSelectedIds([...selectedIds, id]);
+            }
+          };
+
+          // Helper to resolve template variables dynamically
+          const resolveTemplate = (rawText: string, client: any) => {
+            let res = rawText;
+            res = res.replace(/\{\{NOMBRE\}\}/g, client.name || '');
+            res = res.replace(/\{\{RUT\}\}/g, client.rut || '');
+            res = res.replace(/\{\{CATEGORIA_ACTUAL\}\}/g, client.categoria || 'Sin categoría');
+            res = res.replace(/\{\{CATEGORIA_NUEVA\}\}/g, client.newTier || client.categoria || 'Sin categoría');
+            res = res.replace(/\{\{CATEGORIA_PREVIA\}\}/g, client.prevTier || client.categoria || 'Sin categoría');
+            res = res.replace(/\{\{COMPRAS_2026\}\}/g, (client.v2026 || 0).toLocaleString('es-CL'));
+            res = res.replace(/\{\{BRECHA\}\}/g, (client.diffSales || 0).toLocaleString('es-CL'));
+            return res;
+          };
+
+          const selectedClientsSubset = segmentList.filter(c => selectedIds.includes(c.id));
+
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* COLUMNA IZQUIERDA: CLIENT DIRECTORIO DEL SEGMENTO CON CHECKS */}
+              <div className="lg:col-span-5 bg-[#0D1527] rounded-2xl border border-slate-800 p-4 space-y-3 flex flex-col">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-850">
+                  <span className={`text-[9px] bg-${currentSegmentThemeColor}-500/10 text-${currentSegmentThemeColor}-400 border border-${currentSegmentThemeColor}-500/20 p-1 px-2.5 rounded font-black font-mono uppercase`}>
+                    CATEGORIZACIÓN ACTIVA
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold font-mono">
+                    {selectedIds.length} / {segmentList.length} Seleccionados
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-tight">{currentSegmentTitle}</h4>
+                  <p className="text-[10px] text-slate-400 leading-normal mt-1">{currentSegmentDesc}</p>
+                </div>
+
+                {/* SELECT ALL MASTER CONTROLLER */}
+                {segmentList.length > 0 && (
+                  <label className="flex items-center gap-2.5 p-2 bg-[#152035]/40 rounded-xl border border-slate-800/80 cursor-pointer select-none transition-all hover:bg-[#152035]/60">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-pink-500 focus:ring-0 cursor-pointer"
+                    />
+                    <div className="flex-1 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-200 uppercase tracking-wider">Seleccionar Todo el Lote</span>
+                      <span className="text-[9px] font-mono text-slate-500 font-extrabold">(Toggles todo el grupo)</span>
+                    </div>
+                  </label>
+                )}
+
+                {/* SPREADSHEET ROW CHIPS FOR CLIENTS */}
+                <div className="flex-1 overflow-y-auto max-h-[350px] divide-y divide-slate-800/60 pr-1 scrollbar-thin space-y-1">
+                  {segmentList.length === 0 ? (
+                    <div className="p-8 text-center text-[11px] text-slate-500 font-bold uppercase">
+                      Ningún cliente se encuentra registrado en esta clasificación fiscal para 2026.
+                    </div>
+                  ) : (
+                    segmentList.map(c => {
+                      const isChecked = selectedIds.includes(c.id);
+                      const isProcessed = sessionProcessedIds.includes(c.id);
+                      const currentVal = c.v2026 || 0;
+                      
+                      let comparisonLine = "";
+                      if (activeSegmentTab === 'subieron') {
+                        comparisonLine = `Subió de ${c.prevTier} a ${c.newTier}`;
+                      } else if (activeSegmentTab === 'bajaron') {
+                        comparisonLine = `Bajó de ${c.prevTier} a ${c.newTier}`;
+                      } else {
+                        comparisonLine = `Venta Plana Estable: $${c.stableSales?.toLocaleString('es-CL')}`;
+                      }
+
+                      return (
+                        <div 
+                          key={c.id} 
+                          onClick={() => handleToggleRow(c.id)}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none ${
+                            isChecked 
+                              ? `bg-[#152035]/60 border-${currentSegmentThemeColor}-500/20 shadow-lg shadow-${currentSegmentThemeColor}-500/5` 
+                              : 'bg-transparent border-transparent hover:bg-[#152035]/25 border-b-slate-800/40'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleToggleRow(c.id);
+                            }}
+                            className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-pink-500 focus:ring-0 cursor-pointer"
+                          />
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className={`text-xs font-black truncate uppercase ${isChecked ? 'text-white' : 'text-slate-300'}`}>
+                                {c.name}
+                              </p>
+                              {isProcessed && (
+                                <span className="p-0.5 px-1.5 rounded bg-sky-950 text-sky-400 border border-sky-800 text-[8px] font-black uppercase font-mono tracking-widest leading-none">
+                                  DESPACHADO
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between text-[9px] text-slate-500 mt-0.5">
+                              <span className="font-mono font-bold leading-none">{c.rut}</span>
+                              <span className={`font-semibold uppercase tracking-tight leading-none ${
+                                activeSegmentTab === 'subieron' ? 'text-emerald-400 font-extrabold' :
+                                activeSegmentTab === 'bajaron' ? 'text-rose-400 font-extrabold' : 'text-indigo-300'
+                              }`}>
+                                {comparisonLine}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* COLUMNA DERECHA: CONSOLA DE ACCIÓN COMERCIAL POR LOTE O CAMPAÑAS */}
+              <div className="lg:col-span-7 bg-[#152035] rounded-2xl border border-slate-800/80 p-5 space-y-5 flex flex-col justify-between">
+                
+                {/* ACCIONES Y TÁCTICAS DISPONIBLES TAB BAR */}
+                <div>
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">CONSULTORÍA COMERCIAL CIMASUR</span>
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider mt-0.5">Selección de Acción o Táctica Comercial</h4>
+                    </div>
+                    <span className="text-xs font-black text-pink-400 font-mono bg-pink-500/10 p-1 px-2 border border-pink-500/20 rounded-xl">
+                      🚀 {selectedClientsSubset.length} en Campaña
+                    </span>
+                  </div>
+
+                  {/* MULTIPLE ACTION SELECTOR BUTTONS */}
+                  <div className="grid grid-cols-3 gap-2 mt-3.5">
+                    
+                    {activeSegmentTab === 'subieron' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubAutomation('wa_congratulations');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all ${
+                            activeTactic === 'wa_congratulations'
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          🎉 Felicitación
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubAutomation('wa_custom_invite');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all ${
+                            activeTactic === 'wa_custom_invite'
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          🌟 Invitación
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubAutomation('update_db_ascent');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all flex items-center justify-center gap-1 ${
+                            activeTactic === 'update_db_ascent'
+                              ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-indigo-400/80'
+                          }`}
+                        >
+                          ⚙️ Sincronizar Base
+                        </button>
+                      </>
+                    )}
+
+                    {activeSegmentTab === 'bajaron' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDownAutomation('fast_track_promo');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all ${
+                            activeTactic === 'fast_track_promo'
+                              ? 'bg-rose-500/10 border-rose-500/30 text-rose-450'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          🚨 Recuperación
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDownAutomation('wa_grace_notify');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all ${
+                            activeTactic === 'wa_grace_notify'
+                              ? 'bg-rose-500/10 border-rose-500/30 text-rose-450'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          🛡️ Periodo Gracia
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDownAutomation('extend_grace_90');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all flex items-center justify-center gap-1 ${
+                            activeTactic === 'extend_grace_90'
+                              ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-indigo-400/80'
+                          }`}
+                        >
+                          ⚙️ Proteger Nivel
+                        </button>
+                      </>
+                    )}
+
+                    {activeSegmentTab === 'sinModificacion' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSameAutomation('stimulus_promo');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all ${
+                            activeTactic === 'stimulus_promo'
+                              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          ⚡ Cupón Estímulo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSameAutomation('wa_survey_co');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all ${
+                            activeTactic === 'wa_survey_co'
+                              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          💬 Encuesta Calidad
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSameAutomation('register_alert_in');
+                          }}
+                          className={`p-2.5 rounded-xl border text-[10px] uppercase font-black tracking-wide text-center transition-all flex items-center justify-center gap-1 ${
+                            activeTactic === 'register_alert_in'
+                              ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400'
+                              : 'bg-[#0D1527] border-slate-850 text-slate-400 hover:text-indigo-400/80'
+                          }`}
+                        >
+                          ⚙️ Alerta Inactividad
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* TEMPLATE CAMPAIGN CONFIGURATOR (FOR NON-DATABASE TACTICS) */}
+                {!isDatabaseTactic ? (
+                  <div className="space-y-3 flex-1 flex flex-col justify-between pt-1">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-extrabold uppercase">
+                        <span>Editor de Plantilla en Vivo:</span>
+                        <span className="text-slate-500 italic lowercase tracking-normal">{"Etiquetas aceptadas: {{NOMBRE}}, {{BRECHA}}, {{CATEGORIA_NUEVA}}"}</span>
+                      </div>
+                      <textarea
+                        value={activeTemplateText}
+                        onChange={(e) => setActiveTemplateText(e.target.value)}
+                        className="w-full text-slate-200 placeholder-slate-600 bg-[#0D1527] p-3 text-xs leading-relaxed font-sans rounded-xl border border-slate-800 outline-none focus:border-sky-500 h-[105px] resize-none"
+                      />
+                    </div>
+
+                    {/* DISPATCH MATRIX FOR ALL CHECKED CLIENTS - ALIVIANAR EL TRABAJO */}
+                    <div className="space-y-2 pt-2 border-t border-slate-800/60 max-h-[170px] overflow-y-auto">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                        Cola de Despacho Masivo ({selectedClientsSubset.length} seleccionados)
+                      </p>
+                      
+                      {selectedClientsSubset.length === 0 ? (
+                        <div className="p-4 bg-[#0D1527] text-center text-[10px] font-black uppercase text-slate-600 rounded-lg">
+                          Sin destinatarios. Selecciona clientes en el panel izquierdo.
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {selectedClientsSubset.map((client) => {
+                            const renderedText = resolveTemplate(activeTemplateText, client);
+                            const parsedPhone = client.phone ? client.phone.trim().replace(/[^0-9+]/g, '') : '';
+                            const isProcessed = sessionProcessedIds.includes(client.id);
+                            
+                            return (
+                              <div key={client.id} className="p-2 bg-[#0D1527] rounded-xl border border-slate-850 flex items-center justify-between gap-3 text-[11px]">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-white text-[11px] truncate">{client.name}</span>
+                                    <span className="text-[9px] font-mono text-slate-500">({client.phone || 'S/F'})</span>
+                                  </div>
+                                  <p className="text-[9.5px] text-slate-450 line-clamp-1 italic text-slate-400 mt-0.5">
+                                    "{renderedText}"
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {/* COPY BTON */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(renderedText);
+                                      setCopiedAutomationId(client.id);
+                                      if (!sessionProcessedIds.includes(client.id)) {
+                                        setSessionProcessedIds([...sessionProcessedIds, client.id]);
+                                      }
+                                      setTimeout(() => setCopiedAutomationId(null), 3000);
+                                    }}
+                                    className="p-1 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-750 text-[9px] font-black uppercase tracking-wider rounded transition-all cursor-pointer"
+                                  >
+                                    {copiedAutomationId === client.id ? "¡Listo! ✓" : "Copiar"}
+                                  </button>
+                                  {/* WHATSAPP ACTION */}
+                                  <button
+                                    type="button"
+                                    disabled={!client.phone}
+                                    onClick={() => {
+                                      if (client.phone) {
+                                        const cleanPhone = client.phone.replace(/[^0-9]/g, '');
+                                        const waLink = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(renderedText)}`;
+                                        window.open(waLink, '_blank', 'noopener,noreferrer');
+                                        if (!sessionProcessedIds.includes(client.id)) {
+                                          setSessionProcessedIds([...sessionProcessedIds, client.id]);
+                                        }
+                                      }
+                                    }}
+                                    className="p-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[9px] font-black uppercase tracking-wider rounded transition-all cursor-pointer flex items-center gap-0.5"
+                                  >
+                                    <span>WhatsApp</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  
+                  /* DATABASE UPDATE EXECUTION CARD (⚙️ ACCIONES EN SISTEMA) */
+                  <div className="bg-[#0D1527] p-5 rounded-2xl border border-slate-850/80 space-y-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-indigo-400 font-mono text-[10px] font-black uppercase tracking-wider">
+                        <Shield className="w-4 h-4 text-indigo-400" />
+                        EJECUCIÓN DEL MOTOR DE REGLAS DE NEGOCIO
+                      </div>
+                      
+                      <h4 className="text-xs font-black text-slate-100 uppercase tracking-wider mt-2.5">
+                        {activeTactic === 'update_db_ascent' && "Sincronizar Oficialmente Ascensos de Categoría CRM"}
+                        {activeTactic === 'extend_grace_90' && "Conceder Periodos de Gracia a Cuentas en Riesgo de Descenso"}
+                        {activeTactic === 'register_alert_in' && "Establecer Alerta Ledger de Inactividad de Facturación en CRM"}
+                      </h4>
+
+                      <p className="text-[11px] text-slate-400 leading-relaxed mt-2 font-medium">
+                        {activeTactic === 'update_db_ascent' && "Esta acción sincroniza la categoría CRM guardada de los clientes seleccionados con su nivel calificado para 2026. Registra de forma automática la auditoría correspondiente en su historial unificado."}
+                        {activeTactic === 'extend_grace_90' && "Esta acción congela la categoría comercial histórica original para las cuentas seleccionadas por 90 días, salvando los descuentos corporativos y registrando una prórroga por prórroga en su bitácora."}
+                        {activeTactic === 'register_alert_in' && "Esta acción asienta una anotación ledger automática de inactividad de compras en el historial unificado de los clientes planos seleccionados para notificar a los gestores."}
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-indigo-950/20 border border-indigo-900/35 rounded-xl flex items-center justify-between">
+                      <span className="text-[10px] text-indigo-350 font-black uppercase tracking-wider">Destinatarios Seleccionados:</span>
+                      <span className="text-xs text-white font-mono font-black bg-indigo-500/20 p-1 px-2.5 border border-indigo-500/30 rounded-lg">
+                        {selectedClientsSubset.length} Veterinario(s)
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={bulkProcessing || selectedClientsSubset.length === 0}
+                      onClick={() => {
+                        if (activeTactic === 'update_db_ascent') handleBulkUpgrade();
+                        if (activeTactic === 'extend_grace_90') handleBulkGracePeriod();
+                        if (activeTactic === 'register_alert_in') handleBulkInactivityTask();
+                      }}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl cursor-pointer hover:scale-[1.01] transition-all flex items-center justify-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${bulkProcessing ? 'animate-spin' : ''}`} />
+                      {bulkProcessing ? "APLICANDO LOGS..." : "CONFIRMAR & ACTUALIZAR EN BASE DE DATOS ⚡"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* CORE INTERACTIVE INTERFACE */}

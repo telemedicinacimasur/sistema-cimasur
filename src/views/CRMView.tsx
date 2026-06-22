@@ -481,24 +481,13 @@ export default function CRMView() {
           )}
           {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('smart')) && (
             <button 
-              onClick={() => setActiveTab('smart')}
-              className={cn(
-                "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-                activeTab === 'smart' ? "border-b-2 border-blue-600 text-[#38BDF8]" : "text-slate-400 hover:text-slate-300"
-              )}
-            >
-              Motor Comercial
-            </button>
-          )}
-          {(!user?.allowedSubmodules?.crm || user.allowedSubmodules.crm.includes('smart')) && (
-            <button 
               onClick={() => setActiveTab('club')}
               className={cn(
                 "px-6 py-2 text-xs font-bold uppercase tracking-widest transition-all",
                 activeTab === 'club' ? "border-b-2 border-pink-500 text-pink-400 font-extrabold" : "text-slate-400 hover:text-slate-300"
               )}
             >
-              Club Social Cimasur 👑
+              Club Social & Motor Comercial 👑
             </button>
           )}
         </div>
@@ -514,7 +503,6 @@ export default function CRMView() {
           onImportSingle={handleImportSingleFromIntranet}
         />
       )}
-      {activeTab === 'smart' && <SmartCampaigns />}
       {activeTab === 'club' && <ClubSocialManager />}
       {commentTarget && (
         <CommentDialog 
