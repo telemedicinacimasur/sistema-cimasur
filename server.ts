@@ -3,6 +3,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
+import nodemailer from 'nodemailer';
 
 let computedFilename = '';
 try {
@@ -30,6 +31,52 @@ async function startServer() {
   // Health check early
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'CIMASUR Backend Active' });
+  });
+
+  // API route for batch email sending via SMTP
+  app.post("/api/mail/send-batch", async (req, res) => {
+    const { config, emails } = req.body;
+    
+    if (!config || !emails || !Array.isArray(emails)) {
+      return res.status(400).json({ error: "Configuración o destinatarios inválidos." });
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: config.smtpServer,
+        port: parseInt(config.smtpPort),
+        secure: config.smtpPort === '465',
+        auth: {
+          user: config.smtpUser,
+          pass: config.smtpPass,
+        },
+      });
+
+      // Verify connection configuration
+      await transporter.verify();
+
+      const results = [];
+      for (const item of emails) {
+        try {
+          await transporter.sendMail({
+            from: `"${config.nombre}" <${config.smtpUser}>`,
+            to: item.to,
+            subject: item.subject,
+            text: item.text,
+            html: item.html || undefined,
+          });
+          results.push({ email: item.to, status: 'success' });
+        } catch (err: any) {
+          console.error(`Error sending to ${item.to}:`, err);
+          results.push({ email: item.to, status: 'error', error: err.message });
+        }
+      }
+
+      res.json({ results });
+    } catch (error: any) {
+      console.error("SMTP Configuration Error:", error);
+      res.status(500).json({ error: `Fallo en la conexión SMTP: ${error.message}` });
+    }
   });
 
   console.log('Iniciando servidor CIMASUR...');
@@ -244,7 +291,7 @@ async function startServer() {
       });
       
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash-exp",
         contents: `Eres un Motor de IA de Estrategia Analítica para ${isSchool ? 'Escuela CIMASUR (Educación Médica)' : 'CIMASUR Comercial'}. Contexto actual:\n${context}\n\nInstrucciones del usuario: "${prompt}".\n\nInformación estratégica clave para CIMASUR Comercial:\n- Los productos oficiales que vendemos en nuestra tienda y en los que DEBES basar todas las ideas de difusión, sugerencias, ofertas y contenidos son únicamente:\n  * Acqua Maris CS Salina\n  * allium s cs Salina\n  * Arnica CS Salina\n  * Beilschmiedia CS Salina\n  * Calostrum CS Salina\n  * Cina CS Salina\n  * Daucus CS Salina\n  * Escencias Florales (E.F. Aprende CS, E.F. Cambios Cs, E.F. Energia CS, E.F. Libre CS, E.F. Lider CS, E.F. Miedos CS, E.F. Rescue Remedy CS, E.F. Senior CS, E.F. Serenidad CS)\n  * Fórmulas Diluidas y Etanol (E.F.D. A – Arnica CS – Etanol, E.F.D. D – Fuchsia CS – Etanol, E.F.D. E – Dandelion CS – Etanol)\n  * Echinac A CS\n  * Kalium Tic CS\n  * Kit Fin de Año\n  * Kit Modulador Digestivo\n  * Kit Osteoarticular\n  * Kit Viaje\n  * Maqui CS\n  * Melissa P CS\n  * Muces CS\n  * Neem CS\n  * Sarsaparrilla CS\n\n- Reglas de promoción altamente prioritarias para los contenidos y campañas directas:\n  1. Ofrecemos "Envíos Gratis" por compras sobre 30 unidades en la primera compra.\n  2. Los clientes clasificados en la categoría de "Sin compra" (médicos veterinarios con acceso recién aprobado a la Intranet de Ventas) tienen un beneficio insuperable: por compras sobre 30 unidades en su primer pedido se llevan de regalo un "Vademécum Físico Gratuito" (guía clínica con todas nuestras fórmulas magistrales homeopáticas). El objetivo estrella ante ellos es persuadirlos para realizar esta primera compra destacando esta oferta del Vademécum Físico y Envío Gratis.\n  3. También contamos con atractivos descuentos por compras por volumen, ofreciendo condiciones especiales y reducciones en compras a mayor escala para incentivar pedidos grandes.\n\nGenera un plan estratégico que devuelva un objeto JSON con los siguientes campos obligatorios:\n- "auditoria": Un diagnóstico profundo del impacto promocional previo o situación actual (1 párrafo, motivador, con redacción corporativa impecable, sin etiquetas CSS ni HTML).\n- "ficha": Un array of 3 objetos, cada uno con "target" (a quién va dirigido específicamente), "accion" (qué hacer), y "kpi" (qué indicador mejorar).\n- "pasos": Un array de strings con 3-5 pasos operativos inmediatos para el gestor del sistema.\n- "tipo_envio": Debe ser estrictamente "whatsapp" o "email" dependiendo del canal estratégico óptimo.\n- "contenido": Si "tipo_envio" is "whatsapp", proporciona un texto de mensaje altamente persuasivo, sumamente ATRACTIVO, ordenado, profesional e interesante, preparado con marcadores dinámicos corporativos {{NOMBRE}} y {{CATEGORIA}} o {{PROGRAMA}} junto con sugerencias de emojis vistosos. Si es "email", proporciona CÓDIGO HTML COMPLETO de una plantilla lista para enviar por correo de alta fidelidad, con marcadores {{NOMBRE}}, con un diseño visual ultra elegante (colores modernos tono azul/pizarra de CIMASUR), fuentes bellamente estilizadas, llamadas a la acción claras (botones de contacto diseñados con estilos inline estéticos, tablas o tarjetas) y firmas profesionales. Evita cualquier código incompleto. No salgas con markdown adicional fuera del JSON.`,
         config: {
           responseMimeType: "application/json",
@@ -300,7 +347,7 @@ async function startServer() {
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.0-flash-exp",
         contents: `Eres un redactor creativo de marketing y fidelización clínica para la prestigiosa farmacia homeopática veterinaria CIMASUR de Chile.
 Genera un único mensaje muy corto, inspirador, motivacional y de apoyo ("Mensaje de Apoyo") para colocarlo de fondo en una postal de reconocimiento que se descargará y enviará al veterinario.
 
@@ -359,7 +406,7 @@ La lista de clientes en formato JSON:
 ${JSON.stringify(clients, null, 2)}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash-exp",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -384,6 +431,70 @@ ${JSON.stringify(clients, null, 2)}`;
     } catch (e: any) {
       console.error(e);
       res.status(500).json({ error: e.message || 'Error AI Batch Generation' });
+    }
+  });
+
+  app.post('/api/ai/generate-email-template', async (req, res) => {
+    try {
+      const { client, objective, prompt } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor." });
+      }
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      const aiPrompt = `Eres un diseñador experto de HTML Emails de alta fidelidad para la farmacia homeopática veterinaria CIMASUR.
+Genera un correo electrónico en formato HTML completo, visualmente impresionante y moderno que parezca diseñado en Canva.
+
+ESPECIFICACIONES TÉCNICAS:
+- Usa estilos inline (CSS inline) compatibles con Outlook y Gmail.
+- Diseño "Responsive" con una tabla central de 600px de ancho.
+- Paleta de colores CIMASUR: Azules pizarra (#0e192f), Sky Blue (#38bdf8), Slate (#94a3b8), Blanco Puro.
+- Tipografía: Sans-serif limpia.
+
+ESTRUCTURA DEL CONTENIDO:
+1. Header elegante con fondo oscuro y logo textual "CIMASUR | Club Social".
+2. Gran titular de impacto (Headline) relacionado con el objetivo: "${objective}".
+3. Imagen hero simulada (usa un placeholder de alta calidad de unsplash si puedes, o un bloque de color estético con un icono grande).
+4. Texto principal altamente persuasivo y personalizado para "${client.name}" (${client.categoria}).
+5. Los productos oficiales de CIMASUR que puedes mencionar si encaja: Acqua Maris, Arnica CS, Escencias Florales, Kit Fin de Año.
+6. CTA (Botón de Acción) grande y redondeado con efecto de elevación visual.
+7. Footer corporativo con información de contacto y redes sociales.
+
+CONTEXTO ADICIONAL DEL USUARIO: "${prompt}"
+
+Retorna un objeto JSON con el campo "html". Solo el HTML, sin markdown.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash-exp",
+        contents: aiPrompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              html: { type: Type.STRING }
+            },
+            required: ["html"]
+          }
+        }
+      });
+
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Error AI Email Generation' });
     }
   });
 
