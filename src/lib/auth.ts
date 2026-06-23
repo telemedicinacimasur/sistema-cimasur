@@ -43,8 +43,12 @@ export const localAuth = {
   },
   getCurrentUser: () => {
     if (isFirebaseReady && auth) return auth.currentUser;
-    const local = sessionStorage.getItem('cimasur_user');
-    return local ? JSON.parse(local) : null;
+    try {
+      const local = sessionStorage.getItem('cimasur_user');
+      return local && local !== 'undefined' ? JSON.parse(local) : null;
+    } catch {
+      return null;
+    }
   },
   getUserById: async (uid: string): Promise<UserProfile | null> => {
     if (isFirebaseReady && db) {

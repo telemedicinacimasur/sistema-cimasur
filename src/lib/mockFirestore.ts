@@ -26,7 +26,12 @@ const notify = (collectionName: string) => {
 };
 
 const getLocalCollection = (name: string): any[] => {
-  return JSON.parse(localStorage.getItem(`db_${name}`) || '[]');
+  try {
+    const item = localStorage.getItem(`db_${name}`);
+    return item ? JSON.parse(item) : [];
+  } catch (e) {
+    return [];
+  }
 };
 
 const setLocalCollection = (name: string, data: any[]) => {

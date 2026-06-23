@@ -63,8 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!isFirebaseReady || !auth) {
       const local = sessionStorage.getItem('cimasur_user');
-      if (local) {
-        setUser(JSON.parse(local));
+      if (local && local !== 'undefined') {
+        try {
+          setUser(JSON.parse(local));
+        } catch (e) {}
       }
       setLoading(false);
       
@@ -72,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const interval = setInterval(async () => {
         try {
           const localUser = sessionStorage.getItem('cimasur_user');
-          if (localUser) {
+          if (localUser && localUser !== 'undefined') {
             const parsedLocal = JSON.parse(localUser);
             const { localAuth } = await import('../lib/auth');
             const updated = await localAuth.getUserById(parsedLocal.uid);

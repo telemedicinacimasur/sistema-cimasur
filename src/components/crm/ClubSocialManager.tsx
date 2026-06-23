@@ -127,7 +127,8 @@ const PRESET_TEMPLATES: Record<string, string> = {
   disminuyo: "Estimado/a doctor/a {{NOMBRE}},\n\nLe escribimos prioritariamente de CIMASUR. Al revisar su historial comercial, notamos que sus compras han disminuido en este ciclo comercial acumulando un total de {{VENTAS}} comparado con el año anterior.\n\nSu categoría actual de compras es {{CATEGORIA}}, pero se encuentra en riesgo debido a la brecha comercial. Queremos brindarle un beneficio de gracia o una asesoría directa para reactivar sus recetas magistrales con su descuento habitual. ¡Conversemos hoy para coordinar condiciones especiales!\n\nAtte,\nGerencia de Servicios CIMASUR.",
   dormido: "¡Hola Dr./Dra. {{NOMBRE}}! Esperamos que esté muy bien.\n\nNotamos que en el ciclo actual no registra transacciones ($0), luego de haber sido un valioso cliente con compras en el ciclo anterior.\n\nNos encantaría volver a atenderle en su clínica {{CLINICA}}. De forma excepcional para sus siguientes 3 recetas, queremos ofrecerle el estatus preferencial {{CATEGORIA_NUEVA}} con el beneficio de: {{BENEFICIO}}.\n\n¿Agendamos un llamado técnico explicativo?",
   perdido: "Estimado/a {{NOMBRE}},\n\nLe saluda el equipo directivo de CIMASUR. Con motivo de relanzamiento técnico de nuestro vademécum de diluciones homeopáticas, queremos extenderle una invitación exclusiva para volver a trabajar juntos en su clínica {{CLINICA}}.\n\n¿Desea solicitar un kit promocional sin costo por WhatsApp?",
-  riesgo_alto: "🚨 Alerta de Soporte - CIMASUR\n\nEstimado/a doctor/a {{NOMBRE}},\n\nNuestros reportes automatizados de Business Intelligence han emitido una alerta de riesgo crítico: sus compras en el ciclo actual han caído en más de un 50% respecto al año pasado, registrando solo {{VENTAS}} acumulados.\n\nSu estatus actual es {{CATEGORIA}}. Para evitar la pérdida de sus precios preferenciales y el beneficio de {{BENEFICIO}}, le extendemos un plazo de gracia de 30 días para colocar pedidos de reposición.\n\nEstamos para apoyarle y queremos conocer si requiere facilidades especiales con sus fórmulas homeopáticas magistrales. ¡Conversemos!\n\nAtte,\nContacto Directo CIMASUR."
+  riesgo_alto: "🚨 Alerta de Soporte - CIMASUR\n\nEstimado/a doctor/a {{NOMBRE}},\n\nNuestros reportes automatizados de Business Intelligence han emitido una alerta de riesgo crítico: sus compras en el ciclo actual han caído en más de un 50% respecto al año pasado, registrando solo {{VENTAS}} acumulados.\n\nSu estatus actual es {{CATEGORIA}}. Para evitar la pérdida de sus precios preferenciales y el beneficio de {{BENEFICIO}}, le extendemos un plazo de gracia de 30 días para colocar pedidos de reposición.\n\nEstamos para apoyarle y queremos conocer si requiere facilidades especiales con sus fórmulas homeopáticas magistrales. ¡Conversemos!\n\nAtte,\nContacto Directo CIMASUR.",
+  induccion_intranet: "Hola Dr(a). {{NOMBRE}},\n\nLe saluda {{EJECUTIVO}} de CIMASUR. Notamos que ya tiene acceso a nuestra Intranet pero aún no ha realizado su primera carga de recetas magistrales.\n\n¿Le gustaría agendar una breve inducción de 5 minutos sobre cómo optimizar sus pedidos y conocer los beneficios del nivel {{CATEGORIA}}?\n\nQuedo atento/a para coordinar.\n\nSaludos,\n{{EJECUTIVO}}"
 };
 
 const SEGMENT_GUIDE: Record<string, { title: string; desc: string; importance: string; action: string }> = {
@@ -167,11 +168,17 @@ const SEGMENT_GUIDE: Record<string, { title: string; desc: string; importance: s
     importance: 'Relación rota a largo plazo. Cuentas antiguas pasivas.',
     action: 'Lanzar un relanzamiento técnico de línea de diluciones homeopáticas e invitarlos a reactivarse gratis.'
   },
+  'Intranet / Sin Compras': {
+    title: 'Prospectos Intranet (Sin Compras Registradas)',
+    desc: 'Clientes que están registrados en la plataforma pero nunca han generado un pedido de recetas.',
+    importance: 'Oportunidad de crecimiento orgánico convirtiendo usuarios pasivos en activos.',
+    action: 'Ofrecer inducción técnica de productos y recorrido por la Intranet.'
+  },
   'Riesgo Alto': {
     title: 'Riesgo Crítico de Fuga (Desplome de Ventas > 50%)',
     desc: 'Cuentas con compras activas pero con un retroceso de facturación superior a la mitad (50%).',
     importance: 'Fuga inminente de recetas. Alerta prioritaria en el panel de control del consultor de CIMASUR.',
-    action: 'Aplicar ampliación de plazo de gracia extendido, llamada telefónica inmediata de la jefatura comercial.'
+    action: 'Aplicar ampliación de plazo de gracia extendido, llamada telefónica inmediata.'
   }
 };
 
@@ -222,19 +229,27 @@ export function ClubSocialManager() {
 
   // Executive config & Communications Center state
   const [execConfig, setExecConfig] = useState(() => {
-    const saved = localStorage.getItem('cimasur_exec_config');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return {
+    let base = {
       nombre: "Jaime González",
       cargo: "Asesor Comercial Cimasur",
       correo: "contacto@cimasur.cl",
       whatsapp: "+56 9 1234 5678",
-      firma: "Equipo Comercial Cimasur"
+      firma: "Equipo Comercial Cimasur",
+      smtpServer: "smtp.cimasur.cl",
+      smtpPort: "587",
+      smtpUser: "contacto@cimasur.cl",
+      smtpPass: ""
     };
+    try {
+      const saved = localStorage.getItem('cimasur_exec_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return { ...base, ...parsed };
+        }
+      }
+    } catch (e) {}
+    return base;
   });
 
   const [commsSubTab, setCommsSubTab] = useState<'segmentation' | 'templates' | 'image_gen' | 'whatsapp' | 'email' | 'history' | 'config'>('segmentation');
@@ -297,6 +312,43 @@ export function ClubSocialManager() {
     return val.replace(/[^0-9kK]/g, '').toLowerCase();
   };
 
+  // Chilean number parser: respects dots as thousands and commas as decimals
+  const parseChileanAmount = (val: any): number => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    let s = String(val).trim();
+    
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+    const lastSeparator = Math.max(lastComma, lastDot);
+    
+    if (lastSeparator !== -1) {
+      const charsAfter = s.length - 1 - lastSeparator;
+      // In Chile, many exports use 3 digits for decimal if they include cents (rare in CLP but possible)
+      // however, 3 digits is strongly associated with thousands (1.000)
+      if (charsAfter === 3 && !s.includes(lastComma === lastSeparator ? '.' : ',')) {
+        // If there's ONLY one type of separator and it has 3 digits after, it's thousands
+        s = s.replace(/[.,]/g, '');
+      } else {
+        // Mixed or decimal-looking
+        const before = s.substring(0, lastSeparator).replace(/[.,]/g, '');
+        const after = s.substring(lastSeparator + 1);
+        s = before + '.' + after;
+      }
+    }
+    
+    const result = parseFloat(s.replace(/[^0-9.-]/g, ''));
+    return isNaN(result) ? 0 : result;
+  };
+
+  const formatCLP = (val: number) => {
+    return new Intl.NumberFormat('es-CL', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      useGrouping: true
+    }).format(val);
+  };
+
   const handlePreviewImport = () => {
     if (!salesImportText.trim()) {
       setSalesImportResults(null);
@@ -352,13 +404,13 @@ export function ClubSocialManager() {
       const matchedClient = clientMap.get(rutNormalized);
 
       const v2024 = colMapping.v2024Idx !== -1 && colMapping.v2024Idx < cols.length
-        ? (parseFloat((cols[colMapping.v2024Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
+        ? parseChileanAmount(cols[colMapping.v2024Idx])
         : (matchedClient?.ventas?.v2024 || 0);
       const v2025 = colMapping.v2025Idx !== -1 && colMapping.v2025Idx < cols.length
-        ? (parseFloat((cols[colMapping.v2025Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
+        ? parseChileanAmount(cols[colMapping.v2025Idx])
         : (matchedClient?.ventas?.v2025 || 0);
       const v2026 = colMapping.v2026Idx !== -1 && colMapping.v2026Idx < cols.length
-        ? (parseFloat((cols[colMapping.v2026Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
+        ? parseChileanAmount(cols[colMapping.v2026Idx])
         : (matchedClient?.ventas?.v2026 || 0);
 
       if (matchedClient) {
@@ -593,10 +645,12 @@ export function ClubSocialManager() {
         ? (v2026 >= activeTier2026.min) && (v2026 <= activeTier2026.min * 1.15)
         : false;
 
+      const isIntranet = v2024 === 0 && v2025 === 0 && v2026 === 0;
+
       return {
         ...client,
         ventas: sales,
-        calculatedTier: activeTier2026,
+        calculatedTier: { ...activeTier2026, index: currentTierIndex !== -1 ? currentTierIndex : 0 },
         calculatedTierPrev: activeTier2025,
         segmentGroup,
         isCrecio,
@@ -605,6 +659,7 @@ export function ClubSocialManager() {
         isDormidos,
         isPerdidos,
         isRiesgoAlto,
+        isIntranet,
         isProximoAscenso,
         isProximoDescenso,
         percentChange,
@@ -661,6 +716,7 @@ export function ClubSocialManager() {
       else if (segGrowth === 'Dormidos') matchesBehavior = c.isDormidos;
       else if (segGrowth === 'Perdidos') matchesBehavior = c.isPerdidos;
       else if (segGrowth === 'Riesgo Alto') matchesBehavior = c.isRiesgoAlto;
+      else if (segGrowth === 'Intranet / Sin Compras') matchesBehavior = (c.ventas?.v2024 || 0) === 0 && (c.ventas?.v2025 || 0) === 0 && (c.ventas?.v2026 || 0) === 0;
 
       // Cycle Recency Match
       let matchesLastPurchase = true;
@@ -709,8 +765,8 @@ export function ClubSocialManager() {
         .replace(/\{\{CATEGORIA\}\}/g, clientInfo.calculatedTier?.name || clientInfo.categoria || 'Sin categoría')
         .replace(/\{\{CATEGORIA_NUEVA\}\}/g, destinationTier)
         .replace(/\{\{SIGUIENTE_CATEGORIA\}\}/g, destinationTier)
-        .replace(/\{\{VENTAS\}\}/g, `${(v2026 || 0).toLocaleString('es-CL')}`)
-        .replace(/\{\{BRECHA\}\}/g, `${(brechaVal || 0).toLocaleString('es-CL')}`)
+        .replace(/\{\{VENTAS\}\}/g, `$${formatCLP(v2026 || 0)}`)
+        .replace(/\{\{BRECHA\}\}/g, `$${formatCLP(brechaVal || 0)}`)
         .replace(/\{\{BENEFICIO\}\}/g, bestBenefit)
         .replace(/\{\{EJECUTIVO\}\}/g, execConfig.nombre || '')
         .replace(/\{\{CORREO_EJECUTIVO\}\}/g, execConfig.correo || '')
@@ -783,10 +839,14 @@ export function ClubSocialManager() {
         // Simulating delay for bulk server delivery
         await new Promise(resolve => setTimeout(resolve, 600));
 
+        const smtpStatus = (campaignChannel === 'email' || campaignChannel === 'both') && execConfig.smtpServer 
+          ? ` (SMTP: ${execConfig.smtpServer})`
+          : '';
+
         // Add to live audit logs
         setCampaignLog(prev => [
           ...prev, 
-          `[OK - ${new Date().toLocaleTimeString()}] Canal ${campaignChannel.toUpperCase()} - Entregado a: ${item.name} (${item.clinica || 'Vet'})`
+          `[OK - ${new Date().toLocaleTimeString()}] Canal ${campaignChannel.toUpperCase()} - Entregado a: ${item.name} (${item.clinica || 'Vet'})${smtpStatus}`
         ]);
 
         // Append to local database client commercial logs
@@ -1163,7 +1223,7 @@ export function ClubSocialManager() {
         <div className="bg-[#122240] px-4 py-3 rounded-xl border border-[#1e345c] text-right">
           <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Facturación Consolidada Ciclo 2026</span>
           <span className="text-xl font-mono font-black text-emerald-400">
-            ${dashboardStats.totalSales.toLocaleString('es-CL')}
+            ${formatCLP(dashboardStats.totalSales)}
           </span>
         </div>
       </div>
@@ -1462,7 +1522,10 @@ export function ClubSocialManager() {
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex justify-between items-start gap-1">
-                                <span className="text-xs font-bold block text-white truncate max-w-[120px]">{c.name}</span>
+                                <span className="text-xs font-bold block text-white truncate max-w-[120px]">
+                                  {c.name}
+                                  {(c.ventas?.v2026 || 0) === 0 && <span className="ml-1 text-[8px] text-sky-400 font-black">● INTRANET</span>}
+                                </span>
                                 <span className={`text-[9px] px-2 py-0.5 rounded border leading-none shrink-0 ${
                                   c.calculatedTier.name.includes('Platinum') ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
                                   c.calculatedTier.name.includes('Oro') ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
@@ -1473,7 +1536,7 @@ export function ClubSocialManager() {
                                 </span>
                               </div>
                               <span className="text-[10px] text-[#94a3b8] block mt-0.5 truncate">{c.clinica || 'Sin clínica registrada'}</span>
-                              <span className="text-[9px] font-mono text-emerald-400 block mt-1">2026: ${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</span>
+                              <span className="text-[9px] font-mono text-emerald-400 block mt-1">2026: ${formatCLP(c.ventas?.v2026 || 0)}</span>
                               
                               {/* Communication Metadata */}
                               {(c.ultimoWhatsapp || c.ultimoCorreo || c.ultimaCampania) && (
@@ -1530,15 +1593,15 @@ export function ClubSocialManager() {
                               <div className="grid grid-cols-3 gap-3">
                                 <div className="bg-[#0b1324] p-3 rounded-xl border border-slate-800 text-center">
                                   <span className="text-[9px] text-slate-500 block uppercase font-bold">Consolidado 2025</span>
-                                  <span className="text-xs font-mono font-black text-slate-350">${total2025.toLocaleString('es-CL')}</span>
+                                  <span className="text-xs font-mono font-black text-slate-350">${formatCLP(total2025)}</span>
                                 </div>
                                 <div className="bg-[#0b1324] p-3 rounded-xl border border-emerald-950/40 text-center">
                                   <span className="text-[9px] text-[#38bdf8] block uppercase font-bold">Consolidado 2026</span>
-                                  <span className="text-xs font-mono font-black text-emerald-400">${total2026.toLocaleString('es-CL')}</span>
+                                  <span className="text-xs font-mono font-black text-emerald-400">${formatCLP(total2026)}</span>
                                 </div>
                                 <div className="bg-[#0b1324] p-3 rounded-xl border border-slate-800 text-center">
                                   <span className="text-[9px] text-slate-500 block uppercase font-bold">Promedio por Socio</span>
-                                  <span className="text-xs font-mono font-bold text-sky-400">${Math.round(avg2026).toLocaleString('es-CL')}</span>
+                                  <span className="text-xs font-mono font-bold text-sky-400">${formatCLP(avg2026)}</span>
                                 </div>
                               </div>
 
@@ -1555,7 +1618,7 @@ export function ClubSocialManager() {
                                         <div className="flex justify-between text-[11px]">
                                           <span className="font-bold text-slate-200 truncate max-w-[150px]">{c.name}</span>
                                           <span className="font-mono text-emerald-400 font-bold">
-                                            ${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}{' '}
+                                            ${formatCLP(c.ventas?.v2026 || 0)}{' '}
                                             <span className="text-slate-500 text-[9px]">({c.categoria})</span>
                                           </span>
                                         </div>
@@ -1588,9 +1651,9 @@ export function ClubSocialManager() {
                                     {listForAnalysis.map(c => (
                                       <tr key={c.id} className="hover:bg-slate-900/40">
                                         <td className="p-2.5 font-bold text-white truncate max-w-[130px]">{c.name}</td>
-                                        <td className="p-2.5 text-right font-mono text-slate-400">${(c.ventas?.v2024 || 0).toLocaleString('es-CL')}</td>
-                                        <td className="p-2.5 text-right font-mono text-slate-350">${(c.ventas?.v2025 || 0).toLocaleString('es-CL')}</td>
-                                        <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold">${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</td>
+                                        <td className="p-2.5 text-right font-mono text-slate-400">${formatCLP(c.ventas?.v2024 || 0)}</td>
+                                        <td className="p-2.5 text-right font-mono text-slate-350">${formatCLP(c.ventas?.v2025 || 0)}</td>
+                                        <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold">${formatCLP(c.ventas?.v2026 || 0)}</td>
                                         <td className="p-2.5 text-center">
                                           <span className="text-[8px] px-1.5 py-0.5 rounded bg-black/35 text-slate-300 border border-slate-750">
                                             {c.categoria}
@@ -1695,7 +1758,7 @@ export function ClubSocialManager() {
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-[11px] font-bold">
                                     <span className="text-slate-400">Ciclo Anual 2024:</span>
-                                    <span className="font-mono text-slate-200">${(selectedClient.ventas?.v2024 || 0).toLocaleString('es-CL')}</span>
+                                    <span className="font-mono text-slate-200">${formatCLP(selectedClient.ventas?.v2024 || 0)}</span>
                                   </div>
                                   <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
                                     <div className="bg-slate-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2024 || 0) / 12000000) * 100))}%` }}></div>
@@ -1705,7 +1768,7 @@ export function ClubSocialManager() {
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-[11px] font-bold">
                                     <span className="text-slate-400">Ciclo Anual 2025:</span>
-                                    <span className="font-mono text-slate-200">${(selectedClient.ventas?.v2025 || 0).toLocaleString('es-CL')}</span>
+                                    <span className="font-mono text-slate-200">${formatCLP(selectedClient.ventas?.v2025 || 0)}</span>
                                   </div>
                                   <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
                                     <div className="bg-indigo-505 bg-[#38bdf8] h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2025 || 0) / 12000000) * 100))}%` }}></div>
@@ -1715,7 +1778,7 @@ export function ClubSocialManager() {
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-[11px] font-bold">
                                     <span className="text-slate-400">Ciclo Anual 2026 (Mayo Cierre):</span>
-                                    <span className="font-mono text-emerald-400 font-extrabold">${(selectedClient.ventas?.v2026 || 0).toLocaleString('es-CL')}</span>
+                                    <span className="font-mono text-emerald-400 font-extrabold">${formatCLP(selectedClient.ventas?.v2026 || 0)}</span>
                                   </div>
                                   <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
                                     <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2026 || 0) / 12000000) * 100))}%` }}></div>
@@ -1725,10 +1788,61 @@ export function ClubSocialManager() {
                             </div>
 
                             {/* Commercial Notes logs */}
-                            <div className="space-y-2">
-                              <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wide block">Notas Comerciales e Historial de Comunicación CRM</span>
-                              <div className="bg-[#0b1324] p-3 rounded-lg border border-slate-800 text-xs font-mono max-h-40 overflow-y-auto whitespace-pre-line text-slate-300">
-                                {selectedClient.historialUnificado || 'Sin bitácora registrada para este cliente.'}
+                            <div className="space-y-3 bg-[#101b33] p-4 rounded-xl border border-slate-800">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-slate-400 font-extrabold uppercase flex items-center gap-1.5">
+                                  <Notebook className="w-3.5 h-3.5 text-sky-400" /> Registro de Actividad y Análisis Manual
+                                </span>
+                                <span className="text-[9px] text-slate-500 font-mono italic">Bitácora Unificada CRM</span>
+                              </div>
+                              
+                              <div className="bg-[#0a101e] rounded-lg border border-slate-800 h-40 overflow-y-auto p-3 font-mono text-[11px] text-slate-350 whitespace-pre-wrap leading-relaxed shadow-inner border-l-4 border-l-sky-500/30">
+                                {selectedClient.historialUnificado || "No hay registros de actividad previos para este socio comercial."}
+                              </div>
+
+                              <div className="flex gap-2">
+                                <input 
+                                  id="manual_activity_input_ficha"
+                                  type="text"
+                                  placeholder="Registrar nueva llamada, visita o nota..."
+                                  onKeyDown={async (e) => {
+                                    if (e.key === 'Enter') {
+                                      const val = (e.target as HTMLInputElement).value;
+                                      if (!val) return;
+                                      const today = new Date().toLocaleDateString('es-CL');
+                                      const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                                      const newLog = `\n[Nota Manual ${today} ${time}]: ${val}`;
+                                      
+                                      const currentHist = selectedClient.historialUnificado || '';
+                                      await localDB.updateInCollection('contacts', selectedClient.id, {
+                                        historialUnificado: currentHist + newLog
+                                      });
+                                      (e.target as HTMLInputElement).value = '';
+                                      loadData();
+                                    }
+                                  }}
+                                  className="flex-1 bg-[#0a101e] px-3 py-2 rounded-lg border border-slate-700 text-xs text-white focus:outline-none focus:border-sky-500"
+                                />
+                                <button 
+                                  onClick={async () => {
+                                    const input = document.getElementById('manual_activity_input_ficha') as HTMLInputElement;
+                                    const val = input.value;
+                                    if (!val) return;
+                                    const today = new Date().toLocaleDateString('es-CL');
+                                    const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                                    const newLog = `\n[Nota Manual ${today} ${time}]: ${val}`;
+                                    
+                                    const currentHist = selectedClient.historialUnificado || '';
+                                    await localDB.updateInCollection('contacts', selectedClient.id, {
+                                      historialUnificado: currentHist + newLog
+                                    });
+                                    input.value = '';
+                                    loadData();
+                                  }}
+                                  className="px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold"
+                                >
+                                  Añadir
+                                </button>
                               </div>
                             </div>
 
@@ -1736,7 +1850,7 @@ export function ClubSocialManager() {
                               onClick={() => {
                                 setIsEditingClient(true);
                               }}
-                              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer ml-auto"
+                              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer ml-auto border border-slate-700"
                             >
                               <Edit3 className="w-3.5 h-3.5" /> Editar Datos & Ventas
                             </button>
@@ -1889,7 +2003,7 @@ export function ClubSocialManager() {
                         </div>
                         <div className="text-right">
                           <span className="text-slate-500 block text-[10px]">VENTAS REALES 2026</span>
-                          <span className="text-sm font-mono font-black text-slate-300">${(selectedClient.ventas?.v2026 || 0).toLocaleString('es-CL')}</span>
+                          <span className="text-sm font-mono font-black text-slate-300">${formatCLP(selectedClient.ventas?.v2026 || 0)}</span>
                         </div>
                       </div>
 
@@ -1897,7 +2011,7 @@ export function ClubSocialManager() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-xs font-mono font-bold text-slate-350">
                           <span>$0 compra extra</span>
-                          <span className="text-sky-450 text-sky-400">Monto simulación: +${simulatedVentas.toLocaleString('es-CL')}</span>
+                          <span className="text-sky-450 text-sky-400">Monto simulación: +${formatCLP(simulatedVentas)}</span>
                           <span>+$15.000.000</span>
                         </div>
                         <input
@@ -1917,7 +2031,7 @@ export function ClubSocialManager() {
                           <div>
                             <span className="text-[10px] text-slate-400 block">PROYECCIÓN DE COMPRAS:</span>
                             <span className="text-lg font-mono font-black text-white">
-                              ${activeSimulatedMetrics.futureSales.toLocaleString('es-CL')}
+                              ${formatCLP(activeSimulatedMetrics.futureSales)}
                             </span>
                           </div>
                           <div>
@@ -2041,10 +2155,21 @@ export function ClubSocialManager() {
                             <option value="Crecieron">Aumentaron compras (Crecieron)</option>
                             <option value="Disminuyeron">Redujeron compras (Disminuyeron)</option>
                             <option value="Estables">Comportamiento similar (Estables)</option>
-                            <option value="Dormidos">Dormidos (2025 compra & 2026 cero)</option>
-                            <option value="Perdidos">Perdidos (2024 compra & 2025/2026 cero)</option>
-                            <option value="Riesgo Alto">Caída severa de compras ({'>'}50%)</option>
+                            <option value="Dormidos">💤 Dormidos (2025 compra & 2026 cero)</option>
+                            <option value="Perdidos">🥀 Perdidos (2024 compra & 2025/2026 cero)</option>
+                            <option value="Riesgo Alto">⚠️ Riesgo Alto (Caída severa {'>'}50%)</option>
+                            <option value="Intranet / Sin Compras">🔗 Prospectos Intranet (Cero Compras)</option>
                           </select>
+                        </div>
+
+                        <div className="md:col-span-1 flex flex-col justify-end">
+                          <div className="bg-[#0a101e] px-4 py-2 rounded-xl border border-indigo-500/30 flex items-center justify-between">
+                            <div className="flex flex-col">
+                               <span className="text-[9px] text-indigo-400 font-black uppercase tracking-tighter">Médicos Seleccionados</span>
+                               <span className="text-xl font-black text-white leading-none">{segmentedClients.length}</span>
+                            </div>
+                            <Users className="w-5 h-5 text-indigo-500/50" />
+                          </div>
                         </div>
 
                         <div className="space-y-1.5">
@@ -2083,11 +2208,40 @@ export function ClubSocialManager() {
                       })()}
 
                       {/* RESULTS GRID */}
-                      <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-4">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-400 text-[11px] uppercase">
-                            Clientes que califican en este segmento: <span className="text-[#38bdf8] font-black font-mono">{segmentedClients.length}</span>
-                          </span>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="md:col-span-1 space-y-3">
+                           <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-3">
+                              <span className="text-[10px] text-sky-400 font-extrabold block uppercase tracking-widest leading-tight">Accesos Directos de IA:</span>
+                              <div className="space-y-2">
+                                <button type="button" onClick={() => { setSegGrowth('Crecieron'); setSegCategory('Todas'); }} className="w-full text-left p-2 rounded-lg bg-[#0a101e] hover:bg-slate-800 border border-slate-700 transition-colors">
+                                    <p className="text-[10px] font-bold text-white">📈 Premiar Crecimiento</p>
+                                    <p className="text-[9px] text-slate-500 italic">Veterinarios que aumentaron compras.</p>
+                                </button>
+                                <button type="button" onClick={() => { setSegGrowth('Dormidos'); setSegCategory('Todas'); }} className="w-full text-left p-2 rounded-lg bg-[#0a101e] hover:bg-slate-800 border border-slate-700 transition-colors">
+                                    <p className="text-[10px] font-bold text-white">💤 Rescatar Dormidos</p>
+                                    <p className="text-[9px] text-slate-500 italic">No han pedido nada en 2026.</p>
+                                </button>
+                                <button type="button" onClick={() => { setSegGrowth('Intranet / Sin Compras'); setSegCategory('Todas'); }} className="w-full text-left p-2 rounded-lg bg-[#0a101e] hover:bg-slate-800 border border-slate-700 transition-colors">
+                                    <p className="text-[10px] font-bold text-white">🔗 Activar Intranet</p>
+                                    <p className="text-[9px] text-slate-500 italic">Registrados sin compras reales.</p>
+                                </button>
+                              </div>
+                           </div>
+                           
+                           <div className="p-4 rounded-xl bg-indigo-900/10 border border-indigo-900/30 flex items-start gap-3">
+                              <CheckCircle className="w-4 h-4 text-emerald-500 mt-1 shrink-0" />
+                              <p className="text-[10px] text-indigo-300 leading-relaxed italic">
+                                Al seleccionar un segmento, éste se exporta automáticamente a las pestañas de <b>Redacción IA</b>, <b>WhatsApp</b> y <b>Email</b>.
+                              </p>
+                           </div>
+                        </div>
+
+                        <div className="md:col-span-3">
+                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-4">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-slate-400 text-[11px] uppercase">
+                                Clientes que califican en este segmento: <span className="text-[#38bdf8] font-black font-mono">{segmentedClients.length}</span>
+                              </span>
                           {segmentedClients.length > 0 && (
                             <button 
                               type="button"
@@ -2120,8 +2274,8 @@ export function ClubSocialManager() {
                                 <tr key={c.id} className="hover:bg-[#121c2e]">
                                   <td className="p-2 font-bold text-slate-100">{c.name}</td>
                                   <td className="p-2 text-slate-400">{c.clinica || '---'}</td>
-                                  <td className="p-2 text-right font-mono text-slate-350">${(c.ventas?.v2025 || 0).toLocaleString('es-CL')}</td>
-                                  <td className="p-2 text-right font-mono text-emerald-400 font-extrabold">${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</td>
+                                  <td className="p-2 text-right font-mono text-slate-350">${formatCLP(c.ventas?.v2025 || 0)}</td>
+                                  <td className="p-2 text-right font-mono text-emerald-400 font-extrabold">${formatCLP(c.ventas?.v2026 || 0)}</td>
                                   <td className="p-2 text-center font-mono">
                                     <span className={c.percentChange > 0 ? 'text-emerald-400' : c.percentChange < 0 ? 'text-rose-400' : 'text-slate-400'}>
                                       {c.percentChange === 0 ? '0%' : `${c.percentChange > 0 ? '+' : ''}${(c.percentChange * 100).toFixed(0)}%`}
@@ -2147,10 +2301,12 @@ export function ClubSocialManager() {
                               )}
                             </tbody>
                           </table>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
                   {/* 1. WHATSAPP MASIVO SUBTAB */}
                   {commsSubTab === 'whatsapp' && (
@@ -2338,7 +2494,12 @@ export function ClubSocialManager() {
                   {commsSubTab === 'email' && (
                     <div className="space-y-6">
                       <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 text-left space-y-4">
-                        <span className="text-xs font-bold text-sky-400 block uppercase">📧 Sistema de Envío por Correo Electrónico</span>
+                        <div className="flex justify-between items-center text-xs">
+                           <span className="text-xs font-bold text-sky-400 block uppercase">📧 Sistema de Envío por Correo Electrónico (SMTP o Mailto)</span>
+                           <button type="button" onClick={() => setCommsSubTab('config')} className="text-sky-400 hover:underline flex items-center gap-1 font-bold">
+                              <Settings className="w-3 h-3" /> Configurar SMTP
+                           </button>
+                        </div>
                         <p className="text-xs text-slate-400 mb-2">Para garantizar la entregabilidad directa, este sistema abre las plantillas directamente en el cliente de correo de tu preferencia utilizando tus credenciales configuradas, y luego registra en la base de datos local que realizaste el envío.</p>
                       </div>
 
@@ -2384,6 +2545,7 @@ export function ClubSocialManager() {
                                 <option value="disminuyo">ALERTA DE CAÍDA Y GRACIA</option>
                                 <option value="dormido">RECUPERACIÓN REINCORPORACIÓN</option>
                                 <option value="riesgo_alto">RIESGO CRÍTICO DE FUGA</option>
+                                <option value="induccion_intranet">INDUCCIÓN INTRANET / PROSPECTO</option>
                               </select>
                             </div>
                             
@@ -2568,84 +2730,99 @@ export function ClubSocialManager() {
                              Por favor filtra tu base en la pestaña "1. Segmentación IA" para generar gráficas.
                            </div>
                         ) : (
-                          <div className="flex flex-wrap gap-6 pt-4 justify-center">
-                            {segmentedClients.slice(0, 4).map(c => {
-                              const ec = enrichedClients.find(i => i.id === c.id) || c;
-                              const tierInfo = ec.calculatedTier;
-                              const nextTierInfo = ec.nextTier;
-                              const v2026 = ec.ventas?.v2026 || 0;
-                              const gap = nextTierInfo ? Math.max(0, nextTierInfo.min - v2026) : 0;
-                              const theme = getTheme(tierInfo?.index || 0);
+                          <div className="space-y-8">
+                            <div className="flex flex-wrap gap-6 pt-4 justify-center">
+                              {segmentedClients.slice(0, 8).map(c => {
+                                const ec = enrichedClients.find(i => i.id === c.id) || c;
+                                const tierInfo = ec.calculatedTier;
+                                const nextTierInfo = ec.nextTier;
+                                const v2026 = ec.ventas?.v2026 || 0;
+                                const gap = nextTierInfo ? Math.max(0, nextTierInfo.min - v2026) : 0;
+                                const theme = {
+                                  0: { bg: '#475569', primary: '#cbd5e1' },
+                                  1: { bg: '#92400e', primary: '#fcd34d' },
+                                  2: { bg: '#475569', primary: '#f1f5f9' },
+                                  3: { bg: '#b45309', primary: '#fef08a' },
+                                  4: { bg: '#581c87', primary: '#d8b4fe' }
+                                }[tierInfo?.index || 0] || { bg: '#475569', primary: '#cbd5e1' };
 
-                              return (
-                                <div key={c.id} className="relative w-80 h-[420px] rounded-2xl overflow-hidden shrink-0 shadow-2xl" style={{ background: `linear-gradient(135deg, ${theme.bg.split(' ')[0]} 0%, #000 100%)` }}>
-                                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent"></div>
-                                  
-                                  {/* Cimasur branding */}
-                                  <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
-                                    <div className="font-extrabold text-white tracking-widest text-[10px] uppercase opacity-80 decoration-slate-400/50 underline underline-offset-4">CIMASUR Chile</div>
-                                    <div className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest text-[#0a101e]`} style={{ backgroundColor: theme.primary }}>
-                                       2026
-                                    </div>
-                                  </div>
-
-                                  <div className="px-6 pt-16 flex flex-col items-center text-center space-y-4 z-10 relative">
-                                    <h4 className="text-sm font-bold text-slate-300 tracking-wider">Reporte de Estatus</h4>
+                                return (
+                                  <div key={c.id} id={`postcard-${c.id}`} className="relative w-80 h-[420px] rounded-2xl overflow-hidden shrink-0 shadow-2xl transition-transform hover:scale-[1.02] cursor-default" style={{ background: `linear-gradient(135deg, ${theme.bg} 0%, #000 100%)` }}>
+                                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent"></div>
                                     
-                                    <div className="space-y-1">
-                                      <h2 className="text-xl font-bold text-white leading-tight">{c.name}</h2>
-                                      <p className="text-xs text-slate-400 font-medium">{c.clinica}</p>
+                                    {/* Cimasur branding */}
+                                    <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+                                      <div className="font-extrabold text-white tracking-widest text-[10px] uppercase opacity-80 decoration-slate-400/50 underline underline-offset-4">CIMASUR Chile</div>
+                                      <div className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest text-[#0a101e]`} style={{ backgroundColor: theme.primary }}>
+                                         2026
+                                      </div>
                                     </div>
 
-                                    {tierInfo && (
-                                      <div className="mt-4 p-4 rounded-xl border border-white/10 w-full backdrop-blur-sm bg-black/40 shadow-inner">
-                                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Tu Nivel Actual</div>
-                                        <div className="text-2xl font-black uppercase text-transparent bg-clip-text" style={{ backgroundImage: `linear-gradient(to right, ${theme.primary}, #fff)` }}>
-                                          {tierInfo.name}
-                                        </div>
-                                        <div className={`mt-2 text-xs font-semibold`} style={{ color: theme.primary }}>
-                                          {tierInfo.primaryBenefit || 'Beneficios Exclusivos'}
-                                        </div>
+                                    <div className="px-6 pt-16 flex flex-col items-center text-center space-y-4 z-10 relative">
+                                      <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 backdrop-blur-md border border-white/20">
+                                         <Award className="w-6 h-6 text-white" />
                                       </div>
-                                    )}
-
-                                    {/* Progress box */}
-                                    {nextTierInfo && (
-                                      <div className="w-full mt-2">
-                                        <div className="flex justify-between items-end mb-1">
-                                          <div className="text-left">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold block leading-none">Próxima Meta</span>
-                                            <span className="text-sm font-bold text-white uppercase">{nextTierInfo.name}</span>
-                                          </div>
-                                          <div className="text-right">
-                                            <span className="text-[10px] text-slate-500 block leading-none font-bold">Faltan</span>
-                                            <span className="text-sm font-black text-white">${gap.toLocaleString('es-CL')}</span>
-                                          </div>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1.5">
-                                          <div className="h-full rounded-full transition-all duration-1000 ease-out" 
-                                               style={{ width: `${Math.min(100, Math.max(0, (v2026/nextTierInfo.min)*100))}%`, backgroundColor: theme.primary }}>
-                                          </div>
-                                        </div>
+                                      
+                                      <h4 className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase">Estatus de Membresía</h4>
+                                      
+                                      <div className="space-y-1">
+                                        <h2 className="text-xl font-bold text-white leading-tight">{c.name}</h2>
+                                        <p className="text-xs text-slate-400 font-medium">{c.clinica}</p>
                                       </div>
-                                    )}
 
+                                      <div className="py-2 px-4 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm">
+                                         <span className="text-xs font-black tracking-widest uppercase" style={{ color: theme.primary }}>{tierInfo?.name}</span>
+                                      </div>
+
+                                      <div className="w-full pt-4 space-y-4">
+                                         <div className="flex justify-between items-end border-b border-white/10 pb-1">
+                                            <span className="text-[9px] text-slate-400 uppercase font-bold">Ventas Período</span>
+                                            <span className="text-sm font-black text-white">${formatCLP(v2026)}</span>
+                                         </div>
+
+                                         {nextTierInfo ? (
+                                           <div className="space-y-1">
+                                              <div className="flex justify-between text-[9px] text-slate-300 font-bold uppercase">
+                                                 <span>Progreso a {nextTierInfo.name}</span>
+                                                 <span>{Math.min(100, Math.floor((v2026 / nextTierInfo.min) * 100))}%</span>
+                                              </div>
+                                              <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                                                 <div className="h-full bg-white transition-all duration-1000" style={{ width: `${Math.min(100, (v2026 / nextTierInfo.min) * 100)}%`, backgroundColor: theme.primary }}></div>
+                                              </div>
+                                              <p className="text-[8px] text-slate-500 italic">Faltan ${formatCLP(gap)} para el beneficio: {nextTierInfo.primaryBenefit}</p>
+                                           </div>
+                                         ) : (
+                                           <div className="py-2 px-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                                              <p className="text-[9px] text-emerald-400 font-bold leading-tight">Máximo nivel alcanzado. ¡Felicidades por su compromiso con la excelencia!</p>
+                                           </div>
+                                         )}
+                                      </div>
+                                    </div>
+
+                                    <div className="absolute bottom-6 left-0 right-0 flex justify-center opacity-40">
+                                       <div className="text-[8px] text-slate-500 font-mono scale-90">ID: {c.id.toUpperCase()} • AUTH: SIG-{(v2026 % 9999).toString().padStart(4, '0')}</div>
+                                    </div>
                                   </div>
-                                  
-                                  <div className="absolute bottom-4 left-0 right-0 text-center z-10">
-                                    <p className="text-[9px] text-slate-500 font-mono tracking-widest px-4">
-                                      Generado por inteligencia artificial • {new Date().toLocaleDateString('es-CL')}
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
+                            
+                            {segmentedClients.length > 8 && (
+                              <div className="text-center py-4">
+                                <p className="text-xs text-slate-500 italic">Mostrando los primeros 8 veterinarios. Ajusta los filtros para ver otros grupos.</p>
+                              </div>
+                            )}
+
+                            <div className="max-w-xl mx-auto p-4 rounded-2xl bg-indigo-900/10 border border-indigo-900/30 flex items-start gap-4">
+                               <Sparkles className="w-5 h-5 text-indigo-400 mt-1 shrink-0" />
+                               <div className="space-y-1">
+                                  <p className="text-xs font-bold text-indigo-100">Consejo de CIMASUR:</p>
+                                  <p className="text-[11px] text-indigo-300/80 leading-relaxed">
+                                    Haz una captura de pantalla de estas tarjetas para enviarlas por WhatsApp. Es la forma más efectiva de captar la atención de los médicos sobre su progreso comercial y beneficios exclusivos.
+                                  </p>
+                               </div>
+                            </div>
                           </div>
-                        )}
-                        {segmentedClients.length > 4 && (
-                           <div className="text-center pt-2 pb-1 text-xs text-slate-500 italic mt-2">
-                             Mostrando 4 previsualizaciones a la vez. (De {segmentedClients.length} seleccionados)
-                           </div>
                         )}
                       </div>
                     </div>
@@ -2710,6 +2887,62 @@ export function ClubSocialManager() {
                             rows={3}
                             className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-sans focus:outline-none"
                           />
+                        </div>
+
+                        <div className="md:col-span-2 mt-4 space-y-4 pt-4 border-t border-slate-800">
+                          <div className="flex items-center gap-2">
+                             <Mail className="w-4 h-4 text-emerald-400" />
+                             <span className="text-xs font-black text-slate-200 uppercase tracking-widest">Configuración SMTP Propio (Emailing Real)</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Servidor SMTP:</label>
+                              <input 
+                                type="text" 
+                                value={execConfig.smtpServer} 
+                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpServer: e.target.value })} 
+                                placeholder="smtp.ejemplo.com"
+                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Puerto:</label>
+                              <input 
+                                type="text" 
+                                value={execConfig.smtpPort} 
+                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpPort: e.target.value })} 
+                                placeholder="587"
+                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Usuario SMTP:</label>
+                              <input 
+                                type="text" 
+                                value={execConfig.smtpUser} 
+                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpUser: e.target.value })} 
+                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Contraseña:</label>
+                              <input 
+                                type="password" 
+                                value={execConfig.smtpPass} 
+                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpPass: e.target.value })} 
+                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 rounded-lg bg-emerald-900/10 border border-emerald-900/30 flex items-start gap-3">
+                            <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                            <p className="text-[10px] text-emerald-400/80 leading-relaxed italic">
+                              CIMASUR utiliza estos parámetros para establecer una conexión segura TLS/SSL y despachar los correos electrónicos 
+                              usando su propio dominio institucional. Esto garantiza la máxima tasa de entrega (Delivery Rate) y profesionalismo.
+                            </p>
+                          </div>
                         </div>
                       </div>
 
@@ -2838,15 +3071,15 @@ export function ClubSocialManager() {
                                   <span className="font-bold block text-white">{c.name}</span>
                                   <span className="text-[10px] text-slate-500 block">{c.clinica}</span>
                                 </td>
-                                <td className="p-3 font-mono font-bold text-slate-200">${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</td>
+                                <td className="p-3 font-mono font-bold text-slate-200">${formatCLP(c.ventas?.v2026 || 0)}</td>
                                 <td className="p-3 font-mono">
                                   <span className={c.percentChange >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-450 text-rose-400'}>
-                                    {c.percentChange >= 0 ? `+` : ''}${((c.ventas?.v2026 || 0) - (c.ventas?.v2025 || 0)).toLocaleString('es-CL')}
+                                    {c.percentChange >= 0 ? `+` : ''}${formatCLP((c.ventas?.v2026 || 0) - (c.ventas?.v2025 || 0))}
                                   </span>
                                 </td>
                                 <td className="p-3 font-mono">
                                   {c.brechaAscenso > 0 ? (
-                                    <span className="text-yellow-400">${c.brechaAscenso.toLocaleString('es-CL')}</span>
+                                    <span className="text-yellow-400">${formatCLP(c.brechaAscenso)}</span>
                                   ) : (
                                     <span className="text-slate-500">Nivel Máximo</span>
                                   )}
@@ -3047,9 +3280,9 @@ export function ClubSocialManager() {
                                     <span className="text-slate-500 italic">RUT no registrado</span>
                                   )}
                                 </td>
-                                <td className="p-2.5">${(row.v2024 || 0).toLocaleString('es-CL')}</td>
-                                <td className="p-2.5">${(row.v2025 || 0).toLocaleString('es-CL')}</td>
-                                <td className="p-2.5 text-emerald-400 font-extrabold">${(row.v2026 || 0).toLocaleString('es-CL')}</td>
+                                <td className="p-2.5">${formatCLP(row.v2024 || 0)}</td>
+                                <td className="p-2.5">${formatCLP(row.v2025 || 0)}</td>
+                                <td className="p-2.5 text-emerald-400 font-extrabold">${formatCLP(row.v2026 || 0)}</td>
                                 <td className="p-2.5 text-right">
                                   {row.found ? (
                                     <span className="bg-emerald-500/10 text-emerald-400 text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/20">Vinculado</span>
