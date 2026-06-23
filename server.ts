@@ -337,6 +337,56 @@ Reglas obligatorias:
     }
   });
 
+  app.post('/api/ai/generate-batch-messages', async (req, res) => {
+    console.log('API call: POST /api/ai/generate-batch-messages');
+    try {
+      const { clients, type } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor." });
+      }
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+
+      const prompt = `Actúa como Ejecutivo Senior de CRM de Laboratorios Homeopáticos CIMASUR. Redacta mensajes de WhatsApp individuales, sumamente profesionales y persuasivos para cada uno de los clientes en la lista provista. 
+Objetivo estratégico de contacto: ${type}.
+No utilices plantillas genéricas. Cada mensaje DEBE contener el nombre y parámetros reales de cada cliente de forma natural, sin placeholders ni llaves. Retorna un objeto JSON con mapeo clave-valor exacto, donde las keys sean el ID de los clientes proporcionados y values los textos finales personalizados.
+
+La lista de clientes en formato JSON:
+${JSON.stringify(clients, null, 2)}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              messages: {
+                type: Type.OBJECT,
+                additionalProperties: { type: Type.STRING },
+                description: "Map of client ID to their respective personalized message"
+              }
+            },
+            required: ["messages"]
+          }
+        }
+      });
+
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Error AI Batch Generation' });
+    }
+  });
+
   // Integración con Vite para Desarrollo
   if (process.env.NODE_ENV !== 'production') {
     console.log('Iniciando middleware de Vite...');

@@ -214,6 +214,8 @@ export function ClubSocialManager() {
   // Campaign State
   const [campaignChannel, setCampaignChannel] = useState<'whatsapp' | 'email' | 'both'>('whatsapp');
   const [messageTemplate, setMessageTemplate] = useState<string>(PRESET_TEMPLATES['activo']);
+  const [aiGeneratedMessages, setAiGeneratedMessages] = useState<Record<string, string>>({});
+  const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
   const [campaignTriggered, setCampaignTriggered] = useState<boolean>(false);
   const [campaignLog, setCampaignLog] = useState<string[]>([]);
   const [isSending, setIsSending] = useState<boolean>(false);
@@ -692,30 +694,73 @@ export function ClubSocialManager() {
 
   // Variables template replacer utility
   const replaceMessageVariables = (textTemplate: string, clientInfo: any) => {
-    if (!clientInfo) return textTemplate;
-    const v2026 = clientInfo.ventas?.v2026 || 0;
-    const bestBenefit = clientInfo.calculatedTier?.primaryBenefit || 'Beneficios generales';
-    const destinationTier = clientInfo.nextTier?.name ?? clientInfo.nextTierName ?? 'Máxima Categoría';
-    const nextTierMin = clientInfo.nextTier?.min ?? 0;
-    const brechaVal = nextTierMin > 0 ? Math.max(0, nextTierMin - v2026) : 0;
+    try {
+      if (!textTemplate) return '';
+      if (!clientInfo) return textTemplate;
+      const v2026 = clientInfo.ventas?.v2026 || 0;
+      const bestBenefit = clientInfo.calculatedTier?.primaryBenefit || 'Beneficios generales';
+      const destinationTier = clientInfo.nextTier?.name ?? clientInfo.nextTierName ?? 'Máxima Categoría';
+      const nextTierMin = clientInfo.nextTier?.min ?? 0;
+      const brechaVal = nextTierMin > 0 ? Math.max(0, nextTierMin - v2026) : 0;
 
-    return textTemplate
-      .replace(/\{\{NOMBRE\}\}/g, clientInfo.name || 'Médico')
-      .replace(/\{\{CLINICA\}\}/g, clientInfo.clinica || 'Clínica Veterinaria')
-      .replace(/\{\{CATEGORIA\}\}/g, clientInfo.calculatedTier?.name || clientInfo.categoria || 'Sin categoría')
-      .replace(/\{\{CATEGORIA_NUEVA\}\}/g, destinationTier)
-      .replace(/\{\{SIGUIENTE_CATEGORIA\}\}/g, destinationTier)
-      .replace(/\{\{VENTAS\}\}/g, `${v2026.toLocaleString('es-CL')}`)
-      .replace(/\{\{BRECHA\}\}/g, `${brechaVal.toLocaleString('es-CL')}`)
-      .replace(/\{\{BENEFICIO\}\}/g, bestBenefit)
-      .replace(/\{\{CORREO_EJECUTIVO\}\}/g, execConfig.correo)
-      .replace(/\{\{WHATSAPP_EJECUTIVO\}\}/g, execConfig.whatsapp)
-      .replace(/\{\{EJECUTIVO\}\}/g, execConfig.nombre);
+      return textTemplate
+        .replace(/\{\{NOMBRE\}\}/g, clientInfo.name || 'Médico')
+        .replace(/\{\{CLINICA\}\}/g, clientInfo.clinica || 'Clínica Veterinaria')
+        .replace(/\{\{CATEGORIA\}\}/g, clientInfo.calculatedTier?.name || clientInfo.categoria || 'Sin categoría')
+        .replace(/\{\{CATEGORIA_NUEVA\}\}/g, destinationTier)
+        .replace(/\{\{SIGUIENTE_CATEGORIA\}\}/g, destinationTier)
+        .replace(/\{\{VENTAS\}\}/g, `${(v2026 || 0).toLocaleString('es-CL')}`)
+        .replace(/\{\{BRECHA\}\}/g, `${(brechaVal || 0).toLocaleString('es-CL')}`)
+        .replace(/\{\{BENEFICIO\}\}/g, bestBenefit)
+        .replace(/\{\{EJECUTIVO\}\}/g, execConfig.nombre || '')
+        .replace(/\{\{CORREO_EJECUTIVO\}\}/g, execConfig.correo || '')
+        .replace(/\{\{WHATSAPP_EJECUTIVO\}\}/g, execConfig.whatsapp || '');
+    } catch (e) {
+      console.error("Error in replaceMessageVariables:", e);
+      return textTemplate || '';
+    }
   };
 
   // Preloaded variables button helper
   const handleInsertVariable = (variable: string) => {
     setMessageTemplate(prev => prev + ' ' + variable);
+  };
+
+  // AI Batch Generation trigger
+  const handleGenerateAIBatch = async (objective: string) => {
+    if (segmentedClients.length === 0) {
+      alert("No hay clientes segmentados para generar mensajes.");
+      return;
+    }
+    setIsGeneratingBatch(true);
+    setAiGeneratedMessages({});
+    try {
+      // Pass minimum info to save tokens
+      const payloadClients = segmentedClients.map(c => ({
+        id: c.id,
+        name: c.name,
+        clinica: c.clinica,
+        ventas_2026: c.ventas?.v2026 || 0,
+        categoria_actual: c.calculatedTier?.name || 'Sin categoría',
+        beneficio: c.calculatedTier?.primaryBenefit || 'Beneficios VIP'
+      }));
+
+      const res = await fetch('/api/ai/generate-batch-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clients: payloadClients, type: objective }),
+      });
+      if (!res.ok) throw new Error("Error en la solicitud a la IA");
+      const data = await res.json();
+      if (data.messages && typeof data.messages === 'object') {
+        setAiGeneratedMessages(data.messages);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Hubo un error generando los mensajes: " + err.message);
+    } finally {
+      setIsGeneratingBatch(false);
+    }
   };
 
   // Mass campaign multi-select dispatch simulator
@@ -732,7 +777,8 @@ export function ClubSocialManager() {
       // Stream batch simulation
       for (let i = 0; i < campaignRecipients.length; i++) {
         const item = campaignRecipients[i];
-        const personalized = replaceMessageVariables(messageTemplate, enrichedClients.find(ec => ec.id === item.id));
+        const clientData = enrichedClients.find(ec => ec.id === item.id);
+        const personalized = aiGeneratedMessages[item.id] || replaceMessageVariables(messageTemplate, clientData);
         
         // Simulating delay for bulk server delivery
         await new Promise(resolve => setTimeout(resolve, 600));
@@ -1792,26 +1838,42 @@ export function ClubSocialManager() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    {tiersList.map((t, idx) => (
-                      <div key={t.name} className={`p-4 rounded-xl border border-slate-800 bg-gradient-to-b ${t.color}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-black uppercase font-mono tracking-wider">{t.name}</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/35 text-white">Nivel {idx + 1}</span>
+                    {tiersList.map((t, idx) => {
+                      // Normalize colors for guaranteed rendering
+                      const getTheme = (idx: number) => {
+                        const themes = [
+                          { bg: 'bg-[#1e293b]', border: 'border-slate-500', text: 'text-slate-200', badgeObj: 'bg-slate-700 text-slate-100' },
+                          { bg: 'bg-gradient-to-b from-[#451a03] to-[#25140b]', border: 'border-amber-600/50', text: 'text-amber-200', badgeObj: 'bg-amber-900/50 text-amber-100' },
+                          { bg: 'bg-gradient-to-b from-[#1e293b] to-[#0f172a]', border: 'border-slate-400/50', text: 'text-slate-100', badgeObj: 'bg-slate-600/50 text-white' },
+                          { bg: 'bg-gradient-to-b from-[#422006] to-[#1a0e03]', border: 'border-yellow-600/60', text: 'text-yellow-400', badgeObj: 'bg-yellow-900/60 text-yellow-100' },
+                          { bg: 'bg-gradient-to-b from-[#2e1065] to-[#170831]', border: 'border-purple-500/60', text: 'text-purple-200', badgeObj: 'bg-purple-900/60 text-purple-100' }
+                        ];
+                        return themes[idx % themes.length];
+                      };
+                      const theme = getTheme(idx);
+                      return (
+                        <div key={t.name} className={`p-5 rounded-2xl border-2 ${theme.border} ${theme.bg} flex flex-col justify-between shadow-xl`}>
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className={`text-[13px] font-black uppercase tracking-wider ${theme.text}`}>{t.name}</span>
+                              <span className={`text-[10px] px-2 py-1 rounded-md font-bold ${theme.badgeObj}`}>Nivel {idx + 1}</span>
+                            </div>
+                            <span className="text-xl font-black block mt-2 text-white font-mono">
+                              {t.min === 0 ? '$0' : `$${(t.min / 1000000).toFixed(1)}M`} 
+                              <span className="text-xs text-slate-400 font-bold px-1.5 uppercase tracking-widest text-[#94a3b8]"> a </span>
+                              {t.max === Infinity ? 'Infinito' : `$${(t.max / 1000000).toFixed(1)}M`}
+                            </span>
+                            
+                            <div className="mt-5 space-y-2 text-[11px] text-[#e2e8f0] leading-snug font-serif">
+                              <span className="block font-bold uppercase text-[#94a3b8] text-[9px] mb-1">Beneficio Destacado:</span>
+                              <span className="block bg-[#0f172a]/60 px-3 py-2 rounded-lg text-white font-bold border border-white/5 line-clamp-2">
+                                {t.primaryBenefit}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-[17px] font-mono font-black block mt-2 text-white">
-                          {t.min === 0 ? '$0' : `$${(t.min / 1000000).toFixed(1)}M`} 
-                          <span className="text-[10px] text-slate-400 font-normal"> a </span>
-                          {t.max === Infinity ? 'Infinito' : `$${(t.max / 1000000).toFixed(1)}M`}
-                        </span>
-                        
-                        <div className="mt-3.5 pt-2 border-t border-white/5 space-y-1.5 text-[9px] text-[#e2e8f0]">
-                          <span className="block font-bold uppercase text-[#94a3b8]">Beneficio Estrella:</span>
-                          <span className="bg-sky-550 block bg-[#1d4ed8]/30 px-1.5 py-1 rounded text-white italic font-bold">
-                            {t.primaryBenefit}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* SIMULATOR TOOL */}
@@ -1911,7 +1973,7 @@ export function ClubSocialManager() {
                         onClick={() => setCommsSubTab('templates')}
                         className={`px-3 py-1.5 rounded-lg transition-all ${commsSubTab === 'templates' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
                       >
-                        📋 2. Plantillas Dinámicas
+                        🤖 2. Redacción IA
                       </button>
                       <button 
                         type="button"
@@ -2160,13 +2222,14 @@ export function ClubSocialManager() {
                               <div className="space-y-3 max-h-[460px] overflow-y-auto divide-y divide-slate-800 pr-1">
                                 {campaignRecipients.map((recipient) => {
                                   const ec = enrichedClients.find(item => item.id === recipient.id) || recipient;
-                                  const textWithVariables = replaceMessageVariables(messageTemplate, ec);
+                                  const textWithVariables = aiGeneratedMessages[recipient.id] || replaceMessageVariables(messageTemplate, ec);
                                   
                                   const cleanPhone = (recipient.phone || '').replace(/\D/g, '');
                                   const waUrl = `https://wa.me/${cleanPhone.startsWith('569') ? cleanPhone : '569' + cleanPhone.slice(-8)}?text=${encodeURIComponent(textWithVariables)}`;
 
                                   // Handlers to trigger copy and mark sent
                                   const handleProcessWA = async () => {
+                                    if (!cleanPhone || cleanPhone.length < 8) return;
                                     // Copy to clipboard
                                     await navigator.clipboard.writeText(textWithVariables);
                                     
@@ -2189,6 +2252,8 @@ export function ClubSocialManager() {
                                     // Open WA Web in new tab
                                     window.open(waUrl, '_blank');
                                   };
+
+                                  const hasWhatsapp = cleanPhone && cleanPhone.length >= 8;
 
                                   return (
                                     <div key={recipient.id} className="pt-3.5 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
@@ -2233,13 +2298,26 @@ export function ClubSocialManager() {
                                       </div>
 
                                       {/* Start campaign button */}
-                                      <button 
-                                        onClick={handleProcessWA}
-                                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-extrabold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-950/20 text-xs shrink-0"
-                                      >
-                                        <Send className="w-3.5 h-3.5" />
-                                        <span>[ Iniciar Campaña ]</span>
-                                      </button>
+                                      {hasWhatsapp ? (
+                                        <button 
+                                          onClick={handleProcessWA}
+                                          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-extrabold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-950/20 text-xs shrink-0"
+                                        >
+                                          <Send className="w-3.5 h-3.5" />
+                                          <span>[ Iniciar Campaña ]</span>
+                                        </button>
+                                      ) : (
+                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                          <span className="text-rose-400 text-[10px] font-bold">No cuenta con WhatsApp válido</span>
+                                          <a 
+                                            href={`mailto:${recipient.email || ''}?subject=${encodeURIComponent('Comunicaciones CIMASUR')}&body=${encodeURIComponent(textWithVariables)}`}
+                                            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-all flex items-center gap-1.5 text-[10px]"
+                                          >
+                                            <Mail className="w-3 h-3" />
+                                            <span>Enviar por Mail</span>
+                                          </a>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -2260,73 +2338,41 @@ export function ClubSocialManager() {
                   {commsSubTab === 'email' && (
                     <div className="space-y-6">
                       <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 text-left space-y-4">
-                        <span className="text-xs font-bold text-sky-455 text-sky-400 block uppercase">🔌 Conectores de Email Corporativo (Integración Oficial CIMASUR)</span>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="bg-emerald-500/10 border border-emerald-500/35 p-3 rounded-lg text-center space-y-1">
-                            <span className="block text-lg">💡</span>
-                            <span className="text-xs font-black text-white block">Brevo (Recomendado)</span>
-                            <span className="text-[9px] text-emerald-400 font-bold">🟢 CONECTADO EXCELENTE</span>
-                          </div>
-                          <div className="bg-[#0b1324] border border-slate-800 p-3 rounded-lg text-center space-y-1 hover:border-slate-700 transition-all cursor-pointer">
-                            <span className="block text-lg">🐒</span>
-                            <span className="text-xs font-bold text-slate-300 block">Mailchimp</span>
-                            <span className="text-[9px] text-slate-500">⚪ DISPONIBLE</span>
-                          </div>
-                          <div className="bg-[#0b1324] border border-slate-800 p-3 rounded-lg text-center space-y-1 hover:border-slate-700 transition-all cursor-pointer">
-                            <span className="block text-lg">📬</span>
-                            <span className="text-xs font-bold text-slate-300 block">Resend API</span>
-                            <span className="text-[9px] text-slate-500">⚪ DISPONIBLE</span>
-                          </div>
-                          <div className="bg-[#0b1324] border border-slate-800 p-3 rounded-lg text-center space-y-1 hover:border-slate-700 transition-all cursor-pointer">
-                            <span className="block text-lg">⚙️</span>
-                            <span className="text-xs font-bold text-slate-300 block">SMTP Propio (Cimasur)</span>
-                            <span className="text-[9px] text-slate-500">⚪ CONFIGURAR</span>
-                          </div>
-                        </div>
+                        <span className="text-xs font-bold text-sky-400 block uppercase">📧 Sistema de Envío por Correo Electrónico</span>
+                        <p className="text-xs text-slate-400 mb-2">Para garantizar la entregabilidad directa, este sistema abre las plantillas directamente en el cliente de correo de tu preferencia utilizando tus credenciales configuradas, y luego registra en la base de datos local que realizaste el envío.</p>
                       </div>
 
-                      {/* Campaign setup and live testing section */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         
                         <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-4 text-left">
                           <span className="text-xs font-bold text-indigo-400 block uppercase">📬 Configuración de Campaña Email</span>
                           
                           <div className="space-y-3.5 text-xs">
-                            <div className="space-y-1">
-                              <label className="text-slate-400 block font-bold">Seleccionar Segmento de Cartera:</label>
-                              <select 
-                                value={segGrowth}
-                                onChange={(e) => setSegGrowth(e.target.value)}
-                                className="w-full bg-[#0a101e] px-2.5 py-2 rounded-xl text-xs border border-slate-700 text-white focus:outline-none"
-                              >
-                                <option value="Todas">Toda la cartera de socios</option>
-                                <option value="Crecieron">Socio de Alto Rendimiento (Próximos Ascensos)</option>
-                                <option value="Disminuyeron">Alerta de Contracción (Reducción compras)</option>
-                                <option value="Estables">Comportamiento Estable y Fiel</option>
-                                <option value="Dormidos">Clientes Dormidos (Compra 2025, $0 actual)</option>
-                                <option value="Riesgo Alto">Riesgo Crítico de Fuga (Caída &gt; 50%)</option>
-                              </select>
-                            </div>
-
                             <div className="bg-[#0a101e] p-3 rounded-lg border border-slate-800 text-[11px]">
                               <div className="flex justify-between font-bold">
-                                <span className="text-slate-400">Destinatarios Cargados:</span>
-                                <span className="text-emerald-400 font-mono font-black">{segmentedClients.length} médicos</span>
+                                <span className="text-slate-400">Destinatarios Seleccionados:</span>
+                                <span className="text-emerald-400 font-mono font-black">{campaignRecipients.length} médicos</span>
                               </div>
                             </div>
+                            
+                            {campaignRecipients.length === 0 && (
+                              <div className="bg-slate-800/50 p-2 rounded text-[10.5px] text-slate-400 text-center">
+                                Carga un lote en la pestaña de Segmentación.
+                              </div>
+                            )}
 
                             <div className="space-y-1">
-                              <label className="text-slate-400 block font-bold">Asunto del Correo:</label>
+                              <label className="text-slate-400 block font-bold">Asunto Personalizado:</label>
                               <input 
                                 type="text"
-                                defaultValue="Felicitaciones por tu crecimiento comercial en CIMASUR Chile"
+                                defaultValue="Comunicaciones Oficiales CIMASUR"
                                 id="campaign_email_subject"
                                 className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 text-white text-xs"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="text-slate-400 block font-bold">Plantilla de Correo:</label>
+                              <label className="text-slate-400 block font-bold">Plantilla Base Sugerida:</label>
                               <select 
                                 onChange={(e) => setMessageTemplate(PRESET_TEMPLATES[e.target.value] || PRESET_TEMPLATES['oficial_cimasur'])}
                                 className="w-full bg-[#0a101e] px-2.5 py-2 rounded-xl text-xs border border-slate-700 text-white"
@@ -2337,178 +2383,270 @@ export function ClubSocialManager() {
                                 <option value="estable">SOCIO ESTABLE Y FIEL</option>
                                 <option value="disminuyo">ALERTA DE CAÍDA Y GRACIA</option>
                                 <option value="dormido">RECUPERACIÓN REINCORPORACIÓN</option>
+                                <option value="riesgo_alto">RIESGO CRÍTICO DE FUGA</option>
                               </select>
                             </div>
-
-                            <button
-                              onClick={async () => {
-                                if (segmentedClients.length === 0) {
-                                  alert("La segmentación lógica actual está vacía.");
-                                  return;
-                                }
-                                setIsSending(true);
-                                setCampaignTriggered(true);
-                                setCampaignLog(["[LOGS] Iniciando despacho masivo de emailing corporativo..."]);
-                                
-                                const subjectVal = (document.getElementById('campaign_email_subject') as HTMLInputElement)?.value || 'Comunicado CIMASUR';
-                                
-                                for (let i = 0; i < segmentedClients.length; i++) {
-                                  await new Promise(r => setTimeout(r, 400));
-                                  const c = segmentedClients[i];
-                                  const today = new Date().toLocaleDateString('es-CL');
-                                  
-                                  // Update client metrics
-                                  await localDB.updateInCollection('contacts', c.id, {
-                                    ultimoCorreo: today,
-                                    ultimaCampania: subjectVal
-                                  });
-
-                                  // Write unified logs
-                                  const logMsg = `\n[Email Despachado ${today} - Campaña: ${subjectVal}]\nCanal: EMAIL\nRemitente: ${execConfig.correo} (Asesor: ${execConfig.nombre})`;
-                                  await localDB.updateInCollection('contacts', c.id, {
-                                    historialUnificado: (c.historialUnificado || '') + logMsg
-                                  });
-
-                                  setCampaignLog(prev => [
-                                    ...prev,
-                                    `[CORRECTO - ${new Date().toLocaleTimeString()}] Email enviado a: ${c.name} (${c.email})`
-                                  ]);
-                                }
-                                
-                                setIsSending(false);
-                                window.dispatchEvent(new Event('db-change'));
-                                alert(`Campaña de Emailing Masivo completada con altas tasas de fidelización. Se han entregado ${segmentedClients.length} piezas comerciales.`);
-                              }}
-                              disabled={isSending}
-                              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[11px] uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
-                            >
-                              <Mail className="w-3.5 h-3.5" />
-                              <span>[ Enviar Campaña ]</span>
-                            </button>
+                            
+                            <div className="space-y-1 pt-2">
+                              <label className="text-slate-400 block font-bold">Cuerpo del Mensaje (con variables):</label>
+                              <textarea
+                                value={messageTemplate}
+                                onChange={(e) => setMessageTemplate(e.target.value)}
+                                rows={8}
+                                className="w-full bg-[#070d18] text-white text-xs border border-slate-700 rounded-lg p-2.5 font-sans focus:outline-none focus:border-indigo-500 leading-relaxed"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        {/* Preview and terminal output */}
+                        {/* Direct Sending Queue */}
                         <div className="md:col-span-2 space-y-4">
-                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-3 text-left">
-                            <span className="text-xs font-bold text-slate-400 block uppercase">🔍 Vista Previa Dinámica del Correo (Primer Destinatario)</span>
-                            {segmentedClients.length > 0 ? (
-                              <div className="space-y-3.5">
-                                <div className="bg-[#070d18] p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300">
-                                  <div>Remitente: <strong className="text-white">{execConfig.nombre} &lt;{execConfig.correo}&gt;</strong></div>
-                                  <div>Destinatario: <strong className="text-sky-305 text-sky-300">{segmentedClients[0].name} ({segmentedClients[0].email})</strong></div>
-                                </div>
-                                <div className="bg-[#121f37] p-4 rounded-xl border border-slate-700 text-sm leading-relaxed whitespace-pre-line text-slate-100 max-h-60 overflow-y-auto">
-                                  {replaceMessageVariables(messageTemplate, segmentedClients[0])}
-                                </div>
+                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-3.5 text-left">
+                            <span className="text-xs font-bold text-slate-400 block uppercase">📥 Bandeja de Intervención One-to-One</span>
+                            <p className="text-[10px] text-slate-500">Puedes generar un mensaje con IA o utilizar la plantilla seleccionada para iniciar el envío desde tu gestor de correo predeterminado (Outlook, Mail, etc).</p>
+                            
+                            {campaignRecipients.length > 0 ? (
+                              <div className="space-y-3 max-h-[500px] overflow-y-auto divide-y divide-slate-800 pr-1">
+                                {campaignRecipients.map((recipient) => {
+                                  const ec = enrichedClients.find(item => item.id === recipient.id) || recipient;
+                                  const textWithVariables = aiGeneratedMessages[recipient.id] || replaceMessageVariables(messageTemplate, ec);
+                                  
+                                  const handleLogEmailSent = async () => {
+                                    const today = new Date().toLocaleDateString('es-CL');
+                                    const subject = (document.getElementById('campaign_email_subject') as HTMLInputElement)?.value || 'CIMASUR';
+                                    await localDB.updateInCollection('contacts', recipient.id, {
+                                      ultimoCorreo: today,
+                                      ultimaCampania: "Correo electrónico manual"
+                                    });
+                                    const auditLog = `\n[Email Directo Enviado ${today}]\nAsunto: ${subject}\n\n"${textWithVariables.substring(0, 150)}..."`;
+                                    await localDB.updateInCollection('contacts', recipient.id, {
+                                      historialUnificado: (ec.historialUnificado || '') + auditLog
+                                    });
+                                    window.dispatchEvent(new Event('db-change'));
+                                  };
+
+                                  return (
+                                    <div key={recipient.id} className="pt-3.5 first:pt-0 flex flex-col gap-2">
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <div className="font-extrabold text-white text-sm">{recipient.name}</div>
+                                          <p className="text-slate-400 text-[11px] font-medium">{recipient.clinica} — {recipient.email || 'Sin correo asociado'}</p>
+                                        </div>
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#101c31] text-indigo-400 border border-indigo-500/20 font-mono">
+                                          {ec.categoria}
+                                        </span>
+                                      </div>
+                                      
+                                      <div className="text-xs text-slate-350 leading-relaxed font-serif whitespace-pre-line pl-1 border-l-2 border-slate-700 h-20 overflow-y-auto">
+                                        {textWithVariables}
+                                      </div>
+
+                                      <div className="flex items-center justify-end gap-2 mt-1">
+                                        {!recipient.email ? (
+                                          <span className="text-[10px] text-red-400 font-bold">Falta dirección de correo</span>
+                                        ) : (
+                                          <>
+                                            <button 
+                                              onClick={handleLogEmailSent}
+                                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition-all text-[10px] cursor-pointer"
+                                            >
+                                              ☑ Solo registrar en Ficha
+                                            </button>
+                                            <a 
+                                              href={`mailto:${recipient.email}?subject=${encodeURIComponent((document.getElementById('campaign_email_subject') as HTMLInputElement)?.value || 'Comunicaciones Oficiales CIMASUR')}&body=${encodeURIComponent(textWithVariables)}`}
+                                              onClick={handleLogEmailSent}
+                                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-950/20 text-xs shrink-0"
+                                            >
+                                              <Mail className="w-3.5 h-3.5" />
+                                              <span>Abrir Cliente de Correo</span>
+                                            </a>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : (
-                              <div className="text-center p-12 text-slate-500 italic text-xs">
-                                No hay socios en el segmento seleccionado. Verifique el filtro lógico de segmentación.
+                              <div className="text-center p-12 text-slate-500 italic text-xs bg-[#0b1220] rounded-lg">
+                                No hay destinatarios seleccionados. Vaya a "1. Segmentación IA" o use su Cartera para cargar a los médicos de la campaña.
                               </div>
                             )}
                           </div>
-
-                          {/* Email Dispatch Simulated Terminal */}
-                          {campaignTriggered && (
-                            <div className="bg-black/60 rounded-xl border border-slate-800 p-4 font-mono text-left">
-                              <span className="text-[10px] text-indigo-400 font-extrabold uppercase block mb-1">Pasarela smtp / api cimasur terminal</span>
-                              <div className="bg-[#050914] p-3 rounded-lg text-[10.5px] text-slate-400 h-32 overflow-y-auto space-y-1">
-                                {campaignLog.map((log, lIdx) => (
-                                  <div key={lIdx}>{log}</div>
-                                ))}
-                                {isSending && <div className="text-yellow-400 animate-pulse font-bold">⚙️ Enviando paquetes a la nube, validando remitente...</div>}
-                                {!isSending && campaignLog.length > 1 && <div className="text-emerald-400 font-bold">✓ Transmisión terminada de manera óptima y guardada permanentemente en el CRM de Cimasur Chile.</div>}
-                              </div>
-                            </div>
-                          )}
                         </div>
 
                       </div>
                     </div>
                   )}
 
-                  {/* 2. PLANTILLAS DINÁMICAS SUBTAB */}
+                  {/* 2. REDACCIÓN IA Y REVISIÓN */}
                   {commsSubTab === 'templates' && (
                     <div className="space-y-6 text-left animate-fadeIn">
-                      {/* TEMPLATES WORKSPACE */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         
-                        {/* Left Quick Helpers list */}
+                        {/* Left Prompts list */}
                         <div className="space-y-4">
-                          <div className="bg-[#101b33] p-3 rounded-xl border border-slate-800 space-y-2.5">
-                            <span className="text-[10px] text-slate-400 font-extrabold block uppercase tracking-wider">Ayuda de Redacción</span>
-                            <p className="text-[11px] text-slate-400 leading-normal">Haz clic sobre cualquier etiqueta dinámica para insertarla automáticamente al final de la plantilla de mensaje.</p>
+                          <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-3">
+                            <span className="text-[10px] text-slate-400 font-extrabold block uppercase tracking-wider">Generador IA (Estilos de Mensaje)</span>
+                            <p className="text-[11px] text-slate-400 leading-normal">
+                              La IA redactará instantáneamente mensajes personalizados para los {segmentedClients.length} veterinarios segmentados.
+                            </p>
                             
-                            <div className="space-y-1.5 pt-2">
-                              <button type="button" onClick={()=>handleInsertVariable('{{NOMBRE}}')} className="w-full text-left bg-[#0a101e] hover:bg-slate-800 px-2 py-1.5 rounded text-[10px] text-[#38bdf8] font-mono font-bold block cursor-pointer">
-                                {"{{NOMBRE}}"} - Nombre Veterinario
+                            <div className="space-y-2 pt-2">
+                              <button type="button" onClick={()=>handleGenerateAIBatch('Crear mensaje de Fidelización reconociendo que está comprando activamente. Debe incluir su nivel de ventas actual.')} className="w-full text-left bg-indigo-600 hover:bg-indigo-500 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
+                                🤖 Generar Fidelización (Socios Activos)
                               </button>
-                              <button type="button" onClick={()=>handleInsertVariable('{{CLINICA}}')} className="w-full text-left bg-[#0a101e] hover:bg-slate-800 px-2 py-1.5 rounded text-[10px] text-[#38bdf8] font-mono font-bold block cursor-pointer">
-                                {"{{CLINICA}}"} - Establecimiento
+                              <button type="button" onClick={()=>handleGenerateAIBatch('Crear mensaje de felicitación por crecimiento en sus volúmenes de compra respecto al año pasado. Felicitarlo sinceramente.')} className="w-full text-left bg-sky-600 hover:bg-sky-500 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
+                                📈 Generar Reconocimiento (Crecimiento)
                               </button>
-                              <button type="button" onClick={()=>handleInsertVariable('{{CATEGORIA}}')} className="w-full text-left bg-[#0a101e] hover:bg-slate-800 px-2 py-1.5 rounded text-[10px] text-[#38bdf8] font-mono font-bold block cursor-pointer">
-                                {"{{CATEGORIA}}"} - Categoría Actual
+                              <button type="button" onClick={()=>handleGenerateAIBatch('Crear alerta suave porque sus compras han disminuido en el presente año. Invitar a retomar pidiendo sus magistrales con un enganche sutil.')} className="w-full text-left bg-rose-600 hover:bg-rose-500 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
+                                🚨 Generar Alerta (Reducción)
                               </button>
-                              <button type="button" onClick={()=>handleInsertVariable('{{CATEGORIA_NUEVA}}')} className="w-full text-left bg-[#0a101e] hover:bg-slate-800 px-2 py-1.5 rounded text-[10px] text-[#38bdf8] font-mono font-bold block cursor-pointer">
-                                {"{{CATEGORIA_NUEVA}}"} - Nueva para Upgrade
-                              </button>
-                              <button type="button" onClick={()=>handleInsertVariable('{{VENTAS}}')} className="w-full text-left bg-[#0a101e] hover:bg-slate-800 px-2 py-1.5 rounded text-[10px] text-[#38bdf8] font-mono font-bold block cursor-pointer">
-                                {"{{VENTAS}}"} - Compras Ciclo 2026
-                              </button>
-                              <button type="button" onClick={()=>handleInsertVariable('{{BRECHA}}')} className="w-full text-left bg-[#0a101e] hover:bg-slate-800 px-2 py-1.5 rounded text-[10px] text-[#38bdf8] font-mono font-bold block cursor-pointer">
-                                {"{{BRECHA}}"} - Falta para próximo nivel
-                              </button>
-                              <button type="button" onClick={()=>handleInsertVariable('{{BENEFICIO}}')} className="w-full text-left bg-[#0a101e] hover:bg-slate-800 px-2 py-1.5 rounded text-[10px] text-[#38bdf8] font-mono font-bold block cursor-pointer">
-                                {"{{BENEFICIO}}"} - Beneficio Clave
+                              <button type="button" onClick={()=>handleGenerateAIBatch('Mensaje de rescate de cliente dormido con 0 compras este año. Muy persuasivo, ofrecer asesoramiento y reactivar sus ganas de prescribir.')} className="w-full text-left bg-slate-700 hover:bg-slate-600 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
+                                💤 Generar Rescate (Dormidos)
                               </button>
                             </div>
                           </div>
-
-                          {/* Quick preset selector */}
-                          <div className="bg-[#101b33] p-3 rounded-xl border border-slate-800 space-y-1.5">
-                            <span className="text-[10px] text-slate-400 font-extrabold block uppercase tracking-wider">Cargar Modelo de Negocio</span>
-                            <button type="button" onClick={()=>setMessageTemplate(PRESET_TEMPLATES['activo'])} className="w-full text-left bg-[#1d2d50] hover:bg-[#253965] px-2 py-1 text-[10px] py-1.5 rounded font-black block cursor-pointer">
-                              Fidelización Socio Activo
-                            </button>
-                            <button type="button" onClick={()=>setMessageTemplate(PRESET_TEMPLATES['crecio'])} className="w-full text-left bg-[#1d2d50] hover:bg-[#253965] px-2 py-1 text-[10px] py-1.5 rounded font-black block cursor-pointer">
-                              Reconocimiento y Crecimiento
-                            </button>
-                            <button type="button" onClick={()=>setMessageTemplate(PRESET_TEMPLATES['disminuyo'])} className="w-full text-left bg-[#1d2d50] hover:bg-[#253965] px-2 py-1 text-[10px] py-1.5 rounded font-black block cursor-pointer">
-                              Alerta de Reducción / Rescate
-                            </button>
-                            <button type="button" onClick={()=>setMessageTemplate(PRESET_TEMPLATES['dormido'])} className="w-full text-left bg-[#1d2d50] hover:bg-[#253965] px-2 py-1 text-[10px] py-1.5 rounded font-black block cursor-pointer">
-                              Plan de Recuperación Dormido
-                            </button>
-                          </div>
                         </div>
 
-                        {/* Master Editor */}
+                        {/* Real-time Parsed Previews */}
                         <div className="md:col-span-3 space-y-4">
-                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-3">
-                            <span className="text-xs font-bold text-slate-400 block uppercase">✍️ Editor de Texto de Plantilla de Mensaje</span>
-                            
-                            <textarea
-                              value={messageTemplate}
-                              onChange={(e)=>setMessageTemplate(e.target.value)}
-                              className="w-full h-80 bg-[#070b14] p-3.5 rounded-xl border border-slate-700 text-xs font-serif text-white leading-relaxed focus:outline-none focus:border-sky-500"
-                            ></textarea>
-
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-[10px] text-slate-500 text-left">Maneja etiquetas dinámicas sensibles para WhatsApp e Email corporativo magistral.</span>
-                              <button 
-                                type="button"
-                                onClick={()=>{
-                                  alert("¡Plantilla Dinámica Guardada Satisfactoriamente para esta sesión!");
-                                }}
-                                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 font-bold text-white rounded-lg cursor-pointer"
-                              >
-                                Guardar Plantilla
-                              </button>
+                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs font-bold text-sky-400 block uppercase">✨ Bandeja de Mensajes Listos ({segmentedClients.length})</span>
+                              <span className="text-[10px] text-slate-400">Mensajes adaptados individualmente por IA. Sin variables a la vista.</span>
                             </div>
+
+                            {segmentedClients.length === 0 ? (
+                              <div className="text-center p-12 text-slate-500 italic text-xs bg-[#0a101e] rounded-xl">
+                                Seleccione un filtro en "1. Segmentación IA" para generar mensajes.
+                              </div>
+                            ) : isGeneratingBatch ? (
+                              <div className="text-center p-12 bg-[#0a101e] rounded-xl flex flex-col items-center justify-center space-y-3">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400"></div>
+                                <span className="text-xs text-indigo-300 font-bold font-mono">El Motor Gemini está redactando mensajes personalizados...</span>
+                              </div>
+                            ) : (
+                              <div className="h-96 pr-2 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                                {segmentedClients.map(c => {
+                                  const finalMsg = aiGeneratedMessages[c.id] || replaceMessageVariables(messageTemplate, c);
+                                  return (
+                                    <div key={c.id} className="bg-[#0a101e] p-3 rounded-lg border border-slate-700 flex flex-col gap-2 relative group hover:border-sky-500 transition-colors">
+                                      <div className="flex justify-between items-start">
+                                        <div className="font-bold text-slate-200 text-xs">Mensaje para: <span className="text-indigo-300">{c.name}</span> <span className="text-slate-500 font-normal">({c.clinica || 'Sin clínica'})</span></div>
+                                        <div className="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-slate-700 font-mono">
+                                          Lista para envío automático
+                                        </div>
+                                      </div>
+                                      <div className="text-xs text-slate-350 leading-relaxed font-serif whitespace-pre-line pl-1 border-l-2 border-indigo-500/30">
+                                        {finalMsg}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
                           </div>
                         </div>
 
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. GENERADOR GRÁFICO */}
+                  {commsSubTab === 'image_gen' && (
+                    <div className="space-y-6 text-left animate-fadeIn">
+                      <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-4">
+                        <span className="text-xs font-bold text-sky-400 block uppercase">🎨 Generador Gráfico Personalizado</span>
+                        <p className="text-[11px] text-slate-400 leading-normal">
+                          Aquí puedes visualizar tarjetas de resumen de nivel con los colores y montos exactos de la categoría actual de cada cliente segmentado. Utiliza estas piezas gráficas capturando la pantalla (Screenshot) para enviarlas como imagen adjunta vía WhatsApp o Correo.
+                        </p>
+                        
+                        {segmentedClients.length === 0 ? (
+                           <div className="text-center p-12 text-slate-500 italic text-xs bg-[#0a101e] rounded-xl border border-slate-800">
+                             Por favor filtra tu base en la pestaña "1. Segmentación IA" para generar gráficas.
+                           </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-6 pt-4 justify-center">
+                            {segmentedClients.slice(0, 4).map(c => {
+                              const ec = enrichedClients.find(i => i.id === c.id) || c;
+                              const tierInfo = ec.calculatedTier;
+                              const nextTierInfo = ec.nextTier;
+                              const v2026 = ec.ventas?.v2026 || 0;
+                              const gap = nextTierInfo ? Math.max(0, nextTierInfo.min - v2026) : 0;
+                              const theme = getTheme(tierInfo?.index || 0);
+
+                              return (
+                                <div key={c.id} className="relative w-80 h-[420px] rounded-2xl overflow-hidden shrink-0 shadow-2xl" style={{ background: `linear-gradient(135deg, ${theme.bg.split(' ')[0]} 0%, #000 100%)` }}>
+                                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent"></div>
+                                  
+                                  {/* Cimasur branding */}
+                                  <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+                                    <div className="font-extrabold text-white tracking-widest text-[10px] uppercase opacity-80 decoration-slate-400/50 underline underline-offset-4">CIMASUR Chile</div>
+                                    <div className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest text-[#0a101e]`} style={{ backgroundColor: theme.primary }}>
+                                       2026
+                                    </div>
+                                  </div>
+
+                                  <div className="px-6 pt-16 flex flex-col items-center text-center space-y-4 z-10 relative">
+                                    <h4 className="text-sm font-bold text-slate-300 tracking-wider">Reporte de Estatus</h4>
+                                    
+                                    <div className="space-y-1">
+                                      <h2 className="text-xl font-bold text-white leading-tight">{c.name}</h2>
+                                      <p className="text-xs text-slate-400 font-medium">{c.clinica}</p>
+                                    </div>
+
+                                    {tierInfo && (
+                                      <div className="mt-4 p-4 rounded-xl border border-white/10 w-full backdrop-blur-sm bg-black/40 shadow-inner">
+                                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Tu Nivel Actual</div>
+                                        <div className="text-2xl font-black uppercase text-transparent bg-clip-text" style={{ backgroundImage: `linear-gradient(to right, ${theme.primary}, #fff)` }}>
+                                          {tierInfo.name}
+                                        </div>
+                                        <div className={`mt-2 text-xs font-semibold`} style={{ color: theme.primary }}>
+                                          {tierInfo.primaryBenefit || 'Beneficios Exclusivos'}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Progress box */}
+                                    {nextTierInfo && (
+                                      <div className="w-full mt-2">
+                                        <div className="flex justify-between items-end mb-1">
+                                          <div className="text-left">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold block leading-none">Próxima Meta</span>
+                                            <span className="text-sm font-bold text-white uppercase">{nextTierInfo.name}</span>
+                                          </div>
+                                          <div className="text-right">
+                                            <span className="text-[10px] text-slate-500 block leading-none font-bold">Faltan</span>
+                                            <span className="text-sm font-black text-white">${gap.toLocaleString('es-CL')}</span>
+                                          </div>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1.5">
+                                          <div className="h-full rounded-full transition-all duration-1000 ease-out" 
+                                               style={{ width: `${Math.min(100, Math.max(0, (v2026/nextTierInfo.min)*100))}%`, backgroundColor: theme.primary }}>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                  </div>
+                                  
+                                  <div className="absolute bottom-4 left-0 right-0 text-center z-10">
+                                    <p className="text-[9px] text-slate-500 font-mono tracking-widest px-4">
+                                      Generado por inteligencia artificial • {new Date().toLocaleDateString('es-CL')}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {segmentedClients.length > 4 && (
+                           <div className="text-center pt-2 pb-1 text-xs text-slate-500 italic mt-2">
+                             Mostrando 4 previsualizaciones a la vez. (De {segmentedClients.length} seleccionados)
+                           </div>
+                        )}
                       </div>
                     </div>
                   )}
