@@ -1399,7 +1399,7 @@ export function ClubSocialManager() {
         <div className="bg-[#122240] px-4 py-3 rounded-xl border border-[#1e345c] text-right">
           <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Facturación Consolidada Ciclo 2026</span>
           <span className="text-xl font-mono font-black text-emerald-400">
-            ${formatCLP(dashboardStats.totalSales)}
+            {formatCLP(Math.round(dashboardStats.totalSales))}
           </span>
         </div>
       </div>
@@ -1705,7 +1705,7 @@ export function ClubSocialManager() {
                                        </td>
                                        <td className="p-3 text-right">
                                           <span className="text-xs font-mono font-bold text-white">
-                                             ${formatCLP(client.ventas?.v2026 || 0)}
+                                             {formatCLP(Math.round(client.ventas?.v2026 || 0))}
                                           </span>
                                        </td>
                                        <td className="p-3 text-right pr-5">
@@ -2994,7 +2994,8 @@ export function ClubSocialManager() {
                                     ctx.fillRect(0, 0, 1000, 1200);
 
                                     // Decorative circles
-                                    const themeColor = ec.categoria.includes('Platinum') ? '#a855f7' : ec.categoria.includes('Oro') ? '#fbbf24' : '#38bdf8';
+                                    const catName = ec?.categoria || '';
+                                    const themeColor = catName.includes('Platinum') ? '#a855f7' : catName.includes('Oro') ? '#fbbf24' : '#38bdf8';
                                     ctx.globalAlpha = 0.1;
                                     ctx.fillStyle = themeColor;
                                     ctx.beginPath(); ctx.arc(1000, 0, 600, 0, Math.PI*2); ctx.fill();
@@ -3036,10 +3037,10 @@ export function ClubSocialManager() {
 
                                     ctx.fillStyle = '#FFFFFF';
                                     ctx.font = 'bold 50px sans-serif';
-                                    ctx.fillText(ec.name.toUpperCase(), 110, 350);
+                                    ctx.fillText((ec?.name || '').toUpperCase(), 110, 350);
                                     ctx.font = '400 30px sans-serif';
                                     ctx.fillStyle = '#94a3b8';
-                                    ctx.fillText(ec.clinica || 'Centro Veterinario', 110, 410);
+                                    ctx.fillText(ec?.clinica || 'Centro Veterinario', 110, 410);
 
                                     // Tier Badge
                                     ctx.fillStyle = themeColor;
@@ -3048,7 +3049,7 @@ export function ClubSocialManager() {
                                     ctx.fillStyle = '#101b33';
                                     ctx.font = 'bold 22px sans-serif';
                                     ctx.textAlign = 'center';
-                                    ctx.fillText(`CATEGORÍA: ${ec.categoria.toUpperCase()}`, 285, 471);
+                                    ctx.fillText(`CATEGORÍA: ${(ec?.categoria || '').toUpperCase()}`, 285, 471);
                                     ctx.textAlign = 'left';
 
                                     // Benefits section

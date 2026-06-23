@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
+import { GoogleGenAI, Type } from "@google/genai";
 
 let computedFilename = '';
 try {
@@ -434,61 +435,6 @@ ${JSON.stringify(clients, null, 2)}`;
     }
   });
 
-  app.post("/api/ai/generate-support-message", async (req, res) => {
-    try {
-      const { clientName, categoria, clinica, type } = req.body;
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY no configurada" });
-      }
-
-      const { GoogleGenAI, Type } = await import('@google/genai');
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
-
-      const prompt = `Eres un asesor comercial experto de CIMASUR Chile. 
-Escribe un mensaje de ${type} para el médico veterinario ${clientName} de la clínica ${clinica || 'su centro veterinario'}.
-Categoría del cliente: ${categoria}.
-
-INSTRUCCIONES:
-- Tono: Profesional, cercano, empático y experto.
-- Objetivo: Fortalecer el vínculo comercial y ofrecer apoyo técnico/logístico.
-- Menciona brevemente los beneficios de ser categoría ${categoria}.
-- El mensaje debe ser corto, máximo 3 párrafos.
-- No uses placeholders como [Nombre], usa los datos proporcionados.
-- Retorna un objeto JSON con el campo "message".`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              message: { type: Type.STRING }
-            },
-            required: ["message"]
-          }
-        }
-      });
-
-      const text = response.text;
-      if (!text) throw new Error("No se pudo generar el mensaje");
-      const data = JSON.parse(text);
-      res.json(data);
-    } catch (e: any) {
-      console.error(e);
-      res.status(500).json({ error: e.message || 'Error AI Support Message' });
-    }
-  });
-
   app.post('/api/ai/generate-email-template', async (req, res) => {
     try {
       const { client, objective, prompt } = req.body;
@@ -496,7 +442,7 @@ INSTRUCCIONES:
       if (!apiKey) {
         return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor." });
       }
-      const { GoogleGenAI, Type } = await import('@google/genai');
+      
       const ai = new GoogleGenAI({
         apiKey,
         httpOptions: {
@@ -544,8 +490,9 @@ Retorna un objeto JSON con el campo "html". Solo el HTML, sin markdown.`;
       });
 
       const text = response.text;
-      if (!text) throw new Error("No se pudo generar el HTML");
-      const data = JSON.parse(text);
+      const resolved = typeof text === 'string' ? text : await text;
+      if (!resolved) throw new Error("No se pudo generar el HTML");
+      const data = JSON.parse(resolved);
       res.json(data);
     } catch (e: any) {
       console.error(e);
@@ -562,7 +509,7 @@ Retorna un objeto JSON con el campo "html". Solo el HTML, sin markdown.`;
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(computedDirname, 'dist');
+    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

@@ -49,10 +49,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   // Request browser notification permissions on mount
   React.useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission();
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().catch(e => console.log('Notification permission request rejected', e));
+        }
       }
+    } catch (err) {
+      console.warn('Native Notifications are not available or blocked in this iframe environment:', err);
     }
   }, []);
 
@@ -83,8 +87,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             }, 15000); // 15 seconds visible on-screen (Nube Visual de 15 segundos)
 
             // Trigger Browser Native Notification (Visible in other tabs & background)
-            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-              try {
+            try {
+              if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                 const browserNotif = new Notification(latestUnread.title, {
                   body: latestUnread.message,
                   icon: '/favicon.ico',
@@ -96,9 +100,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   setIsNotificationsOpen(true);
                   browserNotif.close();
                 };
-              } catch (e) {
-                console.error('Browser push warning:', e);
               }
+            } catch (e) {
+              console.warn('Native Notification construction or permission check failed:', e);
             }
           }
         }
