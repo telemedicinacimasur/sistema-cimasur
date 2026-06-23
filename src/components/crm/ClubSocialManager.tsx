@@ -742,9 +742,9 @@ export function ClubSocialManager() {
   const enrichedClients = useMemo(() => {
     return clients.map(client => {
       const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
-      const v2024 = sales.v2024 || 0;
-      const v2025 = sales.v2025 || 0;
-      const v2026 = sales.v2026 || 0;
+      const v2024 = Number(sales.v2024 || 0);
+      const v2025 = Number(sales.v2025 || 0);
+      const v2026 = Number(sales.v2026 || 0);
 
       const activeTier2026 = getTierBySales(v2026, tiersList);
       const activeTier2025 = getTierBySales(v2025, tiersList);
@@ -753,8 +753,8 @@ export function ClubSocialManager() {
       const isDisminuyo = v2026 < v2025 && v2026 > 0 && v2025 > 0;
       const percentChange = v2025 > 0 ? (v2026 - v2025) / v2025 : 0;
       const isEstables = Math.abs(percentChange) <= 0.10 && v2026 > 0 && v2025 > 0;
-      const isDormidos = v2025 > 0 && v2026 === 0;
-      const isPerdidos = v2024 > 0 && v2025 === 0 && v2026 === 0;
+      const isDormidos = v2025 > 0 && v2026 <= 0;
+      const isPerdidos = v2024 > 0 && v2025 <= 0 && v2026 <= 0;
       const isRiesgoAlto = percentChange <= -0.50 && v2025 > 0;
 
       // Classify
@@ -784,7 +784,7 @@ export function ClubSocialManager() {
 
       return {
         ...client,
-        ventas: sales,
+        ventas: { v2024, v2025, v2026 },
         calculatedTier: { ...activeTier2026, index: currentTierIndex !== -1 ? currentTierIndex : 0 },
         calculatedTierPrev: activeTier2025,
         segmentGroup,
@@ -842,8 +842,11 @@ export function ClubSocialManager() {
 
   // Handle drill-down logic
   const handleDrillDown = (segment: string) => {
-     setDashboardFilter(segment);
-     setActiveTab('clients');
+     if (dashboardFilter === segment) {
+        setDashboardFilter(null);
+     } else {
+        setDashboardFilter(segment);
+     }
   };
 
   // Master Intelligent Segment Filter Results
@@ -1315,18 +1318,6 @@ export function ClubSocialManager() {
   // Helper lists & state computed items
   const filteredClientList = useMemo(() => {
     return enrichedClients.filter(c => {
-      // If drill-down filter is active from dashboard
-      if (dashboardFilter) {
-        if (dashboardFilter === 'TOTAL CLIENTES') return true;
-        if (dashboardFilter === 'CRECIERON') return c.isCrecio;
-        if (dashboardFilter === 'DISMINUYERON') return c.isDisminuyo;
-        if (dashboardFilter === 'ESTABLES') return c.isEstables;
-        if (dashboardFilter === 'RIESGO CRÍTICO') return c.isRiesgoAlto;
-        if (dashboardFilter === 'PRÓXIMOS ASCENSOS') return c.isProximoAscenso;
-        if (dashboardFilter === 'PRÓXIMOS DESCENSOS') return c.isProximoDescenso;
-        if (dashboardFilter === 'PROSPECTOS INTRANET') return c.isIntranet;
-      }
-
       const searchVal = clientSearch.toLowerCase();
       const nameMatch = (c.name || '').toLowerCase().includes(searchVal) || 
                           (c.email || '').toLowerCase().includes(searchVal) ||
@@ -1339,9 +1330,22 @@ export function ClubSocialManager() {
          catMatch = c.isIntranet;
       }
 
-      return nameMatch && catMatch;
+      // If drill-down filter is active from dashboard
+      let dashboardMatch = true;
+      if (dashboardFilter) {
+        if (dashboardFilter === 'TOTAL CLIENTES') dashboardMatch = true;
+        else if (dashboardFilter === 'CRECIERON') dashboardMatch = !!c.isCrecio;
+        else if (dashboardFilter === 'DISMINUYERON') dashboardMatch = !!c.isDisminuyo;
+        else if (dashboardFilter === 'ESTABLES') dashboardMatch = !!c.isEstables;
+        else if (dashboardFilter === 'RIESGO CRÍTICO') dashboardMatch = !!c.isRiesgoAlto;
+        else if (dashboardFilter === 'PRÓXIMOS ASCENSOS') dashboardMatch = !!c.isProximoAscenso;
+        else if (dashboardFilter === 'PRÓXIMOS DESCENSOS') dashboardMatch = !!c.isProximoDescenso;
+        else if (dashboardFilter === 'PROSPECTOS INTRANET') dashboardMatch = !!c.isIntranet;
+      }
+
+      return nameMatch && catMatch && dashboardMatch;
     });
-  }, [enrichedClients, clientSearch, clientCategoryFilter]);
+  }, [enrichedClients, clientSearch, clientCategoryFilter, dashboardFilter]);
 
   const handleToggleAnalyzeClient = (clientId: string) => {
     setSelectedClientIdsForAnalysis(prev => {
@@ -1552,58 +1556,188 @@ export function ClubSocialManager() {
 
                   </div>
 
-                  {/* SECONDARY ROW */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* SECONDARY ROW - High Risk & Opportunity */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     
                     <div 
-                      onClick={() => { setDashboardFilter('RIESGO CRÍTICO'); setActiveTab('clients'); }}
+                      id="card_riesgo_critico"
+                      onClick={() => handleDrillDown('RIESGO CRÍTICO')}
                       className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'RIESGO CRÍTICO' ? 'bg-red-500/10 border-red-500 shadow-lg shadow-red-500/10' : 'bg-[#121c33] border-red-900/40'}`}
                     >
                       <div className="absolute right-3 top-3 bg-red-500/10 text-red-400 p-1.5 rounded-lg border border-red-500/20">
                         <AlertTriangle className="w-4 h-4 animate-bounce" />
                       </div>
-                      <span className="text-[10px] text-red-400 font-extrabold uppercase block tracking-wider">RIESGO CRÍTICO (CAÍDA {'>'}50%)</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-red-500">{dashboardStats.riesgo} Clientes</span>
-                      <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">Requieren plan de rescate inmediato o gracia para mantener estatus de club.</p>
+                      <span className="text-[10px] text-red-400 font-extrabold uppercase block tracking-wider">RIESGO CRÍTICO</span>
+                      <span className="text-3xl font-mono font-black mt-2 block text-red-500">{dashboardStats.riesgo}</span>
+                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">CAÍDA {'>'}50% vs 2025</p>
                     </div>
 
                     <div 
-                      onClick={() => { setDashboardFilter('PRÓXIMOS ASCENSOS'); setActiveTab('clients'); }}
+                      id="card_proximos_ascensos"
+                      onClick={() => handleDrillDown('PRÓXIMOS ASCENSOS')}
                       className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'PRÓXIMOS ASCENSOS' ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-500/10' : 'bg-[#121c33] border-emerald-900/40'}`}
                     >
                       <div className="absolute right-3 top-3 bg-emerald-500/10 text-emerald-400 p-1.5 rounded-lg border border-emerald-500/20">
                         <ArrowUpRight className="w-4 h-4 text-emerald-400" />
                       </div>
-                      <span className="text-[10px] text-emerald-400 font-extrabold uppercase block tracking-wider">PRÓXIMOS ASCENSOS</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-emerald-400">{dashboardStats.ascensos} Clientes</span>
-                      <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">Están en el rango de 15% para desbloquear la categoría siguiente.</p>
+                      <span className="text-[10px] text-emerald-400 font-extrabold uppercase block tracking-wider">PRÓX. ASCENSOS</span>
+                      <span className="text-3xl font-mono font-black mt-2 block text-emerald-400">{dashboardStats.ascensos}</span>
+                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">Margen 15% para subir</p>
                     </div>
 
                     <div 
+                      id="card_proximos_descensos"
                       onClick={() => handleDrillDown('PRÓXIMOS DESCENSOS')}
                       className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'PRÓXIMOS DESCENSOS' ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/10' : 'bg-[#121c33] border-amber-900/40'}`}
                     >
                       <div className="absolute right-3 top-3 bg-amber-500/10 text-amber-400 p-1.5 rounded-lg border border-amber-500/20">
                         <ArrowDownRight className="w-4 h-4 text-amber-400" />
                       </div>
-                      <span className="text-[10px] text-amber-400 font-extrabold uppercase block tracking-wider">PRÓXIMOS DESCENSOS</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-white">{dashboardStats.descensos} Clientes</span>
-                      <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">Están al límite marginal o a menos del 15% de caer de su categoría actual.</p>
+                      <span className="text-[10px] text-amber-400 font-extrabold uppercase block tracking-wider">PRÓX. DESCENSOS</span>
+                      <span className="text-3xl font-mono font-black mt-2 block text-amber-500">{dashboardStats.descensos}</span>
+                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">Al límite de categoría</p>
                     </div>
 
                     <div 
+                      id="card_prospectos_intranet"
                       onClick={() => handleDrillDown('PROSPECTOS INTRANET')}
                       className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'PROSPECTOS INTRANET' ? 'bg-sky-500/10 border-sky-500 shadow-lg shadow-sky-500/10' : 'bg-[#121c33] border-slate-700/40'}`}
                     >
                       <div className="absolute right-3 top-3 bg-sky-500/10 text-sky-400 p-1.5 rounded-lg border border-sky-500/20">
                         <LinkIcon className="w-4 h-4 text-sky-400" />
                       </div>
-                      <span className="text-[10px] text-sky-400 font-extrabold uppercase block tracking-wider">PROSPECTOS INTRANET</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-white">{dashboardStats.intranet} Clientes</span>
-                      <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">Médicos con acceso a la plataforma pero que aún no han realizado su primera compra.</p>
+                      <span className="text-[10px] text-sky-400 font-extrabold uppercase block tracking-wider">PROSPECTS WEB</span>
+                      <span className="text-3xl font-mono font-black mt-2 block text-sky-400">{dashboardStats.intranet}</span>
+                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">Acceso sin primera compra</p>
                     </div>
 
                   </div>
+
+                  {/* METRIC DRILL DOWN LIST (THE "VENTANA DESPLEGABLE") */}
+                  <AnimatePresence>
+                    {dashboardFilter && (
+                      <motion.div 
+                        id="dashboard_drilldown_panel"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-[#0a101e] border border-sky-500/30 rounded-2xl overflow-hidden shadow-2xl shadow-sky-500/5 mb-6"
+                      >
+                        <div className="bg-[#111f38] px-4 py-3 border-b border-sky-500/20 flex items-center justify-between">
+                           <div className="flex items-center gap-3">
+                              <div className="bg-sky-500/20 p-1.5 rounded-lg">
+                                 <Filter className="w-4 h-4 text-sky-400" />
+                              </div>
+                              <div>
+                                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                                    Explorando: {dashboardFilter} 
+                                    <span className="ml-2 text-sky-400 opacity-70 font-mono">
+                                       ({enrichedClients.filter(c => {
+                                          if (dashboardFilter === 'TOTAL CLIENTES') return true;
+                                          if (dashboardFilter === 'CRECIERON') return c.isCrecio;
+                                          if (dashboardFilter === 'DISMINUYERON') return c.isDisminuyo;
+                                          if (dashboardFilter === 'ESTABLES') return c.isEstables;
+                                          if (dashboardFilter === 'RIESGO CRÍTICO') return c.isRiesgoAlto;
+                                          if (dashboardFilter === 'PRÓXIMOS ASCENSOS') return c.isProximoAscenso;
+                                          if (dashboardFilter === 'PRÓXIMOS DESCENSOS') return c.isProximoDescenso;
+                                          if (dashboardFilter === 'PROSPECTOS INTRANET') return c.isIntranet;
+                                          return false;
+                                       }).length} clientes)
+                                    </span>
+                                 </h4>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => { setActiveTab('clients'); }}
+                                className="text-[10px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 bg-sky-500/10 px-2 py-1 rounded transition-all"
+                              >
+                                 VER EN CARTERA <ExternalLink className="w-3 h-3" />
+                              </button>
+                              <button 
+                                onClick={() => setDashboardFilter(null)}
+                                className="text-slate-400 hover:text-white transition-colors p-1"
+                              >
+                                 <RotateCcw className="w-4 h-4" />
+                              </button>
+                           </div>
+                        </div>
+
+                        <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                           <table className="w-full text-left border-collapse">
+                              <thead className="sticky top-0 bg-[#0a101e] z-10">
+                                 <tr className="border-b border-slate-800">
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase pl-5">Médico / Clínica</th>
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase">Categoría</th>
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right">Ventas Acum.</th>
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right pr-5">Acciones</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/50">
+                                 {enrichedClients.filter(c => {
+                                    if (dashboardFilter === 'TOTAL CLIENTES') return true;
+                                    if (dashboardFilter === 'CRECIERON') return c.isCrecio;
+                                    if (dashboardFilter === 'DISMINUYERON') return c.isDisminuyo;
+                                    if (dashboardFilter === 'ESTABLES') return c.isEstables;
+                                    if (dashboardFilter === 'RIESGO CRÍTICO') return c.isRiesgoAlto;
+                                    if (dashboardFilter === 'PRÓXIMOS ASCENSOS') return c.isProximoAscenso;
+                                    if (dashboardFilter === 'PRÓXIMOS DESCENSOS') return c.isProximoDescenso;
+                                    if (dashboardFilter === 'PROSPECTOS INTRANET') return c.isIntranet;
+                                    return false;
+                                 }).map(client => (
+                                    <tr key={client.id} className="hover:bg-sky-500/5 transition-colors group">
+                                       <td className="p-3 pl-5">
+                                          <div className="flex items-center gap-3">
+                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${client.calculatedTier.color.replace('text-', 'bg-').replace('text-', 'bg-')}/20 ${client.calculatedTier.color}`}>
+                                                {client.name.substring(0, 2).toUpperCase()}
+                                             </div>
+                                             <div className="flex flex-col">
+                                                <span className="text-xs font-bold text-slate-200">{client.name}</span>
+                                                <span className="text-[10px] text-slate-500 font-mono">{client.rut}</span>
+                                             </div>
+                                          </div>
+                                       </td>
+                                       <td className="p-3">
+                                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border ${client.calculatedTier.color.replace('text-', 'border-').replace('text-', 'border-')}/30 ${client.calculatedTier.color.replace('text-', 'bg-').replace('text-', 'bg-')}/10 ${client.calculatedTier.color}`}>
+                                             {client.calculatedTier.name}
+                                          </span>
+                                       </td>
+                                       <td className="p-3 text-right">
+                                          <span className="text-xs font-mono font-bold text-white">
+                                             ${formatCLP(client.ventas?.v2026 || 0)}
+                                          </span>
+                                       </td>
+                                       <td className="p-3 text-right pr-5">
+                                          <div className="flex items-center justify-end gap-2">
+                                             <button 
+                                                onClick={() => {
+                                                   setSelectedClientId(client.id);
+                                                   setActiveTab('campaigns');
+                                                   setCommsSubTab('canvas_email');
+                                                }}
+                                                className="bg-sky-500/10 text-sky-400 p-1.5 rounded hover:bg-sky-500 text-[9px] font-black hover:text-white transition-all uppercase tracking-tighter"
+                                             >
+                                                Diseñar Email
+                                             </button>
+                                             <button 
+                                                onClick={() => {
+                                                   setSelectedClientId(client.id);
+                                                   setActiveTab('clients');
+                                                }}
+                                                className="bg-slate-800 text-slate-300 p-1.5 rounded hover:bg-slate-700 text-[9px] font-black transition-all uppercase tracking-tighter"
+                                             >
+                                                Ficha
+                                             </button>
+                                          </div>
+                                       </td>
+                                    </tr>
+                                 ))}
+                              </tbody>
+                           </table>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* MINI HISTORIC TREND GRAPH (SVG) */}
                   <div className="bg-[#0c182e] p-5 rounded-xl border border-slate-800">
