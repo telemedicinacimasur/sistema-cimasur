@@ -347,17 +347,18 @@ export function ClubSocialManager() {
 
       if (!rutNormalized) continue;
 
+      const matchedClient = clientMap.get(rutNormalized);
+
       const v2024 = colMapping.v2024Idx !== -1 && colMapping.v2024Idx < cols.length
         ? (parseFloat((cols[colMapping.v2024Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
-        : 0;
+        : (matchedClient?.ventas?.v2024 || 0);
       const v2025 = colMapping.v2025Idx !== -1 && colMapping.v2025Idx < cols.length
         ? (parseFloat((cols[colMapping.v2025Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
-        : 0;
+        : (matchedClient?.ventas?.v2025 || 0);
       const v2026 = colMapping.v2026Idx !== -1 && colMapping.v2026Idx < cols.length
         ? (parseFloat((cols[colMapping.v2026Idx] || '').replace(/[^0-9.-]/g, '')) || 0)
-        : 0;
+        : (matchedClient?.ventas?.v2026 || 0);
 
-      const matchedClient = clientMap.get(rutNormalized);
       if (matchedClient) {
         matchedCount++;
         details.push({
@@ -623,7 +624,7 @@ export function ClubSocialManager() {
     let totalSalesPeriod = 0;
 
     enrichedClients.forEach(c => {
-      totalSalesPeriod += c.ventas.v2026;
+      totalSalesPeriod += c.ventas?.v2026 || 0;
       if (c.isCrecio) crecieronCount++;
       if (c.isDisminuyo) disminuyeronCount++;
       if (c.isEstables) establesCount++;
@@ -661,8 +662,8 @@ export function ClubSocialManager() {
 
       // Cycle Recency Match
       let matchesLastPurchase = true;
-      if (segLastPurchase === 'En ciclo actual') matchesLastPurchase = c.ventas.v2026 > 0;
-      else if (segLastPurchase === 'Solo ciclo anterior') matchesLastPurchase = c.ventas.v2025 > 0 && c.ventas.v2026 === 0;
+      if (segLastPurchase === 'En ciclo actual') matchesLastPurchase = (c.ventas?.v2026 || 0) > 0;
+      else if (segLastPurchase === 'Solo ciclo anterior') matchesLastPurchase = (c.ventas?.v2025 || 0) > 0 && (c.ventas?.v2026 || 0) === 0;
 
       return matchesCategory && matchesBehavior && matchesLastPurchase;
     });
@@ -926,7 +927,7 @@ export function ClubSocialManager() {
       // Trigger standard browser download
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `cimasur_postal_club_${client.name.replace(/\s+/g, '_')}.png`;
+      link.download = `cimasur_postal_club_${(client.name || '').replace(/\s+/g, '_')}.png`;
       link.href = imgData;
       link.click();
 
@@ -1055,9 +1056,10 @@ export function ClubSocialManager() {
   // Helper lists & state computed items
   const filteredClientList = useMemo(() => {
     return enrichedClients.filter(c => {
-      const nameMatch = c.name.toLowerCase().includes(clientSearch.toLowerCase()) || 
-                          c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                          c.rut.toLowerCase().includes(clientSearch.toLowerCase());
+      const searchVal = clientSearch.toLowerCase();
+      const nameMatch = (c.name || '').toLowerCase().includes(searchVal) || 
+                          (c.email || '').toLowerCase().includes(searchVal) ||
+                          (c.rut || '').toLowerCase().includes(searchVal);
       const catMatch = clientCategoryFilter === 'Todas' || c.calculatedTier.name === clientCategoryFilter;
       return nameMatch && catMatch;
     });
@@ -1425,7 +1427,7 @@ export function ClubSocialManager() {
                                 </span>
                               </div>
                               <span className="text-[10px] text-[#94a3b8] block mt-0.5 truncate">{c.clinica || 'Sin clínica registrada'}</span>
-                              <span className="text-[9px] font-mono text-emerald-400 block mt-1">2026: ${c.ventas.v2026.toLocaleString('es-CL')}</span>
+                              <span className="text-[9px] font-mono text-emerald-400 block mt-1">2026: ${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</span>
                               
                               {/* Communication Metadata */}
                               {(c.ultimoWhatsapp || c.ultimoCorreo || c.ultimaCampania) && (
@@ -1507,14 +1509,14 @@ export function ClubSocialManager() {
                                         <div className="flex justify-between text-[11px]">
                                           <span className="font-bold text-slate-200 truncate max-w-[150px]">{c.name}</span>
                                           <span className="font-mono text-emerald-400 font-bold">
-                                            ${c.ventas?.v2026.toLocaleString('es-CL')}{' '}
+                                            ${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}{' '}
                                             <span className="text-slate-500 text-[9px]">({c.categoria})</span>
                                           </span>
                                         </div>
                                         <div className="w-full bg-[#121c31] h-3 rounded-lg overflow-hidden flex">
                                           <div className={`h-full rounded-lg transition-all ${
-                                            c.categoria.includes('Platinum') ? 'bg-gradient-to-r from-purple-600 to-indigo-500' :
-                                            c.categoria.includes('Oro') ? 'bg-gradient-to-r from-yellow-500 to-amber-600' :
+                                            (c.categoria || '').includes('Platinum') ? 'bg-gradient-to-r from-purple-600 to-indigo-500' :
+                                            (c.categoria || '').includes('Oro') ? 'bg-gradient-to-r from-yellow-500 to-amber-600' :
                                             'bg-gradient-to-r from-sky-500 to-emerald-500'
                                           }`} style={{ width: `${percent}%` }}></div>
                                         </div>
@@ -1540,9 +1542,9 @@ export function ClubSocialManager() {
                                     {listForAnalysis.map(c => (
                                       <tr key={c.id} className="hover:bg-slate-900/40">
                                         <td className="p-2.5 font-bold text-white truncate max-w-[130px]">{c.name}</td>
-                                        <td className="p-2.5 text-right font-mono text-slate-400">${c.ventas?.v2024.toLocaleString('es-CL')}</td>
-                                        <td className="p-2.5 text-right font-mono text-slate-350">${c.ventas?.v2025.toLocaleString('es-CL')}</td>
-                                        <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold">${c.ventas?.v2026.toLocaleString('es-CL')}</td>
+                                        <td className="p-2.5 text-right font-mono text-slate-400">${(c.ventas?.v2024 || 0).toLocaleString('es-CL')}</td>
+                                        <td className="p-2.5 text-right font-mono text-slate-350">${(c.ventas?.v2025 || 0).toLocaleString('es-CL')}</td>
+                                        <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold">${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</td>
                                         <td className="p-2.5 text-center">
                                           <span className="text-[8px] px-1.5 py-0.5 rounded bg-black/35 text-slate-300 border border-slate-750">
                                             {c.categoria}
@@ -1589,8 +1591,8 @@ export function ClubSocialManager() {
                           </div>
                           <div className="text-right">
                             <span className={`px-3 py-1 text-[11px] font-black uppercase rounded-full border ${
-                              selectedClient.categoria.includes('Platinum') ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
-                              selectedClient.categoria.includes('Oro') ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
+                              (selectedClient.categoria || '').includes('Platinum') ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
+                              (selectedClient.categoria || '').includes('Oro') ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
                               'bg-slate-700/30 text-slate-300 border-slate-700'
                             }`}>
                               Socio {selectedClient.categoria}
@@ -1647,7 +1649,7 @@ export function ClubSocialManager() {
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-[11px] font-bold">
                                     <span className="text-slate-400">Ciclo Anual 2024:</span>
-                                    <span className="font-mono text-slate-200">${selectedClient.ventas?.v2024.toLocaleString('es-CL')}</span>
+                                    <span className="font-mono text-slate-200">${(selectedClient.ventas?.v2024 || 0).toLocaleString('es-CL')}</span>
                                   </div>
                                   <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
                                     <div className="bg-slate-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2024 || 0) / 12000000) * 100))}%` }}></div>
@@ -1657,7 +1659,7 @@ export function ClubSocialManager() {
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-[11px] font-bold">
                                     <span className="text-slate-400">Ciclo Anual 2025:</span>
-                                    <span className="font-mono text-slate-200">${selectedClient.ventas?.v2025.toLocaleString('es-CL')}</span>
+                                    <span className="font-mono text-slate-200">${(selectedClient.ventas?.v2025 || 0).toLocaleString('es-CL')}</span>
                                   </div>
                                   <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
                                     <div className="bg-indigo-505 bg-[#38bdf8] h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2025 || 0) / 12000000) * 100))}%` }}></div>
@@ -1667,7 +1669,7 @@ export function ClubSocialManager() {
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-[11px] font-bold">
                                     <span className="text-slate-400">Ciclo Anual 2026 (Mayo Cierre):</span>
-                                    <span className="font-mono text-emerald-400 font-extrabold">${selectedClient.ventas?.v2026.toLocaleString('es-CL')}</span>
+                                    <span className="font-mono text-emerald-400 font-extrabold">${(selectedClient.ventas?.v2026 || 0).toLocaleString('es-CL')}</span>
                                   </div>
                                   <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
                                     <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2026 || 0) / 12000000) * 100))}%` }}></div>
@@ -1825,7 +1827,7 @@ export function ClubSocialManager() {
                         </div>
                         <div className="text-right">
                           <span className="text-slate-500 block text-[10px]">VENTAS REALES 2026</span>
-                          <span className="text-sm font-mono font-black text-slate-300">${selectedClient.ventas?.v2026.toLocaleString('es-CL')}</span>
+                          <span className="text-sm font-mono font-black text-slate-300">${(selectedClient.ventas?.v2026 || 0).toLocaleString('es-CL')}</span>
                         </div>
                       </div>
 
@@ -2056,8 +2058,8 @@ export function ClubSocialManager() {
                                 <tr key={c.id} className="hover:bg-[#121c2e]">
                                   <td className="p-2 font-bold text-slate-100">{c.name}</td>
                                   <td className="p-2 text-slate-400">{c.clinica || '---'}</td>
-                                  <td className="p-2 text-right font-mono text-slate-350">${c.ventas.v2025.toLocaleString('es-CL')}</td>
-                                  <td className="p-2 text-right font-mono text-emerald-400 font-extrabold">${c.ventas.v2026.toLocaleString('es-CL')}</td>
+                                  <td className="p-2 text-right font-mono text-slate-350">${(c.ventas?.v2025 || 0).toLocaleString('es-CL')}</td>
+                                  <td className="p-2 text-right font-mono text-emerald-400 font-extrabold">${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</td>
                                   <td className="p-2 text-center font-mono">
                                     <span className={c.percentChange > 0 ? 'text-emerald-400' : c.percentChange < 0 ? 'text-rose-400' : 'text-slate-400'}>
                                       {c.percentChange === 0 ? '0%' : `${c.percentChange > 0 ? '+' : ''}${(c.percentChange * 100).toFixed(0)}%`}
@@ -2698,10 +2700,10 @@ export function ClubSocialManager() {
                                   <span className="font-bold block text-white">{c.name}</span>
                                   <span className="text-[10px] text-slate-500 block">{c.clinica}</span>
                                 </td>
-                                <td className="p-3 font-mono font-bold text-slate-200">${c.ventas.v2026.toLocaleString('es-CL')}</td>
+                                <td className="p-3 font-mono font-bold text-slate-200">${(c.ventas?.v2026 || 0).toLocaleString('es-CL')}</td>
                                 <td className="p-3 font-mono">
                                   <span className={c.percentChange >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-450 text-rose-400'}>
-                                    {c.percentChange >= 0 ? `+` : ''}${(c.ventas.v2026 - c.ventas.v2025).toLocaleString('es-CL')}
+                                    {c.percentChange >= 0 ? `+` : ''}${((c.ventas?.v2026 || 0) - (c.ventas?.v2025 || 0)).toLocaleString('es-CL')}
                                   </span>
                                 </td>
                                 <td className="p-3 font-mono">
@@ -2788,7 +2790,7 @@ export function ClubSocialManager() {
                 <ol className="list-decimal list-inside space-y-1 text-[11px] text-sky-300">
                   <li>Copia tus columnas directamente desde Excel o Sheets.</li>
                   <li>Las columnas deben contener el <strong className="text-white">RUT</strong> del cliente, seguido de las ventas de cada año.</li>
-                  <li>Si un RUT existe pero no aparece con ventas en algún año, su valor para ese año quedará en <strong className="text-white">0</strong>.</li>
+                  <li>Solo se actualizarán los años en donde hayas mapeado una columna. Los años en <strong className="text-white">"Ninguna"</strong> conservarán su valor histórico.</li>
                   <li>Usa los selectores inferiores para mapear el número de columna correspondiente a cada dato.</li>
                 </ol>
               </div>
@@ -2799,7 +2801,7 @@ export function ClubSocialManager() {
                 <textarea
                   value={salesImportText}
                   onChange={(e) => setSalesImportText(e.target.value)}
-                  placeholder="Ejemplo de copiado de Excel (RUT / 2024 / 2025 / 2026):&#10;12.345.678-9&#9;1200000&#9;2300000&#9;3500000&#10;9.876.543-2&#9;0&#9;450000&#9;120000"
+                  placeholder="Ejemplo con años múltiples (RUT / 2024 / 2025 / 2026):&#10;12.345.678-9&#9;1200000&#9;2300000&#9;3500000&#10;&#10;Ejemplo con un solo año (RUT / Venta):&#10;9.876.543-2&#9;450000"
                   className="w-full h-32 bg-[#090f1d] p-3 rounded-xl border border-slate-705 text-xs text-white resize-none font-mono focus:outline-none focus:border-sky-500 placeholder-slate-600 focus:ring-1 focus:ring-sky-500"
                 ></textarea>
               </div>
@@ -2907,9 +2909,9 @@ export function ClubSocialManager() {
                                     <span className="text-slate-500 italic">RUT no registrado</span>
                                   )}
                                 </td>
-                                <td className="p-2.5">${row.v2024.toLocaleString('es-CL')}</td>
-                                <td className="p-2.5">${row.v2025.toLocaleString('es-CL')}</td>
-                                <td className="p-2.5 text-emerald-400 font-extrabold">${row.v2026.toLocaleString('es-CL')}</td>
+                                <td className="p-2.5">${(row.v2024 || 0).toLocaleString('es-CL')}</td>
+                                <td className="p-2.5">${(row.v2025 || 0).toLocaleString('es-CL')}</td>
+                                <td className="p-2.5 text-emerald-400 font-extrabold">${(row.v2026 || 0).toLocaleString('es-CL')}</td>
                                 <td className="p-2.5 text-right">
                                   {row.found ? (
                                     <span className="bg-emerald-500/10 text-emerald-400 text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/20">Vinculado</span>
