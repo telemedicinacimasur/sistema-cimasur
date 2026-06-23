@@ -1617,6 +1617,7 @@ export function ClubSocialManager() {
                   <AnimatePresence>
                     {dashboardFilter && (
                       <motion.div 
+                        key="dashboard_drilldown_panel"
                         id="dashboard_drilldown_panel"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
@@ -3155,19 +3156,25 @@ export function ClubSocialManager() {
                                         </div>
                                         <button 
                                           onClick={async () => {
-                                            const response = await fetch('/api/ai/generate-support-message', {
-                                              method: 'POST',
-                                              headers: { 'Content-Type': 'application/json' },
-                                              body: JSON.stringify({
-                                                clientName: recipient.name,
-                                                categoria: ec.categoria,
-                                                clinica: recipient.clinica,
-                                                type: 'soporte comercial'
-                                              })
-                                            });
-                                            const data = await response.json();
-                                            if (data.message) {
-                                              setAiGeneratedMessages({...aiGeneratedMessages, [recipient.id]: data.message});
+                                            try {
+                                              const response = await fetch('/api/ai/generate-support-message', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                  clientName: recipient.name,
+                                                  categoria: ec.categoria,
+                                                  clinica: recipient.clinica,
+                                                  type: 'soporte comercial'
+                                                })
+                                              });
+                                              if (!response.ok) throw new Error("Error en servidor AI");
+                                              const data = await response.json();
+                                              if (data.message) {
+                                                setAiGeneratedMessages(prev => ({...prev, [recipient.id]: data.message}));
+                                              }
+                                            } catch (err) {
+                                              console.error("AI Error:", err);
+                                              alert("No se pudo generar el mensaje con IA en este momento.");
                                             }
                                           }}
                                           className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-black/60 rounded-lg text-[9px] text-sky-400 font-bold backdrop-blur-sm transition-all flex items-center gap-1"
