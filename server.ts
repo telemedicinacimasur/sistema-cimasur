@@ -91,9 +91,14 @@ async function startServer() {
     if (!db) {
       try {
         const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-        if (serviceAccountString) {
+        if (serviceAccountString && serviceAccountString.trim()) {
+          const trimmed = serviceAccountString.trim();
+          if (!trimmed.startsWith('{')) {
+            console.warn(`[CIMASUR Warning] FIREBASE_SERVICE_ACCOUNT_JSON no es un JSON válido (valor actual: "${trimmed}"). Verifique sus variables de entorno. Usando almacenamiento local como respaldo.`);
+            return null;
+          }
           if (admin.apps.length === 0) {
-            const serviceAccount = JSON.parse(serviceAccountString);
+            const serviceAccount = JSON.parse(trimmed);
             admin.initializeApp({
               credential: admin.credential.cert(serviceAccount)
             });
