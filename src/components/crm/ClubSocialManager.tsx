@@ -120,6 +120,24 @@ function getTierBySales(sales: number, tiers: TierConfig[]) {
   return list[0];
 }
 
+// Unified Tier Badge CSS styling resolver
+function getTierBadgeClass(name: string): string {
+  const norm = (name || '').toLowerCase();
+  if (norm.includes('platinum')) {
+    return 'bg-purple-950/80 text-purple-300 border-purple-500/40 whitespace-nowrap shadow-sm';
+  }
+  if (norm.includes('oro')) {
+    return 'bg-amber-950/80 text-yellow-300 border-yellow-600/40 whitespace-nowrap shadow-sm';
+  }
+  if (norm.includes('plata')) {
+    return 'bg-slate-800 text-slate-100 border-slate-500/40 whitespace-nowrap shadow-sm';
+  }
+  if (norm.includes('bronce')) {
+    return 'bg-amber-950/40 text-amber-300 border-amber-800/40 whitespace-nowrap shadow-sm';
+  }
+  return 'bg-slate-900/90 text-slate-400 border-slate-800 whitespace-nowrap';
+}
+
 // B2B CRM Custom Script Templates
 const PRESET_TEMPLATES: Record<string, string> = {
   oficial_cimasur: "Hola Dr(a). {{NOMBRE}}\n\nQueremos informarle que actualmente pertenece a la categoría {{CATEGORIA}}.\n\nLe faltan ${{BRECHA}} para acceder a la categoría {{SIGUIENTE_CATEGORIA}}.\n\nSi tiene consultas puede contactarme directamente:\n\n📧 {{CORREO_EJECUTIVO}}\n📱 {{WHATSAPP_EJECUTIVO}}\n\nSaludos,\n{{EJECUTIVO}}",
@@ -717,27 +735,6 @@ export function ClubSocialManager() {
     }
   };
 
-  // Select a client and load in detail panel
-  const selectedClient = useMemo(() => {
-    const found = clients.find(c => c.id === selectedClientId);
-    if (found) return found;
-    return clients[0] || null;
-  }, [clients, selectedClientId]);
-
-  // Handle setting parameters when selected client changes
-  useEffect(() => {
-    if (selectedClient) {
-      setEditName(selectedClient.name);
-      setEditEmail(selectedClient.email);
-      setEditPhone(selectedClient.phone);
-      setEditRut(selectedClient.rut);
-      setEditClinica(selectedClient.clinica || '');
-      setEditSales2024(selectedClient.ventas?.v2024 || 0);
-      setEditSales2025(selectedClient.ventas?.v2025 || 0);
-      setEditSales2026(selectedClient.ventas?.v2026 || 0);
-    }
-  }, [selectedClient]);
-
   // Core intelligence classifier for all clients based on Sales Cycles
   const enrichedClients = useMemo(() => {
     return clients.map(client => {
@@ -804,6 +801,27 @@ export function ClubSocialManager() {
       };
     });
   }, [clients, tiersList]);
+
+  // Select a client and load in detail panel
+  const selectedClient = useMemo(() => {
+    const found = enrichedClients.find(c => c.id === selectedClientId);
+    if (found) return found;
+    return enrichedClients[0] || null;
+  }, [enrichedClients, selectedClientId]);
+
+  // Handle setting parameters when selected client changes
+  useEffect(() => {
+    if (selectedClient) {
+      setEditName(selectedClient.name);
+      setEditEmail(selectedClient.email);
+      setEditPhone(selectedClient.phone);
+      setEditRut(selectedClient.rut);
+      setEditClinica(selectedClient.clinica || '');
+      setEditSales2024(selectedClient.ventas?.v2024 || 0);
+      setEditSales2025(selectedClient.ventas?.v2025 || 0);
+      setEditSales2026(selectedClient.ventas?.v2026 || 0);
+    }
+  }, [selectedClient]);
 
   // Executive Dashboard Sums
   const dashboardStats = useMemo(() => {
@@ -1668,10 +1686,10 @@ export function ClubSocialManager() {
                            <table className="w-full text-left border-collapse">
                               <thead className="sticky top-0 bg-[#0a101e] z-10">
                                  <tr className="border-b border-slate-800">
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase pl-5">Médico / Clínica</th>
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase">Categoría</th>
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right">Ventas Acum.</th>
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right pr-5">Acciones</th>
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase pl-5 w-2/5">Médico / Clínica</th>
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase w-1/4">Categoría</th>
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right w-1/5">Ventas Acum.</th>
+                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right pr-5 w-1/5">Acciones</th>
                                  </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-800/50">
@@ -1687,9 +1705,9 @@ export function ClubSocialManager() {
                                     return false;
                                  }).map(client => (
                                     <tr key={client.id} className="hover:bg-sky-500/5 transition-colors group">
-                                       <td className="p-3 pl-5">
+                                       <td className="p-3 pl-5 w-2/5">
                                           <div className="flex items-center gap-3">
-                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${client.calculatedTier.color.replace('text-', 'bg-').replace('text-', 'bg-')}/20 ${client.calculatedTier.color}`}>
+                                             <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold bg-gradient-to-br ${client.calculatedTier.color}`}>
                                                 {client.name.substring(0, 2).toUpperCase()}
                                              </div>
                                              <div className="flex flex-col">
@@ -1698,8 +1716,8 @@ export function ClubSocialManager() {
                                              </div>
                                           </div>
                                        </td>
-                                       <td className="p-3">
-                                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border ${client.calculatedTier.color.replace('text-', 'border-').replace('text-', 'border-')}/30 ${client.calculatedTier.color.replace('text-', 'bg-').replace('text-', 'bg-')}/10 ${client.calculatedTier.color}`}>
+                                       <td className="p-3 w-1/4">
+                                          <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border inline-flex items-center justify-center whitespace-nowrap leading-none ${getTierBadgeClass(client.calculatedTier.name)}`}>
                                              {client.calculatedTier.name}
                                           </span>
                                        </td>
@@ -1893,12 +1911,7 @@ export function ClubSocialManager() {
                                   {c.name}
                                   {(c.ventas?.v2026 || 0) === 0 && <span className="ml-1 text-[8px] text-sky-400 font-black">● INTRANET</span>}
                                 </span>
-                                <span className={`text-[9px] px-2 py-0.5 rounded border leading-none shrink-0 ${
-                                  c.calculatedTier.name.includes('Platinum') ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                  c.calculatedTier.name.includes('Oro') ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                                  c.calculatedTier.name.includes('Plata') ? 'bg-sky-500/10 text-sky-450 border-sky-500/20' :
-                                  'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}>
+                                <span className={`text-[9px] px-2 py-0.5 rounded border leading-none shrink-0 ${getTierBadgeClass(c.calculatedTier.name)}`}>
                                   {c.calculatedTier.name}
                                 </span>
                               </div>
@@ -2634,11 +2647,16 @@ export function ClubSocialManager() {
                                             })
                                          });
                                          const data = await response.json();
-                                         if (data.html) {
+                                         if (data && data.html) {
                                             setEmailAITemplate(data.html);
+                                         } else if (data && data.error) {
+                                            alert("Error al generar la maqueta: " + data.error);
+                                         } else {
+                                            alert("No se pudo obtener la maqueta.");
                                          }
-                                      } catch (err) {
+                                      } catch (err: any) {
                                          console.error(err);
+                                         alert("Error al generar la maqueta: " + (err.message || err));
                                       } finally {
                                          setIsSending(false);
                                       }
