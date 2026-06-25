@@ -30,6 +30,7 @@ interface ClubClient {
   ultimoWhatsapp?: string;
   ultimoCorreo?: string;
   ultimaCampania?: string;
+  intranet?: string;
 }
 
 interface TierConfig {
@@ -170,6 +171,9 @@ export function ClubSocialManager() {
   const [designerAccentColor, setDesignerAccentColor] = useState('#38bdf8');
   const [designerTitle, setDesignerTitle] = useState('CIMASUR®');
   const [designerSubtitle, setDesignerSubtitle] = useState('Farmacia Homeopática Veterinaria de Chile');
+  const [designerBodyBgColor, setDesignerBodyBgColor] = useState('#050914');
+  const [designerCardBgColor, setDesignerCardBgColor] = useState('#0d162d');
+  const [designerTextColor, setDesignerTextColor] = useState('#cbd5e1');
 
   // Image Upload states for campaign designer
   const [uploadedImageB64, setUploadedImageB64] = useState<string | null>(null);
@@ -334,7 +338,8 @@ export function ClubSocialManager() {
           historialUnificado: c.historialUnificado || '',
           clinica: c.razonSocial || c.clinica || (c.name ? `${c.name} Vet` : 'Clínica Veterinaria'),
           ultimoWhatsapp: c.ultimoWhatsapp || '',
-          ultimoCorreo: c.ultimoCorreo || ''
+          ultimoCorreo: c.ultimoCorreo || '',
+          intranet: c.intranet || 'No'
         };
       });
 
@@ -448,6 +453,21 @@ export function ClubSocialManager() {
       rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
     } else if (recipientFilterSegment === 'silver_to_platinum') {
       rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else if (recipientFilterSegment === 'intranet_sin_compras') {
+      rawList = allClubClients.filter(c => c.intranet === 'Si' && (c.ventas?.v2026 || 0) === 0);
+    } else if (recipientFilterSegment === 'sin_categorias') {
+      rawList = allClubClients.filter(c => {
+        const tier = (c.calculatedTier?.name || '').toLowerCase();
+        return tier === 'sin categoría' || tier === 'sin categoria' || tier === '';
+      });
+    } else if (recipientFilterSegment === 'bronce') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
+    } else if (recipientFilterSegment === 'plata') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else if (recipientFilterSegment === 'oro') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'oro');
+    } else if (recipientFilterSegment === 'platinum') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'platinum');
     } else {
       rawList = allClubClients;
     }
@@ -491,6 +511,21 @@ export function ClubSocialManager() {
       targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
     } else if (recipientFilterSegment === 'silver_to_platinum') {
       targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else if (recipientFilterSegment === 'intranet_sin_compras') {
+      targetList = allClubClients.filter(c => c.intranet === 'Si' && (c.ventas?.v2026 || 0) === 0);
+    } else if (recipientFilterSegment === 'sin_categorias') {
+      targetList = allClubClients.filter(c => {
+        const tier = (c.calculatedTier?.name || '').toLowerCase();
+        return tier === 'sin categoría' || tier === 'sin categoria' || tier === '';
+      });
+    } else if (recipientFilterSegment === 'bronce') {
+      targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
+    } else if (recipientFilterSegment === 'plata') {
+      targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else if (recipientFilterSegment === 'oro') {
+      targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'oro');
+    } else if (recipientFilterSegment === 'platinum') {
+      targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'platinum');
     } else {
       targetList = allClubClients;
     }
@@ -761,16 +796,16 @@ export function ClubSocialManager() {
   <meta charset="utf-8">
   <title>Alianza Preferente CIMASUR</title>
 </head>
-<body style="margin:0; padding:0; background-color:#050914; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color:#f1f5f9;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#050914; padding:24px 12px;">
+<body style="margin:0; padding:0; background-color:${designerBodyBgColor}; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color:${designerTextColor};">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:${designerBodyBgColor}; padding:24px 12px;">
     <tr>
       <td align="center">
         <!-- Main Panel Container -->
-        <table width="560" border="0" cellspacing="0" cellpadding="0" style="background-color:#0d162d; border-radius:16px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
+        <table width="560" border="0" cellspacing="0" cellpadding="0" style="background-color:${designerCardBgColor}; border-radius:16px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
           
           <!-- Header Hero with CIMASUR logo and banner -->
           <tr>
-            <td style="background: linear-gradient(135deg, #0d162d 0%, #070b16 100%); padding:40px 30px; text-align:center; border-bottom:3px solid ${accentColor};">
+            <td style="background: linear-gradient(135deg, ${designerCardBgColor} 0%, ${designerBodyBgColor} 100%); padding:40px 30px; text-align:center; border-bottom:3px solid ${accentColor};">
               <span style="color:${accentColor}; font-size:10px; font-weight:900; letter-spacing:3px; text-transform:uppercase; display:block; margin-bottom:8px;">CLUB SOCIAL & MOTOR COMERCIAL</span>
               <h1 style="color:#ffffff; font-size:26px; font-weight:900; margin:0; tracking: -0.5px;">${designerTitle}</h1>
               <p style="color:#94a3b8; font-size:12px; margin:6px 0 0 0; font-style:italic;">${designerSubtitle}</p>
@@ -790,15 +825,15 @@ export function ClubSocialManager() {
 
           <!-- Dynamic Email Content Block -->
           <tr>
-            <td style="padding:15px 35px 25px 35px; font-size:13.5px; line-height:1.65; color:#cbd5e1;">
+            <td style="padding:15px 35px 25px 35px; font-size:13.5px; line-height:1.65; color:${designerTextColor};">
               <!-- Highlights box -->
-              <div style="background-color:#070b16; border-left:3px solid ${accentColor}; padding:14px; margin-bottom:20px; font-size:12.5px; color:#94a3b8; border-radius:6px; border-top:1px solid #1e293b; border-right:1px solid #1e293b; border-bottom:1px solid #1e293b;">
+              <div style="background-color:${designerBodyBgColor}; border-left:3px solid ${accentColor}; padding:14px; margin-bottom:20px; font-size:12.5px; color:#94a3b8; border-radius:6px; border-top:1px solid #1e293b; border-right:1px solid #1e293b; border-bottom:1px solid #1e293b;">
                 <strong>Resumen Técnico de Alianza 2026:</strong><br>
                 • Nivel de Socio Comercial: <strong style="color:#ffffff;">${client.calculatedTier?.name || 'Preferencial'}</strong><br>
                 • Soporte Activo: <strong style="color:${accentColor};">${client.calculatedTier?.primaryBenefit || 'Muestras clínicas y vademécum'}</strong>
               </div>
               
-              <div style="color:#cbd5e1; font-family:inherit;">
+              <div style="color:${designerTextColor}; font-family:inherit;">
                 ${textHtml}
               </div>
             </td>
@@ -807,7 +842,7 @@ export function ClubSocialManager() {
           <!-- Products Showcase Grid -->
           <tr>
             <td style="padding:10px 35px 30px 35px;">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#070b16; border-radius:10px; border:1px solid #1e293b; padding:18px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:${designerBodyBgColor}; border-radius:10px; border:1px solid #1e293b; padding:18px;">
                 <tr>
                   <td colspan="3" style="padding-bottom:12px; border-bottom:1px solid #1e293b;">
                     <span style="color:#ffffff; font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">Fórmulas Clínicas Recomendadas para este Período:</span>
@@ -833,7 +868,7 @@ export function ClubSocialManager() {
 
           <!-- Interactive Footer Card -->
           <tr>
-            <td style="background-color:#070b16; border-top:1px solid #1e293b; padding:25px 35px; text-align:center;">
+            <td style="background-color:${designerBodyBgColor}; border-top:1px solid #1e293b; padding:25px 35px; text-align:center;">
               <p style="color:#ffffff; font-size:12.5px; margin:0 0 8px 0; font-weight:bold;">Alianza de Soporte Médico Veterinario CIMASUR</p>
               <p style="color:#64748b; font-size:10.5px; margin:0 0 15px 0; line-height:1.5;">
                 Fono: +56 9 1234 5678 | Correo: contacto@cimasur.cl<br>
@@ -927,7 +962,11 @@ export function ClubSocialManager() {
     setIsGeneratingBulk(true);
     
     // Resolve clean display name for selected campaign objective
-    const objectiveText = campaignObjective === 'reactivacion_gracia' ? 'Plazo de Gracia Especial (30 Días de Beneficios con Var. Caída)' :
+    const objectiveText = campaignObjective === 'pertenencia_categoria_intranet' ? 'Pertenencia a Categoría e Intranet (Vademécum y Fichas)' :
+                          campaignObjective === 'subir_categoria_incentivo' ? 'Estímulo para Subir de Categoría (Upgrade)' :
+                          campaignObjective === 'envio_gratis_promocion' ? 'Promoción Envío Gratis Sin Mínimo' :
+                          campaignObjective === 'intranet_sin_compra_orientacion' ? 'Activos en Intranet Sin Compra (Asesoría)' :
+                          campaignObjective === 'reactivacion_gracia' ? 'Plazo de Gracia Especial (30 Días de Beneficios con Var. Caída)' :
                           campaignObjective === 'alianza_comercial' ? 'Alianza Preferencial CIMASUR (Análisis de Categoría 2026)' :
                           campaignObjective === 'descuento_excepcional' ? 'Descuento del 15% Excepcional en la Próxima Reposición' :
                           'Invitación a Testeo Sin Costo de la Nueva Línea de Alérgenos';
@@ -986,7 +1025,23 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
       let localEmailText = '';
       let localWhatsAppText = '';
       
-      if (campaignObjective === 'reactivacion_gracia') {
+      if (campaignObjective === 'pertenencia_categoria_intranet') {
+        localEmailSubject = 'Estatus Oficial Club CIMASUR: Tu Categoría {{CATEGORIA_2026}} y Acceso exclusivo a Intranet';
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nEsperamos que tenga una excelente jornada en {{CLINICA}}.\n\nQueremos informarle oficialmente que pertenece a la prestigiosa categoría {{CATEGORIA_2026}} en nuestro Club de Socios CIMASUR, lo que le otorga soporte farmacéutico prioritario y condiciones comerciales exclusivas para sus recetas.\n\nLe recordamos con gran entusiasmo que cuenta con acceso totalmente activo a nuestra Intranet de Socios, diseñada especialmente para profesionales de la salud animal. En ella, usted puede revisar de forma directa:\n- Fichas técnicas detalladas de nuestras formulaciones magistrales.\n- Vademécum completo de productos oficiales de CIMASUR.\n- Monografías clínicas y protocolos para patologías complejas.\n- Herramientas de dosificación asistida para Arnica CS, Acqua Maris y más.\n\n¿Ha podido explorar su cuenta o prefiere que le brindemos una breve inducción para aprovechar al máximo estos recursos?\n\nQuedamos a su entero servicio,\nFernanda Contreras\nFidelización y Relaciones Clínicas\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🌸 Un gran saludo de parte del equipo de Fidelización de CIMASUR.\n\nQueremos informarle que actualmente se encuentra activa en la categoría *{{CATEGORIA_2026}}* de nuestro Club de Socios, gozando de todos sus beneficios asociados. 🩺✨\n\nLe recordamos además que tiene habilitada nuestra *Intranet Exclusiva*, donde puede descargar de forma gratuita el Vademécum completo de productos, fichas técnicas y protocolos clínicos para patologías veterinarias. 💻📚\n\n¿Le gustaría que le enviemos un enlace directo de acceso rápido o requiere asistencia? ¡Estamos listos para apoyarle! 🥰`;
+      } else if (campaignObjective === 'subir_categoria_incentivo') {
+        localEmailSubject = '¡Estás muy cerca de subir de categoría! Desbloquea mayores beneficios en el Club CIMASUR';
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de parte del equipo comercial de CIMASUR. Esperamos que todo marche excelente en {{CLINICA}}.\n\nAl revisar el estatus de su cuenta, nos alegra ver su continuo compromiso con la terapia homeopática de sus pacientes. Queremos informarle que se encuentra a un paso muy corto de ascender de categoría en nuestro Club de Socios. Al subir de categoría, desbloqueará de forma inmediata beneficios mejorados como:\n- Descuentos fijos más altos en todas sus reposiciones.\n- Despachos express gratuitos y prioritarios en todo Chile.\n- Acceso anticipado a lotes limitados y fórmulas magistrales exclusivas.\n- Soporte personalizado directo con nuestro laboratorio.\n\nPara impulsarle a lograr este upgrade en su próximo ciclo de compras, le hemos asignado un cupón preferente y facilidades excepcionales para reabastecer sus productos favoritos como Arnica CS o el Kit Modulador Digestivo.\n\n¿Le gustaría conversar sobre la brecha exacta de compras para su upgrade y cómo podemos ayudarle a alcanzarla de forma óptima?\n\nCordialmente,\nFernanda Contreras\nDepartamento de Cuentas y Fidelización\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚀 ¿Cómo está? Le escribimos con excelentes noticias desde CIMASUR. Al revisar su actividad en {{CLINICA}}, notamos que está súper cerca de subir de categoría en nuestro Club de Socios. ⭐✨\n\nEste ascenso le dará derecho a mayores descuentos, prioridad máxima de laboratorio y despachos totalmente gratuitos.\n\nPara ayudarle a conseguir este upgrade, le ofrecemos facilidades en su próxima reposición de Arnica CS o fórmulas magistrales. ¿Le gustaría saber la brecha exacta de compras y coordinar una propuesta sugerida hoy? ¡Un gran abrazo! 🩺🌸`;
+      } else if (campaignObjective === 'envio_gratis_promocion') {
+        localEmailSubject = 'Beneficio Exclusivo Club CIMASUR: Envío gratis sin mínimo de compra para {{CLINICA}}';
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nJunto con saludarle con el cariño de siempre de parte del equipo de Farmacias Homeopáticas CIMASUR, esperamos que tenga una fantástica semana en su clínica {{CLINICA}}.\n\nPara agradecer su lealtad profesional y asegurar que sus pacientes cuenten siempre con sus tratamientos a tiempo, nos complace informarle que hemos activado un beneficio especial en su cuenta de socio:\n\n*ENVÍO TOTALMENTE GRATUITO SIN MÍNIMO DE COMPRA EN SU PRÓXIMA REPOSICIÓN*\n\nEste beneficio es ideal para reabastecer de forma inmediata aquellas fórmulas homeopáticas que sus pacientes necesitan con urgencia, ya sea Arnica CS, Acqua Maris o el Kit Modulador Digestivo, sin preocuparse por los costos de flete o montos mínimos de despacho.\n\n¿Desea que le ayudemos a ingresar un pedido rápido con despacho gratuito garantizado para despacho inmediato?\n\nAtentamente,\nFernanda Contreras\nÁrea de Fidelización de Socios\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚚✨ ¡Excelentes noticias de CIMASUR! Queremos informarle que hemos activado en su cuenta un beneficio de *Despacho Totalmente Gratis Sin Mínimo de Compra* para su clínica {{CLINICA}}.\n\nIdeal para reponer con total tranquilidad aquellas fórmulas homeopáticas prioritarias de sus pacientes como Arnica CS o Kit Modulador Digestivo. 🌸🩺\n\n¿Le ayudamos a preparar un pedido express para enviarlo hoy mismo sin costos adicionales? ¡Escríbanos o responda este mensaje! 🥰`;
+      } else if (campaignObjective === 'intranet_sin_compra_orientacion') {
+        localEmailSubject = 'Bienvenida a la Intranet CIMASUR: ¿Le gustaría recibir orientación de uso o conocer beneficios de una primera compra?';
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de bienvenida en nombre de todo el equipo clínico de CIMASUR. Esperamos que todo marche de forma espectacular en {{CLINICA}}.\n\nNos hemos percatado con agrado de que se encuentra activa y registrada en nuestra Intranet de Socios, explorando nuestras herramientas digitales y material científico. ¡Ese es un excelente primer paso para incorporar la medicina homeopática de alta calidad en sus pacientes!\n\nComo sabemos lo valioso que es su tiempo, queríamos preguntarle:\n¿Le gustaría recibir una breve orientación personalizada por teléfono o WhatsApp para conocer el uso clínico de nuestras fórmulas?\n\nAdemás, queremos informarle que los socios que realizan su primera compra en CIMASUR cuentan con grandes beneficios exclusivos de bienvenida:\n- 15% de descuento directo de bienvenida en su primer pedido de reabastecimiento.\n- Despacho prioritario sin costo a su clínica.\n- Envío de un Kit de Vademécum Físico de regalo para su consulta.\n\nEstaremos encantados de resolver sus dudas sobre dosificaciones o protocolos terapéuticos de Arnica CS.\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🩺✨ Le saluda Fernanda de CIMASUR. Nos hemos percatado con mucha alegría que ya está activa y explorando nuestra *Intranet de Socios* de CIMASUR. ¡Bienvenida! 💻🌿\n\nComo sabemos que está conociendo nuestras fórmulas veterinarias, nos encantaría apoyarle: ¿Le gustaría recibir una breve orientación telefónica o resolver dudas sobre dosificaciones de Arnica CS o patologías?\n\nRecuerde que para su primera compra de bienvenida tiene un *15% de descuento especial*, despacho gratis y el Vademécum Físico de regalo para su clínica en {{CLINICA}}. 🎁🌸 ¿Conversamos?`;
+      } else if (campaignObjective === 'reactivacion_gracia') {
         localEmailSubject = '¡Importante!: Prórroga extraordinaria de recalificación CIMASUR 2026';
         localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica {{CLINICA}}.\n\nEn CIMASUR valoramos profundamente el bienestar de sus pacientes y el lazo profesional que nos une. Entendiendo la dinámica laboral de los veterinarios y que sus reposiciones clínicas han tenido variaciones, queremos confirmarle una excelente noticia: le hemos otorgado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026.\n\nGracias a esta medida, usted conservará todos los beneficios exclusivos de la categoría {{CATEGORIA_2026}} sin ninguna alteración. Además, para apoyarle a mantener su stock clínico ideal, le ofrecemos:\n- Despacho gratuito en su próximo pedido.\n- Prioridad de entrega en 24-48 horas hábiles en todo Chile.\n- Muestras clínicas gratuitas de Arnica CS en compras seleccionadas.\n\n¿Le gustaría que coordinemos su próximo reabastecimiento con despacho prioritario?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
         localWhatsAppText = `¡Hola, Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada clínica en {{CLINICA}}.\n\nQueremos confirmarle que, para resguardar su importante labor y mantener sus beneficios preferenciales de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado una *Prórroga Excepcional de Recalificación hasta el 30 de Junio*. 🩺✨\n\nPodrá seguir solicitando sus reposiciones de Arnica CS, Acqua Maris o el Kit Modulador Digestivo con despacho gratis garantizado y soporte prioritario.\n\n¿Desea que le ayudemos a coordinar un despacho sugerido para esta semana? ¡Escríbanos o responda por esta vía! Un afectuoso saludo. 🥰🏥`;
@@ -2204,12 +2259,18 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                 <label className="text-[9px] uppercase font-extrabold text-slate-500 font-mono">Segmento Destinatario:</label>
                 <select
                   value={recipientFilterSegment}
-                  onChange={(e) => setRecipientFilterSegment(e.target.value as any)}
+                  onChange={(e) => setRecipientFilterSegment(e.target.value)}
                   className="w-full bg-[#0d162d] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:border-sky-500/40 font-bold"
                 >
                   <option value="critical">Alerta Retención Crítica ({criticalClients.length})</option>
-                  <option value="bronce_to_gold">Bronce ➔ Oro ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</option>
-                  <option value="silver_to_platinum">Plata ➔ Platinum ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</option>
+                  <option value="intranet_sin_compras">Intranet Activo Sin Compras ({allClubClients.filter(c => c.intranet === 'Si' && (c.ventas?.v2026 || 0) === 0).length})</option>
+                  <option value="sin_categorias">Sin Categorías ({allClubClients.filter(c => ['sin categoría', 'sin categoria', ''].includes((c.calculatedTier?.name || '').toLowerCase())).length})</option>
+                  <option value="bronce">Categoría: Bronce ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</option>
+                  <option value="plata">Categoría: Plata ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</option>
+                  <option value="oro">Categoría: Oro ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'oro').length})</option>
+                  <option value="platinum">Categoría: Platinum ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'platinum').length})</option>
+                  <option value="bronce_to_gold">Estrategia: Bronce ➔ Oro ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</option>
+                  <option value="silver_to_platinum">Estrategia: Plata ➔ Platinum ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</option>
                   <option value="all">Todo el Club ({allClubClients.length})</option>
                 </select>
               </div>
@@ -2432,6 +2493,10 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                     onChange={(e) => setCampaignObjective(e.target.value)}
                     className="w-full bg-[#070b16] border border-slate-800 text-slate-350 px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-sky-500/40"
                   >
+                    <option value="pertenencia_categoria_intranet">Pertenencia a Categoría e Intranet (Vademécum y Fichas)</option>
+                    <option value="subir_categoria_incentivo">Estímulo para Subir de Categoría (Upgrade)</option>
+                    <option value="envio_gratis_promocion">Promoción Envío Gratis Sin Mínimo</option>
+                    <option value="intranet_sin_compra_orientacion">Activos en Intranet Sin Compra (Asesoría)</option>
                     <option value="reactivacion_gracia">Plazo de Gracia Especial (30 Días de Beneficios con Var. Caída)</option>
                     <option value="alianza_comercial">Alianza Preferencial CIMASUR (Análisis de Categoría 2026)</option>
                     <option value="descuento_excepcional">Descuento del 15% Excepcional en la Próxima Reposición</option>
@@ -2571,29 +2636,181 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                           <span className="text-xs text-slate-500 font-bold">Seleccione al menos un destinatario a la izquierda para generar la vista previa del correo.</span>
                         </div>
                       ) : (
-                        <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950 flex flex-col h-[430px] shadow-2xl">
-                          {/* Emulated Outlook Toolbar */}
-                          <div className="bg-[#111827] border-b border-slate-850 p-2.5 flex items-center gap-2 text-[10px] text-slate-400 select-none shrink-0">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-                            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
-                            <span className="text-slate-500 ml-2">De:</span>
-                            <span className="text-sky-400 font-bold">CIMASUR Marketing &lt;marketing@cimasur.cl&gt;</span>
-                            <span className="text-slate-500 ml-2">|</span>
-                            <span className="text-slate-500">Asunto:</span>
-                            <span className="text-white font-bold truncate max-w-[200px]">{bulkEmailSubject}</span>
+                        <div className="space-y-4">
+                          <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950 flex flex-col h-[430px] shadow-2xl">
+                            {/* Emulated Outlook Toolbar */}
+                            <div className="bg-[#111827] border-b border-slate-850 p-2.5 flex items-center gap-2 text-[10px] text-slate-400 select-none shrink-0">
+                              <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                              <span className="text-slate-500 ml-2">De:</span>
+                              <span className="text-sky-400 font-bold">CIMASUR Marketing &lt;marketing@cimasur.cl&gt;</span>
+                              <span className="text-slate-500 ml-2">|</span>
+                              <span className="text-slate-500">Asunto:</span>
+                              <span className="text-white font-bold truncate max-w-[200px]">{bulkEmailSubject}</span>
+                            </div>
+                            
+                            <div className="flex-1 bg-white">
+                              <iframe
+                                title="Live Email Graphic Preview"
+                                srcDoc={compileHtmlTemplate(
+                                  criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0], 
+                                  bulkEmailText, 
+                                  designerAccentColor
+                                )}
+                                className="w-full h-full border-0 bg-white"
+                              />
+                            </div>
                           </div>
-                          
-                          <div className="flex-1 bg-white">
-                            <iframe
-                              title="Live Email Graphic Preview"
-                              srcDoc={compileHtmlTemplate(
-                                criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0], 
-                                bulkEmailText, 
-                                designerAccentColor
-                              )}
-                              className="w-full h-full border-0 bg-white"
-                            />
+
+                          {/* Estilo y Paleta de Colores */}
+                          <div className="bg-[#091022] border border-slate-850 rounded-xl p-4 space-y-4">
+                            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+                              <Palette className="w-4 h-4 text-sky-400" />
+                              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Ajustar Colores e Identidad Visual del Correo</h4>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Colores */}
+                              <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Paleta de Colores (Personalizable)</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] text-slate-450 font-bold block">Acento (Botón/Borde):</label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="color"
+                                        value={designerAccentColor}
+                                        onChange={(e) => setDesignerAccentColor(e.target.value)}
+                                        className="w-8 h-6 bg-transparent border border-slate-700 rounded cursor-pointer"
+                                      />
+                                      <span className="text-[10px] font-mono text-slate-300 font-bold">{designerAccentColor}</span>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] text-slate-450 font-bold block">Fondo de Correo:</label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="color"
+                                        value={designerBodyBgColor}
+                                        onChange={(e) => setDesignerBodyBgColor(e.target.value)}
+                                        className="w-8 h-6 bg-transparent border border-slate-700 rounded cursor-pointer"
+                                      />
+                                      <span className="text-[10px] font-mono text-slate-300 font-bold">{designerBodyBgColor}</span>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] text-slate-450 font-bold block">Fondo de Tarjeta:</label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="color"
+                                        value={designerCardBgColor}
+                                        onChange={(e) => setDesignerCardBgColor(e.target.value)}
+                                        className="w-8 h-6 bg-transparent border border-slate-700 rounded cursor-pointer"
+                                      />
+                                      <span className="text-[10px] font-mono text-slate-300 font-bold">{designerCardBgColor}</span>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] text-slate-450 font-bold block">Color de Texto:</label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="color"
+                                        value={designerTextColor}
+                                        onChange={(e) => setDesignerTextColor(e.target.value)}
+                                        className="w-8 h-6 bg-transparent border border-slate-700 rounded cursor-pointer"
+                                      />
+                                      <span className="text-[10px] font-mono text-slate-300 font-bold">{designerTextColor}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-[9px] font-bold text-slate-500 block uppercase">Combinaciones Rápidas:</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDesignerAccentColor('#38bdf8');
+                                        setDesignerBodyBgColor('#050914');
+                                        setDesignerCardBgColor('#0d162d');
+                                        setDesignerTextColor('#cbd5e1');
+                                      }}
+                                      className="px-2 py-0.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-[9px] text-sky-400 font-bold rounded"
+                                    >
+                                      Dark Classic
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDesignerAccentColor('#0284c7');
+                                        setDesignerBodyBgColor('#f8fafc');
+                                        setDesignerCardBgColor('#ffffff');
+                                        setDesignerTextColor('#334155');
+                                      }}
+                                      className="px-2 py-0.5 bg-white border border-slate-200 hover:bg-slate-100 text-[9px] text-sky-600 font-bold rounded"
+                                    >
+                                      Light Mode ☀
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDesignerAccentColor('#10b981');
+                                        setDesignerBodyBgColor('#022c22');
+                                        setDesignerCardBgColor('#064e3b');
+                                        setDesignerTextColor('#e6fbf2');
+                                      }}
+                                      className="px-2 py-0.5 bg-[#022c22] border border-emerald-900 hover:border-emerald-800 text-[9px] text-emerald-400 font-bold rounded"
+                                    >
+                                      Mint Esmeralda 🌿
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDesignerAccentColor('#f59e0b');
+                                        setDesignerBodyBgColor('#1c1917');
+                                        setDesignerCardBgColor('#292524');
+                                        setDesignerTextColor('#f5f5f4');
+                                      }}
+                                      className="px-2 py-0.5 bg-[#292524] border border-stone-850 hover:border-stone-800 text-[9px] text-amber-400 font-bold rounded"
+                                    >
+                                      Amber Cálido 🍂
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Identidad de Cabecera */}
+                              <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Identidad de la Cabecera</span>
+                                
+                                <div className="space-y-1">
+                                  <label className="text-[9px] text-slate-450 font-bold block">Título Principal del Correo:</label>
+                                  <input
+                                    type="text"
+                                    value={designerTitle}
+                                    onChange={(e) => setDesignerTitle(e.target.value)}
+                                    placeholder="Ej: CIMASUR®"
+                                    className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:border-sky-500/30"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[9px] text-slate-450 font-bold block">Subtítulo de Cabecera:</label>
+                                  <input
+                                    type="text"
+                                    value={designerSubtitle}
+                                    onChange={(e) => setDesignerSubtitle(e.target.value)}
+                                    placeholder="Ej: Farmacia Homeopática Veterinaria de Chile"
+                                    className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:border-sky-500/30"
+                                  />
+                                </div>
+
+                                <p className="text-[9px] text-slate-500 leading-relaxed pt-1">
+                                  💡 <strong>Tip:</strong> Pruebe diferentes esquemas para coincidir con la identidad de marca o el objetivo de la campaña.
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
