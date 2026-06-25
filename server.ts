@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -506,6 +507,272 @@ Retorna un objeto JSON con el campo "html". Solo el HTML, sin markdown.`;
     } catch (e: any) {
       console.error(e);
       res.status(500).json({ error: e.message || 'Error AI Email Generation' });
+    }
+  });
+
+  app.post('/api/ai/evaluate-improve-message', async (req, res) => {
+    console.log('API call: POST /api/ai/evaluate-improve-message');
+    try {
+      const { client, status, currentMessage, improvePrompt, channel } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
+      }
+
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      const clientName = client?.name || 'Estimado/a Doctor/a';
+      const clientCategory = client?.calculatedTier?.name || client?.categoria || 'Sin Categoría';
+      const clientClinica = client?.clinica || 'Socio Clínico Autorizado';
+      const v2025 = client?.ventas?.v2025 || 0;
+      const v2026 = client?.ventas?.v2026 || 0;
+      const percentChange = client?.percentChange || 0;
+      const percentChangeFormatted = percentChange !== 0 ? `${(percentChange * 100).toFixed(1)}%` : 'Sin ventas registradas';
+
+      const aiPrompt = `Eres el Asesor Senior de Inteligencia de Clientes y Fidelización Comercial para CIMASUR, la prestigiosa farmacia homeopática veterinaria de Chile.
+Tu misión es diseñar, evaluar y optimizar un mensaje de reactivación y fidelización para un socio veterinario que se encuentra en un estado comercial crítico de alerta.
+
+Información del Socio Clínico:
+- Nombre del Médico Veterinario: ${clientName}
+- Clínica/Empresa: ${clientClinica}
+- Categoría en el Club: ${clientCategory}
+- Compras Año Anterior (2025): $${v2025.toLocaleString('es-CL')} CLP
+- Compras Año Actual (2026): $${v2026.toLocaleString('es-CL')} CLP
+- Variación de Compras: ${percentChangeFormatted}
+- Estado / Tipo de Alerta: ${status}
+- Canal Seleccionado: ${channel || 'whatsapp'} (ej. whatsapp, email)
+
+Mensaje Base Actual (si el usuario ingresó o generó uno previamente, si está vacío ignora este campo):
+"${currentMessage || ''}"
+
+Instrucción de mejora del usuario (ej: "hazlo más cercano", "menciona envíos gratis", "destaca que tiene 30 días de gracia", "ofrece asesoría directa con Jaime González"):
+"${improvePrompt || 'Generar propuesta inicial altamente persuasiva y empática'}"
+
+REGLAS DE REDACCIÓN DEL MENSAJE:
+1. Si el canal es 'whatsapp':
+   - Debe ser empático, sumamente cercano, ordenado con saltos de línea estratégicos.
+   - Usa emojis de manera profesional y atractiva.
+   - Debe ser directo y no demasiado largo (máximo 1200 caracteres).
+   - Ofrece un plazo de gracia (30 días), asistencia personalizada, o consulta con empatía si requiere alguna de nuestras fórmulas homeopáticas más vendidas como Arnica CS, Acqua Maris o el Kit Modulador Digestivo.
+2. Si el canal es 'email':
+   - Debe ser un correo electrónico completo con Asunto, Saludo, Cuerpo persuasivo, Oferta o Propuesta de valor, Llamado a la acción (CTA) claro, y Firma formal del equipo CIMASUR.
+   - Utiliza un tono corporativo, cálido y elegante.
+3. El tono general debe ser de alianza, colaboración, respeto y absoluto apoyo. En CIMASUR nunca reclamamos ni regañamos al cliente por comprar menos; buscamos ser sus aliados clínicos y facilitarle las cosas.
+
+Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de evaluación en español.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: aiPrompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              improvedMessage: { 
+                type: Type.STRING,
+                description: "El mensaje final diseñado u optimizado para el canal seleccionado, con marcadores como {{NOMBRE}} o con los datos del cliente ya integrados."
+              },
+              evaluation: {
+                type: Type.OBJECT,
+                properties: {
+                  scorePersonalizacion: { type: Type.INTEGER, description: "Puntaje de personalización de 0 a 100" },
+                  scoreTonoApoyo: { type: Type.INTEGER, description: "Puntaje de empatía y tono de apoyo de 0 a 100" },
+                  scoreLlamadoAccion: { type: Type.INTEGER, description: "Puntaje del llamado a la acción de 0 a 100" },
+                  scoreEfectividad: { type: Type.INTEGER, description: "Puntaje general de efectividad de 0 a 100" },
+                  positives: { 
+                    type: Type.ARRAY, 
+                    items: { type: Type.STRING },
+                    description: "Puntos fuertes de esta versión del mensaje (máximo 3)"
+                  },
+                  improvements: { 
+                    type: Type.ARRAY, 
+                    items: { type: Type.STRING },
+                    description: "Aspectos mejorados o recomendaciones clave incorporadas (máximo 3)"
+                  }
+                },
+                required: ["scorePersonalizacion", "scoreTonoApoyo", "scoreLlamadoAccion", "scoreEfectividad", "positives", "improvements"]
+              }
+            },
+            required: ["improvedMessage", "evaluation"]
+          }
+        }
+      });
+
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      if (!resolved) throw new Error("No se pudo obtener la respuesta de evaluación de la IA.");
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Error AI Evaluation & Improvement' });
+    }
+  });
+
+  app.post('/api/ai/converse-bulk-campaign', async (req, res) => {
+    console.log('API call: POST /api/ai/converse-bulk-campaign');
+    try {
+      const { 
+        chatHistory, 
+        currentEmailSubject, 
+        currentEmailText, 
+        currentWhatsAppText, 
+        userMessage,
+        image, // base64 string
+        imageMimeType,
+        currentDesignerTitle,
+        currentDesignerSubtitle,
+        currentDesignerAccentColor
+      } = req.body;
+      
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
+      }
+
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      // Format previous history
+      const formattedHistory = (chatHistory || [])
+        .map((h: any) => `${h.sender === 'user' ? 'Usuario' : 'Copiloto IA'}: ${h.text}`)
+        .join('\n');
+
+      const bulkAiPrompt = `Eres el Copiloto Experto en Copywriting y Estrategia de Marketing Digital para CIMASUR.
+Te encuentras asesorando al Administrador de Clientes Corporativos en el diseño de su campaña masiva de reactivación y fidelización para médicos veterinarios de Chile.
+
+Estado actual de las plantillas de campaña:
+- Asunto de Correo Actual: "${currentEmailSubject || 'Sin asunto'}"
+- Cuerpo de Correo Actual: "${currentEmailText || 'Sin cuerpo de correo'}"
+- Mensaje de WhatsApp Actual: "${currentWhatsAppText || 'Sin mensaje de WhatsApp'}"
+
+Estado actual del diseño gráfico institucional del correo:
+- Título Cabecera Actual: "${currentDesignerTitle || 'CIMASUR®'}"
+- Subtítulo Actual: "${currentDesignerSubtitle || 'Farmacia Homeopática Veterinaria de Chile'}"
+- Color de Acento Actual: "${currentDesignerAccentColor || '#38bdf8'}"
+
+Historial de la conversación previa:
+${formattedHistory}
+
+Nuevo requerimiento del usuario:
+"${userMessage}"
+
+Si el usuario adjuntó una imagen, se te ha suministrado como parte de la entrada. Analiza la imagen minuciosamente (puede ser un banner promocional, un folleto, un diseño previo, etc.). Si el usuario pide algo como "cambiar la fecha", "adaptar este diseño para envío gratis" o usar el diseño, extrae todo el contenido, el tono comercial, las ofertas y los colores. Adapta el diseño y los textos masivos de acuerdo a la imagen suministrada.
+
+Reglas importantes de redacción que debes recordar:
+1. El correo electrónico masivo debe usar variables de reemplazo dinámicas:
+   - {{NOMBRE}} (para el nombre del veterinario)
+   - {{CLINICA}} (para la veterinaria asociada)
+   - {{CATEGORIA_2026}} (para la categoría vigente en el club)
+   - {{BENEFICIO_PRINCIPAL}} (el beneficio preferente que le corresponde)
+   - {{VARIACION_VENTAS}} o datos relativos a su variación de ventas.
+2. El correo masivo es gráfico, cálido, formal-cercano y altamente profesional. Explica que somos sus aliados clínicos estratégicos de confianza en Chile.
+3. El mensaje de WhatsApp debe ser más corto, estructurado de forma atractiva con saltos de línea y emojis profesionales. Debe usar amigablemente variables dinámicas como {{NOMBRE}}, {{CLINICA}} y {{CATEGORIA_2026}}.
+4. Ofrece plazos de gracia ("Prórrogas de Recalificación excepcionales hasta el 30 de Junio de 2026") para que los clientes en riesgo crítico puedan ponerse al día y mantener sus beneficios preferenciales (muestras clínicas anuales, devolución garantizada, soporte prioritario).
+5. Haz referencia a nuestras reconocidas líneas de fórmulas homeopáticas veterinarias, como Arnica CS (modulador inflamatorio), Acqua Maris (soporte respiratorio natural) o el Kit Modulador Digestivo.
+6. Ajusta los parámetros del diseño gráfico institucional del correo (Título cabecera, Subtítulo de soporte y Color de acento en formato HEX) para que coincidan con la campaña actual, el mood y los colores de la imagen suministrada (por ejemplo, si la imagen es verde bosque, sugiere un acento verde '#10b981', si es dorado '#eab308', etc.).
+
+Debes analizar las observaciones del usuario (y la imagen si está presente), aplicar mejoras estratégicas a todos los elementos (asunto, cuerpo del correo, mensaje de WhatsApp, diseño visual) y redactar una respuesta de chat explicativa detallada, empática y comercial en español.
+
+Retorna UNICAMENTE un objeto JSON con el siguiente formato estricto:`;
+
+      // Construct content parts
+      const contentsParts: any[] = [];
+      
+      if (image) {
+        let base64Data = image;
+        let mime = imageMimeType || "image/png";
+        if (image.includes(';base64,')) {
+          const parts = image.split(';base64,');
+          mime = parts[0].replace('data:', '');
+          base64Data = parts[1];
+        }
+        contentsParts.push({
+          inlineData: {
+            mimeType: mime,
+            data: base64Data
+          }
+        });
+      }
+      
+      contentsParts.push({
+        text: bulkAiPrompt
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: contentsParts,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              reply: {
+                type: Type.STRING,
+                description: "Respuesta conversacional explicativa dirigida al usuario en español, con un tono amable, profesional y estratégico, detallando qué mejoras se aplicaron."
+              },
+              updatedEmailSubject: {
+                type: Type.STRING,
+                description: "La plantilla del asunto del correo optimizada de acuerdo a las instrucciones del usuario o la imagen."
+              },
+              updatedEmailText: {
+                type: Type.STRING,
+                description: "La plantilla del cuerpo del correo electrónico optimizada, que debe mantener o incluir adecuadamente las variables {{NOMBRE}}, {{CLINICA}}, {{CATEGORIA_2026}} y {{BENEFICIO_PRINCIPAL}}."
+              },
+              updatedWhatsAppText: {
+                type: Type.STRING,
+                description: "La plantilla de WhatsApp optimizada, estructurada amigablemente con saltos de línea y emojis profesionales."
+              },
+              updatedDesignerTitle: {
+                type: Type.STRING,
+                description: "Título del header institucional del correo gráfico que mejor se adapte al diseño o campaña."
+              },
+              updatedDesignerSubtitle: {
+                type: Type.STRING,
+                description: "Subtítulo de soporte del header institucional para la campaña."
+              },
+              updatedDesignerAccentColor: {
+                type: Type.STRING,
+                description: "Color hexadecimal de acento sugerido para el diseño gráfico (ej: '#eab308' para dorado, '#10b981' para verde, '#38bdf8' para celeste, '#a855f7' para platino morado)."
+              }
+            },
+            required: [
+              "reply", 
+              "updatedEmailSubject", 
+              "updatedEmailText", 
+              "updatedWhatsAppText",
+              "updatedDesignerTitle",
+              "updatedDesignerSubtitle",
+              "updatedDesignerAccentColor"
+            ]
+          }
+        }
+      });
+
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      if (!resolved) throw new Error("No se pudo obtener la respuesta conversacional de la IA.");
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Error en la conversación de campaña masiva con IA' });
     }
   });
 

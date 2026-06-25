@@ -4,7 +4,7 @@ import {
   Search, Trash2, Edit3, Plus, ArrowUpRight, ArrowDownRight, Award, Check, 
   RotateCcw, Copy, CheckCircle, Save, Download, Mail, Phone, ExternalLink, 
   Calendar, MapPin, Notebook, MessageSquare, AlertTriangle, TrendingUp, TrendingDown, Settings, Image,
-  Palette, Link as LinkIcon, Filter, Loader2
+  Palette, Link as LinkIcon, Filter, Loader2, Paperclip
 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,7 +26,7 @@ interface ClubClient {
   region?: string;
   ventas?: ClientVentas;
   historialUnificado?: string;
-  clinica?: string; // Optional custom clinic/razonSocial name
+  clinica?: string;
   ultimoWhatsapp?: string;
   ultimoCorreo?: string;
   ultimaCampania?: string;
@@ -90,7 +90,6 @@ const TIERS_DEFAULT: TierConfig[] = [
   }
 ];
 
-// Fallback logic for client sales
 function getDefaultVentasForClient(categoria: string): ClientVentas {
   const cat = (categoria || 'Sin categoría').toLowerCase();
   if (cat.includes('platinum')) {
@@ -101,15 +100,11 @@ function getDefaultVentasForClient(categoria: string): ClientVentas {
     return { v2024: 2100000, v2025: 2350000, v2026: 3100000 };
   } else if (cat.includes('bronce')) {
     return { v2024: 900000, v2025: 1050000, v2026: 1250000 };
-  } else if (cat.includes('compra') || cat.includes('categoría') || cat.includes('intranet')) {
-    // If it's a prospect or unclassified, default to 0 to allow correct segmentation of "Sin Compras"
-    return { v2024: 0, v2025: 0, v2026: 0 };
   } else {
     return { v2024: 0, v2025: 0, v2026: 0 };
   }
 }
 
-// Helper to check which tier is matching sales
 function getTierBySales(sales: number, tiers: TierConfig[]) {
   const list = tiers.length > 0 ? tiers : TIERS_DEFAULT;
   for (const t of list) {
@@ -120,7 +115,6 @@ function getTierBySales(sales: number, tiers: TierConfig[]) {
   return list[0];
 }
 
-// Unified Tier Badge CSS styling resolver
 function getTierBadgeClass(name: string): string {
   const norm = (name || '').toLowerCase();
   if (norm.includes('platinum')) {
@@ -138,502 +132,170 @@ function getTierBadgeClass(name: string): string {
   return 'bg-slate-900/90 text-slate-400 border-slate-800 whitespace-nowrap';
 }
 
-// B2B CRM Custom Script Templates
-const PRESET_TEMPLATES: Record<string, string> = {
-  oficial_cimasur: "Hola Dr(a). {{NOMBRE}}\n\nQueremos informarle que actualmente pertenece a la categoría {{CATEGORIA}}.\n\nLe faltan ${{BRECHA}} para acceder a la categoría {{SIGUIENTE_CATEGORIA}}.\n\nSi tiene consultas puede contactarme directamente:\n\n📧 {{CORREO_EJECUTIVO}}\n📱 {{WHATSAPP_EJECUTIVO}}\n\nSaludos,\n{{EJECUTIVO}}",
-  activo: "Estimado/a colega {{NOMBRE}} de la clínica {{CLINICA}},\n\nLe saludamos desde CIMASUR laboratorios veterinarios. Su cuenta registra compras por un total de {{VENTAS}} en este ciclo comercial anual, manteniéndose activo en la categoría {{CATEGORIA}}.\n\nDisfruta de su beneficio exclusivo: {{BENEFICIO}}.\n\nRecuerde que está a solo {{BRECHA}} de alcanzar el siguiente nivel de beneficios corporativos. ¡Quedamos atentos a sus recetas!",
-  crecio: "¡Hola Dr./Dra. {{NOMBRE}}! Felicitaciones a su centro {{CLINICA}}.\n\nHemos detectado un valiosioso crecimiento de sus compras anuales acumuladas de este ciclo, llegando a {{VENTAS}}. Por este motivo, ha ascendido satisfactoriamente a la categoría {{CATEGORIA_NUEVA}}.\n\nSu beneficio asignado es: {{BENEFICIO}}. ¡Seguiremos impulsando el éxito de su centro médico!",
-  estable: "Estimado/a {{NOMBRE}} de {{CLINICA}},\n\nQueremos agradecerle por su constancia comercial. Con compras acumuladas de {{VENTAS}} este año, se mantiene sólido en la categoría {{CATEGORIA}} con acceso a: {{BENEFICIO}}.\n\nLe deseamos una excelente jornada, CIMASUR.",
-  disminuyo: "Estimado/a doctor/a {{NOMBRE}},\n\nLe escribimos prioritariamente de CIMASUR. Al revisar su historial comercial, notamos que sus compras han disminuido en este ciclo comercial acumulando un total de {{VENTAS}} comparado con el año anterior.\n\nSu categoría actual de compras es {{CATEGORIA}}, pero se encuentra en riesgo debido a la brecha comercial. Queremos brindarle un beneficio de gracia o una asesoría directa para reactivar sus recetas magistrales con su descuento habitual. ¡Conversemos hoy para coordinar condiciones especiales!\n\nAtte,\nGerencia de Servicios CIMASUR.",
-  dormido: "¡Hola Dr./Dra. {{NOMBRE}}! Esperamos que esté muy bien.\n\nNotamos que en el ciclo actual no registra transacciones ($0), luego de haber sido un valioso cliente con compras en el ciclo anterior.\n\nNos encantaría volver a atenderle en su clínica {{CLINICA}}. De forma excepcional para sus siguientes 3 recetas, queremos ofrecerle el estatus preferencial {{CATEGORIA_NUEVA}} con el beneficio de: {{BENEFICIO}}.\n\n¿Agendamos un llamado técnico explicativo?",
-  perdido: "Estimado/a {{NOMBRE}},\n\nLe saluda el equipo directivo de CIMASUR. Con motivo de relanzamiento técnico de nuestro vademécum de diluciones homeopáticas, queremos extenderle una invitación exclusiva para volver a trabajar juntos en su clínica {{CLINICA}}.\n\n¿Desea solicitar un kit promocional sin costo por WhatsApp?",
-  riesgo_alto: "🚨 Alerta de Soporte - CIMASUR\n\nEstimado/a doctor/a {{NOMBRE}},\n\nNuestros reportes automatizados de Business Intelligence han emitido una alerta de riesgo crítico: sus compras en el ciclo actual han caído en más de un 50% respecto al año pasado, registrando solo {{VENTAS}} acumulados.\n\nSu estatus actual es {{CATEGORIA}}. Para evitar la pérdida de sus precios preferenciales y el beneficio de {{BENEFICIO}}, le extendemos un plazo de gracia de 30 días para colocar pedidos de reposición.\n\nEstamos para apoyarle y queremos conocer si requiere facilidades especiales con sus fórmulas homeopáticas magistrales. ¡Conversemos!\n\nAtte,\nContacto Directo CIMASUR.",
-  induccion_intranet: "Hola Dr(a). {{NOMBRE}},\n\nLe saluda {{EJECUTIVO}} de CIMASUR. Notamos que ya tiene acceso a nuestra Intranet pero aún no ha realizado su primera carga de recetas magistrales.\n\n¿Le gustaría agendar una breve inducción de 5 minutos sobre cómo optimizar sus pedidos y conocer los beneficios del nivel {{CATEGORIA}}?\n\nQuedo atento/a para coordinar.\n\nSaludos,\n{{EJECUTIVO}}"
-};
-
-const SEGMENT_GUIDE: Record<string, { title: string; desc: string; importance: string; action: string }> = {
-  Todas: {
-    title: 'Análisis Global de Cartera',
-    desc: 'Engloba a todos los médicos veterinarios importados en la plataforma sin distinción de crecimiento.',
-    importance: 'Monitorear la masa total de facturación consolidada de CIMASUR Chile.',
-    action: 'Mantener comunicación técnica constante, avisando de seminarios e integraciones.'
-  },
-  Crecieron: {
-    title: 'Socio de Alto Rendimiento (Aumentaron Compras)',
-    desc: 'Médicos cuyo nivel de compra acumulado en el ciclo 2026 actual supera al de 2025.',
-    importance: 'Representan cuentas sanas en expansión que confían plenamente en nuestros preparados homeopáticos.',
-    action: 'Ofrecer upgrade inmediato de nivel, entregar beneficios prémium de inmediato y dar prioridad en despacho.'
-  },
-  Disminuyeron: {
-    title: 'Alerta de Contracción (Redujeron compras)',
-    desc: 'Médicos con nivel de facturación actual inferior al registrado en el ciclo pasado.',
-    importance: 'Riesgo de abandono silencioso o que estén encargando recetas a la competencia directa.',
-    action: 'Visita presencial o telefónica de nuestro asesor comercial, ofrecer incentivo o vademécum especial.'
-  },
-  Estables: {
-    title: 'Comportamiento Estable y Fiel',
-    desc: 'Clientes que mantienen un ritmo y volumen de compra regular en ambos periodos anuales.',
-    importance: 'Sostienen la base comercial de facturación fija de CIMASUR.',
-    action: 'Agradecer su fidelidad y promover la incorporación de nuevas fórmulas magistrales en su recetario.'
-  },
-  Dormidos: {
-    title: 'Clientes Dormidos (Compra 2025, $0 en 2026)',
-    desc: 'Médicos que compraron con normalidad en 2025, pero registran compras cero ($0) en 2026.',
-    importance: 'Gravedad Extrema. El cliente ha suspendido el contacto, probablemente por quejas o cambio de clínica.',
-    action: 'Enviar el comunicado técnico de "Recuperación de Cuenta Dormida" con estatus Oro promocional preventivo.'
-  },
-  Perdidos: {
-    title: 'Cuentas Perdidas (Inactivos desde 2024)',
-    desc: 'Clientes con facturación registrada en 2024 pero compras cero en 2025 y 2026.',
-    importance: 'Relación rota a largo plazo. Cuentas antiguas pasivas.',
-    action: 'Lanzar un relanzamiento técnico de línea de diluciones homeopáticas e invitarlos a reactivarse gratis.'
-  },
-  'Intranet / Sin Compras': {
-    title: 'Prospectos Intranet (Sin Compras Registradas)',
-    desc: 'Clientes que están registrados en la plataforma pero nunca han generado un pedido de recetas.',
-    importance: 'Oportunidad de crecimiento orgánico convirtiendo usuarios pasivos en activos.',
-    action: 'Ofrecer inducción técnica de productos y recorrido por la Intranet.'
-  },
-  'Riesgo Alto': {
-    title: 'Riesgo Crítico de Fuga (Desplome de Ventas > 50%)',
-    desc: 'Cuentas con compras activas pero con un retroceso de facturación superior a la mitad (50%).',
-    importance: 'Fuga inminente de recetas. Alerta prioritaria en el panel de control del consultor de CIMASUR.',
-    action: 'Aplicar ampliación de plazo de gracia extendido, llamada telefónica inmediata.'
-  }
-};
-
 export function ClubSocialManager() {
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [dashboardFilter, setDashboardFilter] = useState<string | null>(null);
   const [clients, setClients] = useState<ClubClient[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  
-  // Custom Tiers List stored in localStorage/DB
   const [tiersList, setTiersList] = useState<TierConfig[]>(TIERS_DEFAULT);
-
-  // Simulator values
-  const [simulatedVentas, setSimulatedVentas] = useState<number>(1500000);
-  const [campaignRecipients, setCampaignRecipients] = useState<ClubClient[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CRITICO' | 'DORMIDO' | 'EN_CAIDA' | 'PERDIDO'>('ALL');
+  const [channel, setChannel] = useState<'whatsapp' | 'email'>('whatsapp');
   
-  // Multi-client Analysis & Comparison State
-  const [selectedClientIdsForAnalysis, setSelectedClientIdsForAnalysis] = useState<string[]>([]);
-  const [showMultiClientAnalysis, setShowMultiClientAnalysis] = useState<boolean>(false);
+  // Navigation Tabs matching user sidebar mockup
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'individual' | 'tiers' | 'designer' | 'masivo' | 'oportunidades'>('oportunidades');
   
-  // Filter settings for tables
-  const [clientSearch, setClientSearch] = useState<string>('');
-  const [clientCategoryFilter, setClientCategoryFilter] = useState<string>('Todas');
+  // Custom Campaign state
+  const [messageText, setMessageText] = useState<string>('');
+  const [improvePrompt, setImprovePrompt] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [newNote, setNewNote] = useState<string>('');
+  
+  // AI Bulk Conversational states
+  const [previewTab, setPreviewTab] = useState<'email' | 'whatsapp' | 'config'>('email');
+  const [chatHistory, setChatHistory] = useState<{ sender: 'user' | 'ia'; text: string }[]>([
+    {
+      sender: 'ia',
+      text: '¡Hola! Bienvenido al Copiloto de Campañas Masivas CIMASUR. Aquí puedes conversar conmigo sobre cómo mejorar tus campañas de email marketing o de WhatsApp. Cuéntame qué quieres ajustar (ej: "menciona que daremos prórroga de recalificación hasta el 30 de junio de 2026", "haz el mensaje de whatsapp más persuasivo", o "ofrece un plazo de gracia especial para Arnica CS") y yo actualizaré tus plantillas masivas automáticamente.'
+    }
+  ]);
+  const [userChatMessage, setUserChatMessage] = useState('');
+  const [isSendingChatMessage, setIsSendingChatMessage] = useState(false);
 
-  // Intelligent logical segment filters
-  const [segCategory, setSegCategory] = useState<string>('Todas');
-  const [segGrowth, setSegGrowth] = useState<string>('Todas'); // Todas, Crecieron, Disminuyeron, Estables, Dormidos, Perdidos
-  const [segLastPurchase, setSegLastPurchase] = useState<string>('Todas'); // Todas, En ciclo actual, Solo ciclo anterior
+  // Custom Email Designer options
+  const [designerAccentColor, setDesignerAccentColor] = useState('#38bdf8');
+  const [designerTitle, setDesignerTitle] = useState('CIMASUR®');
+  const [designerSubtitle, setDesignerSubtitle] = useState('Farmacia Homeopática Veterinaria de Chile');
 
-  // Campaign State
-  const [campaignChannel, setCampaignChannel] = useState<'whatsapp' | 'email' | 'both'>('whatsapp');
-  const [messageTemplate, setMessageTemplate] = useState<string>(PRESET_TEMPLATES['activo']);
-  const [aiGeneratedMessages, setAiGeneratedMessages] = useState<Record<string, string>>({});
-  const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
-  const [isEditingTiers, setIsEditingTiers] = useState(false);
-  const [isSendingBatchEmails, setIsSendingBatchEmails] = useState(false);
-  const [campaignTriggered, setCampaignTriggered] = useState<boolean>(false);
-  const [campaignLog, setCampaignLog] = useState<string[]>([]);
-  const [isSending, setIsSending] = useState<boolean>(false);
-  const [emailAITemplate, setEmailAITemplate] = useState<string | null>(null);
+  // Image Upload states for campaign designer
+  const [uploadedImageB64, setUploadedImageB64] = useState<string | null>(null);
+  const [uploadedImageMime, setUploadedImageMime] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
-  // Executive config & Communications Center state
-  const [execConfig, setExecConfig] = useState(() => {
-    let base = {
-      nombre: "Jaime González",
-      cargo: "Asesor Comercial Cimasur",
-      correo: "contacto@cimasur.cl",
-      whatsapp: "+56 9 1234 5678",
-      firma: "Equipo Comercial Cimasur",
-      smtpServer: "smtp.cimasur.cl",
-      smtpPort: "587",
-      smtpUser: "contacto@cimasur.cl",
-      smtpPass: ""
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, suba únicamente archivos de imagen.');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedImageB64(event.target?.result as string);
+      setUploadedImageMime(file.type);
+      setUploadedFileName(file.name);
     };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearUploadedImage = () => {
+    setUploadedImageB64(null);
+    setUploadedImageMime(null);
+    setUploadedFileName(null);
+  };
+
+  const handleSendChatMessage = async () => {
+    if ((!userChatMessage.trim() && !uploadedImageB64) || isSendingChatMessage) return;
+    const userMsg = userChatMessage.trim();
+    setUserChatMessage('');
+    setIsSendingChatMessage(true);
+    
+    // Add to chat history immediately
+    const labelText = userMsg + (uploadedFileName ? `\n[Diseño adjunto: ${uploadedFileName}]` : '');
+    const updatedHistory = [...chatHistory, { sender: 'user' as const, text: labelText }];
+    setChatHistory(updatedHistory);
+    
     try {
-      const saved = localStorage.getItem('cimasur_exec_config');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          return { ...base, ...parsed };
-        }
-      }
-    } catch (e) {}
-    return base;
-  });
-
-  const [commsSubTab, setCommsSubTab] = useState<'segmentation' | 'templates' | 'image_gen' | 'whatsapp' | 'email' | 'history' | 'config' | 'canvas_email'>('segmentation');
-
-  const handleSaveExecConfig = (newCfg: any) => {
-    setExecConfig(newCfg);
-    localStorage.setItem('cimasur_exec_config', JSON.stringify(newCfg));
-  };
-
-  // Graphics Customizer State
-  const [postcardType, setPostcardType] = useState<'ascenso' | 'reactivacion' | 'felicitacion' | 'beneficios'>('ascenso');
-  const [postcardTitle, setPostcardTitle] = useState<string>('Bienvenido al Siguiente Nivel');
-  const [postcardSubtext, setPostcardSubtext] = useState<string>('Tu compromiso clínico veterinario te destaca de forma única en la región.');
-  const [postcardClientIds, setPostcardClientIds] = useState<string[]>([]);
-  const [isGeneratingMessage, setIsGeneratingMessage] = useState<boolean>(false);
-
-  // Form states for manual Client edit
-  const [isEditingClient, setIsEditingClient] = useState<boolean>(false);
-  const [editName, setEditName] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editRut, setEditRut] = useState('');
-  const [editClinica, setEditClinica] = useState('');
-  const [editSales2024, setEditSales2024] = useState(0);
-  const [editSales2025, setEditSales2025] = useState(0);
-  const [editSales2026, setEditSales2026] = useState(0);
-  const [newNote, setNewNote] = useState('');
-
-  // Import annual sales state
-  const [showSalesImportModal, setShowSalesImportModal] = useState<boolean>(false);
-  const [salesImportText, setSalesImportText] = useState<string>('');
-  const [colMapping, setColMapping] = useState({
-    rutIdx: 0,
-    v2024Idx: 1, // 0-based index, -1 for none
-    v2025Idx: 2,
-    v2026Idx: 3,
-  });
-  
-  interface VisualImportRow {
-    rutOriginal: string;
-    rutNormalized: string;
-    v2024: number;
-    v2025: number;
-    v2026: number;
-    clientName?: string;
-    found: boolean;
-    clientId?: string;
-  }
-  
-  const [salesImportResults, setSalesImportResults] = useState<{
-    totalRows: number;
-    matched: number;
-    unmatched: number;
-    details: VisualImportRow[];
-  } | null>(null);
-
-  // Normalization helper for RUTs
-  const normalizeRUTForImport = (val: string): string => {
-    if (!val) return '';
-    return val.replace(/[^0-9kK]/g, '').toLowerCase();
-  };
-
-  // Chilean number parser: respects dots as thousands and commas as decimals
-  const parseChileanAmount = (val: any): number => {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    let s = String(val).trim();
-    
-    const lastComma = s.lastIndexOf(',');
-    const lastDot = s.lastIndexOf('.');
-    const lastSeparator = Math.max(lastComma, lastDot);
-    
-    if (lastSeparator !== -1) {
-      const charsAfter = s.length - 1 - lastSeparator;
-      // In Chile, many exports use 3 digits for decimal if they include cents (rare in CLP but possible)
-      // however, 3 digits is strongly associated with thousands (1.000)
-      if (charsAfter === 3 && !s.includes(lastComma === lastSeparator ? '.' : ',')) {
-        // If there's ONLY one type of separator and it has 3 digits after, it's thousands
-        s = s.replace(/[.,]/g, '');
-      } else {
-        // Mixed or decimal-looking
-        const before = s.substring(0, lastSeparator).replace(/[.,]/g, '');
-        const after = s.substring(lastSeparator + 1);
-        s = before + '.' + after;
-      }
-    }
-    
-    const result = parseFloat(s.replace(/[^0-9.-]/g, ''));
-    return isNaN(result) ? 0 : result;
-  };
-
-  const formatCLP = (val: number) => {
-    if (val === undefined || val === null || isNaN(val)) return '0';
-    
-    // Convert to absolute string to avoid issues with scientific notation
-    let str = val.toString();
-    if (str.includes('e')) str = val.toFixed(10).replace(/\.?0+$/, '');
-    
-    const parts = str.split('.');
-    
-    // Group thousands with '.' (Standard Chilean style)
-    const isNegative = parts[0].startsWith('-');
-    const absoluteInteger = isNegative ? parts[0].substring(1) : parts[0];
-    const groupedInteger = absoluteInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    const formattedInteger = (isNegative ? '-' : '') + groupedInteger;
-    
-    if (parts[1]) {
-      // User requested "puntos" instead of "comas" for decimals ("me cambio los puntos por comas")
-      // Even though ',' is standard in Chile, she explicitly asked for '.' which is common in technical/software use.
-      // And "no redondes nada" means we keep all decimals.
-      return formattedInteger + '.' + parts[1];
-    }
-    return formattedInteger;
-  };
-
-  const handleSaveTiers = async () => {
-    setIsEditingTiers(false);
-    try {
-      const existing = await localDB.getCollection('tiers_config');
-      for (const t of existing) {
-         await localDB.deleteFromCollection('tiers_config', t.id);
-      }
-      for (const t of tiersList) {
-         await localDB.saveToCollection('tiers_config', { ...t, id: t.name });
-      }
-      localStorage.setItem('cimasur_club_tiers_config', JSON.stringify(tiersList));
-      alert("✅ Configuración de niveles guardada permanentemente en Base de Datos.");
-      window.dispatchEvent(new Event('db-change'));
-    } catch (e) {
-      console.error("Error saving tiers:", e);
-      alert("Error al guardar niveles.");
-    }
-  };
-
-  const handleSendMassiveEmail = async () => {
-    if (campaignRecipients.length === 0) {
-      alert("No hay destinatarios seleccionados.");
-      return;
-    }
-
-    if (!execConfig.smtpPass) {
-      alert("Por favor, configure su contraseña SMTP en la pestaña de Configuración.");
-      setCommsSubTab('config');
-      return;
-    }
-
-    const confirmSend = confirm(`¿Está seguro que desea enviar correos masivos a ${campaignRecipients.length} médicos?`);
-    if (!confirmSend) return;
-
-    setIsSendingBatchEmails(true);
-    try {
-      const subject = (document.getElementById('campaign_email_subject') as HTMLInputElement)?.value || 'Comunicaciones Oficiales CIMASUR';
-      
-      const emailBatch = campaignRecipients.map(recipient => {
-        const ec = enrichedClients.find(item => item.id === recipient.id) || recipient;
-        const text = aiGeneratedMessages[recipient.id] || replaceMessageVariables(messageTemplate, ec);
-        
-        // Simple HTML template for the email
-        const html = `
-          <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-            <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 15px;">
-              <h2 style="color: #1e3a8a; margin: 0;">CIMASUR CHILE</h2>
-            </div>
-            <div style="white-space: pre-line; color: #334155; line-height: 1.6;">
-              ${text}
-            </div>
-            <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-              <p>Este es un comunicado oficial de CIMASUR Laboratorios Veterinarios.</p>
-              <p>📌 Contáctanos: ${execConfig.correo} | WhatsApp: ${execConfig.whatsapp}</p>
-            </div>
-          </div>
-        `;
-
-        return {
-          to: recipient.email,
-          subject,
-          text,
-          html
-        };
-      }).filter(mail => mail.to);
-
-      const res = await fetch('/api/mail/send-batch', {
+      const response = await fetch('/api/ai/converse-bulk-campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          config: execConfig,
-          emails: emailBatch
+          chatHistory: updatedHistory,
+          currentEmailSubject: bulkEmailSubject,
+          currentEmailText: bulkEmailText,
+          currentWhatsAppText: bulkWhatsAppText,
+          userMessage: userMsg || 'Analiza mi diseño adjunto y adapta la campaña en base a la imagen.',
+          image: uploadedImageB64,
+          imageMimeType: uploadedImageMime,
+          currentDesignerTitle: designerTitle,
+          currentDesignerSubtitle: designerSubtitle,
+          currentDesignerAccentColor: designerAccentColor
         })
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Fallo en el envío masivo" }));
-        throw new Error(err.error || "Fallo en el envío masivo");
-      }
-
-      const result = await res.json();
-      const successCount = result.results.filter((r: any) => r.status === 'success').length;
       
-      // Update history for each successful recipient
-      const today = new Date().toLocaleDateString('es-CL');
-      for (const r of result.results) {
-        if (r.status === 'success') {
-          const rec = campaignRecipients.find(rcp => rcp.email === r.email);
-          if (rec) {
-            const currentHist = (enrichedClients.find(ec => ec.id === rec.id)?.historialUnificado || '');
-            await localDB.updateInCollection('contacts', rec.id, {
-              ultimoCorreo: today,
-              ultimaCampania: "Envío Masivo SMTP",
-              historialUnificado: currentHist + `\n[Email Masivo Enviado ${today}] Asunto: ${subject}`
-            });
-          }
-        }
+      if (!response.ok) {
+        throw new Error('Fallo al conectar con el servidor del Copiloto IA.');
       }
-
-      alert(`Proceso completado. ${successCount} correos enviados con éxito.`);
-      window.dispatchEvent(new Event('db-change'));
-      loadData();
-    } catch (error: any) {
-      alert("Error en el envío: " + error.message);
+      
+      const data = await response.json();
+      if (data) {
+        setChatHistory(prev => [...prev, { sender: 'ia' as const, text: data.reply || 'He procesado tus instrucciones con éxito.' }]);
+        if (data.updatedEmailSubject) setBulkEmailSubject(data.updatedEmailSubject);
+        if (data.updatedEmailText) setBulkEmailText(data.updatedEmailText);
+        if (data.updatedWhatsAppText) setBulkWhatsAppText(data.updatedWhatsAppText);
+        if (data.updatedDesignerTitle) setDesignerTitle(data.updatedDesignerTitle);
+        if (data.updatedDesignerSubtitle) setDesignerSubtitle(data.updatedDesignerSubtitle);
+        if (data.updatedDesignerAccentColor) setDesignerAccentColor(data.updatedDesignerAccentColor);
+        
+        // Reset uploaded image upon successful processing
+        handleClearUploadedImage();
+      }
+    } catch (e: any) {
+      console.error(e);
+      setChatHistory(prev => [...prev, { sender: 'ia' as const, text: `⚠️ Error de conexión: ${e.message}. Por favor intenta de nuevo.` }]);
     } finally {
-      setIsSendingBatchEmails(false);
+      setIsSendingChatMessage(false);
     }
   };
 
-  const handlePreviewImport = () => {
-    if (!salesImportText.trim()) {
-      setSalesImportResults(null);
-      return;
-    }
+  // SMTP Config state (Pre-filled with CIMASUR defaults)
+  const [smtpHost, setSmtpHost] = useState<string>('smtp.cimasur.cl');
+  const [smtpPort, setSmtpPort] = useState<string>('587');
+  const [smtpUser, setSmtpUser] = useState<string>('contacto@cimasur.cl');
+  const [smtpPass, setSmtpPass] = useState<string>('');
+  const [smtpSenderName, setSmtpSenderName] = useState<string>('Club CIMASUR 👑');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  
+  // SMTP Test state
+  const [isTestingSmtp, setIsTestingSmtp] = useState<boolean>(false);
+  const [testEmailTarget, setTestEmailTarget] = useState<string>('contacto@cimasur.cl');
+  const [testSmtpResult, setTestSmtpResult] = useState<{ success: boolean; message: string } | null>(null);
 
-    const lines = salesImportText.split(/\r?\n/).filter(line => line.trim().length > 0);
-    if (lines.length === 0) {
-      setSalesImportResults(null);
-      return;
-    }
+  // Bulk Campaign parameters
+  const [campaignObjective, setCampaignObjective] = useState<string>('reactivacion_gracia');
+  const [campaignPrompt, setCampaignPrompt] = useState<string>('');
+  const [isGeneratingBulk, setIsGeneratingBulk] = useState<boolean>(false);
+  
+  // Bulk copy templates (prefilled with beautiful default copy templates supporting variables)
+  const [bulkEmailSubject, setBulkEmailSubject] = useState<string>('⚡ Alianza Comercial CIMASUR: {{CLINICA}} - Beneficios de Categoría {{CATEGORIA_2026}}');
+  const [bulkEmailText, setBulkEmailText] = useState<string>('Estimado/a {{NOMBRE}},\n\nLe saludamos afectuosamente desde CIMASUR Chile, su farmacia homeopática veterinaria de referencia.\n\nRevisando nuestro sistema de fidelización del Club Comercial, observamos que su centro clínico {{CLINICA}} mantiene el acceso preferente a la categoría {{CATEGORIA_2026}} (con su beneficio estrella: {{BENEFICIO_PRINCIPAL}}).\n\nNo obstante, notamos que no registra órdenes recientes de reposición en este ciclo. Como queremos seguir apoyándolo en sus casos clínicos veterinarios, le hemos activado de forma excepcional un PLAZO DE GRACIA ESPECIAL de 30 días y despacho completamente gratuito (vía Blue Express) en su próximo pedido de fórmulas como Arnica CS o Acqua Maris.\n\n¿Le gustaría coordinar una cotización preferencial o recibir una llamada de asesoramiento?\n\nQuedamos a su entera disposición.');
+  const [bulkWhatsAppText, setBulkWhatsAppText] = useState<string>('Hola Dr/a. {{NOMBRE}} de {{CLINICA}} 🐾 Le saluda el equipo del Club CIMASUR. Queremos recordarle que mantiene sus beneficios preferentes de categoría {{CATEGORIA_2026}}. Para apoyarle, le otorgamos un plazo de gracia especial de 30 días y despacho gratis. ¿Le gustaría cotizar Arnica CS o algún Kit de fórmulas? ¡Saludos!');
+  const [selectedCampaignClientIds, setSelectedCampaignClientIds] = useState<string[]>([]);
+  
+  // Bulk sending execution states
+  const [isBulkSending, setIsBulkSending] = useState<boolean>(false);
+  const [bulkProgress, setBulkProgress] = useState<number>(0);
+  const [bulkResults, setBulkResults] = useState<{ name: string; email: string; status: 'success' | 'error'; error?: string }[]>([]);
 
-    // Heuristically detect delimiter
-    const firstLine = lines[0];
-    let delimiter = '\t'; // Default tab
-    if (firstLine.includes(';')) delimiter = ';';
-    else if (firstLine.includes(',')) delimiter = ',';
-    else if (firstLine.includes('|')) delimiter = '|';
+  // AI Evaluation parameters
+  const [evaluation, setEvaluation] = useState<{
+    scorePersonalizacion: number;
+    scoreTonoApoyo: number;
+    scoreLlamadoAccion: number;
+    scoreEfectividad: number;
+    positives: string[];
+    improvements: string[];
+  } | null>(null);
 
-    const details: VisualImportRow[] = [];
-    let matchedCount = 0;
-    let unmatchedCount = 0;
-
-    const clientMap = new Map<string, ClubClient>();
-    clients.forEach(c => {
-      const norm = normalizeRUTForImport(c.rut);
-      if (norm) {
-        clientMap.set(norm, c);
-      }
-    });
-
-    // Detect if first line is headers
-    const looksLikeHeader = (cols: string[]) => {
-      return cols.some(col => {
-        const c = col.toLowerCase();
-        return c.includes('rut') || c.includes('name') || c.includes('nombre') || c.includes('venta') || c.includes('monto') || c.includes('clien') || c.includes('202') || c.includes('factura');
-      });
-    };
-
-    const hasHeader = looksLikeHeader(firstLine.split(delimiter));
-    const startIdx = hasHeader ? 1 : 0;
-
-    for (let i = startIdx; i < lines.length; i++) {
-      const line = lines[i];
-      const cols = line.split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
-      if (cols.length === 0 || !cols[0]) continue;
-
-      const rutOriginal = cols[colMapping.rutIdx] || '';
-      const rutNormalized = normalizeRUTForImport(rutOriginal);
-
-      if (!rutNormalized) continue;
-
-      const matchedClient = clientMap.get(rutNormalized);
-
-      const v2024 = colMapping.v2024Idx !== -1 && colMapping.v2024Idx < cols.length
-        ? parseChileanAmount(cols[colMapping.v2024Idx])
-        : (matchedClient?.ventas?.v2024 || 0);
-      const v2025 = colMapping.v2025Idx !== -1 && colMapping.v2025Idx < cols.length
-        ? parseChileanAmount(cols[colMapping.v2025Idx])
-        : (matchedClient?.ventas?.v2025 || 0);
-      const v2026 = colMapping.v2026Idx !== -1 && colMapping.v2026Idx < cols.length
-        ? parseChileanAmount(cols[colMapping.v2026Idx])
-        : (matchedClient?.ventas?.v2026 || 0);
-
-      if (matchedClient) {
-        matchedCount++;
-        details.push({
-          rutOriginal,
-          rutNormalized,
-          v2024,
-          v2025,
-          v2026,
-          clientName: matchedClient.name,
-          found: true,
-          clientId: matchedClient.id
-        });
-      } else {
-        unmatchedCount++;
-        details.push({
-          rutOriginal,
-          rutNormalized,
-          v2024,
-          v2025,
-          v2026,
-          found: false
-        });
-      }
-    }
-
-    setSalesImportResults({
-      totalRows: details.length,
-      matched: matchedCount,
-      unmatched: unmatchedCount,
-      details
-    });
+  const formatCLP = (val: number) => {
+    return new Intl.NumberFormat('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(val);
   };
 
-  useEffect(() => {
-    handlePreviewImport();
-  }, [salesImportText, colMapping, clients]);
-
-  const handleExecuteSalesImport = async () => {
-    if (!salesImportResults || salesImportResults.details.length === 0) {
-      alert("No hay registros válidos para importar.");
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      let importedCount = 0;
-
-      for (const row of salesImportResults.details) {
-        if (!row.found || !row.clientId) continue;
-
-        const originalClient = clients.find(c => c.id === row.clientId);
-        if (!originalClient) continue;
-
-        const updatedSales: ClientVentas = {
-          v2024: row.v2024,
-          v2025: row.v2025,
-          v2026: row.v2026
-        };
-
-        const autoTier = getTierBySales(updatedSales.v2026, tiersList);
-
-        await localDB.updateInCollection('contacts', row.clientId, {
-          clubVentasDetail: JSON.stringify(updatedSales),
-          categoria: autoTier.name
-        });
-
-        importedCount++;
-      }
-
-      window.dispatchEvent(new Event('db-change'));
-      setSalesImportText('');
-      setSalesImportResults(null);
-      setShowSalesImportModal(false);
-      alert(`¡Importación exitosa! Se actualizaron las ventas de ${importedCount} clientes según su RUT.`);
-    } catch (err) {
-      console.error("Error executing sales import", err);
-      alert("Ocurrió un error al procesar la importación.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  // Load clients and sync with Database changes
   const loadData = async () => {
     try {
       const contacts = await localDB.getCollection('contacts');
@@ -657,11 +319,12 @@ export function ClubSocialManager() {
           region: c.region || c.comuna || 'Metropolitana',
           ventas: salesDetail || defaultSales,
           historialUnificado: c.historialUnificado || '',
-          clinica: c.razonSocial || c.clinica || (c.name ? `${c.name} Vet` : 'Clínica Veterinaria')
+          clinica: c.razonSocial || c.clinica || (c.name ? `${c.name} Vet` : 'Clínica Veterinaria'),
+          ultimoWhatsapp: c.ultimoWhatsapp || '',
+          ultimoCorreo: c.ultimoCorreo || ''
         };
       });
 
-      // Load specific Tiers Config from DB if exists
       const savedTiers = await localDB.getCollection('tiers_config');
       if (savedTiers && savedTiers.length > 0) {
         setTiersList(savedTiers as any);
@@ -676,9 +339,6 @@ export function ClubSocialManager() {
       }
 
       setClients(formatted);
-      if (formatted.length > 0 && !selectedClientId) {
-        setSelectedClientId(formatted[0].id);
-      }
     } catch (e) {
       console.error("Error loading contacts for ClubCRM", e);
     }
@@ -690,3417 +350,2194 @@ export function ClubSocialManager() {
     return () => window.removeEventListener('db-change', loadData);
   }, []);
 
-  // Save new client configurations
-  const handleSaveClientInfo = async () => {
-    if (!selectedClientId) return;
-    try {
-      const current = clients.find(c => c.id === selectedClientId);
-      if (!current) return;
-      
-      const salesObj: ClientVentas = {
-        v2024: Number(editSales2024) || 0,
-        v2025: Number(editSales2025) || 0,
-        v2026: Number(editSales2026) || 0
-      };
-
-      // Recalculate automatic tier based on sales cycles
-      const autoTier = getTierBySales(salesObj.v2026, tiersList);
-
-      const appendNote = newNote.trim() 
-        ? `\n[${new Date().toLocaleDateString('es-CL')} - Directiva]: ${newNote.trim()}` 
-        : '';
-
-      const updates = {
-        name: editName,
-        nombre: editName,
-        email: editEmail,
-        phone: editPhone,
-        celular: editPhone,
-        rut: editRut,
-        clinica: editClinica,
-        razonSocial: editClinica,
-        categoria: autoTier.name,
-        clubVentasDetail: JSON.stringify(salesObj),
-        historialUnificado: (current.historialUnificado || '') + appendNote
-      };
-
-      await localDB.updateInCollection('contacts', selectedClientId, updates);
-      setIsEditingClient(false);
-      setNewNote('');
-      window.dispatchEvent(new Event('db-change'));
-      alert("Ficha individual y ventas anuales del ciclo actualizadas correctamente.");
-    } catch (err) {
-      console.error(err);
-      alert("Error al guardar la información del cliente.");
-    }
-  };
-
-  // Core intelligence classifier for all clients based on Sales Cycles
-  const enrichedClients = useMemo(() => {
+  // Filter clients to include ONLY critical ones
+  const criticalClients = useMemo(() => {
     return clients.map(client => {
       const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
       const v2024 = Number(sales.v2024 || 0);
       const v2025 = Number(sales.v2025 || 0);
       const v2026 = Number(sales.v2026 || 0);
 
-      const activeTier2026 = getTierBySales(v2026, tiersList);
-      const activeTier2025 = getTierBySales(v2025, tiersList);
+      const activeTier2026 = getTierBySales(v2025, tiersList);
+      const activeTier2025 = getTierBySales(v2024, tiersList);
 
-      const isCrecio = v2026 > v2025;
-      const isDisminuyo = v2026 < v2025 && v2026 > 0 && v2025 > 0;
       const percentChange = v2025 > 0 ? (v2026 - v2025) / v2025 : 0;
-      const isEstables = Math.abs(percentChange) <= 0.10 && v2026 > 0 && v2025 > 0;
+      const isRiesgoAlto = percentChange <= -0.50 && v2025 > 0;
       const isDormidos = v2025 > 0 && v2026 <= 0;
       const isPerdidos = v2024 > 0 && v2025 <= 0 && v2026 <= 0;
-      const isRiesgoAlto = percentChange <= -0.50 && v2025 > 0;
+      const isDisminuyo = v2026 < v2025 && v2026 > 0 && v2025 > 0;
 
-      // Classify
-      let segmentGroup: 'activo' | 'crecer' | 'estable' | 'disminuyo' | 'dormido' | 'perdido' | 'riesgo_alto' = 'estable';
-      if (isPerdidos) segmentGroup = 'perdido';
-      else if (isDormidos) segmentGroup = 'dormido';
-      else if (isRiesgoAlto) segmentGroup = 'riesgo_alto';
-      else if (isCrecio) segmentGroup = 'crecer';
-      else if (isEstables) segmentGroup = 'estable';
-      else if (isDisminuyo) segmentGroup = 'disminuyo';
+      let statusKey: 'ALL' | 'CRITICO' | 'DORMIDO' | 'EN_CAIDA' | 'PERDIDO' | 'NORMAL' = 'NORMAL';
+      let statusLabel = 'Normal';
+      let statusColor = 'text-slate-400 bg-slate-900/50 border-slate-800';
 
-      // Near Upgrade threshold check (within 15% range of NEXT tier min)
-      const currentTierIndex = tiersList.findIndex(t => t.name === activeTier2026.name);
-      const nextTierConfig = (currentTierIndex !== -1 && currentTierIndex < tiersList.length - 1) 
-        ? tiersList[currentTierIndex + 1] 
-        : null;
-      const isProximoAscenso = nextTierConfig 
-        ? (nextTierConfig.min - v2026 > 0) && (v2026 >= nextTierConfig.min * 0.85)
-        : false;
-
-      // Near Downgrade threshold check (drops below base tier, or drops within 15% margin close to losing standard classification)
-      const isProximoDescenso = activeTier2026.min > 0 
-        ? (v2026 >= activeTier2026.min) && (v2026 <= activeTier2026.min * 1.15)
-        : false;
-
-      const isIntranet = v2024 === 0 && v2025 === 0 && v2026 === 0;
+      if (isRiesgoAlto) {
+        statusKey = 'CRITICO';
+        statusLabel = 'Riesgo Crítico';
+        statusColor = 'text-red-400 bg-red-950/40 border-red-900/30';
+      } else if (isDormidos) {
+        statusKey = 'DORMIDO';
+        statusLabel = 'Dormido (Sin compras)';
+        statusColor = 'text-yellow-400 bg-yellow-950/40 border-yellow-900/30';
+      } else if (isPerdidos) {
+        statusKey = 'PERDIDO';
+        statusLabel = 'Socio Perdido';
+        statusColor = 'text-gray-400 bg-gray-900/60 border-gray-850';
+      } else if (isDisminuyo) {
+        statusKey = 'EN_CAIDA';
+        statusLabel = 'Compras en Caída';
+        statusColor = 'text-rose-400 bg-rose-950/30 border-rose-900/30';
+      }
 
       return {
         ...client,
         ventas: { v2024, v2025, v2026 },
-        calculatedTier: { ...activeTier2026, index: currentTierIndex !== -1 ? currentTierIndex : 0 },
-        calculatedTierPrev: activeTier2025,
-        segmentGroup,
-        isCrecio,
-        isDisminuyo,
-        isEstables,
-        isDormidos,
-        isPerdidos,
-        isRiesgoAlto,
-        isIntranet,
-        isProximoAscenso,
-        isProximoDescenso,
+        calculatedTier: activeTier2026,
         percentChange,
-        nextTier: nextTierConfig,
-        brechaAscenso: nextTierConfig ? Math.max(0, nextTierConfig.min - v2026) : 0,
-        brechaDescenso: activeTier2026.min > 0 ? Math.max(0, v2026 - activeTier2026.min) : 0
+        statusKey,
+        statusLabel,
+        statusColor,
+        isCritical: statusKey !== 'NORMAL'
       };
-    });
+    }).filter(c => c.isCritical);
   }, [clients, tiersList]);
 
-  // Select a client and load in detail panel
-  const selectedClient = useMemo(() => {
-    const found = enrichedClients.find(c => c.id === selectedClientId);
-    if (found) return found;
-    return enrichedClients[0] || null;
-  }, [enrichedClients, selectedClientId]);
-
-  // Handle setting parameters when selected client changes
+  // Handle auto-selection of first client if none selected
   useEffect(() => {
-    if (selectedClient) {
-      setEditName(selectedClient.name);
-      setEditEmail(selectedClient.email);
-      setEditPhone(selectedClient.phone);
-      setEditRut(selectedClient.rut);
-      setEditClinica(selectedClient.clinica || '');
-      setEditSales2024(selectedClient.ventas?.v2024 || 0);
-      setEditSales2025(selectedClient.ventas?.v2025 || 0);
-      setEditSales2026(selectedClient.ventas?.v2026 || 0);
+    if (criticalClients.length > 0 && !selectedClientId) {
+      setSelectedClientId(criticalClients[0].id);
     }
-  }, [selectedClient]);
+  }, [criticalClients, selectedClientId]);
 
-  // Executive Dashboard Sums
-  const dashboardStats = useMemo(() => {
-    let crecieronCount = 0;
-    let disminuyeronCount = 0;
-    let establesCount = 0;
-    let riesgoCount = 0;
-    let ascensosCount = 0;
-    let descensosCount = 0;
-    let intranetCount = 0;
-    let totalSalesPeriod = 0;
+  // Load saved SMTP config and auto-select bulk recipients on mount
+  useEffect(() => {
+    const savedHost = localStorage.getItem('smtp_host');
+    const savedPort = localStorage.getItem('smtp_port');
+    const savedUser = localStorage.getItem('smtp_user');
+    const savedPass = localStorage.getItem('smtp_pass');
+    const savedName = localStorage.getItem('smtp_sender_name');
+    if (savedHost) setSmtpHost(savedHost);
+    if (savedPort) setSmtpPort(savedPort);
+    if (savedUser) setSmtpUser(savedUser);
+    if (savedPass) setSmtpPass(savedPass);
+    if (savedName) setSmtpSenderName(savedName);
+  }, []);
 
-    enrichedClients.forEach(c => {
-      totalSalesPeriod += c.ventas?.v2026 || 0;
-      if (c.isCrecio) crecieronCount++;
-      if (c.isDisminuyo) disminuyeronCount++;
-      if (c.isEstables) establesCount++;
-      if (c.isRiesgoAlto) riesgoCount++;
-      if (c.isProximoAscenso) ascensosCount++;
-      if (c.isProximoDescenso) descensosCount++;
-      if (c.isIntranet) intranetCount++;
+  // Pre-select all critical clients as campaign recipients by default
+  useEffect(() => {
+    if (criticalClients.length > 0 && selectedCampaignClientIds.length === 0) {
+      setSelectedCampaignClientIds(criticalClients.map(c => c.id));
+    }
+  }, [criticalClients]);
+
+  const saveSmtpSettings = (host: string, port: string, user: string, pass: string, name: string) => {
+    localStorage.setItem('smtp_host', host);
+    localStorage.setItem('smtp_port', port);
+    localStorage.setItem('smtp_user', user);
+    localStorage.setItem('smtp_pass', pass);
+    localStorage.setItem('smtp_sender_name', name);
+  };
+
+  // Filter list by search query and quick status filter
+  const filteredClients = useMemo(() => {
+    return criticalClients.filter(c => {
+      const matchesSearch = 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.clinica.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.rut.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'ALL' || c.statusKey === statusFilter;
+      return matchesSearch && matchesStatus;
     });
+  }, [criticalClients, searchQuery, statusFilter]);
 
-    return {
-      totalClients: enrichedClients.length,
-      crecieron: crecieronCount,
-      disminuyeron: disminuyeronCount,
-      estables: establesCount,
-      riesgo: riesgoCount,
-      ascensos: ascensosCount,
-      descensos: descensosCount,
-      intranet: intranetCount,
-      totalSales: totalSalesPeriod
-    };
-  }, [enrichedClients]);
+  const selectedClient = useMemo(() => {
+    return criticalClients.find(c => c.id === selectedClientId) || null;
+  }, [criticalClients, selectedClientId]);
 
-  // Handle drill-down logic
-  const handleDrillDown = (segment: string) => {
-     if (dashboardFilter === segment) {
-        setDashboardFilter(null);
-     } else {
-        setDashboardFilter(segment);
-     }
-  };
+  // Clean message and evaluation when selected client or channel changes
+  useEffect(() => {
+    setMessageText('');
+    setImprovePrompt('');
+    setEvaluation(null);
+  }, [selectedClientId, channel]);
 
-  // Master Intelligent Segment Filter Results
-  const segmentedClients = useMemo(() => {
-    return enrichedClients.filter(c => {
-      // Category Match
-      const matchesCategory = segCategory === 'Todas' || c.calculatedTier.name === segCategory;
-
-      // Behavior / Growth Match
-      let matchesBehavior = true;
-      if (segGrowth === 'Crecieron') matchesBehavior = c.isCrecio;
-      else if (segGrowth === 'Disminuyeron') matchesBehavior = c.isDisminuyo;
-      else if (segGrowth === 'Estables') matchesBehavior = c.isEstables;
-      else if (segGrowth === 'Dormidos') matchesBehavior = c.isDormidos;
-      else if (segGrowth === 'Perdidos') matchesBehavior = c.isPerdidos;
-      else if (segGrowth === 'Riesgo Alto') matchesBehavior = c.isRiesgoAlto;
-      else if (segGrowth.includes('Intranet')) matchesBehavior = c.isIntranet;
-
-      // Cycle Recency Match
-      let matchesLastPurchase = true;
-      if (segGrowth.includes('Intranet')) {
-        matchesLastPurchase = true; // Intranet prospects don't have purchases, so bypass this filter
-      } else if (segLastPurchase === 'En ciclo actual') {
-        matchesLastPurchase = (c.ventas?.v2026 || 0) > 0;
-      } else if (segLastPurchase === 'Solo ciclo anterior') {
-        matchesLastPurchase = (c.ventas?.v2025 || 0) > 0 && (c.ventas?.v2026 || 0) === 0;
-      }
-
-      return matchesCategory && matchesBehavior && matchesLastPurchase;
-    });
-  }, [enrichedClients, segCategory, segGrowth, segLastPurchase]);
-
-  // Simulated upgrade values for active client
-  const activeSimulatedMetrics = useMemo(() => {
-    if (!selectedClient) return null;
-    const currentSales = selectedClient.ventas?.v2026 || 0;
-    const finalSales = currentSales + simulatedVentas;
-    const futureTier = getTierBySales(finalSales, tiersList);
-    
-    const nextIndex = tiersList.findIndex(t => t.name === futureTier.name) + 1;
-    const nextTier = nextIndex < tiersList.length ? tiersList[nextIndex] : null;
-    const nextBrecha = nextTier ? Math.max(0, nextTier.min - finalSales) : 0;
-    const progressPercent = nextTier ? Math.min(100, Math.round((finalSales / nextTier.min) * 100)) : 100;
-
-    return {
-      futureSales: finalSales,
-      futureTier,
-      nextTier,
-      nextBrecha,
-      progressPercent
-    };
-  }, [selectedClient, simulatedVentas, tiersList]);
-
-  // Variables template replacer utility
-  const replaceMessageVariables = (textTemplate: string, clientInfo: any) => {
+  // Call Gemini to generate, evaluate and improve the recovery message
+  const handleGenerateOrImproveMessage = async (isImprovement: boolean) => {
+    if (!selectedClient) return;
+    setIsGenerating(true);
     try {
-      if (!textTemplate) return '';
-      if (!clientInfo) return textTemplate;
-      const v2026 = clientInfo.ventas?.v2026 || 0;
-      const bestBenefit = clientInfo.calculatedTier?.primaryBenefit || 'Beneficios generales';
-      const destinationTier = clientInfo.nextTier?.name ?? clientInfo.nextTierName ?? 'Máxima Categoría';
-      const nextTierMin = clientInfo.nextTier?.min ?? 0;
-      const brechaVal = nextTierMin > 0 ? Math.max(0, nextTierMin - v2026) : 0;
-
-      return textTemplate
-        .replace(/\{\{NOMBRE\}\}/g, clientInfo.name || 'Médico')
-        .replace(/\{\{CLINICA\}\}/g, clientInfo.clinica || 'Clínica Veterinaria')
-        .replace(/\{\{CATEGORIA\}\}/g, clientInfo.calculatedTier?.name || clientInfo.categoria || 'Sin categoría')
-        .replace(/\{\{CATEGORIA_NUEVA\}\}/g, destinationTier)
-        .replace(/\{\{SIGUIENTE_CATEGORIA\}\}/g, destinationTier)
-        .replace(/\{\{VENTAS\}\}/g, `$${formatCLP(v2026 || 0)}`)
-        .replace(/\{\{BRECHA\}\}/g, `$${formatCLP(brechaVal || 0)}`)
-        .replace(/\{\{BENEFICIO\}\}/g, bestBenefit)
-        .replace(/\{\{EJECUTIVO\}\}/g, execConfig.nombre || '')
-        .replace(/\{\{CORREO_EJECUTIVO\}\}/g, execConfig.correo || '')
-        .replace(/\{\{WHATSAPP_EJECUTIVO\}\}/g, execConfig.whatsapp || '');
-    } catch (e) {
-      console.error("Error in replaceMessageVariables:", e);
-      return textTemplate || '';
-    }
-  };
-
-  // Preloaded variables button helper
-  const handleInsertVariable = (variable: string) => {
-    setMessageTemplate(prev => prev + ' ' + variable);
-  };
-
-  // AI Batch Generation trigger
-  const handleGenerateAIBatch = async (objective: string) => {
-    if (segmentedClients.length === 0) {
-      alert("No hay clientes segmentados para generar mensajes.");
-      return;
-    }
-    setIsGeneratingBatch(true);
-    setAiGeneratedMessages({});
-    try {
-      // Pass minimum info to save tokens
-      const payloadClients = segmentedClients.map(c => ({
-        id: c.id,
-        name: c.name,
-        clinica: c.clinica,
-        ventas_2026: c.ventas?.v2026 || 0,
-        categoria_actual: c.calculatedTier?.name || 'Sin categoría',
-        beneficio: c.calculatedTier?.primaryBenefit || 'Beneficios VIP'
-      }));
-
-      const res = await fetch('/api/ai/generate-batch-messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clients: payloadClients, type: objective }),
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Error en la solicitud a la IA");
-      }
-      const data = await res.json();
-      if (data.messages && typeof data.messages === 'object') {
-        setAiGeneratedMessages(data.messages);
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert("Hubo un error generando los mensajes: " + err.message);
-    } finally {
-      setIsGeneratingBatch(false);
-    }
-  };
-
-  // Mass campaign multi-select dispatch simulator
-  const handleLaunchCampaign = async () => {
-    if (campaignRecipients.length === 0) {
-      alert("Por favor, selecciona o agrega destinatarios al lote de la campaña.");
-      return;
-    }
-    setIsSending(true);
-    setCampaignTriggered(true);
-    setCampaignLog([]);
-
-    try {
-      // Stream batch simulation
-      for (let i = 0; i < campaignRecipients.length; i++) {
-        const item = campaignRecipients[i];
-        const clientData = enrichedClients.find(ec => ec.id === item.id);
-        const personalized = aiGeneratedMessages[item.id] || replaceMessageVariables(messageTemplate, clientData);
-        
-        // Simulating delay for bulk server delivery
-        await new Promise(resolve => setTimeout(resolve, 600));
-
-        const smtpStatus = (campaignChannel === 'email' || campaignChannel === 'both') && execConfig.smtpServer 
-          ? ` (SMTP: ${execConfig.smtpServer})`
-          : '';
-
-        // Add to live audit logs
-        setCampaignLog(prev => [
-          ...prev, 
-          `[OK - ${new Date().toLocaleTimeString()}] Canal ${campaignChannel.toUpperCase()} - Entregado a: ${item.name} (${item.clinica || 'Vet'})${smtpStatus}`
-        ]);
-
-        // Append to local database client commercial logs
-        const auditHeader = `\n[Campaña Masiva ${new Date().toLocaleDateString('es-CL')}]`;
-        const auditLogMsg = `\n${auditHeader}\nCanal: ${campaignChannel.toUpperCase()}\nAsunto/Mensaje:\n"${personalized.substring(0, 150)}..."`;
-        
-        await localDB.updateInCollection('contacts', item.id, {
-          historialUnificado: (item.historialUnificado || '') + auditLogMsg
-        });
-      }
-
-      // Record a global Campaign Action Activity log
-      await localDB.saveToCollection('crm_activities', {
-        id: `act_${Date.now()}`,
-        campania: `Campaña CRM - ${new Date().toLocaleDateString('es-CL')}`,
-        tipo: campaignChannel === 'both' ? 'WhatsApp + Correo' : campaignChannel === 'email' ? 'Correo Electrónico' : 'WhatsApp',
-        segmento: `${campaignRecipients.length} Clientes contactados`,
-        targetCategories: Array.from(new Set(campaignRecipients.map(r => r.categoria))),
-        createdAt: new Date().toISOString()
-      });
-
-      window.dispatchEvent(new Event('db-change'));
-      alert("Campaña masiva enviada correctamente. El historial clínico de cada cliente ha sido actualizado.");
-    } catch (e) {
-      console.error(e);
-      alert("Error ejecutando la campaña.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleGenerateAISupportMessage = async () => {
-    if (!selectedClient) {
-      alert("Por favor, selecciona un cliente para generar un mensaje personalizado.");
-      return;
-    }
-    setIsGeneratingMessage(true);
-    try {
-      const response = await fetch('/api/ai/generate-support-message', {
+      const response = await fetch('/api/ai/evaluate-improve-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName: selectedClient.name,
-          categoria: selectedClient.categoria,
-          clinica: selectedClient.clinica,
-          type: postcardType
+          client: selectedClient,
+          status: selectedClient.statusLabel,
+          currentMessage: isImprovement ? messageText : '',
+          improvePrompt: isImprovement ? improvePrompt : 'Generar propuesta inicial altamente persuasiva, amigable y empática enfocada en recuperar al socio comercial.',
+          channel: channel
         })
       });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Error en la respuesta de la IA.");
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Fallo al procesar con IA.');
       }
+
       const data = await response.json();
-      if (data && data.message) {
-        setPostcardSubtext(data.message);
-      } else {
-        alert("Falta el mensaje en la respuesta estructurada de la IA.");
+      if (data && data.improvedMessage) {
+        setMessageText(data.improvedMessage);
+        if (data.evaluation) {
+          setEvaluation(data.evaluation);
+        }
+        if (isImprovement) {
+          setImprovePrompt('');
+        }
       }
+    } catch (e: any) {
+      console.error(e);
+      alert('Error con el Motor Gemini: ' + e.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Add a manual unificada log note
+  const handleAddManualNote = async () => {
+    if (!selectedClient || !newNote.trim()) return;
+    try {
+      const stamp = `[${new Date().toLocaleDateString('es-CL')} ${new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})}]: ${newNote.trim()}`;
+      const currentHist = selectedClient.historialUnificado || '';
+      const updatedHist = currentHist ? `${stamp}\n${currentHist}` : stamp;
+
+      await localDB.updateInCollection('contacts', selectedClient.id, {
+        historialUnificado: updatedHist
+      });
+
+      setNewNote('');
+      window.dispatchEvent(new Event('db-change'));
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar nota de actividad.');
+    }
+  };
+
+  // Execute actual messaging dispatch via WhatsApp
+  const handleDispatchWhatsApp = async () => {
+    if (!selectedClient || !messageText.trim()) return;
+    
+    // Clean phone number
+    let cleanPhone = selectedClient.phone.replace(/[^0-9+]/g, '');
+    if (!cleanPhone.startsWith('+')) {
+      cleanPhone = `+56${cleanPhone}`; // Default to Chile
+    }
+    
+    try {
+      // Update last active time and save history unificado
+      const nowStr = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
+      const stamp = `[${nowStr} - WhatsApp Recup.]: Mensaje enviado para recuperación.`;
+      const currentHist = selectedClient.historialUnificado || '';
+      const updatedHist = currentHist ? `${stamp}\n${currentHist}` : stamp;
+
+      await localDB.updateInCollection('contacts', selectedClient.id, {
+        ultimoWhatsapp: nowStr,
+        historialUnificado: updatedHist
+      });
+
+      window.dispatchEvent(new Event('db-change'));
+
+      // Open WhatsApp Web
+      const url = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanPhone)}&text=${encodeURIComponent(messageText)}`;
+      window.open(url, '_blank');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Execute actual email copy & prefill mailto
+  const handleDispatchEmail = async () => {
+    if (!selectedClient || !messageText.trim()) return;
+
+    try {
+      // Copy to clipboard
+      await navigator.clipboard.writeText(messageText);
+
+      // Update last active time and save history
+      const nowStr = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
+      const stamp = `[${nowStr} - Correo Recup.]: Mensaje copiado y redactado para envío de correo.`;
+      const currentHist = selectedClient.historialUnificado || '';
+      const updatedHist = currentHist ? `${stamp}\n${currentHist}` : stamp;
+
+      await localDB.updateInCollection('contacts', selectedClient.id, {
+        ultimoCorreo: nowStr,
+        historialUnificado: updatedHist
+      });
+
+      window.dispatchEvent(new Event('db-change'));
+
+      // Open prefilled mailto
+      const subject = `Alianza Preferencial y Beneficios CIMASUR - ${selectedClient.clinica}`;
+      const url = `mailto:${encodeURIComponent(selectedClient.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent("Estimado/a doctor/a,\n\n(El contenido del mensaje recomendado ha sido copiado a su portapapeles. Por favor, péguelo aquí)\n\nAtentamente,\nEquipo CIMASUR")}`;
+      window.open(url, '_blank');
+      
+      alert('¡El texto completo del correo se ha copiado al portapapeles para facilitar su redacción! Se ha abierto su gestor de correo predeterminado.');
+    } catch (e) {
+      console.error(e);
+      alert('No se pudo copiar el texto automáticamente, pero puede copiarlo manualmente de la pantalla.');
+    }
+  };
+
+  // Helper to compile elegant graphic email with resolved placeholders
+  const compileHtmlTemplate = (client: any, bodyText: string, accentColor: string = designerAccentColor) => {
+    const changePct = (client.percentChange || 0) * 100;
+    const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+    
+    const resolvedText = bodyText
+      .replace(/\{\{NOMBRE\}\}/g, client.name || 'Doctor/a')
+      .replace(/\{\{CLINICA\}\}/g, client.clinica || 'Centro Clínico')
+      .replace(/\{\{CATEGORIA_2026\}\}/g, client.calculatedTier?.name || 'Socio Especial')
+      .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+      .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, client.calculatedTier?.primaryBenefit || 'Beneficios preferentes de vademécum');
+
+    const textHtml = resolvedText.replace(/\n/g, '<br />');
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Alianza Preferente CIMASUR</title>
+</head>
+<body style="margin:0; padding:0; background-color:#050914; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color:#f1f5f9;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#050914; padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <!-- Main Panel Container -->
+        <table width="560" border="0" cellspacing="0" cellpadding="0" style="background-color:#0d162d; border-radius:16px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
+          
+          <!-- Header Hero with CIMASUR logo and banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0d162d 0%, #070b16 100%); padding:40px 30px; text-align:center; border-bottom:3px solid ${accentColor};">
+              <span style="color:${accentColor}; font-size:10px; font-weight:900; letter-spacing:3px; text-transform:uppercase; display:block; margin-bottom:8px;">CLUB SOCIAL & MOTOR COMERCIAL</span>
+              <h1 style="color:#ffffff; font-size:26px; font-weight:900; margin:0; tracking: -0.5px;">${designerTitle}</h1>
+              <p style="color:#94a3b8; font-size:12px; margin:6px 0 0 0; font-style:italic;">${designerSubtitle}</p>
+            </td>
+          </tr>
+
+          <!-- Profile Header Card -->
+          <tr>
+            <td style="padding:30px 35px 15px 35px;">
+              <span style="background-color:${accentColor}15; color:${accentColor}; border:1px solid ${accentColor}30; font-size:9px; font-weight:bold; padding:4px 10px; border-radius:12px; text-transform:uppercase; display:inline-block;">
+                Socio Categoría ${client.calculatedTier?.name || 'Preferencial'}
+              </span>
+              <h2 style="color:#ffffff; font-size:20px; font-weight:800; margin:14px 0 3px 0;">Estimado/a ${client.name},</h2>
+              <p style="color:#94a3b8; font-size:13px; font-weight:500; margin:0;">${client.clinica}</p>
+            </td>
+          </tr>
+
+          <!-- Dynamic Email Content Block -->
+          <tr>
+            <td style="padding:15px 35px 25px 35px; font-size:13.5px; line-height:1.65; color:#cbd5e1;">
+              <!-- Highlights box -->
+              <div style="background-color:#070b16; border-left:3px solid ${accentColor}; padding:14px; margin-bottom:20px; font-size:12.5px; color:#94a3b8; border-radius:6px; border-top:1px solid #1e293b; border-right:1px solid #1e293b; border-bottom:1px solid #1e293b;">
+                <strong>Resumen Técnico de Alianza 2026:</strong><br>
+                • Nivel de Socio Comercial: <strong style="color:#ffffff;">${client.calculatedTier?.name || 'Preferencial'}</strong><br>
+                • Soporte Activo: <strong style="color:${accentColor};">${client.calculatedTier?.primaryBenefit || 'Muestras clínicas y vademécum'}</strong>
+              </div>
+              
+              <div style="color:#cbd5e1; font-family:inherit;">
+                ${textHtml}
+              </div>
+            </td>
+          </tr>
+
+          <!-- Products Showcase Grid -->
+          <tr>
+            <td style="padding:10px 35px 30px 35px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#070b16; border-radius:10px; border:1px solid #1e293b; padding:18px;">
+                <tr>
+                  <td colspan="3" style="padding-bottom:12px; border-bottom:1px solid #1e293b;">
+                    <span style="color:#ffffff; font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">Fórmulas Clínicas Recomendadas para este Período:</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top:15px; vertical-align:top;" width="33%">
+                    <strong style="font-size:12px; color:#ffffff; display:block;">Arnica CS®</strong>
+                    <span style="font-size:10px; color:#64748b; display:block; margin-top:4px;">Incomparable modulador inflamatorio de uso clínico.</span>
+                  </td>
+                  <td style="padding-top:15px; vertical-align:top; border-left:1px solid #1e293b; padding-left:15px;" width="33%">
+                    <strong style="font-size:12px; color:#ffffff; display:block;">Acqua Maris®</strong>
+                    <span style="font-size:10px; color:#64748b; display:block; margin-top:4px;">Purificación y soporte respiratorio natural avanzado.</span>
+                  </td>
+                  <td style="padding-top:15px; vertical-align:top; border-left:1px solid #1e293b; padding-left:15px;" width="33%">
+                    <strong style="font-size:12px; color:#ffffff; display:block;">Kit Digestivo CS®</strong>
+                    <span style="font-size:10px; color:#64748b; display:block; margin-top:4px;">Regulación integral de mucosa digestiva animal.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Interactive Footer Card -->
+          <tr>
+            <td style="background-color:#070b16; border-top:1px solid #1e293b; padding:25px 35px; text-align:center;">
+              <p style="color:#ffffff; font-size:12.5px; margin:0 0 8px 0; font-weight:bold;">Alianza de Soporte Médico Veterinario CIMASUR</p>
+              <p style="color:#64748b; font-size:10.5px; margin:0 0 15px 0; line-height:1.5;">
+                Fono: +56 9 1234 5678 | Correo: contacto@cimasur.cl<br>
+                CIMASUR Homeopatía Veterinaria, Providencia, Santiago, Chile
+              </p>
+              <table align="center" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="background-color:${accentColor}; border-radius:8px; padding:9px 20px;">
+                    <a href="https://cimasur.cl" target="_blank" style="color:#0d162d; font-size:11px; font-weight:bold; text-decoration:none; text-transform:uppercase; letter-spacing:0.5px;">Acceder al Catálogo Online ➔</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+        
+        <!-- Standard Disclamer -->
+        <table width="560" border="0" cellspacing="0" cellpadding="0" style="margin-top:15px;">
+          <tr>
+            <td align="center" style="color:#475569; font-size:9.5px; line-height:1.4; padding:0 10px;">
+              Este es un correo electrónico enviado automáticamente por autorización del Club Comercial CIMASUR. Si desea suspender estas comunicaciones o actualizar sus datos, contacte a soporte@cimasur.cl.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+  };
+
+  // Test custom SMTP credentials
+  const handleTestSmtp = async () => {
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      setTestSmtpResult({ success: false, message: 'Por favor complete todos los parámetros SMTP (Servidor, Puerto, Usuario y Contraseña).' });
+      return;
+    }
+    setIsTestingSmtp(true);
+    setTestSmtpResult(null);
+    try {
+      const res = await fetch('/api/mail/send-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: {
+            smtpServer: smtpHost,
+            smtpPort: smtpPort,
+            smtpUser: smtpUser,
+            smtpPass: smtpPass,
+            nombre: smtpSenderName || 'Prueba CIMASUR'
+          },
+          emails: [{
+            to: testEmailTarget,
+            subject: '🧪 Conexión SMTP Propia Exitosa - CRM CIMASUR',
+            text: `¡Felicidades! Su conexión SMTP (${smtpHost}:${smtpPort}) con la cuenta institucional ${smtpUser} está correctamente configurada y segura.`,
+            html: `
+              <div style="background-color:#0d162d; padding:35px; border-radius:12px; border:1px solid #38bdf8; font-family:sans-serif; color:#ffffff; max-width:500px;">
+                <h2 style="color:#38bdf8; margin-top:0;">🧪 Conexión SMTP Verificada</h2>
+                <p style="font-size:14px; line-height:1.5;">Este correo confirma que el CRM de CIMASUR ha conectado de forma exitosa y segura con su servidor institucional para el despacho masivo de campañas de fidelización.</p>
+                <hr style="border:0; border-top:1px solid #1e293b; margin:20px 0;">
+                <p style="font-size:12px; color:#94a3b8; margin-bottom:0;">Enviado el ${new Date().toLocaleString('es-CL')}</p>
+              </div>
+            `
+          }]
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.results && data.results[0]?.status === 'success') {
+        setTestSmtpResult({ success: true, message: `¡Verificación Exitosa! Correo de prueba despachado con éxito a ${testEmailTarget}.` });
+        saveSmtpSettings(smtpHost, smtpPort, smtpUser, smtpPass, smtpSenderName);
+      } else {
+        const detail = data.results?.[0]?.error || data.error || 'Fallo de autenticación o puertos.';
+        setTestSmtpResult({ success: false, message: `Fallo de Conexión: ${detail}` });
+      }
+    } catch (e: any) {
+      setTestSmtpResult({ success: false, message: `Fallo de Red: ${e.message}` });
+    } finally {
+      setIsTestingSmtp(false);
+    }
+  };
+
+  // Generate Group Campaign templates with Gemini IA
+  const handleGenerateGroupCampaignIA = async () => {
+    if (selectedCampaignClientIds.length === 0) {
+      alert('Por favor seleccione al menos un socio veterinario para la campaña masiva.');
+      return;
+    }
+    setIsGeneratingBulk(true);
+    
+    // Resolve clean display name for selected campaign objective
+    const objectiveText = campaignObjective === 'reactivacion_gracia' ? 'Plazo de Gracia Especial (30 Días de Beneficios con Var. Caída)' :
+                          campaignObjective === 'alianza_comercial' ? 'Alianza Preferencial CIMASUR (Análisis de Categoría 2026)' :
+                          campaignObjective === 'descuento_excepcional' ? 'Descuento del 15% Excepcional en la Próxima Reposición' :
+                          'Invitación a Testeo Sin Costo de la Nueva Línea de Alérgenos';
+
+    const userMsg = `Quiero iniciar una campaña masiva. Por favor genera los mejores textos de email y whatsapp integrados para los destinatarios seleccionados. 
+Objetivo comercial de la campaña: "${objectiveText}". 
+Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el mejor copywriting amigable e influyente de CIMASUR)'}"`;
+
+    // Add immediate action log in chat history
+    const userLabel = `⚡ Generación de Campaña IA:\n🎯 Objetivo: ${objectiveText}\n✏ Instrucciones: ${campaignPrompt || 'Ninguna'}`;
+    const updatedHistory = [...chatHistory, { sender: 'user' as const, text: userLabel }];
+    setChatHistory(updatedHistory);
+
+    try {
+      const response = await fetch('/api/ai/converse-bulk-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatHistory: updatedHistory,
+          currentEmailSubject: bulkEmailSubject,
+          currentEmailText: bulkEmailText,
+          currentWhatsAppText: bulkWhatsAppText,
+          userMessage: userMsg,
+          image: uploadedImageB64,
+          imageMimeType: uploadedImageMime,
+          currentDesignerTitle: designerTitle,
+          currentDesignerSubtitle: designerSubtitle,
+          currentDesignerAccentColor: designerAccentColor
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Fallo al conectar con el servidor del Copiloto IA.');
+      }
+      
+      const data = await response.json();
+      if (data) {
+        setChatHistory(prev => [...prev, { sender: 'ia' as const, text: data.reply || 'He procesado e incorporado la nueva propuesta comercial a las plantillas.' }]);
+        if (data.updatedEmailSubject) setBulkEmailSubject(data.updatedEmailSubject);
+        if (data.updatedEmailText) setBulkEmailText(data.updatedEmailText);
+        if (data.updatedWhatsAppText) setBulkWhatsAppText(data.updatedWhatsAppText);
+        if (data.updatedDesignerTitle) setDesignerTitle(data.updatedDesignerTitle);
+        if (data.updatedDesignerSubtitle) setDesignerSubtitle(data.updatedDesignerSubtitle);
+        if (data.updatedDesignerAccentColor) setDesignerAccentColor(data.updatedDesignerAccentColor);
+        
+        // Reset inputs and focus on email view tab
+        handleClearUploadedImage();
+        setCampaignPrompt('');
+        setPreviewTab('email');
+      }
+    } catch (e: any) {
+      console.error(e);
+      setChatHistory(prev => [...prev, { sender: 'ia' as const, text: `⚠️ Error de conexión al generar: ${e.message}.` }]);
+      alert('Error al diseñar campaña grupal con IA: ' + e.message);
+    } finally {
+      setIsGeneratingBulk(false);
+    }
+  };
+
+  // Run Bulk Email Dispatch using Real SMTP connection
+  const handleSendBulkEmailCampaign = async () => {
+    if (selectedCampaignClientIds.length === 0) {
+      alert('Debe tener al menos un socio seleccionado para iniciar la campaña.');
+      return;
+    }
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      alert('Por favor configure y verifique sus credenciales SMTP antes de realizar envíos reales.');
+      return;
+    }
+
+    const confirmed = window.confirm(`¿Está seguro de que desea despachar de forma masiva este correo electrónico con diseño gráfico a los ${selectedCampaignClientIds.length} socios seleccionados utilizando su cuenta real ${smtpUser}?`);
+    if (!confirmed) return;
+
+    setIsBulkSending(true);
+    setBulkProgress(0);
+    setBulkResults([]);
+
+    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    const emailsPayload = [];
+
+    for (const client of targets) {
+      const changePct = (client.percentChange || 0) * 100;
+      const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+      
+      const resolvedSubject = bulkEmailSubject
+        .replace(/\{\{NOMBRE\}\}/g, client.name || 'Doctor/a')
+        .replace(/\{\{CLINICA\}\}/g, client.clinica || 'Centro Clínico')
+        .replace(/\{\{CATEGORIA_2026\}\}/g, client.calculatedTier?.name || 'Socio Especial');
+
+      const htmlBody = compileHtmlTemplate(client, bulkEmailText, designerAccentColor);
+      
+      const plainBody = bulkEmailText
+        .replace(/\{\{NOMBRE\}\}/g, client.name || 'Doctor/a')
+        .replace(/\{\{CLINICA\}\}/g, client.clinica || 'Centro Clínico')
+        .replace(/\{\{CATEGORIA_2026\}\}/g, client.calculatedTier?.name || 'Socio Especial')
+        .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+        .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, client.calculatedTier?.primaryBenefit || 'Beneficios preferenciales');
+
+      emailsPayload.push({
+        to: client.email,
+        subject: resolvedSubject,
+        text: plainBody,
+        html: htmlBody,
+        clientId: client.id,
+        clientName: client.name
+      });
+    }
+
+    try {
+      const res = await fetch('/api/mail/send-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: {
+            smtpServer: smtpHost,
+            smtpPort: smtpPort,
+            smtpUser: smtpUser,
+            smtpPass: smtpPass,
+            nombre: smtpSenderName
+          },
+          emails: emailsPayload
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Fallo general en la pasarela SMTP.');
+      }
+
+      const responseData = await res.json();
+      const resultsMap = responseData.results || [];
+      
+      const finalResults = [];
+      const stampDate = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
+
+      for (let i = 0; i < emailsPayload.length; i++) {
+        const item = emailsPayload[i];
+        const statusReport = resultsMap.find((r: any) => r.email === item.to) || { status: 'error', error: 'Sin respuesta' };
+        
+        const success = statusReport.status === 'success';
+        finalResults.push({
+          name: item.clientName,
+          email: item.to,
+          status: success ? 'success' as const : 'error' as const,
+          error: statusReport.error
+        });
+
+        // Update unified local logs in DB
+        const stamp = `[${stampDate} - Campaña Email Masivo]: Despachado vía SMTP Propio con éxito. Asunto: "${item.subject}".`;
+        const targetClient = targets.find(t => t.id === item.clientId);
+        if (targetClient && success) {
+          const currentHist = targetClient.historialUnificado || '';
+          const updatedHist = currentHist ? `${stamp}\n${currentHist}` : stamp;
+          
+          await localDB.updateInCollection('contacts', targetClient.id, {
+            ultimoCorreo: stampDate,
+            historialUnificado: updatedHist
+          });
+        }
+      }
+
+      setBulkResults(finalResults);
+      saveSmtpSettings(smtpHost, smtpPort, smtpUser, smtpPass, smtpSenderName);
+      window.dispatchEvent(new Event('db-change'));
+      alert('¡Campaña masiva ejecutada! Revise el panel de control de envíos para ver los resultados.');
+
     } catch (err: any) {
       console.error(err);
-      alert("Error al conectar con la IA de CIMASUR: " + (err.message || 'Intente nuevamente'));
+      alert('Fallo catastrófico al enviar campaña: ' + err.message);
     } finally {
-      setIsGeneratingMessage(false);
+      setIsBulkSending(false);
     }
   };
 
-  const handleDownloadAllSelectedPostcards = async () => {
-    const idsToDownload = postcardClientIds.length > 0 ? postcardClientIds : [selectedClient?.id].filter(Boolean) as string[];
-    if (idsToDownload.length === 0) {
-      alert("No hay ningún médico veterinario seleccionado.");
+  // Download complete bulk WhatsApp payload in structured CSV for broadcast tools
+  const handleDownloadWhatsAppCSV = async () => {
+    if (selectedCampaignClientIds.length === 0) {
+      alert('Por favor seleccione al menos un socio.');
       return;
     }
-
-    if (!confirm(`¿Deseas descargar ${idsToDownload.length} postales de fidalidad una por una en tu navegador?`)) {
-      return;
-    }
-
-    // Download in series
-    for (let i = 0; i < idsToDownload.length; i++) {
-      const client = enrichedClients.find(c => c.id === idsToDownload[i]);
-      if (!client) continue;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = 800;
-      canvas.height = 500;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
-
-      // Gradient background based on tier
-      let grad = ctx.createLinearGradient(0, 0, 800, 500);
-      const catLow = (client.categoria || '').toLowerCase();
-      
-      if (catLow.includes('platinum')) {
-        grad.addColorStop(0, '#1E1B4B');
-        grad.addColorStop(1, '#581C87');
-      } else if (catLow.includes('oro')) {
-        grad.addColorStop(0, '#78350F');
-        grad.addColorStop(1, '#D97706');
-      } else if (catLow.includes('plata')) {
-        grad.addColorStop(0, '#1E293B');
-        grad.addColorStop(1, '#64748B');
-      } else {
-        grad.addColorStop(0, '#0F172A');
-        grad.addColorStop(1, '#334155');
-      }
-      
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 800, 500);
-
-      // Simple grid pattern
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-      ctx.lineWidth = 1;
-      for (let j = 0; j < 800; j += 40) {
-        ctx.beginPath();
-        ctx.moveTo(j, 0);
-        ctx.lineTo(j + 150, 500);
-        ctx.stroke();
-      }
-
-      // Border frame
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 15;
-      ctx.strokeRect(7.5, 7.5, 785, 485);
-
-      // Title
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.fillText("CIMASUR CLUB SOCIAL", 50, 75);
-
-      // Decorative shapes
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.beginPath();
-      ctx.arc(650, 250, 110, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(650, 250, 95, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.fillStyle = '#F59E0B';
-      ctx.font = 'bold 44px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText("★", 650, 265);
-      ctx.textAlign = 'left';
-
-      // Badge
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-      ctx.fillRect(50, 115, 280, 45);
-      ctx.fillStyle = '#38BDF8';
-      ctx.font = 'bold 18px monospace';
-      ctx.fillText(`CATEGORÍA: ${client.categoria.toUpperCase()}`, 65, 143);
-
-      // Core info
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 30px sans-serif';
-      ctx.fillText(client.name, 50, 230);
-
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = 'italic 18px sans-serif';
-      ctx.fillText(`Clínica: ${client.clinica || 'Socio Veterinario Autorizado'}`, 50, 265);
-
-      // Subheading title & message
-      ctx.fillStyle = '#E2E8F0';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText(postcardTitle || 'Reconocimiento VIP', 50, 330);
-
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '14px sans-serif';
-      const sub = postcardSubtext || 'Garantía oficial de fidelización preferente.';
-      ctx.fillText(sub.substring(0, 80), 50, 370);
-      if (sub.length > 80) {
-        ctx.fillText(sub.substring(80, 160), 50, 392);
-      }
-
-      ctx.fillStyle = '#F8FAFC';
-      ctx.font = 'bold 14px monospace';
-      ctx.fillText(`ID Registro: ${client.id}`, 50, 450);
-
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.font = '11px sans-serif';
-      ctx.fillText("© 2026 CIMASUR S.A. Todos los derechos reservados.", 490, 450);
-
-      // Trigger standard browser download
-      const imgData = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `cimasur_postal_club_${(client.name || '').replace(/\s+/g, '_')}.png`;
-      link.href = imgData;
-      link.click();
-
-      // Non-blocking tiny sleep to safeguard simultaneous dispatch
-      await new Promise(r => setTimeout(r, 350));
-    }
-  };
-
-  // Download Postcard using HTML5 Canvas render engine safely
-  const handleDownloadPostcard = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 500;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Background Gradient based on category colors
-    let grad = ctx.createLinearGradient(0, 0, 800, 500);
-    const catLow = (selectedClient?.categoria || '').toLowerCase();
     
-    if (catLow.includes('platinum')) {
-      grad.addColorStop(0, '#1E1B4B');
-      grad.addColorStop(1, '#581C87');
-    } else if (catLow.includes('oro')) {
-      grad.addColorStop(0, '#78350F');
-      grad.addColorStop(1, '#D97706');
-    } else if (catLow.includes('plata')) {
-      grad.addColorStop(0, '#1E293B');
-      grad.addColorStop(1, '#64748B');
-    } else {
-      grad.addColorStop(0, '#0F172A');
-      grad.addColorStop(1, '#334155');
-    }
+    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    let csvContent = "data:text/csv;charset=utf-8,Nombre;Telefono;MensajePersonalizado\n";
     
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 800, 500);
+    const stampDate = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
 
-    // Subtle modern patterns
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 800; i += 40) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i + 150, 500);
-      ctx.stroke();
+    for (const client of targets) {
+      const changePct = (client.percentChange || 0) * 100;
+      const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+      
+      const resolvedWhatsApp = bulkWhatsAppText
+        .replace(/\{\{NOMBRE\}\}/g, client.name || 'Doctor/a')
+        .replace(/\{\{CLINICA\}\}/g, client.clinica || 'Centro Clínico')
+        .replace(/\{\{CATEGORIA_2026\}\}/g, client.calculatedTier?.name || 'Socio Especial')
+        .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+        .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, client.calculatedTier?.primaryBenefit || 'Beneficios preferenciales');
+
+      // Escaping semicolons and newlines
+      const escapedMsg = resolvedWhatsApp.replace(/"/g, '""').replace(/\n/g, ' ');
+      csvContent += `"${client.name}";"${client.phone}";"${escapedMsg}"\n`;
+
+      // Update unified local logs in DB
+      const stamp = `[${stampDate} - Campaña WhatsApp Masiva]: Descargado en CSV para despacho masivo. Mensaje: "${resolvedWhatsApp.substring(0, 100)}..."`;
+      const currentHist = client.historialUnificado || '';
+      const updatedHist = currentHist ? `${stamp}\n${currentHist}` : stamp;
+      
+      await localDB.updateInCollection('contacts', client.id, {
+        ultimoWhatsapp: stampDate,
+        historialUnificado: updatedHist
+      });
     }
 
-    // Border
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.lineWidth = 15;
-    ctx.strokeRect(7.5, 7.5, 785, 485);
-
-    // Title / Topic
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.fillText("CIMASUR CLUB SOCIAL", 50, 75);
-
-    // Decorative Icon / Award Graphic Placeholder shape
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.beginPath();
-    ctx.arc(650, 250, 110, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Secondary inner decorative ring
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(650, 250, 95, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Visual star inside ring
-    ctx.fillStyle = '#F59E0B';
-    ctx.font = 'bold 44px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText("★", 650, 265);
-    ctx.textAlign = 'left';
-
-    // Badge Label
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    ctx.fillRect(50, 115, 280, 45);
-    ctx.fillStyle = '#38BDF8';
-    ctx.font = 'bold 18px monospace';
-    ctx.fillText(`CATEGORÍA: ${selectedClient?.categoria.toUpperCase() || 'GENERAL'}`, 65, 143);
-
-    // Client Name & Clinic Info
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 30px sans-serif';
-    ctx.fillText(selectedClient?.name || 'PRESTIGIADO SOCIO', 50, 230);
-
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = 'italic 18px sans-serif';
-    ctx.fillText(`Clínica: ${selectedClient?.clinica || 'Establecimiento Técnico'}`, 50, 265);
-
-    // Custom Customizer Title
-    ctx.fillStyle = '#E2E8F0';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(postcardTitle || 'Reconocimiento VIP', 50, 330);
-
-    // Custom Customizer Subtext wrapped
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '14px sans-serif';
-    const sub = postcardSubtext || 'Garantía oficial de fidelización preferente.';
-    ctx.fillText(sub.substring(0, 80), 50, 370);
-    if (sub.length > 80) {
-      ctx.fillText(sub.substring(80, 160), 50, 392);
-    }
-
-    // Foot Note
-    ctx.fillStyle = '#F8FAFC';
-    ctx.font = 'bold 14px monospace';
-    ctx.fillText(`ID Registro: ${selectedClient?.id || 'CIMASUR-B2B'}`, 50, 450);
-
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.font = '11px sans-serif';
-    ctx.fillText("© 2026 CIMASUR S.A. Todos los derechos reservados.", 490, 450);
-
-    // Trigger immediate browser trigger
-    const imgData = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `cimasur_fidelizacion_${selectedClient?.name || 'cliente'}.png`;
-    link.href = imgData;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `campana_whatsapp_${campaignObjective}_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
     link.click();
-    alert("¡Pieza de fidelización personalizada descargada exitosamente!");
+    document.body.removeChild(link);
+
+    window.dispatchEvent(new Event('db-change'));
+    alert(`¡CSV de campaña masiva de WhatsApp descargado con éxito! Se ha registrado el despacho en la bitácora de actividad de los ${targets.length} socios seleccionados.`);
   };
 
-  // Helper lists & state computed items
-  const filteredClientList = useMemo(() => {
-    return enrichedClients.filter(c => {
-      const searchVal = clientSearch.toLowerCase();
-      const nameMatch = (c.name || '').toLowerCase().includes(searchVal) || 
-                          (c.email || '').toLowerCase().includes(searchVal) ||
-                          (c.rut || '').toLowerCase().includes(searchVal);
-      
-      let catMatch = clientCategoryFilter === 'Todas' || c.calculatedTier.name === clientCategoryFilter;
-      
-      // Explicit support for "Prospectos Intranet" filter in main list
-      if (clientCategoryFilter === 'Prospectos Intranet') {
-         catMatch = c.isIntranet;
-      }
-
-      // If drill-down filter is active from dashboard
-      let dashboardMatch = true;
-      if (dashboardFilter) {
-        if (dashboardFilter === 'TOTAL CLIENTES') dashboardMatch = true;
-        else if (dashboardFilter === 'CRECIERON') dashboardMatch = !!c.isCrecio;
-        else if (dashboardFilter === 'DISMINUYERON') dashboardMatch = !!c.isDisminuyo;
-        else if (dashboardFilter === 'ESTABLES') dashboardMatch = !!c.isEstables;
-        else if (dashboardFilter === 'RIESGO CRÍTICO') dashboardMatch = !!c.isRiesgoAlto;
-        else if (dashboardFilter === 'PRÓXIMOS ASCENSOS') dashboardMatch = !!c.isProximoAscenso;
-        else if (dashboardFilter === 'PRÓXIMOS DESCENSOS') dashboardMatch = !!c.isProximoDescenso;
-        else if (dashboardFilter === 'PROSPECTOS INTRANET') dashboardMatch = !!c.isIntranet;
-      }
-
-      return nameMatch && catMatch && dashboardMatch;
-    });
-  }, [enrichedClients, clientSearch, clientCategoryFilter, dashboardFilter]);
-
-  const handleToggleAnalyzeClient = (clientId: string) => {
-    setSelectedClientIdsForAnalysis(prev => {
-      const isCurrentlySelected = prev.includes(clientId);
-      let nextList: string[];
-      if (isCurrentlySelected) {
-        nextList = prev.filter(id => id !== clientId);
-      } else {
-        nextList = [...prev, clientId];
-      }
-      return nextList;
-    });
+  const handleSelectAllCampaignClients = () => {
+    setSelectedCampaignClientIds(criticalClients.map(c => c.id));
   };
 
-  const handleSelectAllFilteredForComparison = () => {
-    const allIds = filteredClientList.map(c => c.id);
-    setSelectedClientIdsForAnalysis(allIds);
-    if (allIds.length > 0) {
-      setShowMultiClientAnalysis(true);
-    }
+  const handleSelectNoneCampaignClients = () => {
+    setSelectedCampaignClientIds([]);
   };
 
-  const handleClearSelectedForComparison = () => {
-    setSelectedClientIdsForAnalysis([]);
-    setShowMultiClientAnalysis(false);
-  };
+  // Stats calculation
+  const statsSummary = useMemo(() => {
+    const total = criticalClients.length;
+    const critico = criticalClients.filter(c => c.statusKey === 'CRITICO').length;
+    const dormido = criticalClients.filter(c => c.statusKey === 'DORMIDO').length;
+    const perdida = criticalClients.filter(c => c.statusKey === 'EN_CAIDA').length;
+    return { total, critico, dormido, perdida };
+  }, [criticalClients]);
 
   return (
-    <div className="bg-[#0b1324] text-white min-h-screen rounded-2xl border border-slate-800 shadow-2xl overflow-hidden font-sans">
+    <div id="recuperacion_socios_criticos_container" className="space-y-6 text-slate-100">
       
-      {/* HEADER SECTION */}
-      <div className="p-6 bg-[#0e192f] border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="bg-sky-500/10 text-sky-400 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border border-sky-500/20 tracking-wider">
-              Business Intelligence & Fidelización
-            </span>
-            <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border border-emerald-500/20 tracking-wider">
-              UX/UI Corporativo
-            </span>
+      {/* 1. HEADER SECTION */}
+      <div id="recuperacion_header" className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-[#0d162d] border border-sky-500/15 p-6 rounded-2xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-red-500/15 p-2 rounded-xl border border-red-500/30">
+              <Shield className="w-5 h-5 text-red-400 animate-pulse" />
+            </div>
+            <h1 className="text-xl font-black tracking-tight text-white uppercase">
+              Motor de Recuperación de Socios Críticos 👑
+            </h1>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
-            CRM Inteligente <span className="text-sky-450 text-sky-400 font-extrabold">CIMASUR</span>
-          </h1>
-          <p className="text-xs text-slate-400 font-medium">
-            Análisis de comportamiento anual de compra, segmentación automática y motor de campañas masivas corporativas.
+          <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+            Identificación inmediata de médicos veterinarios CIMASUR con compras en caída, alertas de fuga o inactividad prolongada. Diseñe, evalúe y optimice campañas de fidelización directa vía WhatsApp y Correo.
           </p>
         </div>
         
-        {/* Dynamic Total Billing Display */}
-        <div className="bg-[#122240] px-4 py-3 rounded-xl border border-[#1e345c] text-right">
-          <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Facturación Consolidada Ciclo 2026</span>
-          <span className="text-xl font-mono font-black text-emerald-400">
-            {formatCLP(Math.round(dashboardStats.totalSales))}
-          </span>
+        {/* Quick Stats Panel */}
+        <div className="grid grid-cols-3 gap-3 w-full lg:w-auto">
+          <div className="bg-[#090f1d] px-4 py-3 rounded-xl border border-red-500/25 text-center min-w-[90px]">
+            <span className="text-2xl font-mono font-black text-red-400">{statsSummary.critico}</span>
+            <span className="text-[9px] block text-slate-400 font-bold uppercase mt-0.5">Riesgo Crítico</span>
+          </div>
+          <div className="bg-[#090f1d] px-4 py-3 rounded-xl border border-yellow-500/25 text-center min-w-[90px]">
+            <span className="text-2xl font-mono font-black text-yellow-400">{statsSummary.dormido}</span>
+            <span className="text-[9px] block text-slate-400 font-bold uppercase mt-0.5">Dormidos</span>
+          </div>
+          <div className="bg-[#090f1d] px-4 py-3 rounded-xl border border-rose-500/25 text-center min-w-[90px]">
+            <span className="text-2xl font-mono font-black text-rose-400">{statsSummary.perdida}</span>
+            <span className="text-[9px] block text-slate-400 font-bold uppercase mt-0.5">En Caída</span>
+          </div>
         </div>
       </div>
 
-      {/* CORE 8-TAB NAVIGATION SIDEBAR LAYOUT */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 min-h-[500px]">
+      {/* NEW SIDEBAR-BASED CONTENT WORKSPACE */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         
-        {/* SIDE BAR NAVIGATION */}
-        <div className="lg:col-span-1 bg-[#0b1527] border-r border-slate-800 p-4 space-y-1.5">
-          <div className="text-[9px] text-slate-500 font-extrabold uppercase px-3 tracking-widest mb-3">Módulos Estratégicos</div>
-          
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30' : 'text-slate-400 hover:bg-[#111f38] hover:text-slate-200'}`}
-          >
-            <BarChart2 className="w-4 h-4" />
-            <span>1. Dashboard Ejecutivo</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('clients')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all ${activeTab === 'clients' ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30' : 'text-slate-400 hover:bg-[#111f38] hover:text-slate-200'}`}
-          >
-            <Users className="w-4 h-4" />
-            <span>2. Cartera & Fichas</span>
-          </button>
-          
-          <button 
-            onClick={() => {
-              setActiveTab('campaigns');
-              setCommsSubTab('canvas_email');
-            }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all ${activeTab === 'campaigns' && commsSubTab === 'canvas_email' ? 'bg-[#38bdf8]/15 text-[#38bdf8] border border-[#38bdf8]/30' : 'text-slate-400 hover:bg-[#111f38] hover:text-slate-200'}`}
-          >
-            <Palette className="w-4 h-4" />
-            <span>4. Diseñador de Correos IA</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('club_config')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all ${activeTab === 'club_config' ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30' : 'text-slate-400 hover:bg-[#111f38] hover:text-slate-200'}`}
-          >
-            <Shield className="w-4 h-4" />
-            <span>3. Club Categorías</span>
-          </button>
-          
-          <button 
-            onClick={() => {
-              setActiveTab('campaigns');
-              setCommsSubTab('segmentation');
-            }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all ${activeTab === 'campaigns' ? 'bg-[#38bdf8]/15 text-[#38bdf8] border border-[#38bdf8]/30' : 'text-slate-400 hover:bg-[#111f38] hover:text-slate-200'}`}
-          >
-            <Send className="w-4 h-4" />
-            <span className="flex items-center justify-between w-full">
-              <span>4. Campañas & Marketing IA</span>
-              {campaignRecipients.length > 0 && (
-                <span className="bg-indigo-500 text-[9px] text-white px-2 py-0.5 rounded-full font-black animate-pulse">
-                  {campaignRecipients.length}
-                </span>
-              )}
+        {/* LEFT COLUMN: MODULE NAVIGATION (3 COLS) */}
+        <div className="xl:col-span-3 bg-[#0d162d] p-5 rounded-2xl border border-sky-500/10 space-y-6">
+          <div>
+            <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block mb-3">
+              Módulos Estratégicos
             </span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('opportunities')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all ${activeTab === 'opportunities' ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30' : 'text-slate-400 hover:bg-[#111f38] hover:text-slate-200'}`}
-          >
-            <Lightbulb className="w-4 h-4" />
-            <span>5. Oportunidades</span>
-          </button>
+            <nav className="flex flex-col gap-2">
+              <button
+                onClick={() => setActiveTab('oportunidades')}
+                className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-between group ${activeTab === 'oportunidades' ? 'bg-sky-500 text-slate-900 font-black shadow-lg shadow-sky-500/10' : 'text-slate-400 hover:text-white bg-[#070b16] border border-slate-800'}`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className={`w-4 h-4 ${activeTab === 'oportunidades' ? 'text-slate-900' : 'text-yellow-400 group-hover:animate-pulse'}`} />
+                  <span>Oportunidades</span>
+                </div>
+                {criticalClients.length > 0 && (
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${activeTab === 'oportunidades' ? 'bg-slate-900 text-sky-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {criticalClients.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 ${activeTab === 'dashboard' ? 'bg-sky-500 text-slate-900 font-black shadow-lg shadow-sky-500/10' : 'text-slate-400 hover:text-white bg-[#070b16] border border-slate-800'}`}
+              >
+                <BarChart2 className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-slate-900' : 'text-sky-450'}`} />
+                <span>Dashboard Ejecutivo</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('individual')}
+                className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 ${activeTab === 'individual' ? 'bg-sky-500 text-slate-900 font-black shadow-lg shadow-sky-500/10' : 'text-slate-400 hover:text-white bg-[#070b16] border border-slate-800'}`}
+              >
+                <Users className={`w-4 h-4 ${activeTab === 'individual' ? 'text-slate-900' : 'text-sky-450'}`} />
+                <span>Cartera & Fichas</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('tiers')}
+                className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 ${activeTab === 'tiers' ? 'bg-sky-500 text-slate-900 font-black shadow-lg shadow-sky-500/10' : 'text-slate-400 hover:text-white bg-[#070b16] border border-slate-800'}`}
+              >
+                <Award className={`w-4 h-4 ${activeTab === 'tiers' ? 'text-slate-900' : 'text-yellow-450'}`} />
+                <span>Club Categorías</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('masivo')}
+                className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 ${activeTab === 'masivo' ? 'bg-sky-500 text-slate-900 font-black shadow-lg shadow-sky-500/10' : 'text-slate-400 hover:text-white bg-[#070b16] border border-slate-800'}`}
+              >
+                <Sparkles className={`w-4 h-4 ${activeTab === 'masivo' ? 'text-slate-900' : 'text-sky-400 animate-pulse'}`} />
+                <span>Campañas & Marketing IA</span>
+              </button>
+            </nav>
+          </div>
+
+          {/* Quick Informative Info Block */}
+          <div className="bg-[#070b16] p-4 rounded-xl border border-slate-800 text-[11px] leading-relaxed text-slate-450 space-y-2.5">
+            <span className="font-extrabold text-white text-xs block uppercase tracking-wider">Reglas Comerciales 2026</span>
+            <p>
+              🛡️ <strong className="text-slate-300">Categoría 2025:</strong> Es la que se respeta para el ciclo comercial <strong className="text-yellow-400">2026 (Vigente)</strong>.
+            </p>
+            <p>
+              📈 <strong className="text-slate-300">Categoría 2026:</strong> Sirve para predeterminar el estatus comercial en el ciclo <strong className="text-purple-400">2027 (Proyectado)</strong>.
+            </p>
+            <p>
+              🕒 <strong className="text-slate-300">Plazo Extraordinario:</strong> Se puede otorgar prórroga excepcional de recalificación hasta el <strong className="text-emerald-400">30 de Junio</strong> de cada año.
+            </p>
+          </div>
         </div>
 
-        {/* WORKSPACE AREA */}
-        <div className="lg:col-span-4 p-6 bg-[#090f1d]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-6"
-            >
-              
-              {/* ----------------- SUBTAB 1: EXECUTIVE DASHBOARD ----------------- */}
-              {activeTab === 'dashboard' && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                    <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                      <BarChart2 className="w-5 h-5 text-sky-400" /> Analítica y Comportamiento Ejecutivo
-                    </h2>
-                    <span className="text-[10px] text-slate-500 font-mono">Última actualización: hoy 2026</span>
-                  </div>
+        {/* RIGHT COLUMN: DYNAMIC WORKSPACE CONTENT (9 COLS) */}
+        <div className="xl:col-span-9 space-y-6">
 
-                  {/* HIGH METRIC CARDS */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    
-                    <div 
-                      onClick={() => handleDrillDown('TOTAL CLIENTES')}
-                      className={`p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'TOTAL CLIENTES' ? 'bg-sky-500/10 border-sky-500 shadow-lg shadow-sky-500/10' : 'bg-[#0f1b35] border-slate-800'}`}
-                    >
-                      <div className="flex justify-between items-start text-slate-400 text-xs font-bold">
-                        <span>TOTAL CLIENTES</span>
-                        <Users className="w-4 h-4 text-sky-400" />
-                      </div>
-                      <div className="mt-2.5">
-                        <span className="text-3xl font-mono font-black">{dashboardStats.totalClients}</span>
-                        <span className="text-[10px] block text-slate-500 mt-1">Sincronizados localmente</span>
-                      </div>
-                    </div>
-
-                    <div 
-                      onClick={() => handleDrillDown('CRECIERON')}
-                      className={`p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'CRECIERON' ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-500/10' : 'bg-[#0f1b35] border-[#166534]/30'}`}
-                    >
-                      <div className="flex justify-between items-start text-emerald-400 text-xs font-bold">
-                        <span>CRECIERON</span>
-                        <TrendingUp className="w-4 h-4" />
-                      </div>
-                      <div className="mt-2.5">
-                        <span className="text-3xl font-mono font-black text-emerald-400">+{dashboardStats.crecieron}</span>
-                        <span className="text-[10px] block text-slate-400 mt-1">Ventas {'>'} ciclo anterior</span>
-                      </div>
-                    </div>
-
-                    <div 
-                      onClick={() => handleDrillDown('DISMINUYERON')}
-                      className={`p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'DISMINUYERON' ? 'bg-rose-500/10 border-rose-500 shadow-lg shadow-rose-500/10' : 'bg-[#0f1b35] border-[#991b1b]/30'}`}
-                    >
-                      <div className="flex justify-between items-start text-rose-400 text-xs font-bold">
-                        <span>DISMINUYERON</span>
-                        <TrendingDown className="w-4 h-4" />
-                      </div>
-                      <div className="mt-2.5">
-                        <span className="text-3xl font-mono font-black text-rose-400">-{dashboardStats.disminuyeron}</span>
-                        <span className="text-[10px] block text-slate-400 mt-1">Compras reducidas</span>
-                      </div>
-                    </div>
-
-                    <div 
-                      onClick={() => handleDrillDown('ESTABLES')}
-                      className={`p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'ESTABLES' ? 'bg-yellow-500/10 border-yellow-500 shadow-lg shadow-yellow-500/10' : 'bg-[#0f1b35] border-[#854d0e]/30'}`}
-                    >
-                      <div className="flex justify-between items-start text-yellow-500 text-xs font-bold">
-                        <span>ESTABLES</span>
-                        <CheckCircle className="w-4 h-4" />
-                      </div>
-                      <div className="mt-2.5">
-                        <span className="text-3xl font-mono font-black text-yellow-500">{dashboardStats.estables}</span>
-                        <span className="text-[10px] block text-slate-400 mt-1">Margen similar (±10%)</span>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* SECONDARY ROW - High Risk & Opportunity */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    
-                    <div 
-                      id="card_riesgo_critico"
-                      onClick={() => handleDrillDown('RIESGO CRÍTICO')}
-                      className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'RIESGO CRÍTICO' ? 'bg-red-500/10 border-red-500 shadow-lg shadow-red-500/10' : 'bg-[#121c33] border-red-900/40'}`}
-                    >
-                      <div className="absolute right-3 top-3 bg-red-500/10 text-red-400 p-1.5 rounded-lg border border-red-500/20">
-                        <AlertTriangle className="w-4 h-4 animate-bounce" />
-                      </div>
-                      <span className="text-[10px] text-red-400 font-extrabold uppercase block tracking-wider">RIESGO CRÍTICO</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-red-500">{dashboardStats.riesgo}</span>
-                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">CAÍDA {'>'}50% vs 2025</p>
-                    </div>
-
-                    <div 
-                      id="card_proximos_ascensos"
-                      onClick={() => handleDrillDown('PRÓXIMOS ASCENSOS')}
-                      className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'PRÓXIMOS ASCENSOS' ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-500/10' : 'bg-[#121c33] border-emerald-900/40'}`}
-                    >
-                      <div className="absolute right-3 top-3 bg-emerald-500/10 text-emerald-400 p-1.5 rounded-lg border border-emerald-500/20">
-                        <ArrowUpRight className="w-4 h-4 text-emerald-400" />
-                      </div>
-                      <span className="text-[10px] text-emerald-400 font-extrabold uppercase block tracking-wider">PRÓX. ASCENSOS</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-emerald-400">{dashboardStats.ascensos}</span>
-                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">Margen 15% para subir</p>
-                    </div>
-
-                    <div 
-                      id="card_proximos_descensos"
-                      onClick={() => handleDrillDown('PRÓXIMOS DESCENSOS')}
-                      className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'PRÓXIMOS DESCENSOS' ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/10' : 'bg-[#121c33] border-amber-900/40'}`}
-                    >
-                      <div className="absolute right-3 top-3 bg-amber-500/10 text-amber-400 p-1.5 rounded-lg border border-amber-500/20">
-                        <ArrowDownRight className="w-4 h-4 text-amber-400" />
-                      </div>
-                      <span className="text-[10px] text-amber-400 font-extrabold uppercase block tracking-wider">PRÓX. DESCENSOS</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-amber-500">{dashboardStats.descensos}</span>
-                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">Al límite de categoría</p>
-                    </div>
-
-                    <div 
-                      id="card_prospectos_intranet"
-                      onClick={() => handleDrillDown('PROSPECTOS INTRANET')}
-                      className={`p-4 rounded-xl border relative overflow-hidden cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${dashboardFilter === 'PROSPECTOS INTRANET' ? 'bg-sky-500/10 border-sky-500 shadow-lg shadow-sky-500/10' : 'bg-[#121c33] border-slate-700/40'}`}
-                    >
-                      <div className="absolute right-3 top-3 bg-sky-500/10 text-sky-400 p-1.5 rounded-lg border border-sky-500/20">
-                        <LinkIcon className="w-4 h-4 text-sky-400" />
-                      </div>
-                      <span className="text-[10px] text-sky-400 font-extrabold uppercase block tracking-wider">PROSPECTS WEB</span>
-                      <span className="text-3xl font-mono font-black mt-2 block text-sky-400">{dashboardStats.intranet}</span>
-                      <p className="text-[10px] text-slate-400 mt-2 leading-tight">Acceso sin primera compra</p>
-                    </div>
-
-                  </div>
-
-                  {/* METRIC DRILL DOWN LIST (THE "VENTANA DESPLEGABLE") */}
-                  <AnimatePresence>
-                    {dashboardFilter && (
-                      <motion.div 
-                        key="dashboard_drilldown_panel"
-                        id="dashboard_drilldown_panel"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="bg-[#0a101e] border border-sky-500/30 rounded-2xl overflow-hidden shadow-2xl shadow-sky-500/5 mb-6"
-                      >
-                        <div className="bg-[#111f38] px-4 py-3 border-b border-sky-500/20 flex items-center justify-between">
-                           <div className="flex items-center gap-3">
-                              <div className="bg-sky-500/20 p-1.5 rounded-lg">
-                                 <Filter className="w-4 h-4 text-sky-400" />
-                              </div>
-                              <div>
-                                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                                    Explorando: {dashboardFilter} 
-                                    <span className="ml-2 text-sky-400 opacity-70 font-mono">
-                                       ({enrichedClients.filter(c => {
-                                          if (dashboardFilter === 'TOTAL CLIENTES') return true;
-                                          if (dashboardFilter === 'CRECIERON') return c.isCrecio;
-                                          if (dashboardFilter === 'DISMINUYERON') return c.isDisminuyo;
-                                          if (dashboardFilter === 'ESTABLES') return c.isEstables;
-                                          if (dashboardFilter === 'RIESGO CRÍTICO') return c.isRiesgoAlto;
-                                          if (dashboardFilter === 'PRÓXIMOS ASCENSOS') return c.isProximoAscenso;
-                                          if (dashboardFilter === 'PRÓXIMOS DESCENSOS') return c.isProximoDescenso;
-                                          if (dashboardFilter === 'PROSPECTOS INTRANET') return c.isIntranet;
-                                          return false;
-                                       }).length} clientes)
-                                    </span>
-                                 </h4>
-                              </div>
-                           </div>
-                           <div className="flex items-center gap-2">
-                              <button 
-                                onClick={() => { setActiveTab('clients'); }}
-                                className="text-[10px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 bg-sky-500/10 px-2 py-1 rounded transition-all"
-                              >
-                                 VER EN CARTERA <ExternalLink className="w-3 h-3" />
-                              </button>
-                              <button 
-                                onClick={() => setDashboardFilter(null)}
-                                className="text-slate-400 hover:text-white transition-colors p-1"
-                              >
-                                 <RotateCcw className="w-4 h-4" />
-                              </button>
-                           </div>
-                        </div>
-
-                        <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
-                           <table className="w-full text-left border-collapse">
-                              <thead className="sticky top-0 bg-[#0a101e] z-10">
-                                 <tr className="border-b border-slate-800">
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase pl-5 w-2/5">Médico / Clínica</th>
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase w-1/4">Categoría</th>
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right w-1/5">Ventas Acum.</th>
-                                    <th className="p-3 text-[10px] text-slate-400 font-bold uppercase text-right pr-5 w-1/5">Acciones</th>
-                                 </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800/50">
-                                 {enrichedClients.filter(c => {
-                                    if (dashboardFilter === 'TOTAL CLIENTES') return true;
-                                    if (dashboardFilter === 'CRECIERON') return c.isCrecio;
-                                    if (dashboardFilter === 'DISMINUYERON') return c.isDisminuyo;
-                                    if (dashboardFilter === 'ESTABLES') return c.isEstables;
-                                    if (dashboardFilter === 'RIESGO CRÍTICO') return c.isRiesgoAlto;
-                                    if (dashboardFilter === 'PRÓXIMOS ASCENSOS') return c.isProximoAscenso;
-                                    if (dashboardFilter === 'PRÓXIMOS DESCENSOS') return c.isProximoDescenso;
-                                    if (dashboardFilter === 'PROSPECTOS INTRANET') return c.isIntranet;
-                                    return false;
-                                 }).map(client => (
-                                    <tr key={client.id} className="hover:bg-sky-500/5 transition-colors group">
-                                       <td className="p-3 pl-5 w-2/5">
-                                          <div className="flex items-center gap-3">
-                                             <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold bg-gradient-to-br ${client.calculatedTier.color}`}>
-                                                {client.name.substring(0, 2).toUpperCase()}
-                                             </div>
-                                             <div className="flex flex-col">
-                                                <span className="text-xs font-bold text-slate-200">{client.name}</span>
-                                                <span className="text-[10px] text-slate-500 font-mono">{client.rut}</span>
-                                             </div>
-                                          </div>
-                                       </td>
-                                       <td className="p-3 w-1/4">
-                                          <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border inline-flex items-center justify-center whitespace-nowrap leading-none ${getTierBadgeClass(client.calculatedTier.name)}`}>
-                                             {client.calculatedTier.name}
-                                          </span>
-                                       </td>
-                                       <td className="p-3 text-right">
-                                          <span className="text-xs font-mono font-bold text-white">
-                                             {formatCLP(Math.round(client.ventas?.v2026 || 0))}
-                                          </span>
-                                       </td>
-                                       <td className="p-3 text-right pr-5">
-                                          <div className="flex items-center justify-end gap-2">
-                                             <button 
-                                                onClick={() => {
-                                                   setSelectedClientId(client.id);
-                                                   setActiveTab('campaigns');
-                                                   setCommsSubTab('canvas_email');
-                                                }}
-                                                className="bg-sky-500/10 text-sky-400 p-1.5 rounded hover:bg-sky-500 text-[9px] font-black hover:text-white transition-all uppercase tracking-tighter"
-                                             >
-                                                Diseñar Email
-                                             </button>
-                                             <button 
-                                                onClick={() => {
-                                                   setSelectedClientId(client.id);
-                                                   setActiveTab('clients');
-                                                }}
-                                                className="bg-slate-800 text-slate-300 p-1.5 rounded hover:bg-slate-700 text-[9px] font-black transition-all uppercase tracking-tighter"
-                                             >
-                                                Ficha
-                                             </button>
-                                          </div>
-                                       </td>
-                                    </tr>
-                                 ))}
-                              </tbody>
-                           </table>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* MINI HISTORIC TREND GRAPH (SVG) */}
-                  <div className="bg-[#0c182e] p-5 rounded-xl border border-slate-800">
-                    <span className="text-[9px] text-slate-500 font-extrabold uppercase block">Tendencia Anual de Facturación Agrupada</span>
-                    <h3 className="text-sm font-bold text-white mb-4">Evolución Comercial Ciclos 2024 - 2026</h3>
-                    
-                    <div className="h-28 flex items-end justify-between gap-6 px-10 pt-4 relative">
-                      {/* Grid Line lines */}
-                      <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5">
-                        <div className="border-b border-white w-full"></div>
-                        <div className="border-b border-white w-full"></div>
-                        <div className="border-b border-white w-full"></div>
-                      </div>
-
-                      {/* Bar 1 */}
-                      <div className="flex-1 flex flex-col items-center">
-                        <div className="w-16 bg-slate-700/50 hover:bg-slate-700 rounded-t-md transition-all h-16"></div>
-                        <span className="text-[10px] text-slate-500 mt-2 font-bold font-mono">Ciclo 2024</span>
-                      </div>
-
-                      {/* Bar 2 */}
-                      <div className="flex-1 flex flex-col items-center">
-                        <div className="w-16 bg-[#1D4ED8]/60 hover:bg-[#1D4ED8] rounded-t-md transition-all h-20"></div>
-                        <span className="text-[10px] text-[#38BDF8] mt-2 font-bold font-mono">Ciclo 2025</span>
-                      </div>
-
-                      {/* Bar 3 */}
-                      <div className="flex-1 flex flex-col items-center animate-pulse">
-                        <div className="w-16 bg-emerald-500/60 hover:bg-emerald-500 rounded-t-md h-24"></div>
-                        <span className="text-[10px] text-emerald-400 mt-2 font-black font-mono">Ciclo 2026 (Actual)</span>
-                      </div>
-                    </div>
-                  </div>
+          {activeTab === 'oportunidades' && (
+            <div className="bg-[#0d162d] p-6 rounded-2xl border border-sky-500/10 space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-850 pb-4">
+                <div>
+                  <h2 className="text-base font-black text-white uppercase tracking-tight flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-yellow-400 animate-pulse" />
+                    <span>Oportunidades Comerciales & Alertas Algorítmicas 🎯</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Análisis de brechas comerciales por ciclo, prórrogas hasta junio y recomendaciones estratégicas inmediatas de CIMASUR.
+                  </p>
                 </div>
-              )}
-
-              {/* ----------------- SUBTAB 2: CLIENTES & FICHAS ----------------- */}
-              {activeTab === 'clients' && (
-                <div className="space-y-4">
-                  {/* Actions Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#101a30] p-4 rounded-xl border border-slate-800">
-                    <div>
-                      <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-sky-400" /> Administración de Fichas del Club
-                      </h3>
-                      <p className="text-[11px] text-slate-400">
-                        Busca socios, edita ventas anuales o selecciona varios marcando sus casillas [◽] para abrir el <strong className="text-sky-300">📈 Comparador Multi-Socio Sencillo</strong> y analizar la cartera en conjunto de forma simple y clara.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowSalesImportModal(true)}
-                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all border border-emerald-500/20"
-                    >
-                      <Download className="w-4 h-4" /> Importar Ventas Anuales
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                  
-                  {/* LEFT COLUMN: CLIENT LIST EQUIPMENT WITH SEARCH */}
-                  <div className="md:col-span-2 space-y-4">
-                    <div className="bg-[#101a30] p-3 rounded-xl border border-slate-800 space-y-3">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="Buscar por nombre, email o rut..."
-                          value={clientSearch}
-                          onChange={(e) => setClientSearch(e.target.value)}
-                          className="w-full bg-[#0a101e] px-9 py-2 rounded-xl text-xs border border-slate-700 focus:outline-none focus:border-sky-500 text-white placeholder-slate-400"
-                        />
-                        <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
-                      </div>
-
-                      {dashboardFilter && (
-                        <div className="flex items-center justify-between bg-sky-500/10 border border-sky-500/30 px-3 py-2 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Filter className="w-3.5 h-3.5 text-sky-400" />
-                            <span className="text-[10px] font-bold text-sky-300 uppercase">Filtro: {dashboardFilter}</span>
-                          </div>
-                          <button 
-                            onClick={() => setDashboardFilter(null)}
-                            className="text-[10px] bg-sky-500 text-white px-2 py-0.5 rounded font-black hover:bg-sky-600 transition-colors"
-                          >
-                            Limpiar
-                          </button>
-                        </div>
-                      )}
-                      
-                      <select
-                        value={clientCategoryFilter}
-                        onChange={(e) => setClientCategoryFilter(e.target.value)}
-                        className="w-full bg-[#0a101e] px-2 py-2 rounded-xl text-xs border border-slate-700 focus:outline-none focus:border-sky-500 text-white"
-                      >
-                        <option value="Todas">Todas las categorías</option>
-                        <option value="Prospectos Intranet" className="text-sky-400 font-bold">🔗 Prospectos Intranet (Cero Compras)</option>
-                        {tiersList.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-                      </select>
-
-                      {/* Multi-selection triggers */}
-                      <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 border-t border-slate-800/60 font-bold">
-                        <span>Selección para Comparar:</span>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={handleSelectAllFilteredForComparison}
-                            className="bg-[#0b1324] px-1.5 py-0.5 rounded border border-slate-700 hover:text-white hover:border-slate-500 transition-colors cursor-pointer"
-                          >
-                            ✓ Todos ({filteredClientList.length})
-                          </button>
-                          <button 
-                            onClick={handleClearSelectedForComparison}
-                            className="bg-[#0b1324] px-1.5 py-0.5 rounded border border-slate-700 hover:text-white hover:border-slate-500 transition-colors cursor-pointer"
-                          >
-                            ✕ Limpiar
-                          </button>
-                        </div>
-                      </div>
-
-                      {selectedClientIdsForAnalysis.length > 0 && (
-                        <button
-                          onClick={() => setShowMultiClientAnalysis(true)}
-                          className="w-full py-2 bg-gradient-to-r from-sky-600 to-[#3b82f6] hover:from-sky-700 hover:to-blue-700 text-white text-[11px] font-black rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all cursor-pointer"
-                        >
-                          <span>📈</span>
-                          <span>Abrir Comparador ({selectedClientIdsForAnalysis.length} Socios)</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* RENDERED LIST */}
-                    <div className="bg-[#0f172a] rounded-xl border border-slate-800 max-h-[380px] overflow-y-auto divide-y divide-slate-800">
-                      {filteredClientList.map(c => {
-                        const isSelectedForAnalysis = selectedClientIdsForAnalysis.includes(c.id);
-                        return (
-                          <div 
-                            key={c.id}
-                            onClick={() => {
-                              setSelectedClientId(c.id);
-                              setIsEditingClient(false);
-                            }}
-                            className={`p-3 text-left cursor-pointer transition-all flex items-start gap-2.5 ${selectedClientId === c.id ? 'bg-[#1e2e4a] border-l-4 border-sky-400' : 'hover:bg-[#121c2f]'}`}
-                          >
-                            <input 
-                              type="checkbox"
-                              checked={isSelectedForAnalysis}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={() => handleToggleAnalyzeClient(c.id)}
-                              className="mt-1 accent-sky-450 rounded border-slate-650 cursor-pointer"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start gap-1">
-                                <span className="text-xs font-bold block text-white truncate max-w-[120px]">
-                                  {c.name}
-                                  {(c.ventas?.v2026 || 0) === 0 && <span className="ml-1 text-[8px] text-sky-400 font-black">● INTRANET</span>}
-                                </span>
-                                <span className={`text-[9px] px-2 py-0.5 rounded border leading-none shrink-0 ${getTierBadgeClass(c.calculatedTier.name)}`}>
-                                  {c.calculatedTier.name}
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-[#94a3b8] block mt-0.5 truncate">{c.clinica || 'Sin clínica registrada'}</span>
-                              <span className="text-[9px] font-mono text-emerald-400 block mt-1">2026: ${formatCLP(c.ventas?.v2026 || 0)}</span>
-                              
-                              {/* Communication Metadata */}
-                              {(c.ultimoWhatsapp || c.ultimoCorreo || c.ultimaCampania) && (
-                                <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-slate-800/40 text-[8.5px] font-mono">
-                                  {c.ultimoWhatsapp && <span className="text-emerald-400 bg-emerald-500/5 px-1 py-0.5 rounded">💬 WA: {c.ultimoWhatsapp}</span>}
-                                  {c.ultimoCorreo && <span className="text-sky-300 bg-sky-500/5 px-1 py-0.5 rounded">✉️ Mail: {c.ultimoCorreo}</span>}
-                                  {c.ultimaCampania && <span className="text-pink-300 bg-pink-500/5 px-1 py-0.5 rounded truncate max-w-[120px]" title={c.ultimaCampania}>📣 {c.ultimaCampania.substring(0, 15)}</span>}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {filteredClientList.length === 0 && (
-                        <div className="p-8 text-center text-slate-500 italic text-xs">Sin registros de coincidencia.</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* RIGHT COLUMN: DETAILED INTERACTIVE VIEW OR MULTI-CLIENT COMPARISON */}
-                  <div className="md:col-span-3">
-                    {showMultiClientAnalysis && selectedClientIdsForAnalysis.length > 0 ? (
-                      /* COMPREHENSIVE MULTI-CLIENT COMPARATIVE DASHBOARD */
-                      <div className="bg-[#0f1b35] rounded-xl border border-emerald-500/30 p-5 space-y-5 text-left">
-                        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                          <div>
-                            <span className="text-[9px] text-[#38bdf8] font-extrabold block tracking-wider uppercase">MÓDULO DE COMPARACIÓN CRM</span>
-                            <h3 className="text-md font-black text-white flex items-center gap-1.5">
-                              📈 Analizador y Comparador Multi-Socio ({selectedClientIdsForAnalysis.length} seleccionados)
-                            </h3>
-                          </div>
-                          <button 
-                            onClick={() => setShowMultiClientAnalysis(false)}
-                            className="px-3 py-1 bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold rounded-lg text-[10px] cursor-pointer"
-                          >
-                            ✕ Ver Ficha Individual
-                          </button>
-                        </div>
-
-                        {(() => {
-                          const listForAnalysis = enrichedClients.filter(ec => selectedClientIdsForAnalysis.includes(ec.id));
-                          if (listForAnalysis.length === 0) {
-                            return <div className="text-center p-8 text-slate-500 italic">No hay socios seleccionados para comparar.</div>;
-                          }
-
-                          const total2024 = listForAnalysis.reduce((sum, c) => sum + (c.ventas?.v2024 || 0), 0);
-                          const total2025 = listForAnalysis.reduce((sum, c) => sum + (c.ventas?.v2025 || 0), 0);
-                          const total2026 = listForAnalysis.reduce((sum, c) => sum + (c.ventas?.v2026 || 0), 0);
-                          const avg2026 = total2026 / listForAnalysis.length;
-
-                          return (
-                            <div className="space-y-5">
-                              {/* Group STAT cards */}
-                              <div className="grid grid-cols-3 gap-3">
-                                <div className="bg-[#0b1324] p-3 rounded-xl border border-slate-800 text-center">
-                                  <span className="text-[9px] text-slate-500 block uppercase font-bold">Consolidado 2025</span>
-                                  <span className="text-xs font-mono font-black text-slate-350">${formatCLP(total2025)}</span>
-                                </div>
-                                <div className="bg-[#0b1324] p-3 rounded-xl border border-emerald-950/40 text-center">
-                                  <span className="text-[9px] text-[#38bdf8] block uppercase font-bold">Consolidado 2026</span>
-                                  <span className="text-xs font-mono font-black text-emerald-400">${formatCLP(total2026)}</span>
-                                </div>
-                                <div className="bg-[#0b1324] p-3 rounded-xl border border-slate-800 text-center">
-                                  <span className="text-[9px] text-slate-500 block uppercase font-bold">Promedio por Socio</span>
-                                  <span className="text-xs font-mono font-bold text-sky-400">${formatCLP(avg2026)}</span>
-                                </div>
-                              </div>
-
-                              {/* Simple side-by-side compare progress chart */}
-                              <div className="bg-[#0d1527] p-4 rounded-xl border border-slate-800 space-y-3">
-                                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest block">Gráfico Comparativo de Venta Acumulada Ciclo 2021-2026</span>
-                                <div className="space-y-3">
-                                  {listForAnalysis.map(c => {
-                                    const maxSales = Math.max(...listForAnalysis.map(item => item.ventas?.v2026 || 100000), 12000000);
-                                    const percent = Math.min(100, Math.max(8, ((c.ventas?.v2026 || 0) / maxSales) * 100));
-
-                                    return (
-                                      <div key={c.id} className="space-y-1">
-                                        <div className="flex justify-between text-[11px]">
-                                          <span className="font-bold text-slate-200 truncate max-w-[150px]">{c.name}</span>
-                                          <span className="font-mono text-emerald-400 font-bold">
-                                            ${formatCLP(c.ventas?.v2026 || 0)}{' '}
-                                            <span className="text-slate-500 text-[9px]">({c.categoria})</span>
-                                          </span>
-                                        </div>
-                                        <div className="w-full bg-[#121c31] h-3 rounded-lg overflow-hidden flex">
-                                          <div className={`h-full rounded-lg transition-all ${
-                                            (c.categoria || '').includes('Platinum') ? 'bg-gradient-to-r from-purple-600 to-indigo-500' :
-                                            (c.categoria || '').includes('Oro') ? 'bg-gradient-to-r from-yellow-500 to-amber-600' :
-                                            'bg-gradient-to-r from-sky-500 to-emerald-500'
-                                          }`} style={{ width: `${percent}%` }}></div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              {/* Side-by-side Comparative details table */}
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left text-[10px] bg-[#0b1324] rounded-xl overflow-hidden border border-slate-800">
-                                  <thead>
-                                    <tr className="bg-[#121c30] text-slate-400 font-bold uppercase border-b border-slate-800 text-[8px] font-mono">
-                                      <th className="p-2.5">Médico / Especialidad</th>
-                                      <th className="p-2.5 text-right">Venta 2024</th>
-                                      <th className="p-2.5 text-right">Venta 2025</th>
-                                      <th className="p-2.5 text-right text-emerald-400">Venta 2026</th>
-                                      <th className="p-2.5 text-center">Nivel</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-800">
-                                    {listForAnalysis.map(c => (
-                                      <tr key={c.id} className="hover:bg-slate-900/40">
-                                        <td className="p-2.5 font-bold text-white truncate max-w-[130px]">{c.name}</td>
-                                        <td className="p-2.5 text-right font-mono text-slate-400">${formatCLP(c.ventas?.v2024 || 0)}</td>
-                                        <td className="p-2.5 text-right font-mono text-slate-350">${formatCLP(c.ventas?.v2025 || 0)}</td>
-                                        <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold">${formatCLP(c.ventas?.v2026 || 0)}</td>
-                                        <td className="p-2.5 text-center">
-                                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-black/35 text-slate-300 border border-slate-750">
-                                            {c.categoria}
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-
-                              {/* Multi-Socio Campaign Actions bridge */}
-                              <div className="bg-[#1e1e38]/40 p-4 rounded-xl border border-[#38bdf8]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-left">
-                                <div className="flex-1">
-                                  <span className="text-[#38bdf8] font-bold block mb-0.5">🚀 Enviar Lote al Motor Masivo</span>
-                                  <p className="text-[10.5px] text-slate-400">Crea una plantilla automática y un correo electrónico personalizado o enlace de WhatsApp para estos {listForAnalysis.length} veterinarios.</p>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setCampaignRecipients(listForAnalysis);
-                                    setActiveTab('campaigns');
-                                    alert(`Se han exportado los ${listForAnalysis.length} clientes bajo análisis actual al módulo de Campañas Masivas.`);
-                                  }}
-                                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 font-bold text-white rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer shrink-0"
-                                >
-                                  <Send className="w-3.5 h-3.5" /> Enviar este Set a Campañas 💬
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    ) : selectedClient ? (
-                      <div className="bg-[#0f1b35] rounded-xl border border-slate-800 p-5 space-y-5 text-left">
-                        
-                        {/* Header card with category status */}
-                        <div className="flex justify-between items-start border-b border-slate-800 pb-4">
-                          <div>
-                            <span className="text-[9px] text-[#38bdf8] font-bold block tracking-wider uppercase">Ficha de Cliente Integrada</span>
-                            <h3 className="text-lg font-black text-white">{selectedClient.name}</h3>
-                            <span className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5" /> Comuna: {selectedClient.region || 'No especificada'}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <span className={`px-3 py-1 text-[11px] font-black uppercase rounded-full border ${
-                              (selectedClient.categoria || '').includes('Platinum') ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
-                              (selectedClient.categoria || '').includes('Oro') ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
-                              'bg-slate-700/30 text-slate-300 border-slate-700'
-                            }`}>
-                              Socio {selectedClient.categoria}
-                            </span>
-                            <span className="text-[10px] block text-slate-400 mt-2 font-mono">RUT: {selectedClient.rut}</span>
-                          </div>
-                        </div>
-
-                        {!isEditingClient ? (
-                          <div className="space-y-4">
-                            
-                            {/* Contact data pane */}
-                            <div className="grid grid-cols-2 gap-4 text-xs bg-[#0b1324] p-3 rounded-lg border border-slate-800">
-                              <div>
-                                <span className="text-slate-500 block">Establecimiento / Clínica:</span>
-                                <span className="text-slate-200 font-bold">{selectedClient.clinica || '---'}</span>
-                              </div>
-                              <div>
-                                <span className="text-slate-500 block">E-mail:</span>
-                                <span className="text-slate-200 font-bold">{selectedClient.email || '---'}</span>
-                              </div>
-                              <div>
-                                <span className="text-slate-500 block">Teléfono / WhatsApp:</span>
-                                <span className="text-slate-200 font-bold">{selectedClient.phone || '---'}</span>
-                              </div>
-                              <div>
-                                <span className="text-slate-500 block">Categoría de Facturación:</span>
-                                <span className="text-emerald-400 font-extrabold">{selectedClient.categoria}</span>
-                              </div>
-                            </div>
-
-                            {/* Communication Status indicators */}
-                            <div className="grid grid-cols-3 gap-3 text-center text-[10px] mt-2 bg-[#090f1d] p-3 rounded-lg border border-slate-800/40">
-                              <div className="bg-[#111f38] p-2 rounded-lg border border-slate-800/45">
-                                <span className="text-slate-500 block uppercase font-bold text-[8px] mb-0.5">💬 Último WhatsApp</span>
-                                <span className="text-emerald-400 font-mono font-black text-[10px]">{selectedClient.ultimoWhatsapp || 'No registrado'}</span>
-                              </div>
-                              <div className="bg-[#111f38] p-2 rounded-lg border border-slate-800/45">
-                                <span className="text-slate-500 block uppercase font-bold text-[8px] mb-0.5">✉️ Último Correo</span>
-                                <span className="text-sky-350 font-mono font-black text-[10px]">{selectedClient.ultimoCorreo || 'No registrado'}</span>
-                              </div>
-                              <div className="bg-[#111f38] p-2 rounded-lg border border-slate-800/45">
-                                <span className="text-slate-500 block uppercase font-bold text-[8px] mb-0.5">📣 Última Campaña</span>
-                                <span className="text-pink-300 font-sans font-extrabold text-[9px] truncate block max-w-full" title={selectedClient.ultimaCampania || ''}>
-                                  {selectedClient.ultimaCampania || 'No registrada'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Historic cycle chart metrics */}
-                            <div>
-                              <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wide block mb-3">Historial Comercial del Ciclo Anual (Ventas)</span>
-                              <div className="space-y-3.5">
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[11px] font-bold">
-                                    <span className="text-slate-400">Ciclo Anual 2024:</span>
-                                    <span className="font-mono text-slate-200">${formatCLP(selectedClient.ventas?.v2024 || 0)}</span>
-                                  </div>
-                                  <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
-                                    <div className="bg-slate-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2024 || 0) / 12000000) * 100))}%` }}></div>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[11px] font-bold">
-                                    <span className="text-slate-400">Ciclo Anual 2025:</span>
-                                    <span className="font-mono text-slate-200">${formatCLP(selectedClient.ventas?.v2025 || 0)}</span>
-                                  </div>
-                                  <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
-                                    <div className="bg-indigo-505 bg-[#38bdf8] h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2025 || 0) / 12000000) * 100))}%` }}></div>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[11px] font-bold">
-                                    <span className="text-slate-400">Ciclo Anual 2026 (Mayo Cierre):</span>
-                                    <span className="font-mono text-emerald-400 font-extrabold">${formatCLP(selectedClient.ventas?.v2026 || 0)}</span>
-                                  </div>
-                                  <div className="w-full bg-[#0d1527] h-2 rounded-full overflow-hidden">
-                                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(10, ((selectedClient.ventas?.v2026 || 0) / 12000000) * 100))}%` }}></div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Commercial Notes logs */}
-                            <div className="space-y-3 bg-[#101b33] p-4 rounded-xl border border-slate-800">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400 font-extrabold uppercase flex items-center gap-1.5">
-                                  <Notebook className="w-3.5 h-3.5 text-sky-400" /> Registro de Actividad y Análisis Manual
-                                </span>
-                                <span className="text-[9px] text-slate-500 font-mono italic">Bitácora Unificada CRM</span>
-                              </div>
-                              
-                              <div className="bg-[#0a101e] rounded-lg border border-slate-800 h-40 overflow-y-auto p-3 font-mono text-[11px] text-slate-350 whitespace-pre-wrap leading-relaxed shadow-inner border-l-4 border-l-sky-500/30">
-                                {selectedClient.historialUnificado || "No hay registros de actividad previos para este socio comercial."}
-                              </div>
-
-                              <div className="flex gap-2">
-                                <input 
-                                  id="manual_activity_input_ficha"
-                                  type="text"
-                                  placeholder="Registrar nueva llamada, visita o nota..."
-                                  onKeyDown={async (e) => {
-                                    if (e.key === 'Enter') {
-                                      const val = (e.target as HTMLInputElement).value;
-                                      if (!val) return;
-                                      const today = new Date().toLocaleDateString('es-CL');
-                                      const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-                                      const newLog = `\n[Nota Manual ${today} ${time}]: ${val}`;
-                                      
-                                      const currentHist = selectedClient.historialUnificado || '';
-                                      await localDB.updateInCollection('contacts', selectedClient.id, {
-                                        historialUnificado: currentHist + newLog
-                                      });
-                                      (e.target as HTMLInputElement).value = '';
-                                      loadData();
-                                    }
-                                  }}
-                                  className="flex-1 bg-[#0a101e] px-3 py-2 rounded-lg border border-slate-700 text-xs text-white focus:outline-none focus:border-sky-500"
-                                />
-                                <button 
-                                  onClick={async () => {
-                                    const input = document.getElementById('manual_activity_input_ficha') as HTMLInputElement;
-                                    const val = input.value;
-                                    if (!val) return;
-                                    const today = new Date().toLocaleDateString('es-CL');
-                                    const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-                                    const newLog = `\n[Nota Manual ${today} ${time}]: ${val}`;
-                                    
-                                    const currentHist = selectedClient.historialUnificado || '';
-                                    await localDB.updateInCollection('contacts', selectedClient.id, {
-                                      historialUnificado: currentHist + newLog
-                                    });
-                                    input.value = '';
-                                    loadData();
-                                  }}
-                                  className="px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold"
-                                >
-                                  Añadir
-                                </button>
-                              </div>
-                            </div>
-
-                            <button 
-                              onClick={() => {
-                                setIsEditingClient(true);
-                              }}
-                              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer ml-auto border border-slate-700"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" /> Editar Datos & Ventas
-                            </button>
-
-                          </div>
-                        ) : (
-                          /* EDITING PANE FORM */
-                          <div className="space-y-4">
-                            <span className="text-xs font-black text-sky-450 block uppercase text-sky-400 mb-2">Editar Ficha y Valores de Ciclo en Base de Datos</span>
-                            
-                            <div className="grid grid-cols-2 gap-3 text-xs">
-                              <div className="space-y-1">
-                                <label className="text-slate-400">Nombre de Médico:</label>
-                                <input type="text" value={editName} onChange={(e)=>setEditName(e.target.value)} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 text-white" />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-slate-400">Clínica Razón Social:</label>
-                                <input type="text" value={editClinica} onChange={(e)=>setEditClinica(e.target.value)} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 text-white" />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-slate-400">E-mail corporativo:</label>
-                                <input type="email" value={editEmail} onChange={(e)=>setEditEmail(e.target.value)} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 text-white" />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-slate-400">Celular / WhatsApp:</label>
-                                <input type="text" value={editPhone} onChange={(e)=>setEditPhone(e.target.value)} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 text-white" />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-slate-400">RUT Empresa:</label>
-                                <input type="text" value={editRut} onChange={(e)=>setEditRut(e.target.value)} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 text-white" />
-                              </div>
-                            </div>
-
-                            <div className="border-t border-slate-800 pt-3 grid grid-cols-3 gap-3">
-                              <div className="space-y-1">
-                                <label className="text-[10px] text-slate-400 font-bold block">VENTAS 2024 (Ciclo):</label>
-                                <input type="number" value={editSales2024} onChange={(e)=>setEditSales2024(Number(e.target.value))} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 font-mono text-xs text-white" />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] text-slate-400 font-bold block">VENTAS 2025 (Ciclo):</label>
-                                <input type="number" value={editSales2025} onChange={(e)=>setEditSales2025(Number(e.target.value))} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 font-mono text-xs text-white" />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] text-emerald-400 font-bold block">VENTAS 2026 (Actual):</label>
-                                <input type="number" value={editSales2026} onChange={(e)=>setEditSales2026(Number(e.target.value))} className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 font-mono text-xs text-white" />
-                              </div>
-                            </div>
-
-                            <div className="space-y-1 border-t border-slate-800 pt-3">
-                              <label className="text-slate-400 text-xs block">Nueva Bitácora Comercial / Comentario:</label>
-                              <textarea
-                                value={newNote}
-                                onChange={(e)=>setNewNote(e.target.value)}
-                                placeholder="Escribe un reporte de contacto o motivo del ajuste comercial..."
-                                className="w-full bg-[#0d1527] p-2.5 rounded-lg border border-slate-700 text-xs text-white resize-none h-16"
-                              ></textarea>
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-4">
-                              <button 
-                                onClick={()=>setIsEditingClient(false)} 
-                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg text-xs"
-                              >
-                                Cancelar
-                              </button>
-                              <button 
-                                onClick={handleSaveClientInfo} 
-                                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1"
-                              >
-                                <Save className="w-3.5 h-3.5" /> Guardar Cambios
-                              </button>
-                            </div>
-
-                          </div>
-                        )}
-
-                      </div>
-                    ) : (
-                      <div className="p-10 text-center text-slate-500 italic">No hay clientes en la base de datos de Intranet. Abra la pestaña Clientes Intranet para importar.</div>
-                    )}
-                  </div>
-
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">Filtro Alerta:</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="bg-[#070b16] border border-slate-800 text-xs rounded-xl px-3.5 py-2 text-slate-300 focus:outline-none focus:border-sky-500/40"
+                  >
+                    <option value="ALL">Todas las Alertas ({criticalClients.length})</option>
+                    <option value="CRITICO">Riesgo Crítico ({criticalClients.filter(c => c.statusKey === 'CRITICO').length})</option>
+                    <option value="DORMIDO">Dormidos ({criticalClients.filter(c => c.statusKey === 'DORMIDO').length})</option>
+                    <option value="EN_CAIDA">En Caída ({criticalClients.filter(c => c.statusKey === 'EN_CAIDA').length})</option>
+                  </select>
                 </div>
               </div>
-            )}
 
-              {/* ----------------- SUBTAB 3: CLUB CATEGORIAS & CONFIGURATION ----------------- */}
-              {activeTab === 'club_config' && (
-                <div className="space-y-6">
-                  
-                  {/* CATEGORIES CARD BOARD */}
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                    <div>
-                      <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                        <Shield className="w-5 h-5 text-indigo-400" /> Configuración de Niveles de Club Social
-                      </h2>
-                      <p className="text-xs text-slate-400">Reglas comerciales fijas basadas en facturación anual consolidada</p>
-                    </div>
-                    {isEditingTiers ? (
-                      <button 
-                        onClick={handleSaveTiers}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-900/20"
-                      >
-                        <Save className="w-3.5 h-3.5" /> Guardar Cambios
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => setIsEditingTiers(true)}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer border border-slate-700"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" /> Modificar Montos y Beneficios
-                      </button>
-                    )}
-                  </div>
+              {/* Table rendering the analytical views */}
+              <div className="overflow-x-auto rounded-xl border border-slate-850 bg-[#070b16]">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#090f1d] border-b border-slate-800 text-slate-400 uppercase font-extrabold text-[10px] tracking-wider">
+                      <th className="p-4">Cliente Veterinario</th>
+                      <th className="p-4 text-right">Facturación 2026</th>
+                      <th className="p-4 text-center">Diferencia Comercial</th>
+                      <th className="p-4">Brecha Próxima Categoría</th>
+                      <th className="p-4">Acción Estratégica</th>
+                      <th className="p-4 text-center">Campaña</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-850">
+                    {filteredClients.map((client) => {
+                      const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
+                      const v2025 = Number(sales.v2025 || 0);
+                      const v2026 = Number(sales.v2026 || 0);
+                      
+                      const diff = v2026 - v2025;
+                      const percent = v2025 > 0 ? (diff / v2025) * 100 : 0;
+                      
+                      const currentTier = client.calculatedTier || TIERS_DEFAULT[0];
+                      const currentTierIdx = tiersList.findIndex(t => t.name === currentTier.name);
+                      const nextTier = currentTierIdx < tiersList.length - 1 ? tiersList[currentTierIdx + 1] : currentTier;
+                      
+                      let brechaText = '';
+                      let brechaGoalColor = 'text-yellow-400';
+                      
+                      if (v2026 < currentTier.min) {
+                        const gapToMaintain = currentTier.min - v2026;
+                        brechaText = `${formatCLP(gapToMaintain)} para mantener ${currentTier.name}`;
+                        brechaGoalColor = 'text-rose-400';
+                      } else {
+                        const gapToAscend = nextTier.min - v2026;
+                        if (gapToAscend > 0 && nextTier.name !== currentTier.name) {
+                          brechaText = `${formatCLP(gapToAscend)} para ascender a ${nextTier.name}`;
+                          brechaGoalColor = 'text-sky-400';
+                        } else {
+                          brechaText = `Meta alcanzada (${currentTier.name})`;
+                          brechaGoalColor = 'text-emerald-400';
+                        }
+                      }
 
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    {tiersList.map((t, idx) => {
-                      // Normalize colors for guaranteed rendering
-                      const getTheme = (idx: number) => {
-                        const themes = [
-                          { bg: 'bg-[#1e293b]', border: 'border-slate-500', text: 'text-slate-200', badgeObj: 'bg-slate-700 text-slate-100' },
-                          { bg: 'bg-gradient-to-b from-[#451a03] to-[#25140b]', border: 'border-amber-600/50', text: 'text-amber-200', badgeObj: 'bg-amber-900/50 text-amber-100' },
-                          { bg: 'bg-gradient-to-b from-[#1e293b] to-[#0f172a]', border: 'border-slate-400/50', text: 'text-slate-100', badgeObj: 'bg-slate-600/50 text-white' },
-                          { bg: 'bg-gradient-to-b from-[#422006] to-[#1a0e03]', border: 'border-yellow-600/60', text: 'text-yellow-400', badgeObj: 'bg-yellow-900/60 text-yellow-100' },
-                          { bg: 'bg-gradient-to-b from-[#2e1065] to-[#170831]', border: 'border-purple-500/60', text: 'text-purple-200', badgeObj: 'bg-purple-900/60 text-purple-100' }
-                        ];
-                        return themes[idx % themes.length];
-                      };
-                      const theme = getTheme(idx);
+                      let suggestedAction = 'Ofrecer prórroga excepcional de recalificación';
+                      if (client.statusKey === 'CRITICO') {
+                        suggestedAction = 'Llamada urgente: Ofrecer prórroga hasta 30 Junio';
+                      } else if (client.statusKey === 'DORMIDO') {
+                        suggestedAction = 'Masivo de reactivación y despacho gratis de Arnica CS';
+                      } else if (client.statusKey === 'EN_CAIDA') {
+                        suggestedAction = 'Ofrecer Kit Modulador Digestivo o Acqua Maris';
+                      }
+
                       return (
-                        <div key={t.name} className={`p-5 rounded-2xl border-2 ${theme.border} ${theme.bg} flex flex-col justify-between shadow-xl min-h-[350px]`}>
-                          <div>
-                            <div className="flex items-center justify-between mb-3">
-                              <span className={`text-[13px] font-black uppercase tracking-wider ${theme.text}`}>{t.name}</span>
-                              <span className={`text-[10px] px-2 py-1 rounded-md font-bold ${theme.badgeObj}`}>Nivel {idx + 1}</span>
-                            </div>
-                            
-                            {isEditingTiers ? (
-                              <div className="space-y-3 mt-4">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] text-slate-400 uppercase font-black">Mínimo ($):</label>
-                                  <input 
-                                    type="number" 
-                                    value={t.min} 
-                                    onChange={(e) => {
-                                      const newList = [...tiersList];
-                                      newList[idx].min = Number(e.target.value);
-                                      setTiersList(newList);
-                                    }}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white font-mono"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] text-slate-400 uppercase font-black">Máximo ($):</label>
-                                  <input 
-                                    type="number" 
-                                    value={t.max === Infinity ? 999999999 : t.max} 
-                                    onChange={(e) => {
-                                      const newList = [...tiersList];
-                                      const val = Number(e.target.value);
-                                      newList[idx].max = val >= 999999999 ? Infinity : val;
-                                      setTiersList(newList);
-                                    }}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white font-mono"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] text-slate-400 uppercase font-black">Beneficio Core:</label>
-                                  <input 
-                                    type="text" 
-                                    value={t.primaryBenefit} 
-                                    onChange={(e) => {
-                                      const newList = [...tiersList];
-                                      newList[idx].primaryBenefit = e.target.value;
-                                      setTiersList(newList);
-                                    }}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] text-white"
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <span className="text-xl font-black block mt-2 text-white font-mono">
-                                  {t.min === 0 ? '$0' : `$${(t.min / 1000000).toFixed(1)}M`} 
-                                  <span className="text-xs text-slate-400 font-bold px-1.5 uppercase tracking-widest text-[#94a3b8]"> a </span>
-                                  {t.max === Infinity ? 'Infinito' : `$${(t.max / 1000000).toFixed(1)}M`}
-                                </span>
-                                
-                                <div className="mt-5 space-y-2 text-[11px] text-[#e2e8f0] leading-snug font-serif">
-                                  <span className="block font-bold uppercase text-[#94a3b8] text-[9px] mb-1">Beneficio Destacado:</span>
-                                  <span className="block bg-[#0f172a]/60 px-3 py-2 rounded-lg text-white font-bold border border-white/5">
-                                    {t.primaryBenefit}
-                                  </span>
-                                  
-                                  <div className="mt-3 space-y-1.5">
-                                    <span className="block font-bold uppercase text-[#94a3b8] text-[9px]">Detalle de Beneficios:</span>
-                                    {t.benefits.map((benefit, bIdx) => (
-                                      <div key={bIdx} className="flex items-start gap-1.5 text-[10px] text-slate-300">
-                                        <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                                        <span>{benefit}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
+                        <tr key={client.id} className="hover:bg-sky-500/5 transition-all">
+                          <td className="p-4">
+                            <div className="font-extrabold text-white text-xs">{client.clinica}</div>
+                            <div className="text-[10.5px] text-slate-400 font-medium">{client.name}</div>
+                            <div className="text-[9.5px] text-slate-500 font-mono mt-0.5">{client.rut}</div>
+                          </td>
+                          <td className="p-4 text-right font-mono font-bold text-white">
+                            {formatCLP(v2026)}
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`inline-flex items-center gap-1 font-mono font-black px-1.5 py-0.5 rounded text-[10.5px] ${diff >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                              {diff >= 0 ? '+' : ''}{formatCLP(diff)} ({percent.toFixed(0)}%)
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`font-mono font-bold text-[11px] ${brechaGoalColor} block`}>
+                              {brechaText}
+                            </span>
+                            <span className="text-[9.5px] text-slate-500 block font-semibold">
+                              Cat. Actual: {currentTier.name} (Ref 2025)
+                            </span>
+                          </td>
+                          <td className="p-4 max-w-[200px]">
+                            <div className="text-slate-350 font-medium leading-relaxed">{suggestedAction}</div>
+                          </td>
+                          <td className="p-4 text-center">
+                            <button
+                              onClick={() => {
+                                setSelectedClientId(client.id);
+                                setActiveTab('individual');
+                              }}
+                              className="bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-slate-900 border border-sky-500/30 font-black px-3 py-1.5 rounded-xl text-[10.5px] transition-all flex items-center justify-center gap-1.5 mx-auto shadow-sm"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span>Cargar</span>
+                            </button>
+                          </td>
+                        </tr>
                       );
                     })}
-                  </div>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-                  {/* SIMULATOR TOOL */}
-                  {selectedClient && (
-                    <div className="bg-[#121c33] p-5 rounded-xl border border-[#3b82f6]/20 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="bg-[#3b82f6]/20 text-[#38bdf8] text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border border-[#3b82f6]/30 tracking-wider">
-                            Herramienta de Simulación de Venta & Fidelidad
-                          </span>
-                          <h4 className="text-md font-bold mt-1 text-white">Prueba de Ascenso para: <span className="text-sky-400">{selectedClient.name}</span></h4>
-                          <p className="text-xs text-slate-400">Suma compras simuladas para ver qué categoría comercial alcanzaría automáticamente en el ciclo 2026.</p>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-slate-500 block text-[10px]">VENTAS REALES 2026</span>
-                          <span className="text-sm font-mono font-black text-slate-300">${formatCLP(selectedClient.ventas?.v2026 || 0)}</span>
-                        </div>
-                      </div>
-
-                      {/* Simulator Control */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs font-mono font-bold text-slate-350">
-                          <span>$0 compra extra</span>
-                          <span className="text-sky-450 text-sky-400">Monto simulación: +${formatCLP(simulatedVentas)}</span>
-                          <span>+$15.000.000</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="15000000"
-                          step="100000"
-                          value={simulatedVentas}
-                          onChange={(e) => setSimulatedVentas(Number(e.target.value))}
-                          className="w-full accent-sky-500 h-2 bg-[#090f1d] rounded-lg appearance-none cursor-pointer"
-                        />
-                      </div>
-
-                      {/* Display Results */}
-                      {activeSimulatedMetrics && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3.5 border-t border-slate-800">
-                          <div>
-                            <span className="text-[10px] text-slate-400 block">PROYECCIÓN DE COMPRAS:</span>
-                            <span className="text-lg font-mono font-black text-white">
-                              ${formatCLP(activeSimulatedMetrics.futureSales)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 block">CATEGORÍA OBTENIDA:</span>
-                            <span className="text-md font-black text-sky-400 flex items-center gap-1.5 mt-1">
-                              <Award className="w-5 h-5 text-yellow-400" /> {activeSimulatedMetrics.futureTier.name}
-                            </span>
-                          </div>
-                          <div className="md:col-span-2">
-                            <span className="text-[10px] text-slate-400 block">PROGRESO PRÓXIMA CATEGORÍA ({activeSimulatedMetrics.nextTier?.name}):</span>
-                            <div className="flex items-center gap-3 mt-1.5">
-                              <div className="flex-1 bg-slate-800 h-3 rounded-full overflow-hidden">
-                                <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${activeSimulatedMetrics.progressPercent}%` }}></div>
-                              </div>
-                              <span className="text-xs font-mono font-black text-emerald-400">{activeSimulatedMetrics.progressPercent}%</span>
-                            </div>
-                            <span className="text-[9px] text-[#94a3b8] block mt-1">
-                              {activeSimulatedMetrics.nextBrecha > 0 
-                                ? `Faltan $${formatCLP(activeSimulatedMetrics.nextBrecha)} de compra para subir de nivel` 
-                                : '¡Felicidades, se encuentra en el nivel Premium máximo del club comercial!'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Stat Boxes */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-[#0d162d] p-5 rounded-2xl border border-sky-500/10">
+                  <span className="text-slate-400 text-[10px] font-black uppercase block tracking-wider mb-1">Socios Críticos Activos</span>
+                  <div className="text-2xl font-mono font-black text-rose-400">{criticalClients.length}</div>
+                  <p className="text-[9.5px] text-slate-500 mt-1">Con caídas de ventas de -50% o más</p>
                 </div>
-              )}
+                <div className="bg-[#0d162d] p-5 rounded-2xl border border-sky-500/10">
+                  <span className="text-slate-400 text-[10px] font-black uppercase block tracking-wider mb-1">Facturación Consolidada 2026</span>
+                  <div className="text-2xl font-mono font-black text-white">
+                    {formatCLP(clients.reduce((acc, c) => acc + Number(c.ventas?.v2026 || 0), 0))}
+                  </div>
+                  <p className="text-[9.5px] text-slate-500 mt-1">Suma acumulada del ciclo corriente</p>
+                </div>
+                <div className="bg-[#0d162d] p-5 rounded-2xl border border-sky-500/10">
+                  <span className="text-slate-400 text-[10px] font-black uppercase block tracking-wider mb-1">Tasa de Fidelización</span>
+                  <div className="text-2xl font-mono font-black text-emerald-400">76.8%</div>
+                  <p className="text-[9.5px] text-slate-500 mt-1">Retención efectiva histórica</p>
+                </div>
+                <div className="bg-[#0d162d] p-5 rounded-2xl border border-sky-500/10">
+                  <span className="text-slate-400 text-[10px] font-black uppercase block tracking-wider mb-1">Prórrogas Sugeridas</span>
+                  <div className="text-2xl font-mono font-black text-yellow-400">
+                    {criticalClients.filter(c => (c.ventas?.v2026 || 0) < (c.calculatedTier?.min || 0)).length}
+                  </div>
+                  <p className="text-[9.5px] text-slate-500 mt-1">Aptos para plazo de gracia hasta junio</p>
+                </div>
+              </div>
 
-              {/* ----------------- SECCIÓN UNIFICADA: CENTRO DE CAMPAÑAS & MARKETING IA 💬 ----------------- */}
-              {activeTab === 'campaigns' && (
-                <div className="space-y-6">
-                  {/* Top bar with Section Selector buttons */}
-                  <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center border-b border-slate-800 pb-3 gap-3">
-                    <div>
-                      <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5 text-indigo-400 animate-pulse" /> Despliegue de Campañas & Marketing IA
-                      </h2>
-                      <p className="text-xs text-slate-400 font-medium">Filtra tu audiencia en un clic, gestiona plantillas, genera postales en lote e inicia envíos automáticos.</p>
+              {/* Progress Distributions */}
+              <div className="bg-[#0d162d] p-6 rounded-2xl border border-sky-500/10 space-y-4">
+                <h3 className="text-xs font-extrabold text-white uppercase tracking-wider block">Distribución de Socios en Tiers</h3>
+                <div className="space-y-4">
+                  {tiersList.map((tier, idx) => {
+                    const count = clients.filter(c => {
+                      const sales = c.ventas?.v2025 || 0;
+                      return sales >= tier.min && sales <= tier.max;
+                    }).length;
+                    const percent = clients.length > 0 ? (count / clients.length) * 100 : 0;
+
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-slate-350">{tier.name}</span>
+                          <span className="text-white">{count} socios ({percent.toFixed(0)}%)</span>
+                        </div>
+                        <div className="h-2 bg-[#070b16] rounded-full overflow-hidden border border-slate-850">
+                          <div className={`h-full bg-gradient-to-r ${tier.color.includes('platinum') ? 'from-purple-500 to-indigo-500' : tier.color.includes('oro') ? 'from-amber-400 to-yellow-500' : tier.color.includes('plata') ? 'from-slate-400 to-slate-200' : 'from-amber-600 to-amber-800'} transition-all`} style={{ width: `${percent}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Strategic Tips Panel */}
+              <div className="bg-[#0d162d] p-6 rounded-2xl border border-sky-500/10 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-yellow-400" />
+                  <h3 className="text-xs font-extrabold text-white uppercase tracking-wider block">Recomendaciones del Motor IA</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs leading-relaxed text-slate-300">
+                  <div className="bg-[#070b16] p-4 rounded-xl border border-slate-800">
+                    <strong className="text-white block mb-1">⏳ Prórroga de Recalificación Directa:</strong>
+                    Los clientes críticos muestran $0 en compras durante 2026, lo que arriesga su pérdida de categoría para 2027. Al concederles prórroga excepcional por email masivo, mantendrán su beneficio Oro o Platinum, incentivándolos a retomar órdenes.
+                  </div>
+                  <div className="bg-[#070b16] p-4 rounded-xl border border-slate-800">
+                    <strong className="text-white block mb-1">💊 Promociones en Fórmulas Clave:</strong>
+                    Filtra y destaca muestras gratis o descuentos en nuestras líneas principales como <strong className="text-sky-400">Arnica CS</strong> (antiinflamatorio veterinario de alta rotación) en tus copys de WhatsApp.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'tiers' && (
+            <div className="bg-[#0d162d] p-6 rounded-2xl border border-sky-500/10 space-y-6">
+              <div>
+                <h2 className="text-base font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <Award className="w-5 h-5 text-yellow-400" />
+                  <span>Configuración del Club Categorías CIMASUR® 🏆</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Rangos de facturación consolidada de ciclos y beneficios vigentes configurados en el sistema de fidelización de médicos veterinarios de Chile.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tiersList.map((tier, idx) => (
+                  <div key={idx} className={`p-5 rounded-2xl border bg-gradient-to-br ${tier.color}`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-slate-400 block">NIVEL</span>
+                        <h4 className="text-sm font-extrabold text-white">{tier.name}</h4>
+                      </div>
+                      <span className="font-mono text-[9px] font-black bg-slate-900/80 px-2 py-0.5 rounded text-slate-300 uppercase border border-slate-700/50">
+                        {tier.min === 0 ? 'Sin mínimo' : `Min: ${formatCLP(tier.min)}`}
+                      </span>
                     </div>
-                    {/* Inner Comms Tabs */}
-                    <div className="flex flex-wrap bg-[#101b33] p-1 rounded-xl border border-slate-800 text-[11px] font-bold gap-1">
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('segmentation')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${commsSubTab === 'segmentation' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-                      >
-                        🧬 1. Segmentación IA
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('templates')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${commsSubTab === 'templates' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-                      >
-                        🤖 2. Redacción IA
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('image_gen')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${commsSubTab === 'image_gen' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-                      >
-                        🎨 3. Generador Gráfico
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('canvas_email')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${commsSubTab === 'canvas_email' ? 'bg-indigo-600 text-white shadow' : 'text-sky-400 font-bold hover:text-sky-200'}`}
-                      >
-                        🎨 Diseñador Visual IA
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('massive')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${commsSubTab === 'massive' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-                      >
-                        📧 Emailing Masivo
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('whatsapp')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${commsSubTab === 'whatsapp' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-                      >
-                        📲 WhatsApp Masivo
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('config')}
-                        className={`px-2.5 py-1.5 rounded-lg transition-all ${commsSubTab === 'config' ? 'bg-slate-800 text-white shadow border border-slate-700' : 'text-slate-500 hover:text-slate-350'}`}
-                      >
-                        ⚙️ Ajustes
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCommsSubTab('history')}
-                        className={`px-2.5 py-1.5 rounded-lg transition-all ${commsSubTab === 'history' ? 'bg-slate-800 text-white shadow border border-slate-700' : 'text-slate-500 hover:text-slate-350'}`}
-                      >
-                        📜 Historial
-                      </button>
+
+                    <div className="space-y-2.5 text-xs leading-relaxed text-slate-300">
+                      <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/40">
+                        <strong className="text-white block text-[9px] uppercase font-black tracking-wider text-slate-400 mb-0.5">Beneficio Principal</strong>
+                        <p className="font-extrabold text-yellow-400">{tier.primaryBenefit}</p>
+                      </div>
+                      
+                      <div className="pt-1.5">
+                        <strong className="text-white text-[9px] uppercase font-black tracking-wider block mb-1">Beneficios del Vademécum</strong>
+                        <ul className="list-disc list-inside space-y-1 font-medium text-slate-300 text-[11px]">
+                          {tier.benefits.map((b, i) => (
+                            <li key={i}>{b}</li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  {/* 4. SECTOR DE DISEÑO VISUAL IA */}
-                  {commsSubTab === 'canvas_email' && (
-                    <div className="space-y-6 animate-fadeIn">
-                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {/* LEFT: DESIGN CONTROLS */}
-                          <div className="space-y-4">
-                             <div className="bg-[#101b33] p-5 rounded-2xl border border-slate-800 space-y-4">
-                                <div className="flex items-center gap-3 mb-2">
-                                   <div className="bg-sky-500/20 p-2 rounded-lg">
-                                      <Palette className="w-5 h-5 text-sky-400" />
-                                   </div>
-                                   <div>
-                                      <h3 className="text-sm font-bold text-white">Configuración del Diseño</h3>
-                                      <p className="text-[10px] text-slate-400">Genera una pieza de emailing tipo "Canva" con IA.</p>
-                                   </div>
-                                </div>
+          {activeTab === 'individual' && (
+            /* 2. MAIN WORKSPACE GRID (INDIVIDUAL) */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* LEFT COLUMN: CLIENT LIST (SPAN 5) */}
+        <div id="clients_critical_list_section" className="lg:col-span-5 bg-[#0d162d] border border-sky-500/10 p-4 rounded-2xl flex flex-col h-[740px]">
+          
+          <div className="space-y-3 mb-4">
+            <h2 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+              <Users className="w-4 h-4 text-sky-400" />
+              <span>Socios con Alerta ({filteredClients.length})</span>
+            </h2>
+            
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+              <input
+                id="critical_client_search"
+                type="text"
+                placeholder="Buscar por Nombre, RUT o Clínica..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#070b16] border border-slate-800 text-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-xs focus:outline-none focus:border-sky-500/50 placeholder-slate-600 transition-all"
+              />
+            </div>
 
-                                <div className="space-y-2">
-                                   <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">1. Objetivo de la Comunicación</label>
-                                   <select 
-                                      className="w-full bg-[#0a101e] px-3 py-2.5 rounded-xl border border-slate-700 text-xs text-white focus:border-sky-500 focus:outline-none transition-colors"
-                                      value={postcardTitle}
-                                      onChange={(e) => setPostcardTitle(e.target.value)}
-                                   >
-                                      <option value="Reconocimiento VIP">Reconocimiento VIP / Fidelización</option>
-                                      <option value="Invitación a Curso">Invitación a Curso / Formación</option>
-                                      <option value="Oferta Exclusiva">Oferta Exclusiva / Venta Directa</option>
-                                      <option value="Recordatorio de Compra">Recordatorio de Compra / Reactivación</option>
-                                      <option value="Lanzamiento Producto">Lanzamiento de Nuevo Producto</option>
-                                   </select>
-                                </div>
+            {/* Quick Status Pill Filters */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <button
+                id="filter_btn_all"
+                onClick={() => setStatusFilter('ALL')}
+                className={`text-[9px] font-bold px-2.5 py-1.5 rounded-lg border transition-all ${statusFilter === 'ALL' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' : 'bg-[#070b16] text-slate-450 border-slate-800 hover:text-slate-300'}`}
+              >
+                Todos ({criticalClients.length})
+              </button>
+              <button
+                id="filter_btn_critico"
+                onClick={() => setStatusFilter('CRITICO')}
+                className={`text-[9px] font-bold px-2.5 py-1.5 rounded-lg border transition-all ${statusFilter === 'CRITICO' ? 'bg-red-500/15 text-red-400 border-red-500/30' : 'bg-[#070b16] text-slate-450 border-slate-800 hover:text-slate-350'}`}
+              >
+                Riesgo Crítico ({criticalClients.filter(c => c.statusKey === 'CRITICO').length})
+              </button>
+              <button
+                id="filter_btn_dormido"
+                onClick={() => setStatusFilter('DORMIDO')}
+                className={`text-[9px] font-bold px-2.5 py-1.5 rounded-lg border transition-all ${statusFilter === 'DORMIDO' ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' : 'bg-[#070b16] text-slate-450 border-slate-800 hover:text-slate-350'}`}
+              >
+                Dormidos ({criticalClients.filter(c => c.statusKey === 'DORMIDO').length})
+              </button>
+              <button
+                id="filter_btn_caida"
+                onClick={() => setStatusFilter('EN_CAIDA')}
+                className={`text-[9px] font-bold px-2.5 py-1.5 rounded-lg border transition-all ${statusFilter === 'EN_CAIDA' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' : 'bg-[#070b16] text-slate-450 border-slate-800 hover:text-slate-350'}`}
+              >
+                En Caída ({criticalClients.filter(c => c.statusKey === 'EN_CAIDA').length})
+              </button>
+            </div>
+          </div>
 
-                                <div className="space-y-2">
-                                   <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">2. Tono y Personalidad (Prompt IA)</label>
-                                   <textarea 
-                                      className="w-full bg-[#0a101e] px-3 py-3 rounded-xl border border-slate-700 text-xs text-white focus:border-sky-500 focus:outline-none transition-colors h-24 resize-none"
-                                      placeholder="Ej: Elegante, minimalista, destacar los envíos gratis y el vademécum físico para prospectos..."
-                                      value={postcardSubtext}
-                                      onChange={(e) => setPostcardSubtext(e.target.value)}
-                                   />
-                                </div>
-
-                                <button 
-                                   onClick={async () => {
-                                      if (!selectedClient) {
-                                         alert("Por favor selecciona un cliente primero en la pestaña de Cartera.");
-                                         return;
-                                      }
-                                      setIsSending(true);
-                                      try {
-                                         const response = await fetch('/api/ai/generate-email-template', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                               client: selectedClient,
-                                               objective: postcardTitle,
-                                               prompt: postcardSubtext
-                                            })
-                                         });
-                                         const data = await response.json();
-                                         if (data && data.html) {
-                                            setEmailAITemplate(data.html);
-                                         } else if (data && data.error) {
-                                            alert("Error al generar la maqueta: " + data.error);
-                                         } else {
-                                            alert("No se pudo obtener la maqueta.");
-                                         }
-                                      } catch (err: any) {
-                                         console.error(err);
-                                         alert("Error al generar la maqueta: " + (err.message || err));
-                                      } finally {
-                                         setIsSending(false);
-                                      }
-                                   }}
-                                   disabled={isSending}
-                                   className="w-full py-3 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-xl shadow-sky-500/10 transition-all disabled:opacity-50"
-                                >
-                                   {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                   GENERAR MAQUETA CON GEMINI 2.0
-                                </button>
-                             </div>
-
-                             {emailAITemplate && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl space-y-3">
-                                   <div className="flex items-center gap-2 text-emerald-400">
-                                      <CheckCircle className="w-4 h-4" />
-                                      <span className="text-xs font-bold uppercase tracking-wider">¡Plantilla Generada Exitosamente!</span>
-                                   </div>
-                                   <div className="grid grid-cols-2 gap-2">
-                                      <button 
-                                         onClick={() => {
-                                            navigator.clipboard.writeText(emailAITemplate);
-                                            alert("Código HTML copiado al portapapeles.");
-                                         }}
-                                         className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white text-[10px] font-bold rounded-lg border border-slate-700 transition-all flex items-center justify-center gap-1.5"
-                                      >
-                                         <Copy className="w-3.5 h-3.5" /> Copiar Código
-                                      </button>
-                                      <button 
-                                         onClick={() => {
-                                             const blob = new Blob([emailAITemplate], { type: 'text/html' });
-                                             const url = URL.createObjectURL(blob);
-                                             const win = window.open(url, '_blank');
-                                             win?.focus();
-                                         }}
-                                         className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
-                                      >
-                                         <ExternalLink className="w-3.5 h-3.5" /> Ver en Pantalla Completa
-                                      </button>
-                                   </div>
-                                </div>
-                             )}
-                          </div>
-
-                          {/* RIGHT: REAL-TIME PREVIEW (CANVA STYLE) */}
-                          <div className="space-y-4">
-                             <div className="bg-[#0f172a] rounded-2xl border border-slate-800 overflow-hidden min-h-[500px] flex flex-col shadow-2xl relative">
-                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.03)_0,transparent_100%)] pointer-events-none"></div>
-                                <div className="bg-[#1e293b] p-3 border-b border-slate-700 flex items-center justify-between px-5">
-                                   <div className="flex items-center gap-2">
-                                      <div className="flex gap-1.5">
-                                         <div className="w-2.5 h-2.5 rounded-full bg-rose-500/50"></div>
-                                         <div className="w-2.5 h-2.5 rounded-full bg-amber-500/50"></div>
-                                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/50"></div>
-                                      </div>
-                                      <span className="text-[10px] text-slate-400 font-mono ml-4 uppercase tracking-widest">Vista Previa: Email de Alta Fidelidad</span>
-                                   </div>
-                                   <div className="bg-sky-500/10 px-2 py-0.5 rounded text-[9px] font-black text-sky-400 border border-sky-500/20">
-                                      {selectedClient?.name || 'Cliente Demo'}
-                                   </div>
-                                </div>
-
-                                <div className="flex-1 p-6 overflow-y-auto bg-white flex justify-center">
-                                   {emailAITemplate ? (
-                                      <div dangerouslySetInnerHTML={{ __html: emailAITemplate }} className="w-full max-w-md shadow-2xl" />
-                                   ) : (
-                                      <div className="flex flex-col items-center justify-center text-center space-y-4 opacity-50 bg-slate-50 w-full rounded-xl border-2 border-dashed border-slate-200">
-                                         <Image className="w-12 h-12 text-slate-300" />
-                                         <div>
-                                            <p className="text-slate-400 font-bold text-sm">Sin Maqueta Generada</p>
-                                            <p className="text-slate-300 text-[10px] max-w-[200px]">Usa el panel de la izquierda para diseñar una pieza visual única para este cliente.</p>
-                                         </div>
-                                      </div>
-                                   )}
-                                </div>
-                             </div>
-                          </div>
-                       </div>
+          {/* Scrollable list */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            {filteredClients.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-800 rounded-xl bg-[#090f1d]/55">
+                <Users className="w-8 h-8 text-slate-700 mb-2" />
+                <span className="text-xs text-slate-500 font-bold">No se encontraron socios críticos</span>
+                <span className="text-[10px] text-slate-600 mt-1">Intente cambiar el filtro o la búsqueda</span>
+              </div>
+            ) : (
+              filteredClients.map((client) => {
+                const isSelected = client.id === selectedClientId;
+                const changePct = client.percentChange * 100;
+                
+                return (
+                  <div
+                    key={client.id}
+                    id={`client_card_${client.id}`}
+                    onClick={() => setSelectedClientId(client.id)}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-sky-500/10 border-sky-500 shadow-md shadow-sky-500/5' : 'bg-[#090f1d] border-slate-800/65 hover:border-slate-700'}`}
+                  >
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <div className="min-w-0">
+                        <span className="text-xs font-black text-white truncate block" title={client.name}>
+                          {client.name}
+                        </span>
+                        <span className="text-[10px] text-slate-450 block truncate font-medium" title={client.clinica}>
+                          {client.clinica}
+                        </span>
+                      </div>
+                      <span className={`text-[9px] px-2 py-0.5 rounded border leading-none font-extrabold shrink-0 ${client.statusColor}`}>
+                        {client.statusLabel}
+                      </span>
                     </div>
-                  )}
-                  {/* 1. SECTOR DE SEGMENTACIÓN IA */}
-                  {commsSubTab === 'segmentation' && (
-                    <div className="space-y-6 animate-fadeIn text-left">
-                      {/* FILTER CRITERIA BOX */}
-                      <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] text-slate-400 font-extrabold uppercase">1. CATEGORÍA DE CLUB (2026):</span>
-                          <select
-                            value={segCategory}
-                            onChange={(e)=>setSegCategory(e.target.value)}
-                            className="w-full bg-[#0a101e] px-2 py-2.5 rounded-lg border border-slate-700 text-xs text-white"
-                          >
-                            <option value="Todas">Todas las categorías</option>
-                            {tiersList.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-                          </select>
-                        </div>
 
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] text-slate-400 font-extrabold uppercase">2. COMPORTAMIENTO COMERCIAL:</span>
-                          <select
-                            value={segGrowth}
-                            onChange={(e)=>setSegGrowth(e.target.value)}
-                            className="w-full bg-[#0a101e] px-2 py-2.5 rounded-lg border border-slate-700 text-xs text-white"
-                          >
-                            <option value="Todas">Todos los estados</option>
-                            <option value="Crecieron">Aumentaron compras (Crecieron)</option>
-                            <option value="Disminuyeron">Redujeron compras (Disminuyeron)</option>
-                            <option value="Estables">Comportamiento similar (Estables)</option>
-                            <option value="Dormidos">💤 Dormidos (2025 compra & 2026 cero)</option>
-                            <option value="Perdidos">🥀 Perdidos (2024 compra & 2025/2026 cero)</option>
-                            <option value="Riesgo Alto">⚠️ Riesgo Alto (Caída severa {'>'}50%)</option>
-                            <option value="Intranet / Sin Compras">🔗 Prospectos Intranet (Cero Compras)</option>
-                          </select>
-                        </div>
+                    {/* Category for 2026 based on 2025 sales */}
+                    <div className="mb-2 flex items-center gap-1.5 text-[10px] text-slate-300">
+                      <Award className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                      <span>
+                        Categoría 2026: <strong className="text-white">{client.calculatedTier?.name || 'Sin Categoría'}</strong>
+                      </span>
+                    </div>
 
-                        <div className="md:col-span-1 flex flex-col justify-end">
-                          <div className="bg-[#0a101e] px-4 py-2 rounded-xl border border-indigo-500/30 flex items-center justify-between">
-                            <div className="flex flex-col">
-                               <span className="text-[9px] text-indigo-400 font-black uppercase tracking-tighter">Médicos Seleccionados</span>
-                               <span className="text-xl font-black text-white leading-none">{segmentedClients.length}</span>
-                            </div>
-                            <Users className="w-5 h-5 text-indigo-500/50" />
-                          </div>
-                        </div>
+                    {/* Grid displaying 2024, 2025, 2026 Sales */}
+                    <div className="bg-[#050914] p-2 rounded-lg border border-slate-850/80 grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                      <div>
+                        <span className="text-slate-500 block text-[9px] font-bold">2024</span>
+                        <span className="font-mono font-semibold text-slate-400">{formatCLP(client.ventas?.v2024 || 0)}</span>
+                      </div>
+                      <div className="border-l border-slate-800/65">
+                        <span className="text-slate-400 block text-[9px] font-extrabold text-yellow-500">2025 (Ref)</span>
+                        <span className="font-mono font-bold text-yellow-400">{formatCLP(client.ventas?.v2025 || 0)}</span>
+                      </div>
+                      <div className="border-l border-slate-800/65">
+                        <span className="text-slate-400 block text-[9px] font-bold">2026 (Act)</span>
+                        <span className="font-mono font-extrabold text-white">{formatCLP(client.ventas?.v2026 || 0)}</span>
+                      </div>
+                    </div>
 
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] text-slate-400 font-extrabold uppercase">3. ÚLTIMA ADQUISICIÓN REGISTRADA:</span>
-                          <select
-                            value={segLastPurchase}
-                            onChange={(e)=>setSegLastPurchase(e.target.value)}
-                            className="w-full bg-[#0a101e] px-2 py-2.5 rounded-lg border border-slate-700 text-xs text-white"
-                          >
-                            <option value="Todas">Cualquier periodo</option>
-                            <option value="En ciclo actual">Durante ciclo 2026 vigente</option>
-                            <option value="Solo ciclo anterior">Ventas solo en ciclo anterior (Dormidos)</option>
-                          </select>
+                    {/* Sales decrease and trend line */}
+                    <div className="mt-2.5 pt-1.5 border-t border-slate-850/40 flex justify-between items-center text-[10px]">
+                      <div className="flex items-center gap-1 text-rose-400 font-bold">
+                        <TrendingDown className="w-3.5 h-3.5" />
+                        <span>Var. 2026 vs 2025:</span>
+                      </div>
+                      <span className="font-mono font-extrabold text-rose-450 text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded">
+                        {changePct < 0 ? `${changePct.toFixed(0)}%` : changePct > 0 ? `+${changePct.toFixed(0)}%` : 'Sin compras'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: INTERACTIVE CAMPAIGN WORKSPACE (SPAN 7) */}
+        <div id="campaign_builder_section" className="lg:col-span-7 bg-[#0d162d] border border-sky-500/10 p-5 rounded-2xl flex flex-col h-[740px] overflow-y-auto">
+          
+          {!selectedClient ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-12">
+              <div className="bg-sky-500/5 p-4 rounded-full border border-sky-500/10 mb-3 animate-pulse">
+                <Sparkles className="w-10 h-10 text-sky-400" />
+              </div>
+              <h3 className="text-sm font-extrabold text-white uppercase tracking-widest">Diseñador y Evaluador de Campañas</h3>
+              <p className="text-xs text-slate-500 mt-2 max-w-sm">
+                Seleccione un médico veterinario de la lista izquierda para iniciar el análisis estratégico de su perfil y generar un mensaje personalizado óptimo de recuperación.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              
+              {/* Selected Doctor Summary Header */}
+              <div className="p-4 rounded-xl bg-[#090f1d] border border-slate-850/60 space-y-3">
+                <div className="flex justify-between items-start gap-4 flex-wrap">
+                  <div>
+                    <span className="text-[9px] font-black uppercase text-sky-400 tracking-widest block">Socio Crítico Bajo Análisis</span>
+                    <h3 className="text-base font-black text-white mt-1 leading-tight">{selectedClient.name}</h3>
+                    <span className="text-[11px] text-slate-400 block">{selectedClient.clinica}</span>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 text-right">
+                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-black border uppercase ${getTierBadgeClass(selectedClient.calculatedTier?.name)}`}>
+                      Categoría 2026: {selectedClient.calculatedTier?.name || 'Sin Categoría'}
+                    </span>
+                    <span className="text-[9px] text-slate-500 font-extrabold block">
+                      Determinado por Ventas 2025
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2.5 border-t border-slate-800/50 text-[11px]">
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase font-bold">RUT</span>
+                    <span className="text-slate-300 font-mono font-bold block">{selectedClient.rut}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase font-bold">Comuna / Región</span>
+                    <span className="text-slate-300 block truncate" title={selectedClient.region}>{selectedClient.region}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase font-bold">Último WhatsApp</span>
+                    <span className="text-slate-300 font-mono block text-[10px]">{selectedClient.ultimoWhatsapp || 'No registrado'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase font-bold">Último Correo</span>
+                    <span className="text-slate-300 font-mono block text-[10px]">{selectedClient.ultimoCorreo || 'No registrado'}</span>
+                  </div>
+                </div>
+
+                {/* Sales Comparison Block */}
+                <div className="mt-3 bg-[#060a14] p-3 rounded-lg border border-slate-800/80 flex justify-between items-center text-center">
+                  <div>
+                    <span className="text-[9px] text-slate-500 uppercase block font-bold">Ventas 2024</span>
+                    <span className="text-xs font-mono font-black text-slate-400 block">${formatCLP(selectedClient.ventas?.v2024 || 0)}</span>
+                  </div>
+                  <div className="text-slate-700 font-bold">➔</div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 uppercase block font-bold">Ventas 2025</span>
+                    <span className="text-xs font-mono font-black text-slate-300 block">${formatCLP(selectedClient.ventas?.v2025 || 0)}</span>
+                  </div>
+                  <div className="text-slate-700 font-bold">➔</div>
+                  <div>
+                    <span className="text-[9px] text-rose-450 text-rose-400 uppercase block font-bold">Ciclo Actual (2026)</span>
+                    <span className="text-xs font-mono font-black text-rose-400 block">${formatCLP(selectedClient.ventas?.v2026 || 0)}</span>
+                  </div>
+                  <div className="text-slate-700 font-bold">➔</div>
+                  <div className="bg-red-500/10 px-2.5 py-1 rounded border border-red-500/20">
+                    <span className="text-[8px] text-red-400 uppercase block font-extrabold">Fuga / Caída</span>
+                    <span className="text-xs font-mono font-extrabold text-red-400 block">
+                      {(selectedClient.percentChange * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Channel Selector Tab Pill & Prompt Panel */}
+              <div className="space-y-3.5">
+                <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
+                  <span className="text-xs font-extrabold text-white uppercase tracking-wider">Diseñador de Campaña Personalizada</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      id="channel_btn_whatsapp"
+                      onClick={() => setChannel('whatsapp')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${channel === 'whatsapp' ? 'bg-[#25D366]/15 text-[#25D366] border-[#25D366]/30' : 'bg-[#090f1d] text-slate-450 border-slate-800'}`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>WhatsApp Directo</span>
+                    </button>
+                    <button
+                      id="channel_btn_email"
+                      onClick={() => setChannel('email')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${channel === 'email' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' : 'bg-[#090f1d] text-slate-450 border-slate-800'}`}
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Correo Recomendado</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Main Message Preview / Editor box */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                    <span>Edite libremente el mensaje generado o redacte una plantilla propia:</span>
+                    <span className="font-mono text-slate-500">{messageText.length} caracteres</span>
+                  </div>
+                  <textarea
+                    id="recovery_message_textarea"
+                    rows={7}
+                    placeholder={`Haga clic en 'Diseñar Mensaje con IA' para generar una propuesta personalizada redactada por Gemini según el estado actual del doctor/a, o comience a escribir...`}
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    className="w-full bg-[#070b16] border border-slate-850 rounded-xl p-3.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-500/50 placeholder-slate-650 leading-relaxed resize-none"
+                  />
+                  
+                  {/* Generate Button Row */}
+                  <div className="flex gap-2">
+                    <button
+                      id="generate_ai_draft_btn"
+                      onClick={() => handleGenerateOrImproveMessage(false)}
+                      disabled={isGenerating}
+                      className="flex-1 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      <span>{messageText ? 'Re-Generar Propuesta Inicial' : '⚡ Diseñar Mensaje Recomendado con IA'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* AI Evaluation Metrics (only visible when evaluation is available) */}
+                {evaluation && (
+                  <motion.div
+                    id="ai_evaluation_panel"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-[#0a101f] border border-sky-500/15 rounded-xl space-y-3"
+                  >
+                    <span className="text-[10px] font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Evaluación Estratégica del Mensaje (Gemini 3.5)
+                    </span>
+
+                    {/* Progress Bars for evaluation scores */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[10px] font-bold">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Personalización</span>
+                          <span className="text-white font-mono">{evaluation.scorePersonalizacion}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500" style={{ width: `${evaluation.scorePersonalizacion}%` }} />
                         </div>
                       </div>
 
-                      {(() => {
-                        const guide = SEGMENT_GUIDE[segGrowth] || SEGMENT_GUIDE['Todas'];
-                        return (
-                          <div className="bg-slate-900/60 p-4 rounded-xl border border-[#38bdf8]/20 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-left animate-fadeIn">
-                            <div className="md:col-span-2 space-y-1">
-                              <span className="text-[10px] text-sky-400 font-extrabold uppercase tracking-wide block">🧬 ¿QUÉ SIGNIFICA ESTE SEGMENTO COMERCIAL?</span>
-                              <h4 className="text-sm font-black text-white">{guide.title}</h4>
-                              <p className="text-slate-300 text-[11px] leading-relaxed">{guide.desc}</p>
-                            </div>
-                            <div className="space-y-1">
-                              <span className="text-[10px] text-slate-400 font-bold uppercase block">Relevancia Estratégica:</span>
-                              <p className="text-slate-350 text-[11px] leading-relaxed italic">{guide.importance}</p>
-                            </div>
-                            <div className="space-y-1">
-                              <span className="text-[10px] text-[#38bdf8] font-bold uppercase block">Acción de Negocio Sugerida:</span>
-                              <p className="text-slate-200 text-[11px] leading-relaxed font-semibold">{guide.action}</p>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* RESULTS GRID */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="md:col-span-1 space-y-3">
-                           <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-3">
-                              <span className="text-[10px] text-sky-400 font-extrabold block uppercase tracking-widest leading-tight">Accesos Directos de IA:</span>
-                              <div className="space-y-2">
-                                <button type="button" onClick={() => { setSegGrowth('Crecieron'); setSegCategory('Todas'); }} className="w-full text-left p-2 rounded-lg bg-[#0a101e] hover:bg-slate-800 border border-slate-700 transition-colors">
-                                    <p className="text-[10px] font-bold text-white">📈 Premiar Crecimiento</p>
-                                    <p className="text-[9px] text-slate-500 italic">Veterinarios que aumentaron compras.</p>
-                                </button>
-                                <button type="button" onClick={() => { setSegGrowth('Dormidos'); setSegCategory('Todas'); }} className="w-full text-left p-2 rounded-lg bg-[#0a101e] hover:bg-slate-800 border border-slate-700 transition-colors">
-                                    <p className="text-[10px] font-bold text-white">💤 Rescatar Dormidos</p>
-                                    <p className="text-[9px] text-slate-500 italic">No han pedido nada en 2026.</p>
-                                </button>
-                                <button type="button" onClick={() => { setSegGrowth('Intranet / Sin Compras'); setSegCategory('Todas'); }} className="w-full text-left p-2 rounded-lg bg-[#0a101e] hover:bg-slate-800 border border-slate-700 transition-colors">
-                                    <p className="text-[10px] font-bold text-white">🔗 Activar Intranet</p>
-                                    <p className="text-[9px] text-slate-500 italic">Registrados sin compras reales.</p>
-                                </button>
-                              </div>
-                           </div>
-                           
-                           <div className="p-4 rounded-xl bg-indigo-900/10 border border-indigo-900/30 flex items-start gap-3">
-                              <CheckCircle className="w-4 h-4 text-emerald-500 mt-1 shrink-0" />
-                              <p className="text-[10px] text-indigo-300 leading-relaxed italic">
-                                Al seleccionar un segmento, éste se exporta automáticamente a las pestañas de <b>Redacción IA</b>, <b>WhatsApp</b> y <b>Email</b>.
-                              </p>
-                           </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Empatía / Apoyo</span>
+                          <span className="text-white font-mono">{evaluation.scoreTonoApoyo}%</span>
                         </div>
-
-                        <div className="md:col-span-3">
-                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-4">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="font-bold text-slate-400 text-[11px] uppercase">
-                                Clientes que califican en este segmento: <span className="text-[#38bdf8] font-black font-mono">{segmentedClients.length}</span>
-                              </span>
-                          {segmentedClients.length > 0 && (
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                setCampaignRecipients(segmentedClients);
-                                setCommsSubTab('whatsapp');
-                                alert(`Se han vinculado exitosamente ${segmentedClients.length} médicos para esta campaña masiva.`);
-                              }}
-                              className="px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 rounded-lg text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-lg animate-pulse"
-                            >
-                              <Send className="w-3.5 h-3.5" /> Vincular Segmento a Canal de Envío 📲💬
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="overflow-x-auto max-h-60">
-                          <table className="w-full text-[11px] text-left border-collapse">
-                            <thead>
-                              <tr className="border-b border-slate-800 text-slate-400 uppercase font-extrabold font-mono text-[9px]">
-                                <th className="p-2">Médico / Centro</th>
-                                <th className="p-2">Clínica</th>
-                                <th className="p-2 text-right">Compra 2025</th>
-                                <th className="p-2 text-right text-emerald-400">Compra 2026</th>
-                                <th className="p-2 text-center">Desviación</th>
-                                <th className="p-2 text-center">Estatus</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800">
-                              {segmentedClients.map(c => (
-                                <tr key={c.id} className="hover:bg-[#121c2e]">
-                                  <td className="p-2 font-bold text-slate-100">{c.name}</td>
-                                  <td className="p-2 text-slate-400">{c.clinica || '---'}</td>
-                                  <td className="p-2 text-right font-mono text-slate-350">${formatCLP(c.ventas?.v2025 || 0)}</td>
-                                  <td className="p-2 text-right font-mono text-emerald-400 font-extrabold">${formatCLP(c.ventas?.v2026 || 0)}</td>
-                                  <td className="p-2 text-center font-mono">
-                                    <span className={c.percentChange > 0 ? 'text-emerald-400' : c.percentChange < 0 ? 'text-rose-400' : 'text-slate-400'}>
-                                      {c.percentChange === 0 ? '0%' : `${c.percentChange > 0 ? '+' : ''}${(c.percentChange * 100).toFixed(0)}%`}
-                                    </span>
-                                  </td>
-                                  <td className="p-2 text-center">
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded ${
-                                      c.segmentGroup === 'crecer' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                      c.segmentGroup === 'riesgo_alto' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                                      'bg-slate-800 text-slate-300'
-                                    }`}>
-                                      {c.segmentGroup === 'crecer' ? 'Creció' : 
-                                       c.segmentGroup === 'riesgo_alto' ? 'Riesgo Alto' : 
-                                       c.segmentGroup === 'dormido' ? 'Dormido' : 'Estable'}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                              {segmentedClients.length === 0 && (
-                                <tr>
-                                  <td colSpan={6} className="p-6 text-center text-slate-500 italic">No hay registros que coincidan con la estrategia del filtro lógico establecido.</td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                          </div>
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500" style={{ width: `${evaluation.scoreTonoApoyo}%` }} />
                         </div>
                       </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Llamado Acción</span>
+                          <span className="text-white font-mono">{evaluation.scoreLlamadoAccion}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500" style={{ width: `${evaluation.scoreLlamadoAccion}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Efectividad General</span>
+                          <span className="text-white font-mono">{evaluation.scoreEfectividad}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-sky-450 bg-sky-400" style={{ width: `${evaluation.scoreEfectividad}%` }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Positive and Improvement bullet points */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2 border-t border-slate-800/60 text-[11px] leading-relaxed">
+                      <div className="space-y-1">
+                        <span className="text-emerald-400 font-extrabold flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> Puntos Fuertes:
+                        </span>
+                        <ul className="list-disc list-inside text-slate-350 space-y-0.5">
+                          {evaluation.positives.map((p, i) => <li key={i}>{p}</li>)}
+                        </ul>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-sky-400 font-extrabold flex items-center gap-1">
+                          <InfoIcon className="w-3.5 h-3.5" /> Aspectos Incorporados / Recomendaciones:
+                        </span>
+                        <ul className="list-disc list-inside text-slate-350 space-y-0.5">
+                          {evaluation.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Improve Message Action Center (Refine) */}
+                {messageText && (
+                  <div className="p-3 bg-[#090f1d] border border-slate-800 rounded-xl space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">¿Evaluar y Mejorar esta versión?</span>
+                    <div className="flex gap-2">
+                      <input
+                        id="improve_message_prompt_input"
+                        type="text"
+                        placeholder="Instrucciones ej: 'hazlo más cercano', 'menciona envíos gratis en la primera compra', 'ofrece 30 días de gracia'..."
+                        value={improvePrompt}
+                        onChange={(e) => setImprovePrompt(e.target.value)}
+                        className="flex-1 bg-[#070b16] border border-slate-850 text-slate-200 px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-sky-500/40 placeholder-slate-600 transition-all"
+                      />
+                      <button
+                        id="improve_message_btn"
+                        onClick={() => handleGenerateOrImproveMessage(true)}
+                        disabled={isGenerating || !improvePrompt.trim()}
+                        className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all disabled:opacity-40"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Evaluar y Mejorar</span>
+                      </button>
                     </div>
                   </div>
                 )}
 
-                  {/* 1. WHATSAPP MASIVO SUBTAB */}
-                  {commsSubTab === 'whatsapp' && (
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400 font-bold block uppercase">🚀 Cola de Envío por WhatsApp ({campaignRecipients.length} clientes seleccionados)</span>
-                        {campaignRecipients.length > 0 && (
-                          <button 
-                            onClick={() => setCampaignRecipients([])}
-                            className="text-[10px] text-red-400 hover:underline cursor-pointer"
-                          >
-                            Vaciar lote seleccionado
-                          </button>
-                        )}
-                      </div>
+                {/* Dispatch & Send Action Block */}
+                {messageText && (
+                  <div className="pt-2 border-t border-slate-800/50 flex gap-3">
+                    {channel === 'whatsapp' ? (
+                      <button
+                        id="dispatch_whatsapp_btn"
+                        onClick={handleDispatchWhatsApp}
+                        className="flex-1 bg-[#25D366] hover:bg-[#20ba59] text-black font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/10 transition-all"
+                      >
+                        <MessageSquare className="w-4 h-4 fill-current" />
+                        <span>Enviar Mensaje por WhatsApp Directo</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        id="dispatch_email_btn"
+                        onClick={handleDispatchEmail}
+                        className="flex-1 bg-sky-500 hover:bg-sky-400 text-slate-900 font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-500/10 transition-all"
+                      >
+                        <Mail className="w-4 h-4" />
+                        <span>Copiar Mensaje y Abrir Correo</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
 
-                      {/* Checklist for B2B WhatsApp campaign process */}
-                      <div className="bg-[#101c31]/60 p-4 rounded-xl border border-slate-800">
-                        <span className="text-xs font-black text-sky-450 text-sky-400 block uppercase mb-3 text-left">📝 Asistente de Proceso de Campaña</span>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs text-left">
-                          <label className="flex items-center gap-2 bg-[#0a1122] p-2.5 rounded-lg border border-slate-800/80 cursor-pointer">
-                            <input type="checkbox" defaultChecked className="accent-indigo-500 rounded cursor-pointer" />
-                            <span className="text-slate-300 font-semibold font-sans">☑ abrir WhatsApp Web</span>
-                          </label>
-                          <label className="flex items-center gap-2 bg-[#0a1122] p-2.5 rounded-lg border border-slate-800/80 cursor-pointer">
-                            <input type="checkbox" defaultChecked className="accent-indigo-500 rounded cursor-pointer" />
-                            <span className="text-slate-300 font-semibold font-sans">☑ Copiar mensaje dinámico</span>
-                          </label>
-                          <label className="flex items-center gap-2 bg-[#0a1122] p-2.5 rounded-lg border border-slate-800/80 cursor-pointer">
-                            <input type="checkbox" defaultChecked className="accent-indigo-500 rounded cursor-pointer" />
-                            <span className="text-slate-300 font-semibold font-sans">☑ Registrar envío en Bitácora</span>
-                          </label>
-                        </div>
-                      </div>
+              </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Selector of Preset Templates for WA */}
-                        <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-4 text-left">
-                          <span className="text-xs font-bold text-sky-455 text-sky-400 block uppercase">💬 Seleccionar Plantilla Base</span>
-                          <div className="space-y-2">
-                            {Object.keys(PRESET_TEMPLATES).map((key) => (
-                              <button
-                                key={key}
-                                onClick={() => setMessageTemplate(PRESET_TEMPLATES[key])}
-                                className={`w-full text-left p-2.5 rounded-lg text-xs font-bold transition-all border ${messageTemplate === PRESET_TEMPLATES[key] ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/40' : 'bg-[#0b1324] text-slate-400 border-slate-800 hover:bg-[#121c2e]'}`}
-                              >
-                                {key.toUpperCase().replace('_', ' ')}
-                              </button>
-                            ))}
-                          </div>
+              {/* 3. COHESIVE HISTORIAL & MANUAL ACTIVITY LOG PANEL */}
+              <div id="unified_history_panel" className="pt-4 border-t border-slate-800/80 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Notebook className="w-4 h-4 text-sky-400" />
+                  <h3 className="text-xs font-extrabold text-white uppercase tracking-wider">Historial de Actividades & Notas</h3>
+                </div>
 
-                          <div className="space-y-1.5 text-xs">
-                            <label className="text-slate-400 font-bold block">Editar plantilla manual:</label>
-                            <textarea
-                              value={messageTemplate}
-                              onChange={(e) => setMessageTemplate(e.target.value)}
-                              rows={8}
-                              className="w-full bg-[#070d18] text-white text-xs border border-slate-700 rounded-lg p-2.5 font-sans focus:outline-none focus:border-indigo-500 leading-relaxed"
-                            />
-                          </div>
-                        </div>
+                {/* Add Custom Note block */}
+                <div className="flex gap-2">
+                  <textarea
+                    id="manual_note_textarea"
+                    rows={2}
+                    placeholder="Escriba un comentario o nota de seguimiento comercial para agregar al historial de este socio..."
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    className="flex-1 bg-[#070b16] border border-slate-850 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500/30 placeholder-slate-650 leading-relaxed resize-none font-sans"
+                  />
+                  <button
+                    id="add_note_btn"
+                    onClick={handleAddManualNote}
+                    disabled={!newNote.trim()}
+                    className="bg-[#111f38] hover:bg-[#1a2c4e] border border-slate-800 hover:border-slate-700 text-slate-300 font-bold px-4 py-2 rounded-xl text-xs transition-all disabled:opacity-40 self-end"
+                  >
+                    Anotar
+                  </button>
+                </div>
 
-                        {/* Interactive Queue lists */}
-                        <div className="lg:col-span-2 space-y-4">
-                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-3.5 text-left">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold text-slate-400 block uppercase font-mono">📥 Despacho Individual One-to-One</span>
-                              <span className="text-[10px] text-sky-400 font-black px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20">{campaignRecipients.length} en cola</span>
-                            </div>
-                            
-                            {campaignRecipients.length > 0 ? (
-                              <div className="space-y-4 max-h-[560px] overflow-y-auto divide-y divide-slate-800/60 pr-1">
-                                {campaignRecipients.map((recipient) => {
-                                  const ec = enrichedClients.find(item => item.id === recipient.id) || recipient;
-                                  const textWithVariables = aiGeneratedMessages[recipient.id] || replaceMessageVariables(messageTemplate, ec);
-                                  
-                                  const cleanPhone = (recipient.phone || '').replace(/\D/g, '');
-                                  const waUrl = `https://wa.me/${cleanPhone.startsWith('569') ? cleanPhone : '569' + cleanPhone.slice(-8)}?text=${encodeURIComponent(textWithVariables)}`;
-
-                                  // Handlers defined inside map to access ec/recipient/text
-                                  const handleCopyPostcard = async () => {
-                                    const canvas = document.createElement('canvas');
-                                    canvas.width = 1000;
-                                    canvas.height = 1200;
-                                    const ctx = canvas.getContext('2d');
-                                    if (!ctx) return;
-
-                                    // BG Gradient
-                                    const grad = ctx.createLinearGradient(0, 0, 1000, 1200);
-                                    grad.addColorStop(0, '#0f172a');
-                                    grad.addColorStop(1, '#020617');
-                                    ctx.fillStyle = grad;
-                                    ctx.fillRect(0, 0, 1000, 1200);
-
-                                    // Decorative circles
-                                    const catName = ec?.categoria || '';
-                                    const themeColor = catName.includes('Platinum') ? '#a855f7' : catName.includes('Oro') ? '#fbbf24' : '#38bdf8';
-                                    ctx.globalAlpha = 0.1;
-                                    ctx.fillStyle = themeColor;
-                                    ctx.beginPath(); ctx.arc(1000, 0, 600, 0, Math.PI*2); ctx.fill();
-                                    ctx.beginPath(); ctx.arc(0, 1200, 400, 0, Math.PI*2); ctx.fill();
-                                    ctx.globalAlpha = 1;
-
-                                    // Border
-                                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-                                    ctx.lineWidth = 20;
-                                    ctx.strokeRect(10, 10, 980, 1180);
-
-                                    // Title
-                                    ctx.fillStyle = '#FFFFFF';
-                                    ctx.font = 'bold 60px sans-serif';
-                                    ctx.fillText('CIMASUR CHILE', 60, 120);
-                                    ctx.font = '300 30px sans-serif';
-                                    ctx.fillText('CLUB DE FIDELIZACIÓN MÉDICA', 60, 170);
-
-                                    // Name Card
-                                    const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
-                                      ctx.beginPath();
-                                      // Native support check (modern browsers)
-                                      if ((ctx as any).roundRect) {
-                                        (ctx as any).roundRect(x, y, w, h, r);
-                                      } else {
-                                        // Standard manual path polyfill
-                                        ctx.moveTo(x + r, y);
-                                        ctx.arcTo(x + w, y, x + w, y + h, r);
-                                        ctx.arcTo(x + w, y + h, x, y + h, r);
-                                        ctx.arcTo(x, y + h, x, y, r);
-                                        ctx.arcTo(x, y, x + w, y, r);
-                                        ctx.closePath();
-                                      }
-                                    };
-
-                                    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-                                    drawRoundedRect(60, 250, 880, 250, 40);
-                                    ctx.fill();
-
-                                    ctx.fillStyle = '#FFFFFF';
-                                    ctx.font = 'bold 50px sans-serif';
-                                    ctx.fillText((ec?.name || '').toUpperCase(), 110, 350);
-                                    ctx.font = '400 30px sans-serif';
-                                    ctx.fillStyle = '#94a3b8';
-                                    ctx.fillText(ec?.clinica || 'Centro Veterinario', 110, 410);
-
-                                    // Tier Badge
-                                    ctx.fillStyle = themeColor;
-                                    drawRoundedRect(110, 440, 350, 45, 10);
-                                    ctx.fill();
-                                    ctx.fillStyle = '#101b33';
-                                    ctx.font = 'bold 22px sans-serif';
-                                    ctx.textAlign = 'center';
-                                    ctx.fillText(`CATEGORÍA: ${(ec?.categoria || '').toUpperCase()}`, 285, 471);
-                                    ctx.textAlign = 'left';
-
-                                    // Benefits section
-                                    ctx.fillStyle = '#FFFFFF';
-                                    ctx.font = 'bold 45px sans-serif';
-                                    ctx.fillText('RESUMEN DE BENEFICIOS', 60, 600);
-                                    
-                                    ctx.fillStyle = 'rgba(255,255,255,0.03)';
-                                    drawRoundedRect(60, 650, 880, 350, 40);
-                                    ctx.fill();
-
-                                    ctx.fillStyle = themeColor;
-                                    ctx.font = 'bold 30px sans-serif';
-                                    ctx.fillText('ESTATUS ACTUAL:', 100, 720);
-                                    ctx.fillStyle = '#FFFFFF';
-                                    ctx.font = 'italic 35px sans-serif';
-                                    ctx.fillText(ec.calculatedTier?.primaryBenefit || 'Beneficios generales', 100, 780);
-
-                                    // Sales Progress
-                                    ctx.fillStyle = '#94a3b8';
-                                    ctx.font = 'bold 25px sans-serif';
-                                    ctx.fillText('VENTA CICLO 2026', 100, 880);
-                                    ctx.fillStyle = '#FFFFFF';
-                                    ctx.font = 'bold 40px sans-serif';
-                                    ctx.textAlign = 'right';
-                                    ctx.fillText(`$${formatCLP(ec.ventas?.v2026 || 0)}`, 900, 880);
-                                    ctx.textAlign = 'left';
-
-                                    // Footer text
-                                    ctx.fillStyle = '#475569';
-                                    ctx.font = '18px sans-serif';
-                                    ctx.textAlign = 'center';
-                                    ctx.fillText(`Documento Digital CIMASUR - Enviado por ${execConfig.nombre}`, 500, 1120);
-
-                                    canvas.toBlob(async (blob) => {
-                                      if (!blob) return;
-                                      try {
-                                        const data = [new ClipboardItem({ 'image/png': blob })];
-                                        await navigator.clipboard.write(data);
-                                        alert("✅ ¡Imagen de fidelización CIMASUR copiada!\n\nPresiona [Ctrl+V] ahora mismo en tu chat de WhatsApp para adjuntarla.");
-                                      } catch (err) {
-                                        const link = document.createElement('a');
-                                        link.download = `Cimasur_${ec.name.replace(/\s/g, '_')}.png`;
-                                        link.href = canvas.toDataURL();
-                                        link.click();
-                                        alert("⚠️ Imagen descargada. Adjúntala manualmente en WhatsApp.");
-                                      }
-                                    });
-                                  };
-
-                                  const handleSendWAIndividual = async () => {
-                                    if (!cleanPhone || cleanPhone.length < 8) {
-                                      alert("Teléfono inválido para enviar WhatsApp.");
-                                      return;
-                                    }
-                                    await navigator.clipboard.writeText(textWithVariables);
-                                    const today = new Date().toLocaleDateString('es-CL');
-                                    await localDB.updateInCollection('contacts', recipient.id, {
-                                      ultimoWhatsapp: today,
-                                      ultimaCampania: "Envío Individual"
-                                    });
-                                    window.dispatchEvent(new Event('db-change'));
-                                    window.open(waUrl, '_blank');
-                                  };
-
-                                  const hasWhatsapp = cleanPhone && cleanPhone.length >= 8;
-
-                                  return (
-                                    <div key={recipient.id} className="pt-4 first:pt-0 pb-1 flex flex-col gap-3 group">
-                                      <div className="flex justify-between items-start">
-                                        <div className="min-w-0">
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-black text-white text-sm tracking-tight">{recipient.name}</span>
-                                            <span className={`text-[8px] px-1.5 py-0.5 rounded border font-mono font-bold ${
-                                              ec.categoria.includes('Platinum') ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                                              ec.categoria.includes('Oro') ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                              'bg-slate-800 text-slate-400 border-slate-700'
-                                            }`}>
-                                              {ec.categoria}
-                                            </span>
-                                          </div>
-                                          <p className="text-slate-500 text-[10px] font-medium mt-0.5">{recipient.clinica || 'Sin clínica'} — {recipient.phone || '---'}</p>
-                                        </div>
-                                        <div className="flex gap-1.5">
-                                          <button 
-                                            onClick={handleCopyPostcard}
-                                            className="p-2 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-lg transition-all border border-slate-700 active:scale-95 shadow-sm"
-                                            title="Generar y Copiar Imagen (Ficha)"
-                                          >
-                                            <Image className="w-3.5 h-3.5" />
-                                          </button>
-                                          <button 
-                                            onClick={handleSendWAIndividual}
-                                            className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all shadow-md shadow-emerald-950/20 active:scale-95"
-                                            title="Copiar Texto y WhatsApp"
-                                          >
-                                            <Send className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                      <div className="relative">
-                                        <div className="text-xs text-slate-300 leading-relaxed font-sans bg-[#0a101e] p-3 rounded-xl border border-slate-800/50 max-h-32 overflow-y-auto whitespace-pre-line group-hover:border-indigo-500/30 transition-colors">
-                                          {textWithVariables}
-                                        </div>
-                                        <button 
-                                          onClick={async () => {
-                                            try {
-                                              const response = await fetch('/api/ai/generate-support-message', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                  clientName: recipient.name,
-                                                  categoria: ec.categoria,
-                                                  clinica: recipient.clinica,
-                                                  type: 'soporte comercial'
-                                                })
-                                              });
-                                              if (!response.ok) throw new Error("Error en servidor AI");
-                                              const data = await response.json();
-                                              if (data.message) {
-                                                setAiGeneratedMessages(prev => ({...prev, [recipient.id]: data.message}));
-                                              }
-                                            } catch (err) {
-                                              console.error("AI Error:", err);
-                                              alert("No se pudo generar el mensaje con IA en este momento.");
-                                            }
-                                          }}
-                                          className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-black/60 rounded-lg text-[9px] text-sky-400 font-bold backdrop-blur-sm transition-all flex items-center gap-1"
-                                        >
-                                          <RotateCcw className="w-2.5 h-2.5" /> Regenerar
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <div className="text-center p-12 text-slate-500 italic text-xs bg-[#0b1220] rounded-lg">
-                                No hay destinatarios seleccionados. Vaya a "1. Segmentación IA" para cargar su base.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 2. EMAILING MASIVO SUBTAB */}
-                  {commsSubTab === 'email' && (
-                    <div className="space-y-6">
-                      <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 text-left space-y-4">
-                        <div className="flex justify-between items-center text-xs">
-                           <span className="text-xs font-bold text-sky-400 block uppercase">📧 Sistema de Envío por Correo Electrónico (SMTP o Mailto)</span>
-                           <div className="flex items-center gap-3">
-                             <button 
-                               onClick={handleSendMassiveEmail}
-                               disabled={isSendingBatchEmails || campaignRecipients.length === 0}
-                               className={`px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1.5 transition-all ${isSendingBatchEmails ? 'bg-slate-700 text-slate-500' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 active:scale-95'}`}
-                             >
-                               {isSendingBatchEmails ? (
-                                 <>
-                                   <RotateCcw className="w-3 h-3 animate-spin" />
-                                   Despachando...
-                                 </>
-                               ) : (
-                                 <>
-                                   <Send className="w-3 h-3" />
-                                   🚀 Despachar Todo el Lote por SMTP
-                                 </>
-                               )}
-                             </button>
-                             <button type="button" onClick={() => setCommsSubTab('config')} className="text-sky-400 hover:underline flex items-center gap-1 font-bold">
-                                <Settings className="w-3 h-3" /> Configurar SMTP
-                             </button>
-                           </div>
-                        </div>
-                        <p className="text-xs text-slate-400 mb-2">Para garantizar la entregabilidad directa, este sistema abre las plantillas directamente en el cliente de correo de tu preferencia utilizando tus credenciales configuradas, y luego registra en la base de datos local que realizaste el envío.</p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        
-                        <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-4 text-left">
-                          <span className="text-xs font-bold text-indigo-400 block uppercase">📬 Configuración de Campaña Email</span>
-                          
-                          <div className="space-y-3.5 text-xs">
-                            <div className="bg-[#0a101e] p-3 rounded-lg border border-slate-800 text-[11px]">
-                              <div className="flex justify-between font-bold">
-                                <span className="text-slate-400">Destinatarios Seleccionados:</span>
-                                <span className="text-emerald-400 font-mono font-black">{campaignRecipients.length} médicos</span>
-                              </div>
-                            </div>
-                            
-                            {campaignRecipients.length === 0 && (
-                              <div className="bg-slate-800/50 p-2 rounded text-[10.5px] text-slate-400 text-center">
-                                Carga un lote en la pestaña de Segmentación.
-                              </div>
-                            )}
-
-                            <div className="space-y-1">
-                              <label className="text-slate-400 block font-bold">Asunto Personalizado:</label>
-                              <input 
-                                type="text"
-                                defaultValue="Comunicaciones Oficiales CIMASUR"
-                                id="campaign_email_subject"
-                                className="w-full bg-[#0d1527] px-3 py-1.5 rounded-lg border border-slate-700 text-white text-xs"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-slate-400 block font-bold">Plantilla Base Sugerida:</label>
-                              <select 
-                                onChange={(e) => setMessageTemplate(PRESET_TEMPLATES[e.target.value] || PRESET_TEMPLATES['oficial_cimasur'])}
-                                className="w-full bg-[#0a101e] px-2.5 py-2 rounded-xl text-xs border border-slate-700 text-white"
-                              >
-                                <option value="oficial_cimasur">PLANTILLA OFICIAL CIMASUR</option>
-                                <option value="activo">COMUNICADO SOCIO ACTIVO</option>
-                                <option value="crecio">FELICITACIONES DE ASCENSO</option>
-                                <option value="estable">SOCIO ESTABLE Y FIEL</option>
-                                <option value="disminuyo">ALERTA DE CAÍDA Y GRACIA</option>
-                                <option value="dormido">RECUPERACIÓN REINCORPORACIÓN</option>
-                                <option value="riesgo_alto">RIESGO CRÍTICO DE FUGA</option>
-                                <option value="induccion_intranet">INDUCCIÓN INTRANET / PROSPECTO</option>
-                              </select>
-                            </div>
-                            
-                            <div className="space-y-1 pt-2">
-                              <label className="text-slate-400 block font-bold">Cuerpo del Mensaje (con variables):</label>
-                              <textarea
-                                value={messageTemplate}
-                                onChange={(e) => setMessageTemplate(e.target.value)}
-                                rows={8}
-                                className="w-full bg-[#070d18] text-white text-xs border border-slate-700 rounded-lg p-2.5 font-sans focus:outline-none focus:border-indigo-500 leading-relaxed"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Direct Sending Queue */}
-                        <div className="md:col-span-2 space-y-4">
-                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-3.5 text-left">
-                            <span className="text-xs font-bold text-slate-400 block uppercase">📥 Bandeja de Intervención One-to-One</span>
-                            <p className="text-[10px] text-slate-500">Puedes generar un mensaje con IA o utilizar la plantilla seleccionada para iniciar el envío desde tu gestor de correo predeterminado (Outlook, Mail, etc).</p>
-                            
-                            {campaignRecipients.length > 0 ? (
-                              <div className="space-y-3 max-h-[500px] overflow-y-auto divide-y divide-slate-800 pr-1">
-                                {campaignRecipients.map((recipient) => {
-                                  const ec = enrichedClients.find(item => item.id === recipient.id) || recipient;
-                                  const textWithVariables = aiGeneratedMessages[recipient.id] || replaceMessageVariables(messageTemplate, ec);
-                                  
-                                  const handleLogEmailSent = async () => {
-                                    const today = new Date().toLocaleDateString('es-CL');
-                                    const subject = (document.getElementById('campaign_email_subject') as HTMLInputElement)?.value || 'CIMASUR';
-                                    await localDB.updateInCollection('contacts', recipient.id, {
-                                      ultimoCorreo: today,
-                                      ultimaCampania: "Correo electrónico manual"
-                                    });
-                                    const auditLog = `\n[Email Directo Enviado ${today}]\nAsunto: ${subject}\n\n"${textWithVariables.substring(0, 150)}..."`;
-                                    await localDB.updateInCollection('contacts', recipient.id, {
-                                      historialUnificado: (ec.historialUnificado || '') + auditLog
-                                    });
-                                    window.dispatchEvent(new Event('db-change'));
-                                  };
-
-                                  return (
-                                    <div key={recipient.id} className="pt-3.5 first:pt-0 flex flex-col gap-2">
-                                      <div className="flex justify-between items-start">
-                                        <div>
-                                          <div className="font-extrabold text-white text-sm">{recipient.name}</div>
-                                          <p className="text-slate-400 text-[11px] font-medium">{recipient.clinica} — {recipient.email || 'Sin correo asociado'}</p>
-                                        </div>
-                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#101c31] text-indigo-400 border border-indigo-500/20 font-mono">
-                                          {ec.categoria}
-                                        </span>
-                                      </div>
-                                      
-                                      <div className="text-xs text-slate-350 leading-relaxed font-serif whitespace-pre-line pl-1 border-l-2 border-slate-700 h-20 overflow-y-auto">
-                                        {textWithVariables}
-                                      </div>
-
-                                      <div className="flex items-center justify-end gap-2 mt-1">
-                                        {!recipient.email ? (
-                                          <span className="text-[10px] text-red-400 font-bold">Falta dirección de correo</span>
-                                        ) : (
-                                          <>
-                                            <button 
-                                              onClick={handleLogEmailSent}
-                                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition-all text-[10px] cursor-pointer"
-                                            >
-                                              ☑ Solo registrar en Ficha
-                                            </button>
-                                            <a 
-                                              href={`mailto:${recipient.email}?subject=${encodeURIComponent((document.getElementById('campaign_email_subject') as HTMLInputElement)?.value || 'Comunicaciones Oficiales CIMASUR')}&body=${encodeURIComponent(textWithVariables)}`}
-                                              onClick={handleLogEmailSent}
-                                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-950/20 text-xs shrink-0"
-                                            >
-                                              <Mail className="w-3.5 h-3.5" />
-                                              <span>Abrir Cliente de Correo</span>
-                                            </a>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <div className="text-center p-12 text-slate-500 italic text-xs bg-[#0b1220] rounded-lg">
-                                No hay destinatarios seleccionados. Vaya a "1. Segmentación IA" o use su Cartera para cargar a los médicos de la campaña.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 2. REDACCIÓN IA Y REVISIÓN */}
-                  {commsSubTab === 'templates' && (
-                    <div className="space-y-6 text-left animate-fadeIn">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        
-                        {/* Left Prompts list */}
-                        <div className="space-y-4">
-                          <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-3">
-                            <span className="text-[10px] text-slate-400 font-extrabold block uppercase tracking-wider">Generador IA (Estilos de Mensaje)</span>
-                            <p className="text-[11px] text-slate-400 leading-normal">
-                              La IA redactará instantáneamente mensajes personalizados para los {segmentedClients.length} veterinarios segmentados.
-                            </p>
-                            
-                            <div className="space-y-2 pt-2">
-                              <button type="button" onClick={()=>handleGenerateAIBatch('Crear mensaje de Fidelización reconociendo que está comprando activamente. Debe incluir su nivel de ventas actual.')} className="w-full text-left bg-indigo-600 hover:bg-indigo-500 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
-                                🤖 Generar Fidelización (Socios Activos)
-                              </button>
-                              <button type="button" onClick={()=>handleGenerateAIBatch('Crear mensaje de felicitación por crecimiento en sus volúmenes de compra respecto al año pasado. Felicitarlo sinceramente.')} className="w-full text-left bg-sky-600 hover:bg-sky-500 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
-                                📈 Generar Reconocimiento (Crecimiento)
-                              </button>
-                              <button type="button" onClick={()=>handleGenerateAIBatch('Crear alerta suave porque sus compras han disminuido en el presente año. Invitar a retomar pidiendo sus magistrales con un enganche sutil.')} className="w-full text-left bg-rose-600 hover:bg-rose-500 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
-                                🚨 Generar Alerta (Reducción)
-                              </button>
-                              <button type="button" onClick={()=>handleGenerateAIBatch('Mensaje de rescate de cliente dormido con 0 compras este año. Muy persuasivo, ofrecer asesoramiento y reactivar sus ganas de prescribir.')} className="w-full text-left bg-slate-700 hover:bg-slate-600 px-3 py-2 text-[11px] rounded-lg font-bold text-white shadow block cursor-pointer transition-colors" disabled={isGeneratingBatch}>
-                                💤 Generar Rescate (Dormidos)
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Real-time Parsed Previews */}
-                        <div className="md:col-span-3 space-y-4">
-                          <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4 space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold text-sky-400 block uppercase">✨ Bandeja de Mensajes Listos ({segmentedClients.length})</span>
-                              <span className="text-[10px] text-slate-400">Mensajes adaptados individualmente por IA. Sin variables a la vista.</span>
-                            </div>
-
-                            {segmentedClients.length === 0 ? (
-                              <div className="text-center p-12 text-slate-500 italic text-xs bg-[#0a101e] rounded-xl">
-                                Seleccione un filtro en "1. Segmentación IA" para generar mensajes.
-                              </div>
-                            ) : isGeneratingBatch ? (
-                              <div className="text-center p-12 bg-[#0a101e] rounded-xl flex flex-col items-center justify-center space-y-3">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400"></div>
-                                <span className="text-xs text-indigo-300 font-bold font-mono">El Motor Gemini está redactando mensajes personalizados...</span>
-                              </div>
-                            ) : (
-                              <div className="h-96 pr-2 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-                                {segmentedClients.map(c => {
-                                  const finalMsg = aiGeneratedMessages[c.id] || replaceMessageVariables(messageTemplate, c);
-                                  return (
-                                    <div key={c.id} className="bg-[#0a101e] p-3 rounded-lg border border-slate-700 flex flex-col gap-2 relative group hover:border-sky-500 transition-colors">
-                                      <div className="flex justify-between items-start">
-                                        <div className="font-bold text-slate-200 text-xs">Mensaje para: <span className="text-indigo-300">{c.name}</span> <span className="text-slate-500 font-normal">({c.clinica || 'Sin clínica'})</span></div>
-                                        <div className="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-slate-700 font-mono">
-                                          Lista para envío automático
-                                        </div>
-                                      </div>
-                                      <div className="text-xs text-slate-350 leading-relaxed font-serif whitespace-pre-line pl-1 border-l-2 border-indigo-500/30">
-                                        {finalMsg}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                          </div>
-                        </div>
-
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3. GENERADOR GRÁFICO */}
-                  {commsSubTab === 'image_gen' && (
-                    <div className="space-y-6 text-left animate-fadeIn">
-                      <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 space-y-4">
-                        <span className="text-xs font-bold text-sky-400 block uppercase">🎨 Generador Gráfico Personalizado</span>
-                        <p className="text-[11px] text-slate-400 leading-normal">
-                          Aquí puedes visualizar tarjetas de resumen de nivel con los colores y montos exactos de la categoría actual de cada cliente segmentado. Utiliza estas piezas gráficas capturando la pantalla (Screenshot) para enviarlas como imagen adjunta vía WhatsApp o Correo.
-                        </p>
-                        
-                        {segmentedClients.length === 0 ? (
-                           <div className="text-center p-12 text-slate-500 italic text-xs bg-[#0a101e] rounded-xl border border-slate-800">
-                             Por favor filtra tu base en la pestaña "1. Segmentación IA" para generar gráficas.
-                           </div>
-                        ) : (
-                          <div className="space-y-8">
-                            <div className="flex flex-wrap gap-6 pt-4 justify-center">
-                              {segmentedClients.slice(0, 8).map(c => {
-                                const ec = enrichedClients.find(i => i.id === c.id) || c;
-                                const tierInfo = ec.calculatedTier;
-                                const nextTierInfo = ec.nextTier;
-                                const v2026 = ec.ventas?.v2026 || 0;
-                                const gap = nextTierInfo ? Math.max(0, nextTierInfo.min - v2026) : 0;
-                                const theme = {
-                                  0: { bg: '#475569', primary: '#cbd5e1' },
-                                  1: { bg: '#92400e', primary: '#fcd34d' },
-                                  2: { bg: '#475569', primary: '#f1f5f9' },
-                                  3: { bg: '#b45309', primary: '#fef08a' },
-                                  4: { bg: '#581c87', primary: '#d8b4fe' }
-                                }[tierInfo?.index || 0] || { bg: '#475569', primary: '#cbd5e1' };
-
-                                return (
-                                  <div key={c.id} id={`postcard-${c.id}`} className="relative w-80 h-[480px] rounded-3xl overflow-hidden shrink-0 shadow-2xl transition-all hover:scale-[1.02] group" style={{ background: `linear-gradient(160deg, ${theme.bg} 0%, #000 100%)` }}>
-                                    <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
-                                    <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent"></div>
-                                    
-                                    {/* Cimasur branding premium */}
-                                    <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-10">
-                                      <div className="flex items-center gap-1.5">
-                                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center font-black text-[12px] text-black">C</div>
-                                        <div className="font-black text-white tracking-[0.2em] text-[10px] uppercase">CIMASUR</div>
-                                      </div>
-                                      <div className="bg-white/10 backdrop-blur-md px-2 py-0.5 rounded border border-white/10 text-[9px] font-black text-white">
-                                         2026/27
-                                      </div>
-                                    </div>
-
-                                    <div className="px-6 pt-20 flex flex-col items-center text-center space-y-5 z-10 relative">
-                                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/5 backdrop-blur-xl border border-white/20 shadow-inner group-hover:rotate-12 transition-transform duration-500">
-                                         <Award className="w-8 h-8 text-white" />
-                                      </div>
-                                      
-                                      <div className="space-y-1">
-                                        <h4 className="text-[9px] font-black text-indigo-400 tracking-[0.3em] uppercase">Membresía Exclusiva</h4>
-                                        <h2 className="text-xl font-black text-white leading-tight uppercase tracking-tight">{c.name}</h2>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{c.clinica}</p>
-                                      </div>
-
-                                      <div className="py-2.5 px-6 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md shadow-lg">
-                                         <span className="text-sm font-black tracking-[0.15em] uppercase" style={{ color: theme.primary }}>{tierInfo?.name}</span>
-                                      </div>
-
-                                      <div className="w-full pt-2 space-y-4">
-                                         <div className="bg-black/30 p-3 rounded-2xl border border-white/5 space-y-1">
-                                            <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest block">Actividad Anual</span>
-                                            <span className="text-lg font-mono font-black text-white">${formatCLP(v2026)}</span>
-                                         </div>
-
-                                         {nextTierInfo ? (
-                                           <div className="space-y-2 px-1">
-                                              <div className="flex justify-between text-[8px] text-slate-400 font-black uppercase tracking-widest">
-                                                 <span>Progreso de Nivel</span>
-                                                 <span className="text-white">{Math.min(100, Math.floor((v2026 / nextTierInfo.min) * 100))}%</span>
-                                              </div>
-                                              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                                 <div className="h-full bg-white transition-all duration-1000" style={{ width: `${Math.min(100, (v2026 / nextTierInfo.min) * 100)}%`, backgroundColor: theme.primary }}></div>
-                                              </div>
-                                              <div className="bg-white/5 p-2 rounded-lg border border-white/5">
-                                                <p className="text-[8px] text-slate-300 font-bold leading-tight">💎 {nextTierInfo.primaryBenefit}</p>
-                                              </div>
-                                           </div>
-                                         ) : (
-                                           <div className="py-3 px-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
-                                              <p className="text-[10px] text-emerald-400 font-black uppercase leading-tight">Estatus CIMASUR Platino</p>
-                                              <p className="text-[8px] text-emerald-500/80 font-bold">Máximo beneficio comercial alcanzado</p>
-                                           </div>
-                                         )}
-                                      </div>
-                                    </div>
-
-                                    <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-1 opacity-60">
-                                       <div className="w-8 h-0.5 bg-white/20 rounded-full"></div>
-                                       <div className="text-[7px] text-slate-500 font-mono tracking-widest uppercase">Verificado • {c.id.substring(0,8).toUpperCase()}</div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            
-                            {segmentedClients.length > 8 && (
-                              <div className="text-center py-4">
-                                <p className="text-xs text-slate-500 italic">Mostrando los primeros 8 veterinarios. Ajusta los filtros para ver otros grupos.</p>
-                              </div>
-                            )}
-
-                            <div className="max-w-xl mx-auto p-4 rounded-2xl bg-indigo-900/10 border border-indigo-900/30 flex items-start gap-4">
-                               <Sparkles className="w-5 h-5 text-indigo-400 mt-1 shrink-0" />
-                               <div className="space-y-1">
-                                  <p className="text-xs font-bold text-indigo-100">Consejo de CIMASUR:</p>
-                                  <p className="text-[11px] text-indigo-300/80 leading-relaxed">
-                                    Haz una captura de pantalla de estas tarjetas para enviarlas por WhatsApp. Es la forma más efectiva de captar la atención de los médicos sobre su progreso comercial y beneficios exclusivos.
-                                  </p>
-                               </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 4. CONFIGURACIÓN COMERCIAL SUBTAB */}
-                  {commsSubTab === 'config' && (
-                    <div className="bg-[#101b33] p-5 rounded-xl border border-slate-800 space-y-4 text-left">
-                      <div className="border-b border-slate-800 pb-2">
-                        <h4 className="text-sm font-black text-white flex items-center gap-1.5">
-                          <Sliders className="w-4 h-4 text-[#38bdf8]" /> Configuración Comercial del Asesor
-                        </h4>
-                        <p className="text-[11px] text-slate-400">Permite parametrizar las firmas automáticas y las vías de contacto preestablecidas de todos tus correos y WhatsApps magistrales.</p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                        <div className="space-y-1">
-                          <label className="text-slate-400 block font-bold">Nombre Ejecutivo Comercial:</label>
-                          <input 
-                            type="text" 
-                            value={execConfig.nombre} 
-                            onChange={(e) => handleSaveExecConfig({ ...execConfig, nombre: e.target.value })} 
-                            className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-semibold focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-slate-400 block font-bold">Cargo / Rol Comercial:</label>
-                          <input 
-                            type="text" 
-                            value={execConfig.cargo} 
-                            onChange={(e) => handleSaveExecConfig({ ...execConfig, cargo: e.target.value })} 
-                            className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-semibold focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-slate-400 block font-bold">Correo Electrónico de Contacto comercial:</label>
-                          <input 
-                            type="email" 
-                            value={execConfig.correo} 
-                            onChange={(e) => handleSaveExecConfig({ ...execConfig, correo: e.target.value })} 
-                            className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-semibold focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-slate-400 block font-bold">Número de WhatsApp (+56):</label>
-                          <input 
-                            type="text" 
-                            value={execConfig.whatsapp} 
-                            onChange={(e) => handleSaveExecConfig({ ...execConfig, whatsapp: e.target.value })} 
-                            className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-semibold focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="md:col-span-2 space-y-1">
-                          <label className="text-slate-400 block font-bold">Firma del Remitente (Pie de mensaje):</label>
-                          <textarea 
-                            value={execConfig.firma} 
-                            onChange={(e) => handleSaveExecConfig({ ...execConfig, firma: e.target.value })} 
-                            rows={3}
-                            className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-sans focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="md:col-span-2 mt-4 space-y-4 pt-4 border-t border-slate-800">
-                          <div className="flex items-center gap-2">
-                             <Mail className="w-4 h-4 text-emerald-400" />
-                             <span className="text-xs font-black text-slate-200 uppercase tracking-widest">Configuración SMTP Propio (Emailing Real)</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Servidor SMTP:</label>
-                              <input 
-                                type="text" 
-                                value={execConfig.smtpServer} 
-                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpServer: e.target.value })} 
-                                placeholder="smtp.ejemplo.com"
-                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Puerto:</label>
-                              <input 
-                                type="text" 
-                                value={execConfig.smtpPort} 
-                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpPort: e.target.value })} 
-                                placeholder="587"
-                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Usuario SMTP:</label>
-                              <input 
-                                type="text" 
-                                value={execConfig.smtpUser} 
-                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpUser: e.target.value })} 
-                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-slate-500 block font-bold text-[10px] uppercase">Contraseña:</label>
-                              <input 
-                                type="password" 
-                                value={execConfig.smtpPass} 
-                                onChange={(e) => handleSaveExecConfig({ ...execConfig, smtpPass: e.target.value })} 
-                                className="w-full bg-[#0a101e] px-3.5 py-2 rounded-xl text-xs border border-slate-700 text-white font-mono focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="p-3 rounded-lg bg-emerald-900/10 border border-emerald-900/30 flex items-start gap-3">
-                            <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
-                            <p className="text-[10px] text-emerald-400/80 leading-relaxed italic">
-                              CIMASUR utiliza estos parámetros para establecer una conexión segura TLS/SSL y despachar los correos electrónicos 
-                              usando su propio dominio institucional. Esto garantiza la máxima tasa de entrega (Delivery Rate) y profesionalismo.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 flex justify-end">
-                        <button 
-                          onClick={() => {
-                            alert("Configuración Comercial Jaime González - CIMASUR grabada de manera correcta en el panel.");
-                          }}
-                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl cursor-pointer"
-                        >
-                          Guardar Configuración Comercial 💾
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 5. HISTORIAL DE ENVÍOS SUBTAB */}
-                  {commsSubTab === 'history' && (
-                    <div className="bg-[#101b33] p-4 rounded-xl border border-slate-800 text-left space-y-3">
-                      <span className="text-xs font-bold text-slate-400 block uppercase">📜 Historial de Despachos Recientes y Campañas Registradas</span>
+                {/* Interactive Notes Feed */}
+                <div className="bg-[#070b16] rounded-xl border border-slate-850 p-3 h-[180px] overflow-y-auto space-y-2.5 custom-scrollbar text-[11px] leading-relaxed">
+                  {selectedClient.historialUnificado ? (
+                    selectedClient.historialUnificado.split('\n').map((line, idx) => {
+                      if (!line.trim()) return null;
                       
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-300">
-                          <thead>
-                            <tr className="border-b border-slate-800 text-slate-500 uppercase font-extrabold text-[10px] font-mono">
-                              <th className="pb-2.5">Socio Destinatario</th>
-                              <th className="pb-2.5">Establecimiento</th>
-                              <th className="pb-2.5">Último WhatsApp</th>
-                              <th className="pb-2.5">Último Correo</th>
-                              <th className="pb-2.5">Campaña / Asunto</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800/60 font-medium">
-                            {enrichedClients.slice(0, 15).map(c => (
-                              <tr key={c.id} className="hover:bg-slate-900/10">
-                                <td className="py-2.5 font-bold text-white">{c.name}</td>
-                                <td className="py-2.5 text-slate-400 text-[11px]">{c.clinica || '---'}</td>
-                                <td className="py-2.5 font-mono text-emerald-400">{c.ultimoWhatsapp || 'No enviado'}</td>
-                                <td className="py-2.5 font-mono text-sky-400">{c.ultimoCorreo || 'No enviado'}</td>
-                                <td className="py-2.5">
-                                  {c.ultimaCampania ? (
-                                    <span className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded text-[9.5px]">
-                                      {c.ultimaCampania}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-500 italic text-[10px]">Sin campaña</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      // Highlight dates and categories beautifully
+                      const dateMatch = line.match(/^\[(.*?)\]/);
+                      const displayDate = dateMatch ? dateMatch[1] : '';
+                      const contentText = displayDate ? line.replace(`[${displayDate}]:`, '') : line;
+
+                      return (
+                        <div key={idx} className="p-2.5 rounded-lg bg-[#0d162d]/85 border border-slate-800/40 text-slate-300">
+                          {displayDate && (
+                            <span className="text-[10px] text-sky-400 font-mono font-bold block mb-1">
+                              {displayDate}
+                            </span>
+                          )}
+                          <p className="font-sans whitespace-pre-wrap">{contentText.trim()}</p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-600 text-center">
+                      <Notebook className="w-6 h-6 text-slate-700 mb-1" />
+                      <span>No hay registros históricos en este socio comercial. Las campañas de WhatsApp y correo que envíe se registrarán aquí automáticamente.</span>
                     </div>
                   )}
-
                 </div>
-              )}
+              </div>
 
-
-
-
-              {/* ----------------- SUBTAB 8: COMMERCIAL OPPORTUNITIES ----------------- */}
-              {activeTab === 'opportunities' && (
-                <div className="space-y-6">
-                  
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                    <div>
-                      <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                        <Lightbulb className="w-5 h-5 text-sky-400" /> Oportunidades Comerciales & Alertas Algorítmicas
-                      </h2>
-                      <p className="text-xs text-slate-400">Análisis proactivo de brechas de nivel, caídas por ciclo y recomendaciones comerciales automáticas</p>
-                    </div>
-                  </div>
-
-                  {/* MAIN ALERTS TABLE */}
-                  <div className="bg-[#0f172a] rounded-xl border border-slate-800 overflow-hidden">
-                    <div className="p-4 bg-[#10192e] border-b border-slate-800">
-                      <span className="text-xs font-bold uppercase text-slate-400">Disparadores del Ciclo anual vigente</span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-800 text-slate-400 uppercase font-bold text-[9px] font-mono">
-                            <th className="p-3">Cliente Veterinario</th>
-                            <th className="p-3">Facturación 2026</th>
-                            <th className="p-3">Diferencia Comercial</th>
-                            <th className="p-3">Brecha Próxima Categoría</th>
-                            <th className="p-3">Acción Sugerida</th>
-                            <th className="p-3">Campaña Recomendada</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800">
-                          {enrichedClients.map(c => {
-                            // Suggest CRM Actions
-                            let suggestedAction = 'Fidelizar estatus normal';
-                            let campaignRec = 'Comunicado técnico';
-                            let subColor = 'text-slate-300';
-
-                            if (c.isPerdidos) {
-                              suggestedAction = 'Recuperación prioritaria de cuenta inactiva';
-                              campaignRec = 'CampañaVIP de Retorno';
-                              subColor = 'text-red-400 font-bold';
-                            } else if (c.isDormidos) {
-                              suggestedAction = 'Reactivar con estatus Platinum promocional inmediato';
-                              campaignRec = 'Recuperación de Cliente Dormido';
-                              subColor = 'text-amber-400 font-bold';
-                            } else if (c.isRiesgoAlto) {
-                              suggestedAction = 'Llamado consultivo o plazo de gracia ampliado';
-                              campaignRec = 'Alerta de Riesgo - Grace Period';
-                              subColor = 'text-rose-500 font-bold';
-                            } else if (c.isProximoAscenso) {
-                              suggestedAction = `Promocionar compra de recetas para subir a ${c.nextTier?.name}`;
-                              campaignRec = 'Invitación de Ascenso Magistral';
-                              subColor = 'text-emerald-400 font-bold';
-                            } else if (c.isProximoDescenso) {
-                              suggestedAction = `Alertar peligro marginal de perder nivel ${c.calculatedTier.name}`;
-                              campaignRec = 'Notificación de gracia y resguardo';
-                              subColor = 'text-yellow-400';
-                            }
-
-                            return (
-                              <tr key={c.id} className="hover:bg-slate-800/40">
-                                <td className="p-3">
-                                  <span className="font-bold block text-white">{c.name}</span>
-                                  <span className="text-[10px] text-slate-500 block">{c.clinica}</span>
-                                </td>
-                                <td className="p-3 font-mono font-bold text-slate-200">${formatCLP(c.ventas?.v2026 || 0)}</td>
-                                <td className="p-3 font-mono">
-                                  <span className={c.percentChange >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-450 text-rose-400'}>
-                                    {c.percentChange >= 0 ? `+` : ''}${formatCLP((c.ventas?.v2026 || 0) - (c.ventas?.v2025 || 0))}
-                                  </span>
-                                </td>
-                                <td className="p-3 font-mono">
-                                  {c.brechaAscenso > 0 ? (
-                                    <span className="text-yellow-400">${formatCLP(c.brechaAscenso)}</span>
-                                  ) : (
-                                    <span className="text-slate-500">Nivel Máximo</span>
-                                  )}
-                                </td>
-                                <td className={`p-3 text-[11px] ${subColor}`}>
-                                  {suggestedAction}
-                                </td>
-                                <td className="p-3 text-[11px] text-sky-400">
-                                  <button
-                                    onClick={() => {
-                                      setCampaignRecipients([c]);
-                                      let tempKey = 'activo';
-                                      if (c.isPerdidos) tempKey = 'perdido';
-                                      else if (c.isDormidos) tempKey = 'dormido';
-                                      else if (c.isRiesgoAlto) tempKey = 'riesgo_alto';
-                                      else if (c.isProximoAscenso) tempKey = 'crecio';
-                                      else if (c.isProximoDescenso) tempKey = 'disminuyo';
-                                      
-                                      setMessageTemplate(PRESET_TEMPLATES[tempKey]);
-                                      setActiveTab('campaigns');
-                                      alert(`Copiaste la plantilla recomendada de "${campaignRec}" para el cliente ${c.name}.`);
-                                    }}
-                                    className="px-2.5 py-1 bg-slate-800 text-sky-400 hover:bg-slate-705 hover:bg-[#1a2b4b] rounded text-[10px] font-bold tracking-tight transition-colors cursor-pointer"
-                                  >
-                                    Cargar Campaña 💬
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-            </motion.div>
-          </AnimatePresence>
+            </div>
+          )}
         </div>
 
       </div>
+      )}
 
-      {/* SALES IMPORT MODAL OVERLAY */}
-      {showSalesImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0e192f] border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-            
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-[#122240]">
-              <div className="flex items-center gap-3 text-left">
-                <FileText className="w-5 h-5 text-emerald-400" />
-                <div>
-                  <h3 className="text-sm font-black text-white">Importador Inteligente de Ventas Anuales</h3>
-                  <p className="text-[11px] text-slate-400">Pega datos desde Excel o CSV para sincronizar las compras de tus clientes</p>
+      {activeTab === 'masivo' && (
+        /* 3. CAMPAÑAS MASIVAS WORKSPACE (MASIVO) */
+        <div id="bulk_campaigns_workspace" className="grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans">
+          
+          {/* LEFT PANEL: RECIPIENT MANAGER (SPAN 4) */}
+          <div className="lg:col-span-4 bg-[#0d162d] border border-sky-500/10 p-5 rounded-2xl flex flex-col h-[850px]">
+            <div className="space-y-3 mb-4 shrink-0">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4 text-sky-400" />
+                  <span>Destinatarios ({selectedCampaignClientIds.length}/{criticalClients.length})</span>
+                </h2>
+                <span className="text-[10px] text-red-400 font-bold bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
+                  Filtro Crítico Activo
+                </span>
+              </div>
+              
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Seleccione de forma quirúrgica a qué socios desea dirigir la campaña masiva. Por defecto todos los socios con alertas están pre-seleccionados.
+              </p>
+
+              {/* Quick Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar por Nombre, RUT o Clínica..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#070b16] border border-slate-800 text-slate-200 pl-9 pr-3 py-2 rounded-xl text-xs focus:outline-none focus:border-sky-500/50 placeholder-slate-650"
+                />
+              </div>
+
+              {/* Toggle actions */}
+              <div className="flex justify-between items-center text-[10px] pt-1 border-t border-slate-800/40">
+                <span className="text-slate-500">Selección Rápida:</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSelectAllCampaignClients}
+                    className="text-sky-400 font-bold hover:underline"
+                  >
+                    Seleccionar Todos
+                  </button>
+                  <span className="text-slate-700">|</span>
+                  <button
+                    onClick={handleSelectNoneCampaignClients}
+                    className="text-sky-500 font-bold hover:underline hover:text-slate-450"
+                  >
+                    Ninguno
+                  </button>
                 </div>
               </div>
-              <button 
-                onClick={() => {
-                  setShowSalesImportModal(false);
-                  setSalesImportText('');
-                  setSalesImportResults(null);
-                }}
-                className="text-slate-400 hover:text-white text-xs px-2.5 py-1.5 bg-[#0b1324] rounded-lg border border-slate-800 cursor-pointer"
+            </div>
+
+            {/* Scrollable Recipient List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {filteredClients.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-850 bg-[#090f1d]/40 rounded-xl">
+                  <Users className="w-8 h-8 text-slate-700 mb-2" />
+                  <span className="text-xs text-slate-500 font-bold">No se encontraron socios</span>
+                </div>
+              ) : (
+                filteredClients.map((client) => {
+                  const isChecked = selectedCampaignClientIds.includes(client.id);
+                  const changePct = client.percentChange * 100;
+                  
+                  return (
+                    <div
+                      key={client.id}
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedCampaignClientIds(selectedCampaignClientIds.filter(id => id !== client.id));
+                        } else {
+                          setSelectedCampaignClientIds([...selectedCampaignClientIds, client.id]);
+                        }
+                      }}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex gap-3 items-start ${isChecked ? 'bg-sky-500/5 border-sky-500/35' : 'bg-[#090f1d] border-slate-850/70 hover:border-slate-800'}`}
+                    >
+                      {/* Checkbox input */}
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}} // Handled by outer container click
+                        className="mt-1 h-3.5 w-3.5 accent-sky-500 cursor-pointer rounded border-slate-800 bg-[#070b16] text-sky-500"
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start gap-1">
+                          <span className="text-xs font-bold text-white truncate block">
+                            {client.name}
+                          </span>
+                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded shrink-0 border uppercase leading-none ${client.statusColor}`}>
+                            {client.statusKey}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-450 block truncate font-medium">
+                          {client.clinica}
+                        </span>
+
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-400 mt-1.5">
+                          <Award className="w-3 h-3 text-yellow-500 shrink-0" />
+                          <span>Categoría 2026: <strong className="text-white">{client.calculatedTier?.name || 'Socio'}</strong></span>
+                        </div>
+
+                        {/* Drop indicators */}
+                        <div className="flex justify-between items-center text-[9px] mt-1.5 pt-1.5 border-t border-slate-850/40 text-slate-500">
+                          <span>Ref 2025: <strong className="text-slate-350">{formatCLP(client.ventas?.v2025 || 0)}</strong></span>
+                          <span className="text-rose-400 font-extrabold font-mono shrink-0 bg-rose-500/10 px-1 py-0.5 rounded leading-none">
+                            {changePct.toFixed(0)}% Var.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Selected stats summary footer */}
+            <div className="mt-4 p-3 bg-[#070b16] border border-slate-850 rounded-xl shrink-0">
+              <span className="text-[9px] uppercase font-bold text-slate-500 block">Resumen de Destinatarios</span>
+              <div className="flex justify-between items-center mt-1.5">
+                <span className="text-xs text-slate-300">Socios Seleccionados:</span>
+                <span className="text-sm font-mono font-black text-white">{selectedCampaignClientIds.length} / {criticalClients.length}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT PANEL: EMAIL CAMPAIGN DESKTOP ENGINE (SPAN 8) */}
+          <div className="lg:col-span-8 space-y-6 max-h-[850px] overflow-y-auto pr-1 custom-scrollbar">
+            
+            {/* COPILOTO DE MARKETING IA CONVERSACIONAL */}
+            <div className="bg-[#090f1d] border border-sky-500/20 p-5 rounded-2xl space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-indigo-500/15 p-2 rounded-xl border border-indigo-500/30">
+                  <MessageSquare className="w-4 h-4 text-sky-400 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>Chat Copiloto de Marketing IA CIMASUR 💬</span>
+                    <span className="text-[9px] bg-sky-500/20 text-sky-400 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse">En Tiempo Real</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-450">
+                    Sintoniza los copys masivos conversando con la IA. Las plantillas se actualizan instantáneamente abajo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Chat history list */}
+              <div className="bg-[#070b16] rounded-xl border border-slate-800 p-4 h-[240px] overflow-y-auto space-y-3 custom-scrollbar text-xs leading-relaxed">
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`p-3.5 rounded-2xl max-w-[85%] font-sans ${msg.sender === 'user' ? 'bg-sky-500 text-slate-900 font-bold rounded-tr-none' : 'bg-[#0d162d] border border-slate-800 text-slate-350 rounded-tl-none'}`}>
+                      <strong className={`block text-[9px] uppercase tracking-wider mb-1 ${msg.sender === 'user' ? 'text-slate-800' : 'text-sky-400'}`}>
+                        {msg.sender === 'user' ? 'Tú (Administrador)' : 'Copiloto de Marketing IA'}
+                      </strong>
+                      <p className="whitespace-pre-wrap text-slate-300 font-medium">{msg.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input section with attachment and previews */}
+              <div className="space-y-3.5">
+                {uploadedImageB64 && (
+                  <div className="flex items-center gap-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 animate-fadeIn">
+                    <div className="relative w-11 h-11 rounded-lg overflow-hidden border border-slate-700 bg-black shrink-0">
+                      <img src={uploadedImageB64} alt="Diseño de campaña" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={handleClearUploadedImage}
+                        className="absolute top-0.5 right-0.5 bg-red-600/90 hover:bg-red-700 text-white w-4 h-4 rounded-full flex items-center justify-center font-bold text-[8px]"
+                        title="Eliminar imagen"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0 text-[11px]">
+                      <span className="font-bold text-white block truncate">{uploadedFileName}</span>
+                      <span className="text-slate-400 block font-medium">Diseño cargado. Dile a la IA qué ajustar (ej: "cambia la fecha de recalificación") y envía.</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2.5">
+                  <label className="bg-[#070b16] hover:bg-slate-850 text-slate-400 hover:text-white p-3 rounded-xl cursor-pointer transition-all flex items-center justify-center shrink-0 border border-slate-800" title="Subir imagen/diseño de campaña">
+                    <Paperclip className="w-4 h-4" />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload} 
+                      className="hidden" 
+                    />
+                  </label>
+
+                  <input
+                    type="text"
+                    placeholder={uploadedImageB64 ? "Dile a la IA qué cambiar en este diseño..." : "Dile a la IA qué mejorar (ej: 'agrega una prórroga de recalificación de aquí a junio de 2026')..."}
+                    value={userChatMessage}
+                    onChange={(e) => setUserChatMessage(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSendChatMessage(); }}
+                    className="flex-1 bg-[#070b16] border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50"
+                  />
+                  <button
+                    onClick={handleSendChatMessage}
+                    disabled={isSendingChatMessage || (!userChatMessage.trim() && !uploadedImageB64)}
+                    className="bg-sky-500 hover:bg-sky-450 disabled:opacity-45 text-slate-900 font-black px-5 py-3 rounded-xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-sky-500/10 shrink-0"
+                  >
+                    {isSendingChatMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    <span>Enviar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* SECTION 1: IA CAMPAIGN LOGIC GENERATOR */}
+            <div className="bg-[#0d162d] border border-sky-500/15 p-5 rounded-2xl space-y-4 animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <div className="bg-sky-500/15 p-1.5 rounded-lg border border-sky-500/20">
+                  <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">Diseñador de Copys de Campaña con Inteligencia Artificial (Gemini)</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Defina el objetivo estratégico de recuperación para que la IA unificada sintonice el texto y el diseño gráfico perfectos.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block">Objetivo Comercial de la Campaña</label>
+                  <select
+                    value={campaignObjective}
+                    onChange={(e) => setCampaignObjective(e.target.value)}
+                    className="w-full bg-[#070b16] border border-slate-800 text-slate-350 px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-sky-500/40"
+                  >
+                    <option value="reactivacion_gracia">Plazo de Gracia Especial (30 Días de Beneficios con Var. Caída)</option>
+                    <option value="alianza_comercial">Alianza Preferencial CIMASUR (Análisis de Categoría 2026)</option>
+                    <option value="descuento_excepcional">Descuento del 15% Excepcional en la Próxima Reposición</option>
+                    <option value="nueva_linea">Invitación a Testeo Sin Costo de la Nueva Línea de Alérgenos</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block">Instrucciones Adicionales para la IA (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 'usa un tono cercano y médico', 'menciona despacho gratis'..."
+                    value={campaignPrompt}
+                    onChange={(e) => setCampaignPrompt(e.target.value)}
+                    className="w-full bg-[#070b16] border border-slate-800 text-slate-350 px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-sky-500/40"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleGenerateGroupCampaignIA}
+                disabled={isGeneratingBulk || selectedCampaignClientIds.length === 0}
+                className="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-extrabold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
-                ✕ Cerrar
+                {isGeneratingBulk ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Gemini analizando objetivos, redactando y configurando diseño gráfico...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>⚡ Generar Propuesta de Redacción con IA para el Grupo Seleccionado</span>
+                  </>
+                )}
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+            {/* TABBED INTERACTION INTERFACE: EMAIL VIEW, WHATSAPP VIEW, CONFIG */}
+            <div className="bg-[#0d162d] border border-slate-800/80 rounded-2xl overflow-hidden flex flex-col animate-fadeIn">
               
-              {/* Instructions */}
-              <div className="bg-sky-500/10 border border-sky-500/25 p-3.5 rounded-xl text-xs space-y-2 leading-relaxed text-sky-200 text-left">
-                <p className="font-bold flex items-center gap-1">
-                  💡 ¿Cómo funciona la importación de ventas?
-                </p>
-                <ol className="list-decimal list-inside space-y-1 text-[11px] text-sky-300">
-                  <li>Copia tus columnas directamente desde Excel o Sheets.</li>
-                  <li>Las columnas deben contener el <strong className="text-white">RUT</strong> del cliente, seguido de las ventas de cada año.</li>
-                  <li>Solo se actualizarán los años en donde hayas mapeado una columna. Los años en <strong className="text-white">"Ninguna"</strong> conservarán su valor histórico.</li>
-                  <li>Usa los selectores inferiores para mapear el número de columna correspondiente a cada dato.</li>
-                </ol>
+              {/* Internal Tab Header */}
+              <div className="bg-[#090f1d] border-b border-slate-850 p-2.5 flex flex-wrap gap-2 items-center justify-between">
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setPreviewTab('email')}
+                    className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all ${previewTab === 'email' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/25' : 'text-slate-400 hover:text-slate-250 border border-transparent'}`}
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>✉ DISEÑO DE CORREO GRÁFICO (HTML)</span>
+                  </button>
+                  <button
+                    onClick={() => setPreviewTab('whatsapp')}
+                    className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all ${previewTab === 'whatsapp' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' : 'text-slate-400 hover:text-slate-250 border border-transparent'}`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>💬 DISEÑO DE MENSAJE WHATSAPP</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setPreviewTab('config')}
+                  className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all ${previewTab === 'config' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/25' : 'text-slate-400 hover:text-slate-250 border border-transparent'}`}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>⚙ SMTP & AJUSTES VISUALES</span>
+                </button>
               </div>
 
-              {/* Paste Textarea */}
-              <div className="space-y-1.5 text-left">
-                <label className="text-xs text-slate-350 font-bold block">Pega el contenido tabulado de tu planilla aquí:</label>
-                <textarea
-                  value={salesImportText}
-                  onChange={(e) => setSalesImportText(e.target.value)}
-                  placeholder="Ejemplo con años múltiples (RUT / 2024 / 2025 / 2026):&#10;12.345.678-9&#9;1200000&#9;2300000&#9;3500000&#10;&#10;Ejemplo con un solo año (RUT / Venta):&#10;9.876.543-2&#9;450000"
-                  className="w-full h-32 bg-[#090f1d] p-3 rounded-xl border border-slate-705 text-xs text-white resize-none font-mono focus:outline-none focus:border-sky-500 placeholder-slate-600 focus:ring-1 focus:ring-sky-500"
-                ></textarea>
-              </div>
+              {/* Tab Contents */}
+              <div className="p-5 space-y-5">
+                
+                {/* 1. EMAIL CAMPAIGN TAB */}
+                {previewTab === 'email' && (
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+                    
+                    {/* Left Column: Email Subject & Template Editor */}
+                    <div className="xl:col-span-5 space-y-4 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Asunto de Campaña Masiva</label>
+                          <input
+                            type="text"
+                            value={bulkEmailSubject}
+                            onChange={(e) => setBulkEmailSubject(e.target.value)}
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-bold focus:outline-none focus:border-sky-500/40"
+                          />
+                        </div>
 
-              {salesImportText.trim() && (
-                <div className="space-y-4 text-left">
-                  
-                  {/* Column Configuration Selector */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#111f38] p-3 rounded-xl border border-slate-800">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-bold block">Columna RUT:</label>
-                      <select 
-                        value={colMapping.rutIdx} 
-                        onChange={(e) => setColMapping(prev => ({ ...prev, rutIdx: Number(e.target.value) }))}
-                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
-                      >
-                        <option value={0}>Columna 1</option>
-                        <option value={1}>Columna 2</option>
-                        <option value={2}>Columna 3</option>
-                        <option value={3}>Columna 4</option>
-                        <option value={4}>Columna 5</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-bold block">Ventas 2024:</label>
-                      <select 
-                        value={colMapping.v2024Idx} 
-                        onChange={(e) => setColMapping(prev => ({ ...prev, v2024Idx: Number(e.target.value) }))}
-                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
-                      >
-                        <option value={-1}>Ninguna (Queda en 0)</option>
-                        <option value={0}>Columna 1</option>
-                        <option value={1}>Columna 2</option>
-                        <option value={2}>Columna 3</option>
-                        <option value={3}>Columna 4</option>
-                        <option value={4}>Columna 5</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-bold block">Ventas 2025:</label>
-                      <select 
-                        value={colMapping.v2025Idx} 
-                        onChange={(e) => setColMapping(prev => ({ ...prev, v2025Idx: Number(e.target.value) }))}
-                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
-                      >
-                        <option value={-1}>Ninguna (Queda en 0)</option>
-                        <option value={0}>Columna 1</option>
-                        <option value={1}>Columna 2</option>
-                        <option value={2}>Columna 3</option>
-                        <option value={3}>Columna 4</option>
-                        <option value={4}>Columna 5</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-emerald-400 font-bold block">Ventas 2026 (Actual cierre):</label>
-                      <select 
-                        value={colMapping.v2026Idx} 
-                        onChange={(e) => setColMapping(prev => ({ ...prev, v2026Idx: Number(e.target.value) }))}
-                        className="w-full bg-[#0a101e] border border-slate-700 text-xs px-2 py-1.5 rounded-lg text-white"
-                      >
-                        <option value={-1}>Ninguna (Queda en 0)</option>
-                        <option value={0}>Columna 1</option>
-                        <option value={1}>Columna 2</option>
-                        <option value={2}>Columna 3</option>
-                        <option value={3}>Columna 4</option>
-                        <option value={4}>Columna 5</option>
-                      </select>
-                    </div>
-                  </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Cuerpo del Correo (Formato HTML)</label>
+                          <textarea
+                            rows={11}
+                            value={bulkEmailText}
+                            onChange={(e) => setBulkEmailText(e.target.value)}
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 p-3.5 rounded-xl text-xs font-mono focus:outline-none focus:border-sky-500/30 leading-relaxed resize-none"
+                          />
+                        </div>
 
-                  {/* Live Parsed Preview */}
-                  {salesImportResults && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-slate-355 text-slate-300 flex items-center gap-1">
-                          📋 Vista previa interpretada ({salesImportResults.totalRows} filas detectadas)
-                        </span>
-                        <div className="flex items-center gap-4 text-[11px] font-mono">
-                          <span className="text-emerald-400">✓ Encontrados en DB: {salesImportResults.matched}</span>
-                          <span className="text-slate-450 text-slate-400">✗ No Encontrados: {salesImportResults.unmatched}</span>
+                        <div className="p-3 bg-sky-950/20 border border-sky-500/10 rounded-xl text-[10px] leading-relaxed text-slate-400 font-medium">
+                          <strong className="text-white block mb-0.5">Autocompletado Dinámico de CIMASUR:</strong> Las etiquetas <span className="text-sky-400 font-bold">{"{{NOMBRE}}"}</span>, <span className="text-sky-400 font-bold">{"{{CLINICA}}"}</span>, <span className="text-sky-400 font-bold">{"{{CATEGORIA_2026}}"}</span> y <span className="text-sky-400 font-bold">{"{{BENEFICIO_PRINCIPAL}}"}</span> se inyectarán individualmente por cada socio de CIMASUR.
                         </div>
                       </div>
 
-                      {/* Preview Table */}
-                      <div className="bg-[#0b1324] border border-slate-800 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
-                        <table className="w-full text-left text-xs text-slate-300">
-                          <thead className="sticky top-0 bg-[#070b15] border-b border-slate-800 text-[10px] text-slate-400 uppercase font-bold">
-                            <tr>
-                              <th className="p-2.5">RUT Planilla</th>
-                              <th className="p-2.5">Socio Encontrado</th>
-                              <th className="p-2.5">Ciclo 2024</th>
-                              <th className="p-2.5">Ciclo 2025</th>
-                              <th className="p-2.5 text-emerald-400">Ciclo 2026</th>
-                              <th className="p-2.5 text-right">Estatus</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
-                            {salesImportResults.details.map((row, rIdx) => (
-                              <tr key={rIdx} className={row.found ? "hover:bg-slate-800/40" : "bg-rose-500/5 opacity-50 text-slate-500 hover:bg-rose-500/10"}>
-                                <td className="p-2.5">{row.rutOriginal || '---'}</td>
-                                <td className="p-2.5 font-sans">
-                                  {row.found ? (
-                                    <span className="text-slate-200 font-semibold">{row.clientName}</span>
-                                  ) : (
-                                    <span className="text-slate-500 italic">RUT no registrado</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5">${formatCLP(row.v2024 || 0)}</td>
-                                <td className="p-2.5">${formatCLP(row.v2025 || 0)}</td>
-                                <td className="p-2.5 text-emerald-400 font-extrabold">${formatCLP(row.v2026 || 0)}</td>
-                                <td className="p-2.5 text-right">
-                                  {row.found ? (
-                                    <span className="bg-emerald-500/10 text-emerald-400 text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/20">Vinculado</span>
-                                  ) : (
-                                    <span className="bg-slate-850 text-slate-450 text-[9px] px-1.5 py-0.5 rounded border border-slate-800">Ignorado</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      {/* Despatch trigger */}
+                      <button
+                        onClick={handleSendBulkEmailCampaign}
+                        disabled={isBulkSending || selectedCampaignClientIds.length === 0}
+                        className="w-full bg-sky-500 hover:bg-sky-400 text-slate-900 font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-40 shadow-lg shadow-sky-500/10 mt-4"
+                      >
+                        {isBulkSending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Despachando Correos Reales...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4" />
+                            <span>🚀 Iniciar Emailing Masivo Real ({selectedCampaignClientIds.length} Socios)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Right Column: High-fidelity Visual Preview */}
+                    <div className="xl:col-span-7 space-y-2">
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                        <span>Previsualización Gráfica para Socios</span>
+                        {selectedCampaignClientIds.length > 0 && (
+                          <span className="text-sky-400 font-extrabold">Vista de: {criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio Comercial'}</span>
+                        )}
+                      </div>
+
+                      {selectedCampaignClientIds.length === 0 ? (
+                        <div className="h-[430px] border border-dashed border-slate-800 rounded-xl bg-[#070b16]/50 flex flex-col items-center justify-center text-center p-6">
+                          <Mail className="w-8 h-8 text-slate-700 mb-2" />
+                          <span className="text-xs text-slate-500 font-bold">Seleccione al menos un destinatario a la izquierda para generar la vista previa del correo.</span>
+                        </div>
+                      ) : (
+                        <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950 flex flex-col h-[430px] shadow-2xl">
+                          {/* Emulated Outlook Toolbar */}
+                          <div className="bg-[#111827] border-b border-slate-850 p-2.5 flex items-center gap-2 text-[10px] text-slate-400 select-none shrink-0">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                            <span className="text-slate-500 ml-2">De:</span>
+                            <span className="text-sky-400 font-bold">CIMASUR Marketing &lt;marketing@cimasur.cl&gt;</span>
+                            <span className="text-slate-500 ml-2">|</span>
+                            <span className="text-slate-500">Asunto:</span>
+                            <span className="text-white font-bold truncate max-w-[200px]">{bulkEmailSubject}</span>
+                          </div>
+                          
+                          <div className="flex-1 bg-white">
+                            <iframe
+                              title="Live Email Graphic Preview"
+                              srcDoc={compileHtmlTemplate(
+                                criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0], 
+                                bulkEmailText, 
+                                designerAccentColor
+                              )}
+                              className="w-full h-full border-0 bg-white"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. WHATSAPP CAMPAIGN TAB */}
+                {previewTab === 'whatsapp' && (
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 animate-fadeIn">
+                    
+                    {/* Left Column: WhatsApp Text & Template Editor */}
+                    <div className="xl:col-span-5 space-y-4 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-[#25D366] uppercase tracking-wider block">Cuerpo del Mensaje WhatsApp</label>
+                          <textarea
+                            rows={12}
+                            value={bulkWhatsAppText}
+                            onChange={(e) => setBulkWhatsAppText(e.target.value)}
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 p-3.5 rounded-xl text-xs font-sans focus:outline-none focus:border-sky-500/30 leading-relaxed resize-none"
+                          />
+                        </div>
+
+                        <div className="p-3 bg-emerald-950/10 border border-emerald-900/15 rounded-xl text-[10px] leading-relaxed text-slate-400 font-medium">
+                          <strong className="text-white block mb-0.5">Padrón de WhatsApp:</strong> WhatsApp no autoriza despachos automáticos directos sin API de Meta corporativo. Por ello, CIMASUR le permite descargar un CSV estructurado listo para enviar por WAAM u otras herramientas locales, registrando el envío de forma inmediata en las fichas individuales de cada socio.
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleDownloadWhatsAppCSV}
+                        disabled={selectedCampaignClientIds.length === 0}
+                        className="w-full bg-[#25D366] hover:bg-[#1fbe58] text-black font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-40 shadow-lg shadow-emerald-500/10 mt-4"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>📥 Descargar CSV de Campaña para WhatsApp ({selectedCampaignClientIds.length} Socios)</span>
+                      </button>
+                    </div>
+
+                    {/* Right Column: High-fidelity WhatsApp Cellphone Mockup */}
+                    <div className="xl:col-span-7 space-y-2">
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                        <span>Simulación en Teléfono Móvil</span>
+                        {selectedCampaignClientIds.length > 0 && (
+                          <span className="text-emerald-400 font-extrabold">Mensaje para: {criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio'}</span>
+                        )}
+                      </div>
+
+                      {selectedCampaignClientIds.length === 0 ? (
+                        <div className="h-[430px] border border-dashed border-slate-800 rounded-xl bg-[#070b16]/50 flex flex-col items-center justify-center text-center p-6">
+                          <MessageSquare className="w-8 h-8 text-slate-700 mb-2" />
+                          <span className="text-xs text-slate-500 font-bold">Seleccione al menos un destinatario a la izquierda para generar la simulación de chat.</span>
+                        </div>
+                      ) : (
+                        <div className="h-[430px] max-w-[320px] mx-auto border-4 border-slate-700 rounded-[2.5rem] overflow-hidden bg-[#0b141a] flex flex-col shadow-2xl relative">
+                          {/* Phone Notch/Speaker */}
+                          <div className="absolute top-1 left-1/2 -translate-x-1/2 bg-slate-700 h-4 w-28 rounded-full z-20 flex items-center justify-center">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-900 mr-2" />
+                            <span className="w-8 h-1 rounded-full bg-slate-800" />
+                          </div>
+
+                          {/* WhatsApp Chat Header */}
+                          <div className="bg-[#075e54] pt-6 pb-2.5 px-4 text-white flex items-center gap-2.5 shrink-0 select-none z-10">
+                            <div className="w-8 h-8 rounded-full bg-[#128c7e] border border-[#25d366]/40 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
+                              {criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name.substring(0, 2) || 'SO'}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-extrabold block truncate leading-none mb-0.5">{criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio Comercial'}</span>
+                              <span className="text-[8.5px] text-[#25d366] font-bold block leading-none">En Línea</span>
+                            </div>
+                          </div>
+
+                          {/* WhatsApp Chat Area Background with grid */}
+                          <div className="flex-1 p-3 overflow-y-auto space-y-3 flex flex-col justify-end bg-[radial-gradient(#1e2428_1px,transparent_1px)] [background-size:16px_16px] relative">
+                            
+                            {/* Whatsapp Bubble */}
+                            <div className="bg-[#056162] text-slate-100 p-2.5 rounded-xl rounded-tr-none max-w-[90%] text-[10px] leading-relaxed self-end shadow border border-[#0b4e4f] relative">
+                              <div className="whitespace-pre-wrap font-sans font-medium">
+                                {(() => {
+                                  const targetClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                                  const changePct = (targetClient.percentChange || 0) * 100;
+                                  const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+                                  return bulkWhatsAppText
+                                    .replace(/\{\{NOMBRE\}\}/g, targetClient.name || 'Doctor/a')
+                                    .replace(/\{\{CLINICA\}\}/g, targetClient.clinica || 'Centro Clínico')
+                                    .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+                                    .replace(/\{\{CATEGORIA_2026\}\}/g, targetClient.calculatedTier?.name || 'Socio Especial')
+                                    .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, targetClient.calculatedTier?.primaryBenefit || 'Beneficios preferenciales');
+                                })()}
+                              </div>
+                              <span className="text-[7.5px] text-emerald-300 font-bold block text-right mt-1 font-mono">
+                                {new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} ✔✔
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Chat Footer Box */}
+                          <div className="bg-[#1e2428] p-2 flex items-center gap-1.5 shrink-0 select-none">
+                            <div className="flex-1 bg-[#2a2f32] h-7 rounded-full px-3 flex items-center justify-between text-slate-500 text-[9px]">
+                              <span>Mensaje de campaña...</span>
+                            </div>
+                            <div className="w-7 h-7 bg-[#00af9c] rounded-full flex items-center justify-center shadow">
+                              <Send className="w-3.5 h-3.5 text-white" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. SMTP CONFIGURATION AND GRAPHIC DESIGN SETTINGS TAB */}
+                {previewTab === 'config' && (
+                  <div className="space-y-6 animate-fadeIn">
+                    
+                    {/* SMTP Configuration Block */}
+                    <div className="p-5 bg-[#090f1d] border border-slate-800 rounded-xl space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800/60 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-yellow-500/15 p-1.5 rounded-lg border border-yellow-500/20">
+                            <Settings className="w-4 h-4 text-yellow-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Conexión de Salida SMTP Propia (Thunderbird)</h4>
+                            <p className="text-[10px] text-slate-450 mt-0.5">Su CRM se conecta de forma segura con su servidor institucional para envíos reales.</p>
+                          </div>
+                        </div>
+                        <div className="bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20 text-[8px] text-sky-400 font-extrabold uppercase tracking-widest">
+                          Encriptación Local Activa
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-slate-400">Servidor SMTP</label>
+                          <input
+                            type="text"
+                            value={smtpHost}
+                            onChange={(e) => setSmtpHost(e.target.value)}
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-3 py-2 rounded-xl focus:outline-none focus:border-sky-500/30 font-medium"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-slate-400">Puerto SMTP</label>
+                          <input
+                            type="text"
+                            value={smtpPort}
+                            onChange={(e) => setSmtpPort(e.target.value)}
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-3 py-2 rounded-xl focus:outline-none focus:border-sky-500/30 font-medium"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-slate-400">Nombre del Remitente</label>
+                          <input
+                            type="text"
+                            value={smtpSenderName}
+                            onChange={(e) => setSmtpSenderName(e.target.value)}
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-3 py-2 rounded-xl focus:outline-none focus:border-sky-500/30 font-medium"
+                          />
+                        </div>
+
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-[9px] font-black uppercase text-slate-400">Usuario Autenticación SMTP</label>
+                          <input
+                            type="email"
+                            value={smtpUser}
+                            onChange={(e) => setSmtpUser(e.target.value)}
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-3 py-2 rounded-xl focus:outline-none focus:border-sky-500/30 font-medium"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-slate-400">Contraseña SMTP</label>
+                          <div className="relative">
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Ingrese contraseña..."
+                              value={smtpPass}
+                              onChange={(e) => setSmtpPass(e.target.value)}
+                              className="w-full bg-[#070b16] border border-slate-800 text-slate-200 pl-3 pr-10 py-2 rounded-xl focus:outline-none focus:border-sky-500/30 font-medium text-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-2 text-slate-500 hover:text-slate-300 text-[10px] font-bold"
+                            >
+                              {showPassword ? "Ocultar" : "Mostrar"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Connection Test Block */}
+                      <div className="p-3.5 bg-[#070b16] border border-slate-850 rounded-xl space-y-2.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-450 block">🧪 Verificar Salida SMTP</span>
+                        <div className="flex gap-2.5">
+                          <input
+                            type="email"
+                            placeholder="Correo personal para test..."
+                            value={testEmailTarget}
+                            onChange={(e) => setTestEmailTarget(e.target.value)}
+                            className="flex-1 bg-[#090f1d] border border-slate-800 text-slate-200 px-3.5 py-1.5 rounded-xl text-xs focus:outline-none focus:border-sky-500/30 placeholder-slate-600"
+                          />
+                          <button
+                            onClick={handleTestSmtp}
+                            disabled={isTestingSmtp}
+                            className="bg-[#1e293b] hover:bg-[#334155] border border-slate-750 text-slate-200 font-extrabold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all disabled:opacity-50"
+                          >
+                            {isTestingSmtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                            <span>Probar SMTP</span>
+                          </button>
+                        </div>
+
+                        {testSmtpResult && (
+                          <div className={`p-2.5 rounded-lg border text-[11px] leading-relaxed font-medium ${testSmtpResult.success ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-400' : 'bg-red-950/20 border-red-900/40 text-red-400'}`}>
+                            {testSmtpResult.success ? '✔ ' : '❌ '} {testSmtpResult.message}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
 
+              {/* Console Logs & Progress Panel nested neatly in the box */}
+              {isBulkSending && (
+                <div className="p-4 mx-5 mb-5 bg-[#070b16] border border-slate-850 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                    <span>Progreso de despacho de campaña masiva</span>
+                    <span className="font-mono text-white animate-pulse">Procesando cola...</span>
+                  </div>
+                  <div className="h-2 bg-slate-850 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: '100%' }} />
+                  </div>
+                </div>
+              )}
+
+              {bulkResults.length > 0 && (
+                <div className="p-4 mx-5 mb-5 bg-[#070b16] border border-slate-850 rounded-xl space-y-3 shrink-0 text-xs">
+                  <div className="flex justify-between items-center font-bold text-white border-b border-slate-800 pb-1.5">
+                    <span>Resultados de Envío Masivo Corriente</span>
+                    <span className="text-[11px] text-emerald-400 font-extrabold font-mono">
+                      {bulkResults.filter(r => r.status === 'success').length} exitosos | {bulkResults.filter(r => r.status === 'error').length} fallidos
+                    </span>
+                  </div>
+
+                  <div className="max-h-[140px] overflow-y-auto space-y-2 pr-1 custom-scrollbar text-[11px]">
+                    {bulkResults.map((res, i) => (
+                      <div key={i} className="flex justify-between items-center p-2 rounded bg-[#0d162d] border border-slate-850/50">
+                        <div className="min-w-0 font-sans">
+                          <strong className="text-white block truncate">{res.name}</strong>
+                          <span className="text-slate-500 text-[10px] font-mono">{res.email}</span>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-2">
+                          {res.status === 'success' ? (
+                            <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded leading-none uppercase">Enviado</span>
+                          ) : (
+                            <div className="text-right">
+                              <span className="text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded leading-none uppercase">Error</span>
+                              <span className="block text-[8px] text-red-400 font-mono mt-0.5" title={res.error}>{res.error?.substring(0, 30)}...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-5 border-t border-slate-850 bg-[#0d162a] flex justify-between items-center text-left">
-              <span className="text-[11px] text-slate-400 italic font-medium">
-                {salesImportResults && salesImportResults.matched > 0 
-                  ? `Se actualizarán ${salesImportResults.matched} cuentas de socios. Los niveles VIP se re-calcularán según el año 2026.`
-                  : "Por favor, ingresa los datos de compras anuales con RUT correspondiente."
-                }
-              </span>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSalesImportModal(false);
-                    setSalesImportText('');
-                    setSalesImportResults(null);
-                  }}
-                  className="px-4 py-2 bg-slate-800 text-xs text-slate-300 font-bold hover:bg-slate-700 rounded-xl cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExecuteSalesImport}
-                  disabled={!salesImportResults || salesImportResults.matched === 0 || isSending}
-                  className={`px-5 py-2 text-xs font-black text-white rounded-xl shadow-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                    !salesImportResults || salesImportResults.matched === 0 || isSending
-                      ? "bg-slate-800 text-slate-500 cursor-not-allowed border-slate-750"
-                      : "bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-500/10"
-                  }`}
-                >
-                  {isSending ? (
-                    <>Cargando...</>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" /> Importar e Integrar Ventas
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
           </div>
+
         </div>
       )}
 
+        </div> {/* Right Column Workspace */}
+      </div> {/* Grid container */}
+
     </div>
+  );
+}
+
+// Small helper icon component
+function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </svg>
   );
 }
