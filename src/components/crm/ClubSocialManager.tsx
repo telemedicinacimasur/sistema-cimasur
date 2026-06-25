@@ -4,7 +4,7 @@ import {
   Search, Trash2, Edit3, Plus, ArrowUpRight, ArrowDownRight, Award, Check, 
   RotateCcw, Copy, CheckCircle, Save, Download, Mail, Phone, ExternalLink, 
   Calendar, MapPin, Notebook, MessageSquare, AlertTriangle, AlertCircle, TrendingUp, TrendingDown, Settings, Image,
-  Palette, Link as LinkIcon, Filter, Loader2, Paperclip
+  Palette, Link as LinkIcon, Filter, Loader2, Paperclip, Maximize2, X, Laptop, Smartphone, Tablet as TabletIcon, Code
 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -205,6 +205,9 @@ export function ClubSocialManager() {
 </html>`);
 
   // Image Upload states for campaign designer
+  const [isLargePreviewOpen, setIsLargePreviewOpen] = useState(false);
+  const [previewViewport, setPreviewViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [copiedHtmlTimer, setCopiedHtmlTimer] = useState(false);
   const [uploadedImageB64, setUploadedImageB64] = useState<string | null>(null);
   const [uploadedImageMime, setUploadedImageMime] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
@@ -395,6 +398,16 @@ export function ClubSocialManager() {
     loadData();
     window.addEventListener('db-change', loadData);
     return () => window.removeEventListener('db-change', loadData);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsLargePreviewOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Process all contacts into formatted club clients (including those in normal standing)
@@ -2784,15 +2797,25 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                         <div className="space-y-4">
                           <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950 flex flex-col h-[430px] shadow-2xl">
                             {/* Emulated Outlook Toolbar */}
-                            <div className="bg-[#111827] border-b border-slate-850 p-2.5 flex items-center gap-2 text-[10px] text-slate-400 select-none shrink-0">
-                              <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-                              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
-                              <span className="text-slate-500 ml-2">De:</span>
-                              <span className="text-sky-400 font-bold">CIMASUR Marketing &lt;marketing@cimasur.cl&gt;</span>
-                              <span className="text-slate-500 ml-2">|</span>
-                              <span className="text-slate-500">Asunto:</span>
-                              <span className="text-white font-bold truncate max-w-[200px]">{bulkEmailSubject}</span>
+                            <div className="bg-[#111827] border-b border-slate-850 p-2 flex items-center justify-between text-[10px] text-slate-400 select-none shrink-0">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                                <span className="text-slate-500 ml-2 shrink-0">De:</span>
+                                <span className="text-sky-400 font-bold shrink-0">CIMASUR Marketing</span>
+                                <span className="text-slate-500 shrink-0">|</span>
+                                <span className="text-slate-500 shrink-0">Asunto:</span>
+                                <span className="text-white font-bold truncate max-w-[120px] md:max-w-[200px]">{bulkEmailSubject}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setIsLargePreviewOpen(true)}
+                                className="flex items-center gap-1 px-2.5 py-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold rounded-md text-[9px] uppercase tracking-wider transition-all duration-200 cursor-pointer shadow hover:shadow-sky-500/10 active:scale-95 shrink-0"
+                              >
+                                <Maximize2 className="w-2.5 h-2.5" />
+                                <span>Previsualizar en grande</span>
+                              </button>
                             </div>
                             
                             <div className="flex-1 bg-white">
@@ -3368,6 +3391,255 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
         </div> {/* Right Column Workspace */}
       </div> {/* Grid container */}
 
+      <AnimatePresence>
+        {isLargePreviewOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[9999] flex flex-col p-4 md:p-6 text-slate-200"
+          >
+            {/* Modal Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-sky-500/10 rounded-xl border border-sky-500/20 text-sky-400">
+                  <Maximize2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Previsualización Expandida de Campaña</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Inspeccione el correo diseñado tal como lo recibirán los veterinarios socios de CIMASUR.
+                  </p>
+                </div>
+              </div>
+
+              {/* Viewport Segmented Control and Copier */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Viewport toggles */}
+                <div className="bg-[#091022] border border-slate-800 rounded-lg p-0.5 flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewViewport('desktop')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all cursor-pointer ${previewViewport === 'desktop' ? 'bg-sky-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                    title="Vista de Escritorio (Widescreen)"
+                  >
+                    <Laptop className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Escritorio</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewViewport('tablet')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all cursor-pointer ${previewViewport === 'tablet' ? 'bg-sky-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                    title="Vista de Tablet"
+                  >
+                    <TabletIcon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Tablet</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewViewport('mobile')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all cursor-pointer ${previewViewport === 'mobile' ? 'bg-sky-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                    title="Vista Móvil"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Móvil</span>
+                  </button>
+                </div>
+
+                {/* Copy Compiled HTML Code Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const activeClientForCode = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                    const fullHtml = compileHtmlTemplate(activeClientForCode, bulkEmailText, designerAccentColor);
+                    navigator.clipboard.writeText(fullHtml);
+                    setCopiedHtmlTimer(true);
+                    setTimeout(() => setCopiedHtmlTimer(false), 2000);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black uppercase rounded-lg shadow-lg hover:shadow-emerald-500/10 active:scale-95 transition-all cursor-pointer"
+                >
+                  {copiedHtmlTimer ? <Check className="w-3.5 h-3.5 animate-bounce" /> : <Code className="w-3.5 h-3.5" />}
+                  <span>{copiedHtmlTimer ? '¡Copiado!' : 'Copiar HTML'}</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsLargePreviewOpen(false)}
+                  className="flex items-center justify-center p-2 bg-slate-800 hover:bg-slate-700 hover:text-white text-slate-400 rounded-lg transition-colors cursor-pointer"
+                  title="Cerrar Previsualización"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Workspace */}
+            <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 overflow-hidden">
+              
+              {/* Left Side: Real-time quick customization panels */}
+              <div className="w-full md:w-80 shrink-0 bg-[#091022] border border-slate-800 rounded-2xl p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+                <div>
+                  <h4 className="text-[11px] font-black text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Palette className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Personalización Rápida</span>
+                  </h4>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    Ajuste el estilo visual o la información del socio para ver el impacto inmediato.
+                  </p>
+                </div>
+
+                {/* Quick Style Switcher */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase text-slate-400 block">Estilo de Plantilla</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(['modern', 'letter', 'promotional', 'custom'] as const).map((style) => (
+                      <button
+                        key={style}
+                        type="button"
+                        onClick={() => setEmailTemplateStyle(style)}
+                        className={`py-1.5 px-2 rounded text-[9px] font-extrabold border transition-all text-center capitalize cursor-pointer ${emailTemplateStyle === style ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                      >
+                        {style === 'modern' ? '✨ Moderno' : style === 'letter' ? '📜 Carta' : style === 'promotional' ? '🔥 Promo' : '💻 Propio'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Color Pickers */}
+                <div className="grid grid-cols-2 gap-2 border-t border-slate-800/60 pt-3">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block">Color Acento</span>
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-lg">
+                      <input
+                        type="color"
+                        value={designerAccentColor}
+                        onChange={(e) => setDesignerAccentColor(e.target.value)}
+                        className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent shrink-0"
+                      />
+                      <span className="text-[8px] font-mono text-slate-300 select-all shrink-0 uppercase">{designerAccentColor}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block">Fondo Tarjeta</span>
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-lg">
+                      <input
+                        type="color"
+                        value={designerCardBgColor}
+                        onChange={(e) => setDesignerCardBgColor(e.target.value)}
+                        className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent shrink-0"
+                      />
+                      <span className="text-[8px] font-mono text-slate-300 select-all shrink-0 uppercase">{designerCardBgColor}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Header Text Quick Editor */}
+                <div className="space-y-2 border-t border-slate-800/60 pt-3">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block">Título de Cabecera</span>
+                    <input
+                      type="text"
+                      value={designerTitle}
+                      onChange={(e) => setDesignerTitle(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1.5 rounded text-[10px] focus:outline-none focus:border-sky-500/50"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block">Subtítulo de Soporte</span>
+                    <input
+                      type="text"
+                      value={designerSubtitle}
+                      onChange={(e) => setDesignerSubtitle(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1.5 rounded text-[10px] focus:outline-none focus:border-sky-500/50"
+                    />
+                  </div>
+                </div>
+
+                {/* Simulated Device Metadata info */}
+                <div className="mt-auto bg-slate-950 p-2.5 rounded-xl border border-slate-850 space-y-2 text-[10px]">
+                  <div className="text-slate-400 font-extrabold text-[9px] uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Socio Comercial de Prueba</span>
+                  </div>
+                  {(() => {
+                    const targetClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                    if (!targetClient) return <div className="text-slate-500">Ninguno seleccionado</div>;
+                    return (
+                      <div className="space-y-1 text-slate-300 leading-normal">
+                        <div>• <strong className="text-white">Nombre:</strong> {targetClient.name}</div>
+                        <div>• <strong className="text-white">Centro:</strong> {targetClient.clinica}</div>
+                        <div>• <strong className="text-white">Categoría:</strong> {targetClient.calculatedTier?.name || 'Socio'}</div>
+                        <div>• <strong className="text-white">Descuento:</strong> {targetClient.calculatedTier?.primaryBenefit || 'Preferente'}</div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Right Side: Centered preview stage with device emulator frame */}
+              <div className="flex-1 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col justify-center items-center p-4 overflow-hidden relative min-h-[350px]">
+                
+                {/* Device container wrap with dynamic width */}
+                <div 
+                  className="w-full h-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ease-in-out"
+                  style={{ 
+                    maxWidth: previewViewport === 'desktop' ? '100%' : previewViewport === 'tablet' ? '768px' : '400px',
+                    height: previewViewport === 'mobile' ? '92%' : '100%'
+                  }}
+                >
+                  {/* Browser or Phone Header Bar */}
+                  <div className="bg-[#111827] border-b border-slate-850 px-4 py-2 flex items-center justify-between text-[10px] text-slate-400 shrink-0 select-none">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                      
+                      <span className="text-slate-500 ml-4 hidden sm:inline">De:</span>
+                      <span className="text-sky-400 font-extrabold hidden sm:inline">CIMASUR Marketing &lt;marketing@cimasur.cl&gt;</span>
+                    </div>
+
+                    <div className="bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-md text-[9px] font-mono text-slate-400 max-w-[150px] sm:max-w-xs truncate">
+                      {previewViewport === 'desktop' ? '🖥️ Vista de Escritorio (Widescreen)' : previewViewport === 'tablet' ? '📟 Vista de Tablet' : '📱 Vista de Celular Responsiva'}
+                    </div>
+
+                    <div className="text-[9px] font-bold text-slate-500 uppercase">
+                      Fidelización 2026
+                    </div>
+                  </div>
+
+                  {/* Subject and stats mini bar */}
+                  <div className="bg-slate-900 px-4 py-2 border-b border-slate-850 text-[10px] flex items-center gap-2 text-slate-400 shrink-0">
+                    <span className="font-bold text-slate-500">Asunto:</span>
+                    <span className="text-slate-200 font-extrabold truncate">{bulkEmailSubject}</span>
+                  </div>
+
+                  {/* Main iFrame Content Area */}
+                  <div className="flex-1 bg-white relative">
+                    <iframe
+                      title="Large Email Graphic Preview iFrame"
+                      srcDoc={compileHtmlTemplate(
+                        criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0], 
+                        bulkEmailText, 
+                        designerAccentColor
+                      )}
+                      className="w-full h-full border-0 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal ESC hotkey guide footer */}
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex justify-between items-center text-[10px] text-slate-500 font-medium">
+              <span>💡 Presione el botón de cerrar arriba para volver al CRM. El diseño se actualiza dinámicamente en tiempo real.</span>
+              <span className="font-mono bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-slate-400">ESC para cerrar</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
