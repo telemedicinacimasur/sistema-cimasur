@@ -174,6 +174,35 @@ export function ClubSocialManager() {
   const [designerBodyBgColor, setDesignerBodyBgColor] = useState('#050914');
   const [designerCardBgColor, setDesignerCardBgColor] = useState('#0d162d');
   const [designerTextColor, setDesignerTextColor] = useState('#cbd5e1');
+  const [emailTemplateStyle, setEmailTemplateStyle] = useState<'modern' | 'letter' | 'promotional' | 'custom'>('modern');
+  const [customHtmlWrapper, setCustomHtmlWrapper] = useState(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CIMASUR Club Social</title>
+</head>
+<body style="margin:0; padding:20px; background-color:#050914; color:#cbd5e1; font-family:sans-serif;">
+  <div style="max-width:580px; margin:0 auto; background:#0d162d; border: 2px solid {{ACCENT_COLOR}}; padding:30px; border-radius:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+    <h2 style="color:{{ACCENT_COLOR}}; font-size:24px; margin-top:0;">{{TITLE}}</h2>
+    <p style="font-size:12px; color:#94a3b8; font-style:italic; margin-bottom:20px;">{{SUBTITLE}}</p>
+    
+    <div style="background-color:#050914; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #1e293b; font-size:12px; color:#94a3b8;">
+      • <strong>Socio:</strong> {{CLIENT_NAME}}<br>
+      • <strong>Clínica:</strong> {{CLIENT_CLINICA}}<br>
+      • <strong>Estatus:</strong> {{CLIENT_TIER}}
+    </div>
+
+    <div style="line-height:1.6; color:#cbd5e1; font-size:14px;">
+      {{CONTENT}}
+    </div>
+    
+    <hr style="border:0; border-top:1px solid #1e293b; margin:30px 0;">
+    <div style="text-align:center; font-size:11px; color:#64748b;">
+      Enviado con aprecio por el Equipo de Fidelización de CIMASUR.
+    </div>
+  </div>
+</body>
+</html>`);
 
   // Image Upload states for campaign designer
   const [uploadedImageB64, setUploadedImageB64] = useState<string | null>(null);
@@ -789,6 +818,123 @@ export function ClubSocialManager() {
 
     const textHtml = resolvedText.replace(/\n/g, '<br />');
 
+    if (emailTemplateStyle === 'custom') {
+      return customHtmlWrapper
+        .replace(/\{\{ACCENT_COLOR\}\}/g, accentColor)
+        .replace(/\{\{BODY_BG\}\}/g, designerBodyBgColor)
+        .replace(/\{\{CARD_BG\}\}/g, designerCardBgColor)
+        .replace(/\{\{TEXT_COLOR\}\}/g, designerTextColor)
+        .replace(/\{\{TITLE\}\}/g, designerTitle)
+        .replace(/\{\{SUBTITLE\}\}/g, designerSubtitle)
+        .replace(/\{\{CLIENT_NAME\}\}/g, client.name || 'Socio')
+        .replace(/\{\{CLIENT_CLINICA\}\}/g, client.clinica || 'Veterinaria')
+        .replace(/\{\{CLIENT_TIER\}\}/g, client.calculatedTier?.name || 'Preferencial')
+        .replace(/\{\{CONTENT\}\}/g, textHtml);
+    }
+
+    if (emailTemplateStyle === 'letter') {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CIMASUR Alianza Profesional</title>
+</head>
+<body style="margin:0; padding:0; background-color:${designerBodyBgColor === '#050914' ? '#f8fafc' : designerBodyBgColor}; font-family:Georgia, serif; color:${designerTextColor === '#cbd5e1' ? '#1e293b' : designerTextColor}; line-height:1.8;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:${designerBodyBgColor === '#050914' ? '#f8fafc' : designerBodyBgColor}; padding:40px 12px;">
+    <tr>
+      <td align="center">
+        <table width="560" border="0" cellspacing="0" cellpadding="0" style="background-color:${designerCardBgColor === '#0d162d' ? '#ffffff' : designerCardBgColor}; padding:40px; border-radius:4px; border-top:4px solid ${accentColor}; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding-bottom:20px; border-bottom:1px solid #e2e8f0;">
+              <span style="color:${accentColor}; font-family:'Segoe UI', sans-serif; font-size:11px; font-weight:bold; letter-spacing:1px; text-transform:uppercase;">${designerTitle}</span>
+              <p style="color:#64748b; font-family:'Segoe UI', sans-serif; font-size:11px; margin:4px 0 0 0;">${designerSubtitle}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:25px 0 15px 0;">
+              <p style="font-size:13px; margin:0 0 20px 0; color:#64748b; font-family:'Segoe UI', sans-serif;">Santiago, ${new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <h2 style="font-size:18px; font-weight:normal; margin:0 0 4px 0; color:#0f172a; font-family:Georgia, serif;">Estimado/a ${client.name},</h2>
+              <p style="font-size:12px; color:#64748b; margin:0 0 20px 0; font-family:'Segoe UI', sans-serif;">${client.clinica} • Categoría ${client.calculatedTier?.name || 'Socio'}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size:14px; font-family:Georgia, serif; color:${designerTextColor === '#cbd5e1' ? '#334155' : designerTextColor};">
+              ${textHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top:40px; border-top:1px solid #e2e8f0; font-family:'Segoe UI', sans-serif; font-size:11px; color:#64748b;">
+              <p style="margin:0 0 4px 0; font-weight:bold; color:#0f172a;">Atentamente,</p>
+              <p style="margin:0 0 15px 0; font-weight:bold; color:${accentColor};">${designerTitle}</p>
+              <p style="margin:0; font-size:10px;">Este mensaje institucional es confidencial y de uso exclusivo para profesionales veterinarios colegiados de Chile.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    }
+
+    if (emailTemplateStyle === 'promotional') {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CIMASUR Alianza Especial</title>
+</head>
+<body style="margin:0; padding:0; background-color:${designerBodyBgColor}; font-family:'Segoe UI', sans-serif; color:${designerTextColor};">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:${designerBodyBgColor}; padding:30px 12px;">
+    <tr>
+      <td align="center">
+        <table width="560" border="0" cellspacing="0" cellpadding="0" style="background-color:${designerCardBgColor}; border-radius:24px; overflow:hidden; border:2px solid ${accentColor};">
+          <tr>
+            <td style="background-color:${accentColor}; padding:35px 30px; text-align:center;">
+              <span style="color:#ffffff; background-color:rgba(0,0,0,0.25); font-size:9px; font-weight:900; letter-spacing:2px; padding:4px 12px; border-radius:20px; text-transform:uppercase;">BENEFICIO SOCIO COMERCIAL</span>
+              <h1 style="color:#0d162d; font-size:28px; font-weight:900; margin:15px 0 5px 0; tracking:-1px;">${designerTitle}</h1>
+              <p style="color:#0d162d; font-size:12px; margin:0; opacity:0.8;">${designerSubtitle}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:30px 30px 15px 30px; text-align:center;">
+              <h2 style="color:#ffffff; font-size:20px; font-weight:800; margin:0 0 8px 0;">¡Hola ${client.name}!</h2>
+              <p style="color:#94a3b8; font-size:12px; margin:0;">Exclusivo para la clínica: <strong>${client.clinica}</strong></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 30px 25px 30px; font-size:13.5px; line-height:1.7;">
+              <div style="background-color:rgba(255,255,255,0.03); border:1px dashed ${accentColor}50; border-radius:12px; padding:18px; text-align:center; margin-bottom:20px;">
+                <span style="color:#94a3b8; font-size:10px; text-transform:uppercase; font-weight:bold; letter-spacing:1px; display:block; margin-bottom:6px;">Estatus Actualizado Club 2026</span>
+                <span style="color:#ffffff; font-size:18px; font-weight:900; display:block;">Categoría ${client.calculatedTier?.name || 'Socio'}</span>
+                <span style="color:${accentColor}; font-size:13px; font-weight:bold; display:block; margin-top:4px;">★ ${client.calculatedTier?.primaryBenefit || 'Condiciones Preferentes'} ★</span>
+              </div>
+              <div style="color:${designerTextColor};">
+                ${textHtml}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 30px 35px 30px; text-align:center;">
+              <table align="center" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="background-color:${accentColor}; border-radius:50px; padding:11px 30px;">
+                    <a href="https://cimasur.cl" target="_blank" style="color:#0d162d; font-size:12px; font-weight:900; text-decoration:none; text-transform:uppercase; letter-spacing:1px; display:block;">Reclamar mi Beneficio Ahora ➔</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="color:#64748b; font-size:10px; margin:15px 0 0 0;">¿Dudas o requerimientos especiales? Contáctenos hoy mismo.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    }
+
+    // Default to 'modern' style
     return `
 <!DOCTYPE html>
 <html>
@@ -898,8 +1044,7 @@ export function ClubSocialManager() {
     </tr>
   </table>
 </body>
-</html>
-    `;
+</html>`;
   };
 
   // Test custom SMTP credentials
@@ -2667,8 +2812,67 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                           <div className="bg-[#091022] border border-slate-850 rounded-xl p-4 space-y-4">
                             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                               <Palette className="w-4 h-4 text-sky-400" />
-                              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Ajustar Colores e Identidad Visual del Correo</h4>
+                              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Ajustar Colores, Estilo de Plantilla e Identidad Visual</h4>
                             </div>
+
+                            {/* Selector de Tipo de Plantilla / Diseño */}
+                            <div className="space-y-1.5 border-b border-slate-800 pb-3">
+                              <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Estilo de Diseño de Plantilla</label>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEmailTemplateStyle('modern')}
+                                  className={`px-3 py-2 rounded-lg text-[10px] font-extrabold border transition-all text-center flex flex-col justify-center items-center gap-1 ${emailTemplateStyle === 'modern' ? 'bg-sky-500/10 text-sky-400 border-sky-500/30 shadow' : 'bg-[#070b16] border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                                >
+                                  <span>✨ Moderno Premium</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEmailTemplateStyle('letter')}
+                                  className={`px-3 py-2 rounded-lg text-[10px] font-extrabold border transition-all text-center flex flex-col justify-center items-center gap-1 ${emailTemplateStyle === 'letter' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow' : 'bg-[#070b16] border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                                >
+                                  <span>📜 Carta Profesional</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEmailTemplateStyle('promotional')}
+                                  className={`px-3 py-2 rounded-lg text-[10px] font-extrabold border transition-all text-center flex flex-col justify-center items-center gap-1 ${emailTemplateStyle === 'promotional' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow' : 'bg-[#070b16] border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                                >
+                                  <span>🔥 Spotlight Promocional</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEmailTemplateStyle('custom')}
+                                  className={`px-3 py-2 rounded-lg text-[10px] font-extrabold border transition-all text-center flex flex-col justify-center items-center gap-1 ${emailTemplateStyle === 'custom' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow' : 'bg-[#070b16] border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                                >
+                                  <span>💻 Envoltura HTML Propia</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Editor de Envoltura HTML */}
+                            {emailTemplateStyle === 'custom' && (
+                              <div className="space-y-1.5 bg-purple-950/10 border border-purple-500/20 rounded-xl p-3 animate-fadeIn">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-[9px] font-bold text-purple-400 uppercase">Editor de Código de Envoltura HTML</span>
+                                  <span className="text-[8px] text-slate-500 italic">Inserte {"{{CONTENT}}"} para inyectar el cuerpo</span>
+                                </div>
+                                <textarea
+                                  rows={6}
+                                  value={customHtmlWrapper}
+                                  onChange={(e) => setCustomHtmlWrapper(e.target.value)}
+                                  className="w-full bg-[#04060d] border border-purple-900/30 text-purple-200 p-2.5 rounded-lg text-[10px] font-mono focus:outline-none focus:border-purple-500/50 leading-relaxed resize-none"
+                                />
+                                <div className="text-[8px] text-slate-400 leading-normal grid grid-cols-2 gap-x-2 gap-y-0.5 pt-1">
+                                  <span>• <code className="text-purple-400">{"{{CONTENT}}"}</code>: Cuerpo del correo</span>
+                                  <span>• <code className="text-purple-400">{"{{ACCENT_COLOR}}"}</code>: Color acento</span>
+                                  <span>• <code className="text-purple-400">{"{{TITLE}}"}</code>: Título de cabecera</span>
+                                  <span>• <code className="text-purple-400">{"{{SUBTITLE}}"}</code>: Subtítulo de cabecera</span>
+                                  <span>• <code className="text-purple-400">{"{{CLIENT_NAME}}"}</code>: Nombre de socio</span>
+                                  <span>• <code className="text-purple-400">{"{{CLIENT_TIER}}"}</code>: Estatus o categoría</span>
+                                </div>
+                              </div>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {/* Colores */}
@@ -2886,6 +3090,81 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                           {/* WhatsApp Chat Area Background with grid */}
                           <div className="flex-1 p-3 overflow-y-auto space-y-3 flex flex-col justify-end bg-[radial-gradient(#1e2428_1px,transparent_1px)] [background-size:16px_16px] relative">
                             
+                            {/* WhatsApp Image Attachment Bubble (Diseño en Imagen) */}
+                            {(() => {
+                              const targetClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                              
+                              return (
+                                <div className="bg-[#056162]/40 border border-slate-800/40 p-1.5 rounded-xl max-w-[90%] self-end shadow-sm flex flex-col gap-1 text-[9px] text-slate-300">
+                                  <div className="bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex flex-col">
+                                    {/* Simulated Email Graphic Image Header */}
+                                    <div 
+                                      className="p-3 text-center relative flex flex-col justify-center items-center overflow-hidden"
+                                      style={{ 
+                                        background: `linear-gradient(135deg, ${designerCardBgColor} 0%, ${designerBodyBgColor} 100%)`,
+                                        borderBottom: `2.5px solid ${designerAccentColor}`
+                                      }}
+                                    >
+                                      {/* Miniature decorative gradient circle */}
+                                      <span className="absolute -top-6 -right-6 w-12 h-12 rounded-full opacity-25" style={{ backgroundColor: designerAccentColor }}></span>
+                                      
+                                      <span className="text-[7px] font-black tracking-widest text-slate-400 block mb-1">CIMASUR COMUNICACIÓN</span>
+                                      <h3 className="text-white text-xs font-black tracking-tight" style={{ color: '#ffffff' }}>{designerTitle}</h3>
+                                      <p className="text-[8px] text-slate-400 font-medium leading-tight mt-0.5" style={{ color: '#94a3b8' }}>{designerSubtitle}</p>
+                                    </div>
+
+                                    {/* Simulated Email Graphic Image Body */}
+                                    <div className="p-3 bg-slate-900/90 text-slate-200 space-y-2">
+                                      {/* Name & Tier Banner */}
+                                      <div className="flex justify-between items-center bg-slate-950/60 p-1.5 rounded border border-slate-800">
+                                        <div>
+                                          <span className="text-[7px] text-slate-500 font-bold block uppercase leading-none">Veterinaria / Dra.</span>
+                                          <span className="text-[8.5px] text-white font-extrabold leading-none block mt-0.5">{targetClient.name}</span>
+                                        </div>
+                                        <span 
+                                          className="text-[7px] font-black px-1.5 py-0.5 rounded uppercase"
+                                          style={{ 
+                                            backgroundColor: `${designerAccentColor}15`, 
+                                            color: designerAccentColor,
+                                            border: `1px solid ${designerAccentColor}30`
+                                          }}
+                                        >
+                                          {targetClient.calculatedTier?.name || 'Socio'}
+                                        </span>
+                                      </div>
+
+                                      {/* Template specific preview style mini card */}
+                                      <div className="bg-[#050914] p-2 rounded border border-slate-850 space-y-1.5">
+                                        <div className="flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: designerAccentColor }} />
+                                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">
+                                            Estilo: {emailTemplateStyle === 'modern' ? 'Moderno Premium' : emailTemplateStyle === 'letter' ? 'Carta Formal' : emailTemplateStyle === 'promotional' ? 'Spotlight Promocional' : 'HTML Custom'}
+                                          </span>
+                                        </div>
+                                        <p className="text-[7.5px] text-slate-400 leading-relaxed font-sans line-clamp-3">
+                                          {bulkEmailText
+                                            .replace(/\{\{NOMBRE\}\}/g, targetClient.name || 'Doctor/a')
+                                            .replace(/\{\{CLINICA\}\}/g, targetClient.clinica || 'Centro Clínico')
+                                            .replace(/\{\{CATEGORIA_2026\}\}/g, targetClient.calculatedTier?.name || 'Socio Especial')
+                                            .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, targetClient.calculatedTier?.primaryBenefit || 'Beneficios preferentes')}
+                                        </p>
+                                      </div>
+
+                                      {/* Showcase preview footer decoration */}
+                                      <div className="flex justify-between items-center text-[7px] text-slate-500 font-bold border-t border-slate-800 pt-1.5 leading-none">
+                                        <span>📧 Formato Email Diseñado</span>
+                                        <span className="text-emerald-400">● Live Preview</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-between items-center px-1 text-[8px] text-slate-400 font-medium pt-0.5">
+                                    <span className="italic text-slate-500">cimasur_diseno_campana.jpg (84.2 KB)</span>
+                                    <span className="text-[7px] text-emerald-400 font-bold">✔ Enviado</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
                             {/* Whatsapp Bubble */}
                             <div className="bg-[#056162] text-slate-100 p-2.5 rounded-xl rounded-tr-none max-w-[90%] text-[10px] leading-relaxed self-end shadow border border-[#0b4e4f] relative">
                               <div className="whitespace-pre-wrap font-sans font-medium">
