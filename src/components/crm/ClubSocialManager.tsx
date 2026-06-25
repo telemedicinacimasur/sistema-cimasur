@@ -140,6 +140,11 @@ export function ClubSocialManager() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CRITICO' | 'DORMIDO' | 'EN_CAIDA' | 'PERDIDO'>('ALL');
   const [channel, setChannel] = useState<'whatsapp' | 'email'>('whatsapp');
   
+  // Segment and upgrade states for Opportunities & Campaigns
+  const [opportunityViewType, setOpportunityViewType] = useState<'alertas' | 'upgrades'>('alertas');
+  const [upgradeSegmentFilter, setUpgradeSegmentFilter] = useState<'bronce_oro' | 'plata_platinum'>('bronce_oro');
+  const [recipientFilterSegment, setRecipientFilterSegment] = useState<'critical' | 'bronce_to_gold' | 'silver_to_platinum' | 'all'>('critical');
+  
   // Navigation Tabs matching user sidebar mockup
   const [activeTab, setActiveTab] = useState<'dashboard' | 'individual' | 'tiers' | 'designer' | 'masivo' | 'oportunidades'>('oportunidades');
   
@@ -350,8 +355,8 @@ export function ClubSocialManager() {
     return () => window.removeEventListener('db-change', loadData);
   }, []);
 
-  // Filter clients to include ONLY critical ones
-  const criticalClients = useMemo(() => {
+  // Process all contacts into formatted club clients (including those in normal standing)
+  const allClubClients = useMemo(() => {
     return clients.map(client => {
       const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
       const v2024 = Number(sales.v2024 || 0);
@@ -399,8 +404,54 @@ export function ClubSocialManager() {
         statusColor,
         isCritical: statusKey !== 'NORMAL'
       };
-    }).filter(c => c.isCritical);
+    });
   }, [clients, tiersList]);
+
+  // Filter clients to include ONLY critical ones
+  const criticalClients = useMemo(() => {
+    return allClubClients.filter(c => c.isCritical);
+  }, [allClubClients]);
+
+  // Candidates for category upgrade (Bronze -> Gold, Silver -> Platinum)
+  const upgradeCandidates = useMemo(() => {
+    const rawList = allClubClients.filter(c => {
+      const tierName = (c.calculatedTier?.name || '').toLowerCase();
+      if (upgradeSegmentFilter === 'bronce_oro') {
+        return tierName === 'bronce';
+      } else {
+        return tierName === 'plata';
+      }
+    });
+    return rawList.filter(c => {
+      const matchesSearch = 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.clinica.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.rut.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    });
+  }, [allClubClients, upgradeSegmentFilter, searchQuery]);
+
+  // Dynamic list of recipients for the bulk campaign view
+  const bulkCampaignRecipients = useMemo(() => {
+    let rawList: ClubClient[] = [];
+    if (recipientFilterSegment === 'critical') {
+      rawList = criticalClients;
+    } else if (recipientFilterSegment === 'bronce_to_gold') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
+    } else if (recipientFilterSegment === 'silver_to_platinum') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else {
+      rawList = allClubClients;
+    }
+
+    return rawList.filter(c => {
+      const matchesSearch = 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.clinica.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.rut.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    });
+  }, [allClubClients, criticalClients, recipientFilterSegment, searchQuery]);
 
   // Handle auto-selection of first client if none selected
   useEffect(() => {
@@ -423,12 +474,20 @@ export function ClubSocialManager() {
     if (savedName) setSmtpSenderName(savedName);
   }, []);
 
-  // Pre-select all critical clients as campaign recipients by default
+  // Pre-select recipients matching the active segment filter by default
   useEffect(() => {
-    if (criticalClients.length > 0 && selectedCampaignClientIds.length === 0) {
-      setSelectedCampaignClientIds(criticalClients.map(c => c.id));
+    let targetList: ClubClient[] = [];
+    if (recipientFilterSegment === 'critical') {
+      targetList = criticalClients;
+    } else if (recipientFilterSegment === 'bronce_to_gold') {
+      targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
+    } else if (recipientFilterSegment === 'silver_to_platinum') {
+      targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else {
+      targetList = allClubClients;
     }
-  }, [criticalClients]);
+    setSelectedCampaignClientIds(targetList.map(c => c.id));
+  }, [recipientFilterSegment, criticalClients, allClubClients]);
 
   const saveSmtpSettings = (host: string, port: string, user: string, pass: string, name: string) => {
     localStorage.setItem('smtp_host', host);
@@ -438,7 +497,7 @@ export function ClubSocialManager() {
     localStorage.setItem('smtp_sender_name', name);
   };
 
-  // Filter list by search query and quick status filter
+  // Filter list by search query and quick status filter (used for general/critical lists)
   const filteredClients = useMemo(() => {
     return criticalClients.filter(c => {
       const matchesSearch = 
@@ -452,8 +511,8 @@ export function ClubSocialManager() {
   }, [criticalClients, searchQuery, statusFilter]);
 
   const selectedClient = useMemo(() => {
-    return criticalClients.find(c => c.id === selectedClientId) || null;
-  }, [criticalClients, selectedClientId]);
+    return allClubClients.find(c => c.id === selectedClientId) || null;
+  }, [allClubClients, selectedClientId]);
 
   // Clean message and evaluation when selected client or channel changes
   useEffect(() => {
@@ -1130,30 +1189,95 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
 
           {activeTab === 'oportunidades' && (
             <div className="bg-[#0d162d] p-6 rounded-2xl border border-sky-500/10 space-y-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-850 pb-4">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-850 pb-4">
                 <div>
                   <h2 className="text-base font-black text-white uppercase tracking-tight flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-yellow-400 animate-pulse" />
                     <span>Oportunidades Comerciales & Alertas Algorítmicas 🎯</span>
                   </h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Análisis de brechas comerciales por ciclo, prórrogas hasta junio y recomendaciones estratégicas inmediatas de CIMASUR.
+                  <p className="text-xs text-slate-400 mt-1 font-medium">
+                    Análisis de brechas comerciales por ciclo, prórrogas de recalificación y estímulos de ascenso de categoría en CIMASUR.
                   </p>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">Filtro Alerta:</span>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as any)}
-                    className="bg-[#070b16] border border-slate-800 text-xs rounded-xl px-3.5 py-2 text-slate-300 focus:outline-none focus:border-sky-500/40"
+                
+                {/* View Switcher segment controller */}
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <button
+                    onClick={() => setOpportunityViewType('alertas')}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 border ${opportunityViewType === 'alertas' ? 'bg-red-500/10 border-red-500/35 text-red-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
                   >
-                    <option value="ALL">Todas las Alertas ({criticalClients.length})</option>
-                    <option value="CRITICO">Riesgo Crítico ({criticalClients.filter(c => c.statusKey === 'CRITICO').length})</option>
-                    <option value="DORMIDO">Dormidos ({criticalClients.filter(c => c.statusKey === 'DORMIDO').length})</option>
-                    <option value="EN_CAIDA">En Caída ({criticalClients.filter(c => c.statusKey === 'EN_CAIDA').length})</option>
-                  </select>
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                    <span>Alertas de Retención ({criticalClients.length})</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOpportunityViewType('upgrades');
+                      setUpgradeSegmentFilter('bronce_oro');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'bronce_oro' ? 'bg-yellow-500/10 border-yellow-500/35 text-yellow-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
+                  >
+                    <Award className="w-3.5 h-3.5 text-yellow-400" />
+                    <span>Objetivo: Bronce ➔ Oro ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOpportunityViewType('upgrades');
+                      setUpgradeSegmentFilter('plata_platinum');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'plata_platinum' ? 'bg-purple-500/10 border-purple-500/35 text-purple-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
+                  >
+                    <Award className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Objetivo: Plata ➔ Platinum ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</span>
+                  </button>
                 </div>
               </div>
+
+              {/* Explanatory cards depending on view mode */}
+              {opportunityViewType === 'alertas' ? (
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#070b16] p-4 rounded-xl border border-slate-850">
+                  <div className="text-xs text-slate-400 font-medium">
+                    Mostrando socios comerciales con inactividad, inactividad prolongada o compras caídas de -50% o más.
+                  </div>
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">Filtro Alerta:</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      className="bg-[#0d162d] border border-slate-800 text-[11px] rounded-xl px-3.5 py-1.5 text-slate-300 focus:outline-none focus:border-sky-500/40"
+                    >
+                      <option value="ALL">Todas las Alertas ({criticalClients.length})</option>
+                      <option value="CRITICO">Riesgo Crítico ({criticalClients.filter(c => c.statusKey === 'CRITICO').length})</option>
+                      <option value="DORMIDO">Dormidos ({criticalClients.filter(c => c.statusKey === 'DORMIDO').length})</option>
+                      <option value="EN_CAIDA">En Caída ({criticalClients.filter(c => c.statusKey === 'EN_CAIDA').length})</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-sky-500/5 border border-sky-500/15 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-white uppercase flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
+                      <span>{upgradeSegmentFilter === 'bronce_oro' ? 'Campaña de Estímulo: Bronce ➔ Oro' : 'Campaña de Estímulo: Plata ➔ Platinum'}</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
+                      {upgradeSegmentFilter === 'bronce_oro' 
+                        ? 'Socios en nivel Bronce ($500K - $1.99M). Impúlselos a alcanzar un total de $5.000.000 acumulado este ciclo para obtener los beneficios preferenciales de la categoría ORO.'
+                        : 'Socios en nivel Plata ($2M - $4.99M). Impúlselos a alcanzar un total de $12.000.000 acumulado para obtener estatus PLATINUM y liberar despachos gratis ilimitados.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCampaignObjective(upgradeSegmentFilter === 'bronce_oro' ? 'upgrade_bronce_oro' : 'upgrade_plata_platinum');
+                      setRecipientFilterSegment(upgradeSegmentFilter === 'bronce_oro' ? 'bronce_to_gold' : 'silver_to_platinum');
+                      setActiveTab('masivo');
+                    }}
+                    className="bg-sky-500 hover:bg-sky-450 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs shrink-0 flex items-center gap-2 transition-all shadow-md shadow-sky-500/10"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Preparar Campaña Grupal ({upgradeCandidates.length})</span>
+                  </button>
+                </div>
+              )}
 
               {/* Table rendering the analytical views */}
               <div className="overflow-x-auto rounded-xl border border-slate-850 bg-[#070b16]">
@@ -1162,93 +1286,177 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                     <tr className="bg-[#090f1d] border-b border-slate-800 text-slate-400 uppercase font-extrabold text-[10px] tracking-wider">
                       <th className="p-4">Cliente Veterinario</th>
                       <th className="p-4 text-right">Facturación 2026</th>
-                      <th className="p-4 text-center">Diferencia Comercial</th>
-                      <th className="p-4">Brecha Próxima Categoría</th>
-                      <th className="p-4">Acción Estratégica</th>
-                      <th className="p-4 text-center">Campaña</th>
+                      <th className="p-4 text-center">Estatus Actual</th>
+                      <th className="p-4 text-center">Meta Propuesta</th>
+                      <th className="p-4">Brecha Comercial</th>
+                      <th className="p-4 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-850">
-                    {filteredClients.map((client) => {
-                      const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
-                      const v2025 = Number(sales.v2025 || 0);
-                      const v2026 = Number(sales.v2026 || 0);
-                      
-                      const diff = v2026 - v2025;
-                      const percent = v2025 > 0 ? (diff / v2025) * 100 : 0;
-                      
-                      const currentTier = client.calculatedTier || TIERS_DEFAULT[0];
-                      const currentTierIdx = tiersList.findIndex(t => t.name === currentTier.name);
-                      const nextTier = currentTierIdx < tiersList.length - 1 ? tiersList[currentTierIdx + 1] : currentTier;
-                      
-                      let brechaText = '';
-                      let brechaGoalColor = 'text-yellow-400';
-                      
-                      if (v2026 < currentTier.min) {
-                        const gapToMaintain = currentTier.min - v2026;
-                        brechaText = `${formatCLP(gapToMaintain)} para mantener ${currentTier.name}`;
-                        brechaGoalColor = 'text-rose-400';
-                      } else {
-                        const gapToAscend = nextTier.min - v2026;
-                        if (gapToAscend > 0 && nextTier.name !== currentTier.name) {
-                          brechaText = `${formatCLP(gapToAscend)} para ascender a ${nextTier.name}`;
-                          brechaGoalColor = 'text-sky-400';
+                    {opportunityViewType === 'alertas' ? (
+                      filteredClients.map((client) => {
+                        const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
+                        const v2025 = Number(sales.v2025 || 0);
+                        const v2026 = Number(sales.v2026 || 0);
+                        
+                        const diff = v2026 - v2025;
+                        const percent = v2025 > 0 ? (diff / v2025) * 100 : 0;
+                        
+                        const currentTier = client.calculatedTier || TIERS_DEFAULT[0];
+                        const currentTierIdx = tiersList.findIndex(t => t.name === currentTier.name);
+                        const nextTier = currentTierIdx < tiersList.length - 1 ? tiersList[currentTierIdx + 1] : currentTier;
+                        
+                        let brechaText = '';
+                        let brechaGoalColor = 'text-yellow-400';
+                        
+                        if (v2026 < currentTier.min) {
+                          const gapToMaintain = currentTier.min - v2026;
+                          brechaText = `${formatCLP(gapToMaintain)} para mantener ${currentTier.name}`;
+                          brechaGoalColor = 'text-rose-400';
                         } else {
-                          brechaText = `Meta alcanzada (${currentTier.name})`;
-                          brechaGoalColor = 'text-emerald-400';
+                          const gapToAscend = nextTier.min - v2026;
+                          if (gapToAscend > 0 && nextTier.name !== currentTier.name) {
+                            brechaText = `${formatCLP(gapToAscend)} para ascender a ${nextTier.name}`;
+                            brechaGoalColor = 'text-sky-400';
+                          } else {
+                            brechaText = `Meta alcanzada (${currentTier.name})`;
+                            brechaGoalColor = 'text-emerald-400';
+                          }
                         }
-                      }
 
-                      let suggestedAction = 'Ofrecer prórroga excepcional de recalificación';
-                      if (client.statusKey === 'CRITICO') {
-                        suggestedAction = 'Llamada urgente: Ofrecer prórroga hasta 30 Junio';
-                      } else if (client.statusKey === 'DORMIDO') {
-                        suggestedAction = 'Masivo de reactivación y despacho gratis de Arnica CS';
-                      } else if (client.statusKey === 'EN_CAIDA') {
-                        suggestedAction = 'Ofrecer Kit Modulador Digestivo o Acqua Maris';
-                      }
+                        let suggestedAction = 'Ofrecer prórroga excepcional de recalificación';
+                        if (client.statusKey === 'CRITICO') {
+                          suggestedAction = 'Llamada urgente: Ofrecer prórroga hasta 30 Junio';
+                        } else if (client.statusKey === 'DORMIDO') {
+                          suggestedAction = 'Masivo de reactivación y despacho gratis de Arnica CS';
+                        } else if (client.statusKey === 'EN_CAIDA') {
+                          suggestedAction = 'Ofrecer Kit Modulador Digestivo o Acqua Maris';
+                        }
 
-                      return (
-                        <tr key={client.id} className="hover:bg-sky-500/5 transition-all">
-                          <td className="p-4">
-                            <div className="font-extrabold text-white text-xs">{client.clinica}</div>
-                            <div className="text-[10.5px] text-slate-400 font-medium">{client.name}</div>
-                            <div className="text-[9.5px] text-slate-500 font-mono mt-0.5">{client.rut}</div>
-                          </td>
-                          <td className="p-4 text-right font-mono font-bold text-white">
-                            {formatCLP(v2026)}
-                          </td>
-                          <td className="p-4 text-center">
-                            <span className={`inline-flex items-center gap-1 font-mono font-black px-1.5 py-0.5 rounded text-[10.5px] ${diff >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                              {diff >= 0 ? '+' : ''}{formatCLP(diff)} ({percent.toFixed(0)}%)
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <span className={`font-mono font-bold text-[11px] ${brechaGoalColor} block`}>
-                              {brechaText}
-                            </span>
-                            <span className="text-[9.5px] text-slate-500 block font-semibold">
-                              Cat. Actual: {currentTier.name} (Ref 2025)
-                            </span>
-                          </td>
-                          <td className="p-4 max-w-[200px]">
-                            <div className="text-slate-350 font-medium leading-relaxed">{suggestedAction}</div>
-                          </td>
-                          <td className="p-4 text-center">
-                            <button
-                              onClick={() => {
-                                setSelectedClientId(client.id);
-                                setActiveTab('individual');
-                              }}
-                              className="bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-slate-900 border border-sky-500/30 font-black px-3 py-1.5 rounded-xl text-[10.5px] transition-all flex items-center justify-center gap-1.5 mx-auto shadow-sm"
-                            >
-                              <Send className="w-3 h-3" />
-                              <span>Cargar</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                        return (
+                          <tr key={client.id} className="hover:bg-sky-500/5 transition-all">
+                            <td className="p-4">
+                              <div className="font-extrabold text-white text-xs">{client.clinica}</div>
+                              <div className="text-[10.5px] text-slate-400 font-medium">{client.name}</div>
+                              <div className="text-[9.5px] text-slate-500 font-mono mt-0.5">{client.rut}</div>
+                            </td>
+                            <td className="p-4 text-right font-mono font-bold text-white">
+                              {formatCLP(v2026)}
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`inline-flex items-center gap-1 font-mono font-black px-1.5 py-0.5 rounded text-[10.5px] ${diff >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                {diff >= 0 ? '+' : ''}{formatCLP(diff)} ({percent.toFixed(0)}%)
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="text-slate-350 font-bold block">{currentTier.name}</span>
+                            </td>
+                            <td className="p-4">
+                              <span className={`font-mono font-bold text-[11px] ${brechaGoalColor} block`}>
+                                {brechaText}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <button
+                                onClick={() => {
+                                  setSelectedClientId(client.id);
+                                  setActiveTab('individual');
+                                }}
+                                className="bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-slate-900 border border-sky-500/30 font-black px-3 py-1.5 rounded-xl text-[10.5px] transition-all flex items-center justify-center gap-1.5 mx-auto shadow-sm"
+                              >
+                                <Send className="w-3 h-3" />
+                                <span>Cargar</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : upgradeCandidates.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-500 font-bold font-sans text-xs">
+                          No se encontraron socios en la categoría actual {upgradeSegmentFilter === 'bronce_oro' ? 'Bronce' : 'Plata'} con brechas activas.
+                        </td>
+                      </tr>
+                    ) : (
+                      upgradeCandidates.map((client) => {
+                        const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
+                        const v2026 = Number(sales.v2026 || 0);
+                        
+                        const targetTierObj = tiersList.find(t => t.name === (upgradeSegmentFilter === 'bronce_oro' ? 'Oro' : 'Platinum')) || TIERS_DEFAULT[3];
+                        const targetMin = targetTierObj.min;
+                        const gap = targetMin - v2026;
+                        
+                        const currentTier = client.calculatedTier || TIERS_DEFAULT[1];
+                        
+                        return (
+                          <tr key={client.id} className="hover:bg-sky-500/5 transition-all">
+                            <td className="p-4">
+                              <div className="font-extrabold text-white text-xs">{client.clinica}</div>
+                              <div className="text-[10.5px] text-slate-400 font-medium">{client.name}</div>
+                              <div className="text-[9.5px] text-slate-500 font-mono mt-0.5">{client.rut}</div>
+                            </td>
+                            <td className="p-4 text-right font-mono font-bold text-white">
+                              {formatCLP(v2026)}
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="text-slate-300 font-bold block bg-slate-850 px-2.5 py-1 rounded-lg text-[10px] w-fit mx-auto border border-slate-800">
+                                {currentTier.name}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="text-sky-400 font-bold block bg-sky-500/10 px-2.5 py-1 rounded-lg text-[10px] w-fit mx-auto border border-sky-500/20">
+                                Meta: {targetTierObj.name} ({formatCLP(targetMin)})
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              {gap <= 0 ? (
+                                <span className="text-emerald-400 font-black text-[11px] flex items-center gap-1 leading-none">
+                                  <Check className="w-3.5 h-3.5 shrink-0" /> ¡Meta Alcanzada!
+                                </span>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  <span className="text-yellow-400 font-mono font-bold text-[11px] block leading-none">
+                                    Faltan: {formatCLP(gap)}
+                                  </span>
+                                  <span className="text-[9.5px] text-slate-500 block leading-none font-medium">
+                                    para estatus {targetTierObj.name}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-4 text-center">
+                              <div className="flex gap-2 justify-center">
+                                <button
+                                  onClick={() => {
+                                    setSelectedClientId(client.id);
+                                    setChannel('whatsapp');
+                                    setCampaignObjective(upgradeSegmentFilter === 'bronce_oro' ? 'upgrade_bronce_oro' : 'upgrade_plata_platinum');
+                                    setActiveTab('individual');
+                                  }}
+                                  className="bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-slate-900 border border-sky-500/30 font-black px-2.5 py-1.5 rounded-xl text-[10.5px] transition-all flex items-center gap-1 shadow-sm"
+                                  title="Preparar mensaje individual para este socio"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  <span>Cargar</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCampaignObjective(upgradeSegmentFilter === 'bronce_oro' ? 'upgrade_bronce_oro' : 'upgrade_plata_platinum');
+                                    setRecipientFilterSegment(upgradeSegmentFilter === 'bronce_oro' ? 'bronce_to_gold' : 'silver_to_platinum');
+                                    setActiveTab('masivo');
+                                  }}
+                                  className="bg-purple-500/15 hover:bg-purple-500 text-purple-400 hover:text-white border border-purple-500/30 font-black px-2.5 py-1.5 rounded-xl text-[10.5px] transition-all flex items-center gap-1 shadow-sm"
+                                  title="Preparar campaña masiva para este segmento"
+                                >
+                                  <Sparkles className="w-3 h-3" />
+                                  <span>Masivo</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1851,15 +2059,30 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
               <div className="flex justify-between items-center">
                 <h2 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
                   <Users className="w-4 h-4 text-sky-400" />
-                  <span>Destinatarios ({selectedCampaignClientIds.length}/{criticalClients.length})</span>
+                  <span>Destinatarios ({selectedCampaignClientIds.length}/{bulkCampaignRecipients.length})</span>
                 </h2>
-                <span className="text-[10px] text-red-400 font-bold bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
-                  Filtro Crítico Activo
+                <span className="text-[10px] text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                  Público Activo
                 </span>
               </div>
               
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Seleccione de forma quirúrgica a qué socios desea dirigir la campaña masiva. Por defecto todos los socios con alertas están pre-seleccionados.
+              {/* Dynamic segment selector */}
+              <div className="space-y-1 bg-[#070b16] p-2.5 rounded-xl border border-slate-850">
+                <label className="text-[9px] uppercase font-extrabold text-slate-500 font-mono">Segmento Destinatario:</label>
+                <select
+                  value={recipientFilterSegment}
+                  onChange={(e) => setRecipientFilterSegment(e.target.value as any)}
+                  className="w-full bg-[#0d162d] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:border-sky-500/40 font-bold"
+                >
+                  <option value="critical">Alerta Retención Crítica ({criticalClients.length})</option>
+                  <option value="bronce_to_gold">Bronce ➔ Oro ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</option>
+                  <option value="silver_to_platinum">Plata ➔ Platinum ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</option>
+                  <option value="all">Todo el Club ({allClubClients.length})</option>
+                </select>
+              </div>
+              
+              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
+                Seleccione de forma quirúrgica a qué socios desea dirigir la campaña masiva. Por defecto los socios del segmento seleccionado están pre-seleccionados.
               </p>
 
               {/* Quick Search */}
@@ -1876,18 +2099,18 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
 
               {/* Toggle actions */}
               <div className="flex justify-between items-center text-[10px] pt-1 border-t border-slate-800/40">
-                <span className="text-slate-500">Selección Rápida:</span>
+                <span className="text-slate-500 font-bold">Selección Rápida:</span>
                 <div className="flex gap-2">
                   <button
                     onClick={handleSelectAllCampaignClients}
-                    className="text-sky-400 font-bold hover:underline"
+                    className="text-sky-400 font-black hover:underline"
                   >
                     Seleccionar Todos
                   </button>
                   <span className="text-slate-700">|</span>
                   <button
                     onClick={handleSelectNoneCampaignClients}
-                    className="text-sky-500 font-bold hover:underline hover:text-slate-450"
+                    className="text-sky-500 font-black hover:underline hover:text-slate-450"
                   >
                     Ninguno
                   </button>
@@ -1897,13 +2120,13 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
 
             {/* Scrollable Recipient List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {filteredClients.length === 0 ? (
+              {bulkCampaignRecipients.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-850 bg-[#090f1d]/40 rounded-xl">
                   <Users className="w-8 h-8 text-slate-700 mb-2" />
                   <span className="text-xs text-slate-500 font-bold">No se encontraron socios</span>
                 </div>
               ) : (
-                filteredClients.map((client) => {
+                bulkCampaignRecipients.map((client) => {
                   const isChecked = selectedCampaignClientIds.includes(client.id);
                   const changePct = client.percentChange * 100;
                   
@@ -1964,7 +2187,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
               <span className="text-[9px] uppercase font-bold text-slate-500 block">Resumen de Destinatarios</span>
               <div className="flex justify-between items-center mt-1.5">
                 <span className="text-xs text-slate-300">Socios Seleccionados:</span>
-                <span className="text-sm font-mono font-black text-white">{selectedCampaignClientIds.length} / {criticalClients.length}</span>
+                <span className="text-sm font-mono font-black text-white">{selectedCampaignClientIds.length} / {bulkCampaignRecipients.length}</span>
               </div>
             </div>
           </div>
