@@ -3384,7 +3384,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                             {testSmtpResult.success ? '✔ ' : '❌ '} {testSmtpResult.message}
                             {!testSmtpResult.success && testSmtpResult.message.includes('timeout') && (
                               <div className="mt-2 text-yellow-400">
-                                💡 Tip: Intenta usar el puerto <strong>465</strong> (con SSL/TLS) en lugar del puerto 587. El puerto 465 suele funcionar mejor con Google Workspace.
+                                💡 Tip: Si estás probando la aplicación desde el enlace compartido, ten en cuenta que el servidor bloquea por seguridad los puertos SMTP (465/587), lo que causa este "Timeout". Para hacer envíos reales, deberás descargar el código o usar una pasarela API (como Resend o SendGrid) que opere en el puerto HTTPS (443).
                               </div>
                             )}
                             {!testSmtpResult.success && testSmtpResult.message.includes('ENOTFOUND') && (

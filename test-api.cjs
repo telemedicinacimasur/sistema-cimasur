@@ -5,7 +5,7 @@ async function test() {
     body: JSON.stringify({
       config: {
         smtpServer: 'smtp.gmail.com',
-        smtpPort: '465',
+        smtpPort: '587',
         smtpUser: 'comercial@cimasur.cl',
         smtpPass: 'gscz csib mrfk isuh',
         nombre: 'Prueba'
