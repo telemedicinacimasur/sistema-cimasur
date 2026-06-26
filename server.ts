@@ -49,6 +49,9 @@ async function startServer() {
         host: config.smtpServer,
         port: portInt,
         secure: portInt === 465,
+        connectionTimeout: 10000, // 10 seconds timeout
+        greetingTimeout: 10000, // 10 seconds
+        socketTimeout: 15000, // 15 seconds
         auth: {
           user: config.smtpUser,
           pass: config.smtpPass,

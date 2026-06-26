@@ -1098,7 +1098,15 @@ export function ClubSocialManager() {
         })
       });
 
-      const data = await res.json();
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const textResponse = await res.text();
+        throw new Error(`El servidor devolvió un error inesperado (posible timeout de red). ${res.status} ${res.statusText}`);
+      }
+
       if (res.ok && data.results && data.results[0]?.status === 'success') {
         setTestSmtpResult({ success: true, message: `¡Verificación Exitosa! Correo de prueba despachado con éxito a ${testEmailTarget}.` });
         saveSmtpSettings(smtpHost, smtpPort, smtpUser, smtpPass, smtpSenderName);
@@ -1297,20 +1305,18 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
         })
       });
 
-      if (!res.ok) {
-        let errMessage = 'Fallo general en la pasarela SMTP.';
-        try {
-          const errData = await res.json();
-          if (errData && errData.error) {
-            errMessage = errData.error;
-          }
-        } catch (e) {
-          // ignore JSON parsing errors
-        }
-        throw new Error(errMessage);
+      let responseData;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        responseData = await res.json();
+      } else {
+        const textResponse = await res.text();
+        throw new Error(`El servidor devolvió un error inesperado (posible timeout de red o puertos SMTP bloqueados). Status: ${res.status} ${res.statusText}`);
       }
 
-      const responseData = await res.json();
+      if (!res.ok) {
+        throw new Error(responseData?.error || 'Fallo general en la pasarela SMTP.');
+      }
       const resultsMap = responseData.results || [];
       
       const finalResults = [];
@@ -3371,7 +3377,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                             {testSmtpResult.success ? '✔ ' : '❌ '} {testSmtpResult.message}
                             {!testSmtpResult.success && testSmtpResult.message.includes('timeout') && (
                               <div className="mt-2 text-yellow-400">
-                                💡 Tip: Si el puerto 465 falla por timeout, intenta usar el puerto <strong>587</strong>. (Dependiendo de la red, algunos puertos SMTP pueden estar bloqueados).
+                                💡 Tip: Intenta usar el puerto <strong>465</strong> (con SSL/TLS) en lugar del puerto 587. El puerto 465 suele funcionar mejor con Google Workspace.
                               </div>
                             )}
                           </div>
