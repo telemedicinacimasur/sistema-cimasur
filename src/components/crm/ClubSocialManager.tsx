@@ -1128,6 +1128,71 @@ export function ClubSocialManager() {
     }
   };
 
+  // Load expert pre-written CIMASUR template directly and instantly (No AI / No API key required)
+  const handleLoadLocalTemplateDirectly = () => {
+    if (selectedCampaignClientIds.length === 0) {
+      alert('Por favor seleccione al menos un socio de CIMASUR para cargar la plantilla.');
+      return;
+    }
+    
+    const objectiveText = campaignObjective === 'pertenencia_categoria_intranet' ? 'Pertenencia a Categoría e Intranet (Vademécum y Fichas)' :
+                          campaignObjective === 'subir_categoria_incentivo' ? 'Estímulo para Subir de Categoría (Upgrade)' :
+                          campaignObjective === 'envio_gratis_promocion' ? 'Promoción Envío Gratis Sin Mínimo' :
+                          campaignObjective === 'intranet_sin_compra_orientacion' ? 'Activos en Intranet Sin Compra (Asesoría)' :
+                          campaignObjective === 'reactivacion_gracia' ? 'Plazo de Gracia Especial (30 Días de Beneficios con Var. Caída)' :
+                          campaignObjective === 'alianza_comercial' ? 'Alianza Preferencial CIMASUR (Análisis de Categoría 2026)' :
+                          campaignObjective === 'descuento_excepcional' ? 'Descuento del 15% Excepcional en la Próxima Reposición' :
+                          'Invitación a Testeo Sin Costo de la Nueva Línea de Alérgenos';
+
+    let localEmailSubject = '';
+    let localEmailText = '';
+    let localWhatsAppText = '';
+    
+    if (campaignObjective === 'pertenencia_categoria_intranet') {
+      localEmailSubject = 'Estatus Oficial Club CIMASUR: Tu Categoría {{CATEGORIA_2026}} y Acceso exclusivo a Intranet';
+      localEmailText = `Estimada Dra. {{NOMBRE}},\n\nEsperamos que tenga una excelente jornada en {{CLINICA}}.\n\nQueremos informarle oficialmente que pertenece a la prestigiosa categoría {{CATEGORIA_2026}} en nuestro Club de Socios CIMASUR, lo que le otorga soporte farmacéutico prioritario y condiciones comerciales exclusivas para sus recetas.\n\nLe recordamos con gran entusiasmo que cuenta con acceso totalmente activo a nuestra Intranet de Socios, diseñada especialmente para profesionales de la salud animal. En ella, usted puede revisar de forma directa:\n- Fichas técnicas detalladas de nuestras formulaciones magistrales.\n- Vademécum completo de productos oficiales de CIMASUR.\n- Monografías clínicas y protocolos para patologías complejas.\n- Herramientas de dosificación asistida para nuestras fórmulas.\n\n¿Ha podido explorar su cuenta o prefiere que le brindemos una breve inducción para aprovechar al máximo estos recursos?\n\nQuedamos a su entero servicio,\nFernanda Contreras\nFidelización y Relaciones Clínicas\nCIMASUR - Chile`;
+      localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🌸 Un gran saludo de parte del equipo de Fidelización de CIMASUR.\n\nQueremos informarle que actualmente se encuentra activa en la categoría *{{CATEGORIA_2026}}* de nuestro Club de Socios, gozando de todos sus beneficios asociados. 🩺✨\n\nLe recordamos además que tiene habilitada nuestra *Intranet Exclusiva*, donde puede descargar de forma gratuita el Vademécum completo de productos, fichas técnicas y protocolos clínicos para patologías veterinarias. 💻📚\n\n¿Le gustaría que le enviemos un enlace directo de acceso rápido o requiere asistencia? ¡Estamos listos para apoyarle! 🥰`;
+    } else if (campaignObjective === 'subir_categoria_incentivo') {
+      localEmailSubject = '¡Estás muy cerca de subir de categoría! Desbloquea mayores beneficios en el Club CIMASUR';
+      localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de parte del equipo comercial de CIMASUR. Esperamos que todo marche excelente en {{CLINICA}}.\n\nAl revisar el estatus de su cuenta, nos alegra ver su continuo compromiso con la terapia homeopática de sus pacientes. Queremos informarle que se encuentra a un paso muy corto de ascender de categoría en nuestro Club de Socios. Al subir de categoría, desbloqueará de forma inmediato beneficios mejorados como:\n- Descuentos fijos más altos en todas sus reposiciones.\n- Despachos express gratuitos y prioritarios en todo Chile.\n- Acceso anticipado a lotes limitados y fórmulas magistrales exclusivas.\n- Soporte personalizado directo con nuestro laboratorio.\n\nPara impulsarle a lograr este upgrade en su próximo ciclo de compras, le hemos asignado un cupón preferente y facilidades excepcionales para reabastecer sus productos favoritos de alta rotación.\n\n¿Le gustaría conversar sobre la brecha exacta de compras para su upgrade y cómo podemos ayudarle a alcanzarla de forma óptima?\n\nCordialmente,\nFernanda Contreras\nDepartamento de Cuentas y Fidelización\nCIMASUR - Chile`;
+      localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚀 ¿Cómo está? Le escribimos con excelentes noticias desde CIMASUR. Al revisar su actividad en {{CLINICA}}, notamos que está súper cerca de subir de categoría en nuestro Club de Socios. ⭐✨\n\nEste ascenso le dará derecho a mayores descuentos, prioridad máxima de laboratorio y despachos totalmente gratuitos.\n\nPara ayudarle a conseguir este upgrade, le ofrecemos facilidades en su próxima reposición de fórmulas magistrales. ¿Le gustaría saber la brecha exacta de compras y coordinar una propuesta sugerida hoy? ¡Un gran abrazo! 🩺🌸`;
+    } else if (campaignObjective === 'envio_gratis_promocion') {
+      localEmailSubject = 'Beneficio Exclusivo Club CIMASUR: Envío gratis sin mínimo de compra para {{CLINICA}}';
+      localEmailText = `Estimada Dra. {{NOMBRE}},\n\nJunto con saludarle con el cariño de siempre de parte del equipo de Farmacias Homeopáticas CIMASUR, esperamos que tenga una fantástica semana en su clínica {{CLINICA}}.\n\nPara agradecer su lealtad profesional y asegurar que sus pacientes cuenten siempre con sus tratamientos a tiempo, nos complace informarle que hemos activado un beneficio especial en su cuenta de socio:\n\n*ENVÍO TOTALMENTE GRATUITO SIN MÍNIMO DE COMPRA EN SU PRÓXIMA REPOSICIÓN*\n\nEste beneficio es ideal para reabastecer de forma inmediata aquellas fórmulas homeopáticas que sus pacientes necesitan con urgencia, ya sean productos de alta rotación o fórmulas magistrales, sin preocuparse por los costos de flete o montos mínimos de despacho.\n\n¿Desea que le ayudemos a ingresar un pedido rápido con despacho gratuito garantizado para despacho inmediato?\n\nAtentamente,\nFernanda Contreras\nÁrea de Fidelización de Socios\nCIMASUR - Chile`;
+      localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚚✨ ¡Excelentes noticias de CIMASUR! Queremos informarle que hemos activado en su cuenta un beneficio de *Despacho Totalmente Gratis Sin Mínimo de Compra* para su clínica {{CLINICA}}.\n\nIdeal para reponer con total tranquilidad aquellas fórmulas homeopáticas prioritarias de sus pacientes. 🌸🩺\n\n¿Le ayudamos a preparar un pedido express para enviarlo hoy mismo sin costos adicionales? ¡Escríbanos o responda este mensaje! 🥰`;
+    } else if (campaignObjective === 'intranet_sin_compra_orientacion') {
+      localEmailSubject = 'Bienvenida a la Intranet CIMASUR: ¿Le gustaría recibir orientación de uso o conocer beneficios de una primera compra?';
+      localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de bienvenida en nombre de todo el equipo clínico de CIMASUR. Esperamos que todo marche de forma espectacular en {{CLINICA}}.\n\nNos hemos percatado con agrado de que se encuentra activa y registrada en nuestra Intranet de Socios, explorando nuestras herramientas digitales y material científico. ¡Ese es un excelente primer paso para incorporar la medicina homeopática de alta calidad en sus pacientes!\n\nComo sabemos lo valioso que es su tiempo, queríamos preguntarle:\n¿Le gustaría recibir una breve orientación personalizada por teléfono o WhatsApp para conocer el uso clínico de nuestras fórmulas?\n\nAdemás, queremos informarle que los socios que realizan su primera compra en CIMASUR cuentan con grandes beneficios exclusivos de bienvenida:\n- 15% de descuento directo de bienvenida en su primer pedido de reabastecimiento.\n- Despacho prioritario sin costo a su clínica.\n- Envío de un Kit de Vademécum Físico de regalo para su consulta.\n\nEstaremos encantados de resolver sus dudas sobre dosificaciones o protocolos terapéuticos.\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+      localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🩺✨ Le saluda Fernanda de CIMASUR. Nos hemos percatado con mucha alegría que ya está activa y explorando nuestra *Intranet de Socios* de CIMASUR. ¡Bienvenida! 💻🌿\n\nComo sabemos que está conociendo nuestras fórmulas veterinarias, nos encantaría apoyarle: ¿Le gustaría recibir una breve orientación telefónica o resolver dudas sobre dosificaciones o patologías?\n\nRecuerde que para su primera compra de bienvenida tiene un *15% de descuento especial*, despacho gratis y el Vademécum Físico de regalo para su clínica en {{CLINICA}}. 🎁🌸 ¿Conversamos?`;
+    } else if (campaignObjective === 'reactivacion_gracia') {
+      localEmailSubject = '¡Importante!: Prórroga extraordinaria de recalificación CIMASUR 2026';
+      localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica {{CLINICA}}.\n\nEn CIMASUR valoramos profundamente el bienestar de sus pacientes y el lazo profesional que nos une. Entendiendo la dinámica laboral de los veterinarios y que sus reposiciones clínicas han tenido variaciones, queremos confirmarle una excelente noticia: le hemos otorgado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026.\n\nGracias a esta medida, usted conservará todos los beneficios exclusivos de la categoría {{CATEGORIA_2026}} sin ninguna alteración. Además, para apoyarle a mantener su stock clínico ideal, le ofrecemos:\n- Despacho gratuito en su próximo pedido.\n- Prioridad de entrega en 24-48 horas hábiles en todo Chile.\n- Muestras clínicas gratuitas en compras seleccionadas.\n\n¿Le gustaría que coordinemos su próximo reabastecimiento con despacho prioritario?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+      localWhatsAppText = `¡Hola, Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada clínica en {{CLINICA}}.\n\nQueremos confirmarle que, para resguardar su importante labor y mantener sus beneficios preferenciales de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado una *Prórroga Excepcional de Recalificación hasta el 30 de Junio*. 🩺✨\n\nPodrá seguir solicitando sus reposiciones de nuestras fórmulas magistrales con despacho gratis garantizado y soporte prioritario.\n\n¿Desea que le ayudemos a coordinar un despacho sugerido para esta semana? ¡Escríbanos o responda por esta vía! Un afectuoso saludo. 🥰🏥`;
+    } else if (campaignObjective === 'descuento_excepcional') {
+      localEmailSubject = 'Beneficio Especial de Reposición: 15% Descuento Excepcional en CIMASUR';
+      localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos que tenga una excelente semana en {{CLINICA}}.\n\nQueremos informarle que, como parte de los beneficios de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado un cupón de descuento excepcional del 15% de descuento para su próximo pedido de reabastecimiento.\n\nEste beneficio es ideal para renovar su stock de nuestras fórmulas de alta rotación.\n\n¿Le ayudamos a preparar un pedido sugerido con despacho preferente hoy?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
+      localWhatsAppText = `¡Estimado/a Dr/a. {{NOMBRE}}! ✨ Un afectuoso saludo de parte del equipo CIMASUR. Esperamos que esté teniendo una excelente semana en {{CLINICA}}.\n\nComo socio de la categoría {{CATEGORIA_2026}}, le ofrecemos un *Descuento Excepcional del 15%* en su próximo pedido de reposición, ideal para reabastecer sus fórmulas de alta rotación.\n\n¿Le ayudamos a preparar un pedido sugerido con despacho preferente? ¡Un gran abrazo! 🩺`;
+    } else {
+      localEmailSubject = 'Estatus de Beneficios Club CIMASUR para Dr/a. {{NOMBRE}}';
+      localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nJunto con saludarle afectuosamente en nombre de todo el equipo de Farmacia Homeopática CIMASUR de Chile, le escribimos para agradecer su constante confianza en nuestras fórmulas magistrales homeopáticas en {{CLINICA}}.\n\nQueremos recordarle que actualmente se encuentra activo en la categoría {{CATEGORIA_2026}} del Club de Socios, lo que le garantiza soporte prioritario, stock reservado y excelentes condiciones de compra.\n\nSi necesita asesoría técnica en la dosificación de nuestras fórmulas para alguno de sus pacientes, recuerde que nuestro equipo clínico está siempre disponible para asistirle sin costo.\n\n¿Le ayudamos a coordinar su pedido de reposición semanal para mantener su farmacia al día?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
+      localWhatsAppText = `¡Estimado/a Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada en {{CLINICA}}.\n\nQueremos agradecer su confianza continua en nuestras soluciones homeopáticas. Actualmente cuenta con estatus activo en la categoría *{{CATEGORIA_2026}}* de nuestro Club de Socios.\n\nRecuerde que ante cualquier duda con recetas o dosificaciones, nuestro equipo clínico está para apoyarle. ¿Desea realizar alguna reposición para esta semana? ¡Que tenga un excelente día! 🩺`;
+    }
+    
+    setBulkEmailSubject(localEmailSubject);
+    setBulkEmailText(localEmailText);
+    setBulkWhatsAppText(localWhatsAppText);
+    setUsingLocalFallback(true);
+
+    setChatHistory(prev => [
+      ...prev,
+      {
+        sender: 'ia',
+        text: `⚡ Plantilla oficial cargada de manera local e instantánea (sin IA) para el objetivo: "${objectiveText}". Puedes revisarla y editarla libremente en los paneles de arriba.`
+      }
+    ]);
+    setPreviewTab('email');
+  };
+
   // Generate Group Campaign templates with Gemini IA
   const handleGenerateGroupCampaignIA = async () => {
     if (selectedCampaignClientIds.length === 0) {
@@ -2698,23 +2763,35 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                 </div>
               </div>
 
-              <button
-                onClick={handleGenerateGroupCampaignIA}
-                disabled={isGeneratingBulk || selectedCampaignClientIds.length === 0}
-                className="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-extrabold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-              >
-                {isGeneratingBulk ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Gemini analizando objetivos, redactando y configurando diseño gráfico...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>⚡ Generar Propuesta de Redacción con IA para el Grupo Seleccionado</span>
-                  </>
-                )}
-              </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  onClick={handleLoadLocalTemplateDirectly}
+                  disabled={selectedCampaignClientIds.length === 0}
+                  className="bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-40"
+                  title="Carga la plantilla oficial redactada por expertos de forma instantánea sin usar IA ni requerir API Keys"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>📋 Cargar Plantilla Oficial (Instantáneo, Sin IA)</span>
+                </button>
+
+                <button
+                  onClick={handleGenerateGroupCampaignIA}
+                  disabled={isGeneratingBulk || selectedCampaignClientIds.length === 0}
+                  className="bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {isGeneratingBulk ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Gemini redactando propuesta...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>⚡ Generar Propuesta con IA (Requiere API Key)</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* TABBED INTERACTION INTERFACE: EMAIL VIEW, WHATSAPP VIEW, CONFIG */}
@@ -3355,6 +3432,30 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                               </a>.
                             </p>
                           )}
+                        </div>
+                      </div>
+
+                      {/* Explanation of Render's SMTP port block and HTTP API fallback */}
+                      <div className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-300 leading-relaxed p-3.5 rounded-xl space-y-1.5">
+                        <strong className="text-amber-200 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider">
+                          ⚠️ ¿POR QUÉ DA TIMEOUT O CONEXIÓN FALLIDA EN RENDER?
+                        </strong>
+                        <p>
+                          La plataforma de alojamiento <strong>Render bloquea por defecto todos los puertos SMTP salientes (25, 465, 587)</strong> para evitar spam. Por lo tanto, cualquier intento de conectarse por SMTP tradicional (como smtp.gmail.com) desde el servidor de Render fallará con un "Connection timeout" o "Network Unreachable".
+                        </p>
+                        <div className="pt-1.5 border-t border-amber-500/10 space-y-1">
+                          <p className="font-extrabold text-white text-[10.5px]">🚀 SOLUCIÓN DEFINITIVA: Conexión mediante API HTTP (Nunca se bloquea)</p>
+                          <p>
+                            Hemos integrado un bypass inteligente. Puedes registrarte gratis en <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="underline text-sky-400 font-bold hover:text-sky-300">Resend.com</a> (tarda 1 minuto) para obtener una API Key y configurarla aquí de la siguiente manera:
+                          </p>
+                          <ul className="list-disc pl-4 space-y-1 text-slate-300 mt-1">
+                            <li><strong>Servidor SMTP:</strong> Escribe <code className="bg-slate-950 px-1.5 py-0.5 rounded text-amber-200">resend</code></li>
+                            <li><strong>Usuario Autenticación:</strong> Tu correo electrónico verificado en Resend (remitente)</li>
+                            <li><strong>Contraseña SMTP:</strong> Pega tu API Key de Resend (empieza con <code className="bg-slate-950 px-1.5 py-0.5 rounded text-amber-200">re_...</code>)</li>
+                          </ul>
+                          <p className="text-[9.5px] text-slate-400 italic mt-1">
+                            * Al detectar "resend" como servidor, el sistema usará el puerto seguro 443 (HTTPS) para transmitir los correos de forma instantánea y garantizada, evadiendo el bloqueo de puertos de Render.
+                          </p>
                         </div>
                       </div>
 

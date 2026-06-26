@@ -48,6 +48,85 @@ async function startServer() {
     }
 
     try {
+      const isResend = config.smtpServer && (config.smtpServer.toLowerCase().includes('resend') || config.smtpPass.startsWith('re_'));
+      const isSendGrid = config.smtpServer && (config.smtpServer.toLowerCase().includes('sendgrid') || config.smtpPass.startsWith('SG.'));
+
+      // Resend API Bypass (Port 443 HTTPS - Never blocked by Render)
+      if (isResend) {
+        console.log(`[SMTP Bypass] Sending via Resend API (Host: ${config.smtpServer})`);
+        const apiKey = config.smtpPass;
+        const results = [];
+        
+        for (const item of emails) {
+          try {
+            const response = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                from: `"${config.nombre}" <${config.smtpUser}>`,
+                to: [item.to],
+                subject: item.subject,
+                text: item.text,
+                html: item.html || undefined,
+              })
+            });
+
+            const data = await response.json() as any;
+            if (response.ok && data.id) {
+              results.push({ email: item.to, status: 'success' });
+            } else {
+              throw new Error(data?.message || JSON.stringify(data));
+            }
+          } catch (err: any) {
+            console.error(`Error sending via Resend API to ${item.to}:`, err);
+            results.push({ email: item.to, status: 'error', error: err.message });
+          }
+        }
+        return res.json({ results });
+      }
+
+      // SendGrid API Bypass (Port 443 HTTPS - Never blocked by Render)
+      if (isSendGrid) {
+        console.log(`[SMTP Bypass] Sending via SendGrid API (Host: ${config.smtpServer})`);
+        const apiKey = config.smtpPass;
+        const results = [];
+        
+        for (const item of emails) {
+          try {
+            const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                personalizations: [{ to: [{ email: item.to }] }],
+                from: { email: config.smtpUser, name: config.nombre },
+                subject: item.subject,
+                content: [
+                  { type: 'text/plain', value: item.text },
+                  { type: 'text/html', value: item.html || item.text }
+                ]
+              })
+            });
+
+            if (response.ok) {
+              results.push({ email: item.to, status: 'success' });
+            } else {
+              const errData = await response.json() as any;
+              throw new Error(errData?.errors?.[0]?.message || JSON.stringify(errData));
+            }
+          } catch (err: any) {
+            console.error(`Error sending via SendGrid API to ${item.to}:`, err);
+            results.push({ email: item.to, status: 'error', error: err.message });
+          }
+        }
+        return res.json({ results });
+      }
+
       const portInt = parseInt(config.smtpPort, 10);
       
       // Resolve IPv4 manually to bypass IPv6 ENETUNREACH errors in sandboxes/Render
