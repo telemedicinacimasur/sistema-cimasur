@@ -322,6 +322,7 @@ export function ClubSocialManager() {
   const [bulkEmailText, setBulkEmailText] = useState<string>('Estimado/a {{NOMBRE}},\n\nLe saludamos afectuosamente desde CIMASUR Chile, su farmacia homeopática veterinaria de referencia.\n\nRevisando nuestro sistema de fidelización del Club Comercial, observamos que su centro clínico {{CLINICA}} mantiene el acceso preferente a la categoría {{CATEGORIA_2026}} (con su beneficio estrella: {{BENEFICIO_PRINCIPAL}}).\n\nNo obstante, notamos que no registra órdenes recientes de reposición en este ciclo. Como queremos seguir apoyándolo en sus casos clínicos veterinarios, le hemos activado de forma excepcional un PLAZO DE GRACIA ESPECIAL de 30 días y despacho completamente gratuito (vía Blue Express) en su próximo pedido de fórmulas magistrales.\n\n¿Le gustaría coordinar una cotización preferencial o recibir una llamada de asesoramiento?\n\nQuedamos a su entera disposición.');
   const [bulkWhatsAppText, setBulkWhatsAppText] = useState<string>('Hola Dr/a. {{NOMBRE}} de {{CLINICA}} 🐾 Le saluda el equipo del Club CIMASUR. Queremos recordarle que mantiene sus beneficios preferentes de categoría {{CATEGORIA_2026}}. Para apoyarle, le otorgamos un plazo de gracia especial de 30 días y despacho gratis. ¿Le gustaría cotizar algún Kit de fórmulas? ¡Saludos!');
   const [selectedCampaignClientIds, setSelectedCampaignClientIds] = useState<string[]>([]);
+  const [dispatchedWhatsAppIds, setDispatchedWhatsAppIds] = useState<string[]>([]);
   
   // Bulk sending execution states
   const [isBulkSending, setIsBulkSending] = useState<boolean>(false);
@@ -1191,6 +1192,110 @@ export function ClubSocialManager() {
       }
     ]);
     setPreviewTab('email');
+  };
+
+  // Open individual WhatsApp message with variable substitution for "one by one" dispatch
+  const handleOpenIndividualWhatsApp = async (clientId: string) => {
+    const client = criticalClients.find(c => c.id === clientId);
+    if (!client) return;
+
+    let cleanPhone = (client.phone || '').replace(/[^0-9+]/g, '');
+    if (!cleanPhone) {
+      alert(`El socio ${client.name} no tiene número de teléfono registrado.`);
+      return;
+    }
+    if (!cleanPhone.startsWith('+')) {
+      cleanPhone = `+56${cleanPhone}`; // Default to Chile
+    }
+
+    const changePct = (client.percentChange || 0) * 100;
+    const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+
+    // Compile message individually with actual partner variables
+    const resolvedWhatsApp = bulkWhatsAppText
+      .replace(/\{\{NOMBRE\}\}/g, client.name || 'Doctor/a')
+      .replace(/\{\{CLINICA\}\}/g, client.clinica || client.clinic || 'su Centro Clínico')
+      .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+      .replace(/\{\{CATEGORIA_2026\}\}/g, client.calculatedTier?.name || client.category2026 || 'Socio Especial')
+      .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, client.calculatedTier?.primaryBenefit || 'beneficios preferenciales');
+
+    try {
+      const nowStr = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
+      const stamp = `[${nowStr} - WhatsApp Campaña Directa]: Abrir chat directo uno por uno para envío de campaña.`;
+      const currentHist = client.historialUnificado || '';
+      const updatedHist = currentHist ? `${stamp}\n${currentHist}` : stamp;
+
+      await localDB.updateInCollection('contacts', client.id, {
+        ultimoWhatsapp: nowStr,
+        historialUnificado: updatedHist
+      });
+
+      // Mark as dispatched locally in state
+      if (!dispatchedWhatsAppIds.includes(clientId)) {
+        setDispatchedWhatsAppIds(prev => [...prev, clientId]);
+      }
+
+      window.dispatchEvent(new Event('db-change'));
+
+      // Open WhatsApp Web/API URL
+      const url = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanPhone)}&text=${encodeURIComponent(resolvedWhatsApp)}`;
+      window.open(url, '_blank');
+    } catch (e) {
+      console.error(e);
+      alert('Error al registrar la actividad en el historial local.');
+    }
+  };
+
+  // Open email bulk compose in local email client (Thunderbird, Outlook, etc) via mailto with BCC
+  const handleOpenThunderbirdMailto = () => {
+    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    if (targets.length === 0) {
+      alert('Por favor seleccione al menos un socio comercial.');
+      return;
+    }
+
+    const emailsList = targets.map(c => c.email).filter(Boolean);
+    if (emailsList.length === 0) {
+      alert('Los socios seleccionados no tienen correos electrónicos válidos registrados.');
+      return;
+    }
+
+    // Join emails with commas for BCC to guarantee recipient privacy
+    const bccPart = emailsList.join(',');
+
+    // Resolve general text since a single BCC mail is sent to multiple people
+    const resolvedBody = bulkEmailText
+      .replace(/\{\{NOMBRE\}\}/g, 'Doctor/a')
+      .replace(/\{\{CLINICA\}\}/g, 'su Centro Clínico')
+      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Comercial')
+      .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, 'los beneficios preferentes del Club');
+
+    // Create mailto url with standard parameters
+    const mailtoUrl = `mailto:comercial@cimasur.cl?bcc=${encodeURIComponent(bccPart)}&subject=${encodeURIComponent(bulkEmailSubject)}&body=${encodeURIComponent(resolvedBody)}`;
+    
+    // Log activity in each individual client history
+    targets.forEach(async (client) => {
+      try {
+        const nowStr = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
+        const stamp = `[${nowStr} - Campaña Correo Local]: Redireccionado a cliente de correo local (Thunderbird/Outlook) para envío masivo de campaña.`;
+        const currentHist = client.historialUnificado || '';
+        const updatedHist = currentHist ? `${stamp}\n${currentHist}` : stamp;
+
+        await localDB.updateInCollection('contacts', client.id, {
+          ultimoCorreo: nowStr,
+          historialUnificado: updatedHist
+        });
+      } catch (err) {
+        console.error('Error logging local email activity:', err);
+      }
+    });
+
+    window.dispatchEvent(new Event('db-change'));
+    
+    // Open the local client
+    window.location.href = mailtoUrl;
+
+    alert(`¡Redirección exitosa! Se ha abierto su cliente de correo predeterminado (como Thunderbird) con ${emailsList.length} destinatarios cargados en copia oculta (BCC) para resguardar la privacidad. Las bitácoras individuales de los socios han sido actualizadas.`);
   };
 
   // Generate Group Campaign templates with Gemini IA
@@ -2860,24 +2965,41 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                         </div>
                       </div>
 
-                      {/* Despatch trigger */}
-                      <button
-                        onClick={handleSendBulkEmailCampaign}
-                        disabled={isBulkSending || selectedCampaignClientIds.length === 0}
-                        className="w-full bg-sky-500 hover:bg-sky-400 text-slate-900 font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-40 shadow-lg shadow-sky-500/10 mt-4"
-                      >
-                        {isBulkSending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Despachando Correos Reales...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4" />
-                            <span>🚀 Iniciar Emailing Masivo Real ({selectedCampaignClientIds.length} Socios)</span>
-                          </>
-                        )}
-                      </button>
+                      {/* Despatch trigger options */}
+                      <div className="space-y-3 mt-4">
+                        <button
+                          onClick={handleOpenThunderbirdMailto}
+                          disabled={selectedCampaignClientIds.length === 0}
+                          className="w-full bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-40 shadow-lg shadow-blue-500/15"
+                        >
+                          <Send className="w-4 h-4" />
+                          <span>📬 Abrir en Cliente de Correo Local (Thunderbird / Outlook) con BCC ({selectedCampaignClientIds.length} Socios)</span>
+                        </button>
+
+                        <div className="flex items-center my-2 select-none">
+                          <div className="flex-grow border-t border-slate-800"></div>
+                          <span className="text-[9px] text-slate-500 px-3 uppercase font-black tracking-widest">O enviar por SMTP en línea</span>
+                          <div className="flex-grow border-t border-slate-800"></div>
+                        </div>
+
+                        <button
+                          onClick={handleSendBulkEmailCampaign}
+                          disabled={isBulkSending || selectedCampaignClientIds.length === 0}
+                          className="w-full bg-[#070b16] hover:bg-slate-900 text-sky-400 border border-sky-500/30 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-40"
+                        >
+                          {isBulkSending ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Despachando Correos por SMTP...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="w-3.5 h-3.5" />
+                              <span>🚀 Enviar vía Servidor SMTP Integrado ({selectedCampaignClientIds.length} Socios)</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Right Column: High-fidelity Visual Preview */}
@@ -3172,32 +3294,106 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                 {previewTab === 'whatsapp' && (
                   <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 animate-fadeIn">
                     
-                    {/* Left Column: WhatsApp Text & Template Editor */}
+                    {/* Left Column: WhatsApp Text, Template Editor & Individual Chat Dispatcher List */}
                     <div className="xl:col-span-5 space-y-4 flex flex-col justify-between">
                       <div className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-[#25D366] uppercase tracking-wider block">Cuerpo del Mensaje WhatsApp</label>
                           <textarea
-                            rows={12}
+                            rows={8}
                             value={bulkWhatsAppText}
                             onChange={(e) => setBulkWhatsAppText(e.target.value)}
-                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 p-3.5 rounded-xl text-xs font-sans focus:outline-none focus:border-sky-500/30 leading-relaxed resize-none"
+                            className="w-full bg-[#070b16] border border-slate-800 text-slate-200 p-3.5 rounded-xl text-xs font-sans focus:outline-none focus:border-[#25D366]/30 leading-relaxed resize-none"
+                            placeholder="Mensaje de WhatsApp con etiquetas {{NOMBRE}}, {{CLINICA}}, etc."
                           />
                         </div>
 
-                        <div className="p-3 bg-emerald-950/10 border border-emerald-900/15 rounded-xl text-[10px] leading-relaxed text-slate-400 font-medium">
-                          <strong className="text-white block mb-0.5">Padrón de WhatsApp:</strong> WhatsApp no autoriza despachos automáticos directos sin API de Meta corporativo. Por ello, CIMASUR le permite descargar un CSV estructurado listo para enviar por WAAM u otras herramientas locales, registrando el envío de forma inmediata en las fichas individuales de cada socio.
+                        {/* Interactive One-by-One Dispatcher List */}
+                        <div className="bg-[#091022] border border-slate-850 rounded-xl p-3.5 space-y-3">
+                          <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span className="text-[10px] font-black uppercase text-[#25D366] tracking-wider block">
+                              💬 DESPACHO DIRECTO UNO POR UNO ({selectedCampaignClientIds.length})
+                            </span>
+                            <span className="text-[9px] bg-[#25D366]/10 text-[#25D366] font-bold px-2 py-0.5 rounded-full">
+                              Progreso: {dispatchedWhatsAppIds.filter(id => selectedCampaignClientIds.includes(id)).length} / {selectedCampaignClientIds.length}
+                            </span>
+                          </div>
+
+                          {selectedCampaignClientIds.length === 0 ? (
+                            <p className="text-[10px] text-slate-500 text-center py-4 italic">
+                              Seleccione socios a la izquierda para cargarlos en el despachador directo.
+                            </p>
+                          ) : (
+                            <div className="max-h-[220px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                              {criticalClients
+                                .filter(client => selectedCampaignClientIds.includes(client.id))
+                                .map((client) => {
+                                  const isDispatched = dispatchedWhatsAppIds.includes(client.id);
+                                  return (
+                                    <div 
+                                      key={client.id} 
+                                      className={`p-2.5 rounded-lg border transition-all flex items-center justify-between gap-3 ${
+                                        isDispatched 
+                                          ? 'bg-slate-900/40 border-emerald-950/30 opacity-70' 
+                                          : 'bg-[#070b16] border-slate-850 hover:border-slate-800'
+                                      }`}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[10.5px] font-extrabold text-white truncate block">
+                                            {client.name}
+                                          </span>
+                                          {isDispatched && (
+                                            <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-bold px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0">
+                                              <Check className="w-2.5 h-2.5" />
+                                              Abierto
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="text-[9.5px] text-slate-400 block truncate leading-tight">
+                                          🏥 {client.clinica || client.clinic || 'Clínica Veterinaria'}
+                                        </span>
+                                        <span className="text-[8.5px] text-slate-500 block font-mono">
+                                          📞 {client.phone || 'Sin Teléfono'}
+                                        </span>
+                                      </div>
+
+                                      <button
+                                        onClick={() => handleOpenIndividualWhatsApp(client.id)}
+                                        className={`px-3 py-1.5 rounded-lg text-[9.5px] font-extrabold flex items-center gap-1 transition-all active:scale-95 shrink-0 ${
+                                          isDispatched
+                                            ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-950/40'
+                                            : 'bg-[#25D366] hover:bg-[#1fbe58] text-black font-extrabold shadow-lg shadow-emerald-500/5'
+                                        }`}
+                                        title={`Abrir chat directo para ${client.name}`}
+                                      >
+                                        <ExternalLink className="w-3 h-3" />
+                                        <span>Abrir Chat</span>
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
+
+                          <p className="text-[9px] text-slate-450 leading-relaxed pt-1 border-t border-slate-800/60">
+                            💡 Al presionar <strong>"Abrir Chat"</strong> se abrirá una nueva pestaña con el mensaje 100% personalizado para ese socio y se registrará de inmediato en su historial clínico-comercial.
+                          </p>
                         </div>
                       </div>
 
-                      <button
-                        onClick={handleDownloadWhatsAppCSV}
-                        disabled={selectedCampaignClientIds.length === 0}
-                        className="w-full bg-[#25D366] hover:bg-[#1fbe58] text-black font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-40 shadow-lg shadow-emerald-500/10 mt-4"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>📥 Descargar CSV de Campaña para WhatsApp ({selectedCampaignClientIds.length} Socios)</span>
-                      </button>
+                      {/* Secondary CSV Download option as requested */}
+                      <div className="pt-2">
+                        <button
+                          onClick={handleDownloadWhatsAppCSV}
+                          disabled={selectedCampaignClientIds.length === 0}
+                          className="w-full bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800 py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+                          title="Descargar padrón estructurado completo para herramientas externas de envío masivo"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Descargar CSV como respaldo opcional ({selectedCampaignClientIds.length} Socios)</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Right Column: High-fidelity WhatsApp Cellphone Mockup */}
