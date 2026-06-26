@@ -1296,7 +1296,16 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
       });
 
       if (!res.ok) {
-        throw new Error('Fallo general en la pasarela SMTP.');
+        let errMessage = 'Fallo general en la pasarela SMTP.';
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) {
+            errMessage = errData.error;
+          }
+        } catch (e) {
+          // ignore JSON parsing errors
+        }
+        throw new Error(errMessage);
       }
 
       const responseData = await res.json();
@@ -1342,6 +1351,81 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
     } finally {
       setIsBulkSending(false);
     }
+  };
+
+  const handleDownloadEml = () => {
+    if (selectedCampaignClientIds.length === 0) {
+      alert('Por favor seleccione al menos un socio.');
+      return;
+    }
+
+    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    const bccList = targets.map(t => t.email).filter(Boolean).join(', ');
+    
+    // We will use the first target to render the template (as EML is a single file, 
+    // it's not possible to have dynamic variables per recipient in a standard EML for BCC).
+    const representativeClient = targets[0] || {} as any;
+    
+    const changePct = (representativeClient.percentChange || 0) * 100;
+    const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+    
+    const resolvedSubject = bulkEmailSubject
+      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
+      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
+      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial');
+
+    // Replace the placeholders in text since EML goes out via BCC and can't be hyper-personalized per recipient
+    const safeText = bulkEmailText
+      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
+      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
+      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial')
+      .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+      .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, 'Beneficios preferenciales');
+
+    const htmlBody = compileHtmlTemplate(representativeClient, safeText, designerAccentColor);
+
+    const emlContent = `To: ${smtpSenderName || 'CIMASUR'} <${smtpUser || 'marketing@cimasur.cl'}>
+Bcc: ${bccList}
+Subject: ${resolvedSubject}
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+${htmlBody}
+`;
+    const blob = new Blob([emlContent], { type: 'message/rfc822' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Campaña_Masiva_${new Date().getTime()}.eml`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleMailto = () => {
+    if (selectedCampaignClientIds.length === 0) {
+      alert('Por favor seleccione al menos un socio.');
+      return;
+    }
+    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    const bccList = targets.map(t => t.email).filter(Boolean).join(',');
+    
+    const representativeClient = targets[0] || {} as any;
+    const changePct = (representativeClient.percentChange || 0) * 100;
+    const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+
+    const resolvedSubject = bulkEmailSubject
+      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
+      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
+      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial');
+
+    const safeText = bulkEmailText
+      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
+      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
+      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial')
+      .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+      .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, 'Beneficios preferenciales');
+
+    window.location.href = `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodeURIComponent(resolvedSubject)}&body=${encodeURIComponent(safeText)}`;
   };
 
   // Download complete bulk WhatsApp payload in structured CSV for broadcast tools
@@ -2777,6 +2861,27 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                           </>
                         )}
                       </button>
+
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <button
+                          onClick={handleMailto}
+                          disabled={isBulkSending || selectedCampaignClientIds.length === 0}
+                          className="w-full bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-slate-300 font-extrabold py-2 rounded-xl text-[10px] flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+                          title="Abre la aplicación de correo por defecto (ej. Thunderbird) con los destinatarios en Copia Oculta (BCC)."
+                        >
+                          <Mail className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Abrir en Thunderbird / Mailto</span>
+                        </button>
+                        <button
+                          onClick={handleDownloadEml}
+                          disabled={isBulkSending || selectedCampaignClientIds.length === 0}
+                          className="w-full bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-slate-300 font-extrabold py-2 rounded-xl text-[10px] flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+                          title="Descarga la plantilla HTML en formato .EML para abrir y enviar desde Thunderbird conservando el diseño."
+                        >
+                          <Download className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Descargar como .EML (HTML)</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Right Column: High-fidelity Visual Preview */}

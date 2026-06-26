@@ -88,6 +88,12 @@ export default function CimasurInventoryManager() {
   const isBaseModule = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(activeTab);
   const isMatrixView = activeTab === 'MATRIZ COMPLETA';
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [activeTab, activeModule, activeCategory]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -297,6 +303,41 @@ export default function CimasurInventoryManager() {
       } catch (err) {
         console.error("Error al eliminar el registro de la matriz:", err);
         alert('Error al intentar eliminar el registro.');
+      }
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (confirm(`¿Está seguro de que desea eliminar los ${selectedIds.length} registros seleccionados de ${activeTab.replace(' CS', '')}? Esta acción no se puede deshacer.`)) {
+      try {
+        for (const id of selectedIds) {
+          await localDB.deleteFromCollection('inventory_master', id);
+        }
+        alert(`Se eliminaron ${selectedIds.length} registros con éxito.`);
+        setSelectedIds([]);
+        await loadData();
+      } catch (err) {
+        console.error("Error al eliminar registros seleccionados:", err);
+        alert('Hubo un error al intentar eliminar algunos registros.');
+      }
+    }
+  };
+
+  const handleDeleteAllFiltered = async () => {
+    const currentFiltered = getFilteredRecords();
+    if (currentFiltered.length === 0) return;
+    if (confirm(`¡ADVERTENCIA CRÍTICA! ¿Está completamente seguro de que desea eliminar TODOS los ${currentFiltered.length} registros visibles del módulo/tab ${activeTab.replace(' CS', '')}? Esta acción no se puede deshacer.`)) {
+      try {
+        for (const r of currentFiltered) {
+          await localDB.deleteFromCollection('inventory_master', r.id);
+        }
+        alert(`Se eliminaron todos los ${currentFiltered.length} registros con éxito.`);
+        setSelectedIds([]);
+        await loadData();
+      } catch (err) {
+        console.error("Error al eliminar todos los registros filtrados:", err);
+        alert('Hubo un error al intentar eliminar todos los registros.');
       }
     }
   };
@@ -676,6 +717,49 @@ export default function CimasurInventoryManager() {
                 </button>
               </div>
             </div>
+
+            {/* Acciones Masivas Sub-Bar */}
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-red-950/20 border border-red-500/20 rounded-2xl shadow-inner">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-red-400" />
+                <div>
+                  <span className="text-xs font-black text-red-200 uppercase tracking-widest block leading-none">Acciones Masivas</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 block">
+                    {selectedIds.length} seleccionados de {filtered.length} visibles
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedIds.length === 0}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5",
+                    selectedIds.length > 0
+                      ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20"
+                      : "bg-red-500/10 text-red-500/30 border border-red-500/10 cursor-not-allowed"
+                  )}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Eliminar Seleccionados ({selectedIds.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAllFiltered}
+                  disabled={filtered.length === 0}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5",
+                    filtered.length > 0
+                      ? "bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30"
+                      : "bg-[#152035] text-slate-500 border border-[#1E293B]/60 cursor-not-allowed"
+                  )}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Eliminar Todo ({filtered.length})
+                </button>
+              </div>
+            </div>
           </div>
  
           <div className="flex flex-col flex-1 min-h-0">
@@ -684,6 +768,26 @@ export default function CimasurInventoryManager() {
               <table className="w-full text-left">
                 <thead className="sticky top-0 z-10 bg-[#111A2E] border-b border-[#1E293B]">
                   <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest bg-[#111A2E]">
+                    <th className="p-4 w-12 text-center border-r border-[#1E293B] bg-[#111A2E] sticky top-0">
+                      <input 
+                        type="checkbox"
+                        className="rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-sky-500 focus:ring-opacity-25 cursor-pointer w-4 h-4"
+                        checked={filtered.length > 0 && filtered.every(r => selectedIds.includes(r.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(prev => {
+                              const newIds = [...prev];
+                              filtered.forEach(r => {
+                                if (!newIds.includes(r.id)) newIds.push(r.id);
+                              });
+                              return newIds;
+                            });
+                          } else {
+                            setSelectedIds(prev => prev.filter(id => !filtered.some(r => r.id === id)));
+                          }
+                        }}
+                      />
+                    </th>
                     {getHeadersForTab(activeTab).map((h, i) => (
                       <th key={i} className={`p-4 border-r border-[#1E293B] bg-[#111A2E] sticky top-0 ${i === 0 ? 'w-32' : ''}`}>{h}</th>
                     ))}
@@ -696,6 +800,20 @@ export default function CimasurInventoryManager() {
                       const rowVals = getRowForTab(r, activeTab);
                       return (
                       <tr key={r.id || i} className="hover:bg-[#1E293B] group transition-all duration-300">
+                        <td className="p-4 text-center border-r border-[#1E293B] w-12 bg-transparent">
+                          <input 
+                            type="checkbox"
+                            className="rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-sky-500 focus:ring-opacity-25 cursor-pointer w-4 h-4"
+                            checked={selectedIds.includes(r.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds(prev => [...prev, r.id]);
+                              } else {
+                                setSelectedIds(prev => prev.filter(id => id !== r.id));
+                              }
+                            }}
+                          />
+                        </td>
                         {rowVals.map((val, idx) => {
                           const isPrice = (isBaseModule || isMatrixView) && idx === rowVals.length - 1;
                           return (
@@ -727,7 +845,7 @@ export default function CimasurInventoryManager() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="p-12 text-center">
+                      <td colSpan={getHeadersForTab(activeTab).length + 2} className="p-12 text-center">
                         <div className="flex flex-col items-center justify-center text-slate-400">
                           <Box className="w-12 h-12 mb-4 text-slate-300" />
                           <p className="text-sm font-medium">No hay registros almacenados.</p>
