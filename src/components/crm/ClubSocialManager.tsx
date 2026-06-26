@@ -3382,14 +3382,14 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                         {testSmtpResult && (
                           <div className={`p-2.5 rounded-lg border text-[11px] leading-relaxed font-medium ${testSmtpResult.success ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-400' : 'bg-red-950/20 border-red-900/40 text-red-400'}`}>
                             {testSmtpResult.success ? '✔ ' : '❌ '} {testSmtpResult.message}
-                            {!testSmtpResult.success && testSmtpResult.message.includes('timeout') && (
-                              <div className="mt-2 text-yellow-400">
-                                💡 Tip: Si estás probando la aplicación desde el enlace compartido, ten en cuenta que el servidor bloquea por seguridad los puertos SMTP (465/587), lo que causa este "Timeout". Para hacer envíos reales, deberás descargar el código o usar una pasarela API (como Resend o SendGrid) que opere en el puerto HTTPS (443).
-                              </div>
-                            )}
                             {!testSmtpResult.success && testSmtpResult.message.includes('ENOTFOUND') && (
                               <div className="mt-2 text-yellow-400">
                                 💡 Tip: Parece que el servidor SMTP "{smtpHost}" no existe. Si usas Google Workspace o Gmail, el servidor SMTP debe ser obligatoriamente <strong>smtp.gmail.com</strong>.
+                              </div>
+                            )}
+                            {!testSmtpResult.success && testSmtpResult.message.includes('BadCredentials') && (
+                              <div className="mt-2 text-yellow-400">
+                                💡 Importante: Google bloqueó el inicio de sesión porque estás usando tu contraseña normal. Debes generar una <strong>Contraseña de Aplicación de 16 dígitos</strong> en tu cuenta de Google. Sigue el enlace que aparece arriba ("Generar aquí").
                               </div>
                             )}
                           </div>
