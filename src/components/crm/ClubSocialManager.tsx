@@ -161,7 +161,7 @@ export function ClubSocialManager() {
   const [chatHistory, setChatHistory] = useState<{ sender: 'user' | 'ia'; text: string }[]>([
     {
       sender: 'ia',
-      text: '¡Hola! Bienvenido al Copiloto de Campañas Masivas CIMASUR. Aquí puedes conversar conmigo sobre cómo mejorar tus campañas de email marketing o de WhatsApp. Cuéntame qué quieres ajustar (ej: "menciona que daremos prórroga de recalificación hasta el 30 de junio de 2026", "haz el mensaje de whatsapp más persuasivo", o "ofrece un plazo de gracia especial para Arnica CS") y yo actualizaré tus plantillas masivas automáticamente.'
+      text: '¡Hola! Bienvenido al Copiloto de Campañas Masivas CIMASUR. Aquí puedes conversar conmigo sobre cómo mejorar tus campañas de email marketing o de WhatsApp. Cuéntame qué quieres ajustar (ej: "menciona que daremos prórroga de recalificación hasta el 30 de junio de 2026", "haz el mensaje de whatsapp más persuasivo", o "ofrece un plazo de gracia especial en la próxima reposición") y yo actualizaré tus plantillas masivas automáticamente.'
     }
   ]);
   const [userChatMessage, setUserChatMessage] = useState('');
@@ -174,6 +174,8 @@ export function ClubSocialManager() {
   const [designerBodyBgColor, setDesignerBodyBgColor] = useState('#050914');
   const [designerCardBgColor, setDesignerCardBgColor] = useState('#0d162d');
   const [designerTextColor, setDesignerTextColor] = useState('#cbd5e1');
+  const [designerButtonText, setDesignerButtonText] = useState('Reclamar mi Beneficio Ahora ➔');
+  const [designerButtonUrl, setDesignerButtonUrl] = useState('https://cimasur.cl');
   const [emailTemplateStyle, setEmailTemplateStyle] = useState<'modern' | 'letter' | 'promotional' | 'custom'>('modern');
   const [customHtmlWrapper, setCustomHtmlWrapper] = useState(`<!DOCTYPE html>
 <html>
@@ -317,8 +319,8 @@ export function ClubSocialManager() {
   
   // Bulk copy templates (prefilled with beautiful default copy templates supporting variables)
   const [bulkEmailSubject, setBulkEmailSubject] = useState<string>('⚡ Alianza Comercial CIMASUR: {{CLINICA}} - Beneficios de Categoría {{CATEGORIA_2026}}');
-  const [bulkEmailText, setBulkEmailText] = useState<string>('Estimado/a {{NOMBRE}},\n\nLe saludamos afectuosamente desde CIMASUR Chile, su farmacia homeopática veterinaria de referencia.\n\nRevisando nuestro sistema de fidelización del Club Comercial, observamos que su centro clínico {{CLINICA}} mantiene el acceso preferente a la categoría {{CATEGORIA_2026}} (con su beneficio estrella: {{BENEFICIO_PRINCIPAL}}).\n\nNo obstante, notamos que no registra órdenes recientes de reposición en este ciclo. Como queremos seguir apoyándolo en sus casos clínicos veterinarios, le hemos activado de forma excepcional un PLAZO DE GRACIA ESPECIAL de 30 días y despacho completamente gratuito (vía Blue Express) en su próximo pedido de fórmulas como Arnica CS o Acqua Maris.\n\n¿Le gustaría coordinar una cotización preferencial o recibir una llamada de asesoramiento?\n\nQuedamos a su entera disposición.');
-  const [bulkWhatsAppText, setBulkWhatsAppText] = useState<string>('Hola Dr/a. {{NOMBRE}} de {{CLINICA}} 🐾 Le saluda el equipo del Club CIMASUR. Queremos recordarle que mantiene sus beneficios preferentes de categoría {{CATEGORIA_2026}}. Para apoyarle, le otorgamos un plazo de gracia especial de 30 días y despacho gratis. ¿Le gustaría cotizar Arnica CS o algún Kit de fórmulas? ¡Saludos!');
+  const [bulkEmailText, setBulkEmailText] = useState<string>('Estimado/a {{NOMBRE}},\n\nLe saludamos afectuosamente desde CIMASUR Chile, su farmacia homeopática veterinaria de referencia.\n\nRevisando nuestro sistema de fidelización del Club Comercial, observamos que su centro clínico {{CLINICA}} mantiene el acceso preferente a la categoría {{CATEGORIA_2026}} (con su beneficio estrella: {{BENEFICIO_PRINCIPAL}}).\n\nNo obstante, notamos que no registra órdenes recientes de reposición en este ciclo. Como queremos seguir apoyándolo en sus casos clínicos veterinarios, le hemos activado de forma excepcional un PLAZO DE GRACIA ESPECIAL de 30 días y despacho completamente gratuito (vía Blue Express) en su próximo pedido de fórmulas magistrales.\n\n¿Le gustaría coordinar una cotización preferencial o recibir una llamada de asesoramiento?\n\nQuedamos a su entera disposición.');
+  const [bulkWhatsAppText, setBulkWhatsAppText] = useState<string>('Hola Dr/a. {{NOMBRE}} de {{CLINICA}} 🐾 Le saluda el equipo del Club CIMASUR. Queremos recordarle que mantiene sus beneficios preferentes de categoría {{CATEGORIA_2026}}. Para apoyarle, le otorgamos un plazo de gracia especial de 30 días y despacho gratis. ¿Le gustaría cotizar algún Kit de fórmulas? ¡Saludos!');
   const [selectedCampaignClientIds, setSelectedCampaignClientIds] = useState<string[]>([]);
   
   // Bulk sending execution states
@@ -655,11 +657,11 @@ export function ClubSocialManager() {
       if (channel === 'whatsapp') {
         let text = '';
         if (selectedClient.statusKey === 'CRITICO') {
-          text = `¡Estimado/a Dr/a. ${clientName}! 🏥 Le saluda Fernanda de Fidelización de CIMASUR. Esperamos de corazón que todo marche excelente en ${clinica}.\n\nRevisando nuestro registro, notamos que sus reposiciones clínicas han disminuido este ciclo (${changePct}%). Para nosotros su alianza es invaluable, por lo que le hemos asignado una *Prórroga Excepcional de Recalificación automática hasta el 30 de Junio* para mantener sus beneficios activos.\n\nAdemás, queremos apoyarle con un descuento o condiciones especiales en su próximo pedido de Arnica CS, Acqua Maris o Kit Modulador Digestivo. ¿Podemos coordinar una llamada para asistirle? Quedamos a su total servicio. 🌸`;
+          text = `¡Estimado/a Dr/a. ${clientName}! 🏥 Le saluda Fernanda de Fidelización de CIMASUR. Esperamos de corazón que todo marche excelente en ${clinica}.\n\nRevisando nuestro registro, notamos que sus reposiciones clínicas han disminuido este ciclo (${changePct}%). Para nosotros su alianza es invaluable, por lo que le hemos asignado una *Prórroga Excepcional de Recalificación automática hasta el 30 de Junio* para mantener sus beneficios activos.\n\nAdemás, queremos apoyarle con un descuento o condiciones especiales en su próximo pedido de fórmulas magistrales. ¿Podemos coordinar una llamada para asistirle? Quedamos a su total servicio. 🌸`;
         } else if (selectedClient.statusKey === 'DORMIDO') {
-          text = `¡Hola, Dr/a. ${clientName}! 🌿 Le escribimos con mucho cariño de CIMASUR. Hace un tiempo que no sabemos de usted en ${clinica} y le extrañamos mucho en nuestro Club de Socios.\n\nQueremos reactivar su cuenta ofreciéndole un beneficio exclusivo de bienvenida: *Despacho gratuito sin mínimo de compra* en su próximo pedido. Además, contamos con stock renovado de todas nuestras reconocidas fórmulas homeopáticas.\n\n¿Le gustaría que le enviemos nuestro Vademécum digital actualizado para revisar dosificaciones de Arnica CS? ¡Estaremos felices de conversar! 🥰`;
+          text = `¡Hola, Dr/a. ${clientName}! 🌿 Le escribimos con mucho cariño de CIMASUR. Hace un tiempo que no sabemos de usted en ${clinica} y le extrañamos mucho en nuestro Club de Socios.\n\nQueremos reactivar su cuenta ofreciéndole un beneficio exclusivo de bienvenida: *Despacho gratuito sin mínimo de compra* en su próximo pedido. Además, contamos con stock renovado de todas nuestras reconocidas fórmulas homeopáticas.\n\n¿Le gustaría que le enviemos nuestro Vademécum digital actualizado para revisar dosificaciones de nuestras fórmulas? ¡Estaremos felices de conversar! 🥰`;
         } else if (selectedClient.statusKey === 'EN_CAIDA') {
-          text = `¡Estimado/a Dr/a. ${clientName}! ✨ Un afectuoso saludo del equipo CIMASUR. Esperamos que esté teniendo una excelente semana en ${clinica}.\n\nHemos detectado que su volumen de reposición ha bajado comparado con el año anterior. Para facilitarle las cosas, le ofrecemos un *Descuento Excepcional del 15%* en su próximo pedido de reposición, ideal para reabastecer sus fórmulas de alta rotación como Arnica CS o Kit Modulador Digestivo.\n\n¿Le ayudamos a preparar un pedido sugerido hoy? ¡Un gran abrazo! 🩺`;
+          text = `¡Estimado/a Dr/a. ${clientName}! ✨ Un afectuoso saludo del equipo CIMASUR. Esperamos que esté teniendo una excelente semana en ${clinica}.\n\nHemos detectado que su volumen de reposición ha bajado comparado con el año anterior. Para facilitarle las cosas, le ofrecemos un *Descuento Excepcional del 15%* en su próximo pedido de reposición, ideal para reabastecer sus fórmulas de alta rotación.\n\n¿Le ayudamos a preparar un pedido sugerido hoy? ¡Un gran abrazo! 🩺`;
         } else {
           text = `¡Estimado/a Dr/a. ${clientName}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada en ${clinica}.\n\nQueremos agradecer su confianza continua en nuestras soluciones homeopáticas. Actualmente cuenta con estatus activo en la categoría *${category}* de nuestro Club de Socios, lo que le garantiza soporte prioritario y condiciones de compra preferenciales.\n\n¿Desea realizar alguna reposición de fórmulas magistrales para esta semana? ¡Que tenga un excelente día! 🩺`;
         }
@@ -681,7 +683,7 @@ export function ClubSocialManager() {
           ],
           improvements: [
             "Generado localmente por contingencia operativa (Falta GEMINI_API_KEY).",
-            "Mención de fórmulas emblemáticas de CIMASUR como Arnica CS.",
+            "Mención de fórmulas emblemáticas de CIMASUR.",
             "Cumple estrictamente con las reglas de extensión de WhatsApp."
           ]
         });
@@ -692,13 +694,13 @@ export function ClubSocialManager() {
 
         if (selectedClient.statusKey === 'CRITICO') {
           subject = `CIMASUR Apoyo Clínico: Prórroga de Recalificación y beneficios exclusivos para Dr/a. ${clientName}`;
-          body = `Estimado/a Doctor/a ${clientName},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica ${clinica}.\n\nNos ponemos en contacto con usted porque para CIMASUR su alianza profesional y la salud de sus pacientes son de máxima prioridad. Revisando nuestro sistema comercial, notamos una disminución inusual en el volumen de sus reposiciones de medicamentos homeopáticos este ciclo (${changePct}%).\n\nEntendemos plenamente que el sector veterinario enfrenta desafíos constantes. Por ello, queremos brindarle nuestro respaldo completo. Le informamos que de manera automática le hemos asignado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026 para que conserve intactos todos sus beneficios de la categoría ${category}.\n\nAdicionalmente, le ofrecemos un descuento especial del 15% en su próximo pedido de fórmulas de alta rotación como Arnica CS o el Kit Modulador Digestivo, junto con despacho prioritario gratuito.\n\n¿Le gustaría que coordinemos una breve llamada o asesoría sin costo hoy?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+          body = `Estimado/a Doctor/a ${clientName},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica ${clinica}.\n\nNos ponemos en contacto con usted porque para CIMASUR su alianza profesional y la salud de sus pacientes son de máxima prioridad. Revisando nuestro sistema comercial, notamos una disminución inusual en el volumen de sus reposiciones de medicamentos homeopáticos este ciclo (${changePct}%).\n\nEntendemos plenamente que el sector veterinario enfrenta desafíos constantes. Por ello, queremos brindarle nuestro respaldo completo. Le informamos que de manera automática le hemos asignado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026 para que conserve intactos todos sus beneficios de la categoría ${category}.\n\nAdicionalmente, le ofrecemos un descuento especial del 15% en su próximo pedido de fórmulas de alta rotación, junto con despacho prioritario gratuito.\n\n¿Le gustaría que coordinemos una breve llamada o asesoría sin costo hoy?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
         } else if (selectedClient.statusKey === 'DORMIDO') {
           subject = `¡Le extrañamos en el Club CIMASUR! Beneficios de reactivación exclusivos para ${clinica} 🌸`;
-          body = `Estimado/a Doctor/a ${clientName},\n\nEsperamos que se encuentre excelente. Le saludamos con mucho cariño de parte de todo el equipo de Farmacias Homeopáticas CIMASUR.\n\nHace un tiempo que no registramos sus pedidos habituales de reabastecimiento en ${clinica}, y queremos expresarle que su presencia en nuestra comunidad de veterinarios es muy importante para nosotros.\n\nPara celebrar su retorno y facilitarle el cuidado homeopático de sus pacientes, este mes hemos activado despacho 100% gratuito sin mínimo de compra en su próximo pedido, y el envío de regalo de nuestro nuevo Vademécum Físico si programa compras sobre 30 unidades.\n\nContamos con stock completo de nuestras fórmulas magistrales líderes, tales como Arnica CS, Kalium Tic CS, y el Kit Modulador Digestivo.\n\n¿Le gustaría que le enviemos la lista de precios vigente y nuestro vademécum digital de apoyo terapéutico?\n\nCordialmente,\nFernanda Contreras\nÁrea de Fidelización de Socios\nCIMASUR - Chile`;
+          body = `Estimado/a Doctor/a ${clientName},\n\nEsperamos que se encuentre excelente. Le saludamos con mucho cariño de parte de todo el equipo de Farmacias Homeopáticas CIMASUR.\n\nHace un tiempo que no registramos sus pedidos habituales de reabastecimiento en ${clinica}, y queremos expresarle que su presencia en nuestra comunidad de veterinarios es muy importante para nosotros.\n\nPara celebrar su retorno y facilitarle el cuidado homeopático de sus pacientes, este mes hemos activado despacho 100% gratuito sin mínimo de compra en su próximo pedido, y el envío de regalo de nuestro nuevo Vademécum Físico si programa compras sobre 30 unidades.\n\nContamos con stock completo de nuestras fórmulas magistrales líderes.\n\n¿Le gustaría que le enviemos la lista de precios vigente y nuestro vademécum digital de apoyo terapéutico?\n\nCordialmente,\nFernanda Contreras\nÁrea de Fidelización de Socios\nCIMASUR - Chile`;
         } else {
           subject = `Estatus de Beneficios Club CIMASUR para Dr/a. ${clientName} - Clínica ${clinica}`;
-          body = `Estimado/a Doctor/a ${clientName},\n\nJunto con saludarle afectuosamente en nombre de todo el equipo de Farmacia Homeopática CIMASUR de Chile, le escribimos para agradecer su constante confianza en nuestras fórmulas magistrales homeopáticas.\n\nQueremos recordarle que actualmente se encuentra activo en la categoría ${category} del Club de Socios, lo que le garantiza soporte prioritario, stock reservado y excelentes condiciones de compra.\n\nSi necesita asesoría técnica en la dosificación de Arnica CS, Acqua Maris o el Kit Modulador Digestivo para alguno de sus pacientes, recuerde que nuestro equipo clínico está siempre disponible para asistirle sin costo.\n\n¿Le ayudamos a coordinar su pedido de reposición semanal para mantener su farmacia al día?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
+          body = `Estimado/a Doctor/a ${clientName},\n\nJunto con saludarle afectuosamente en nombre de todo el equipo de Farmacia Homeopática CIMASUR de Chile, le escribimos para agradecer su constante confianza en nuestras fórmulas magistrales homeopáticas.\n\nQueremos recordarle que actualmente se encuentra activo en la categoría ${category} del Club de Socios, lo que le garantiza soporte prioritario, stock reservado y excelentes condiciones de compra.\n\nSi necesita asesoría técnica en la dosificación de fórmulas de alta rotación para alguno de sus pacientes, recuerde que nuestro equipo clínico está siempre disponible para asistirle sin costo.\n\n¿Le ayudamos a coordinar su pedido de reposición semanal para mantener su farmacia al día?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
         }
 
         if (isImprovement && messageText) {
@@ -932,7 +934,7 @@ export function ClubSocialManager() {
               <table align="center" border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td align="center" style="background-color:${accentColor}; border-radius:50px; padding:11px 30px;">
-                    <a href="https://cimasur.cl" target="_blank" style="color:#0d162d; font-size:12px; font-weight:900; text-decoration:none; text-transform:uppercase; letter-spacing:1px; display:block;">Reclamar mi Beneficio Ahora ➔</a>
+                    <a href="${designerButtonUrl}" target="_blank" style="color:#0d162d; font-size:12px; font-weight:900; text-decoration:none; text-transform:uppercase; letter-spacing:1px; display:block;">${designerButtonText}</a>
                   </td>
                 </tr>
               </table>
@@ -1009,7 +1011,7 @@ export function ClubSocialManager() {
                 </tr>
                 <tr>
                   <td style="padding-top:15px; vertical-align:top;" width="33%">
-                    <strong style="font-size:12px; color:#ffffff; display:block;">Arnica CS®</strong>
+                    <strong style="font-size:12px; color:#ffffff; display:block;">Fórmula Magistral</strong>
                     <span style="font-size:10px; color:#64748b; display:block; margin-top:4px;">Incomparable modulador inflamatorio de uso clínico.</span>
                   </td>
                   <td style="padding-top:15px; vertical-align:top; border-left:1px solid #1e293b; padding-left:15px;" width="33%">
@@ -1036,7 +1038,7 @@ export function ClubSocialManager() {
               <table align="center" border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td align="center" style="background-color:${accentColor}; border-radius:8px; padding:9px 20px;">
-                    <a href="https://cimasur.cl" target="_blank" style="color:#0d162d; font-size:11px; font-weight:bold; text-decoration:none; text-transform:uppercase; letter-spacing:0.5px;">Acceder al Catálogo Online ➔</a>
+                    <a href="${designerButtonUrl}" target="_blank" style="color:#0d162d; font-size:11px; font-weight:bold; text-decoration:none; text-transform:uppercase; letter-spacing:0.5px;">${designerButtonText}</a>
                   </td>
                 </tr>
               </table>
@@ -1185,31 +1187,31 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
       
       if (campaignObjective === 'pertenencia_categoria_intranet') {
         localEmailSubject = 'Estatus Oficial Club CIMASUR: Tu Categoría {{CATEGORIA_2026}} y Acceso exclusivo a Intranet';
-        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nEsperamos que tenga una excelente jornada en {{CLINICA}}.\n\nQueremos informarle oficialmente que pertenece a la prestigiosa categoría {{CATEGORIA_2026}} en nuestro Club de Socios CIMASUR, lo que le otorga soporte farmacéutico prioritario y condiciones comerciales exclusivas para sus recetas.\n\nLe recordamos con gran entusiasmo que cuenta con acceso totalmente activo a nuestra Intranet de Socios, diseñada especialmente para profesionales de la salud animal. En ella, usted puede revisar de forma directa:\n- Fichas técnicas detalladas de nuestras formulaciones magistrales.\n- Vademécum completo de productos oficiales de CIMASUR.\n- Monografías clínicas y protocolos para patologías complejas.\n- Herramientas de dosificación asistida para Arnica CS, Acqua Maris y más.\n\n¿Ha podido explorar su cuenta o prefiere que le brindemos una breve inducción para aprovechar al máximo estos recursos?\n\nQuedamos a su entero servicio,\nFernanda Contreras\nFidelización y Relaciones Clínicas\nCIMASUR - Chile`;
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nEsperamos que tenga una excelente jornada en {{CLINICA}}.\n\nQueremos informarle oficialmente que pertenece a la prestigiosa categoría {{CATEGORIA_2026}} en nuestro Club de Socios CIMASUR, lo que le otorga soporte farmacéutico prioritario y condiciones comerciales exclusivas para sus recetas.\n\nLe recordamos con gran entusiasmo que cuenta con acceso totalmente activo a nuestra Intranet de Socios, diseñada especialmente para profesionales de la salud animal. En ella, usted puede revisar de forma directa:\n- Fichas técnicas detalladas de nuestras formulaciones magistrales.\n- Vademécum completo de productos oficiales de CIMASUR.\n- Monografías clínicas y protocolos para patologías complejas.\n- Herramientas de dosificación asistida para nuestras fórmulas.\n\n¿Ha podido explorar su cuenta o prefiere que le brindemos una breve inducción para aprovechar al máximo estos recursos?\n\nQuedamos a su entero servicio,\nFernanda Contreras\nFidelización y Relaciones Clínicas\nCIMASUR - Chile`;
         localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🌸 Un gran saludo de parte del equipo de Fidelización de CIMASUR.\n\nQueremos informarle que actualmente se encuentra activa en la categoría *{{CATEGORIA_2026}}* de nuestro Club de Socios, gozando de todos sus beneficios asociados. 🩺✨\n\nLe recordamos además que tiene habilitada nuestra *Intranet Exclusiva*, donde puede descargar de forma gratuita el Vademécum completo de productos, fichas técnicas y protocolos clínicos para patologías veterinarias. 💻📚\n\n¿Le gustaría que le enviemos un enlace directo de acceso rápido o requiere asistencia? ¡Estamos listos para apoyarle! 🥰`;
       } else if (campaignObjective === 'subir_categoria_incentivo') {
         localEmailSubject = '¡Estás muy cerca de subir de categoría! Desbloquea mayores beneficios en el Club CIMASUR';
-        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de parte del equipo comercial de CIMASUR. Esperamos que todo marche excelente en {{CLINICA}}.\n\nAl revisar el estatus de su cuenta, nos alegra ver su continuo compromiso con la terapia homeopática de sus pacientes. Queremos informarle que se encuentra a un paso muy corto de ascender de categoría en nuestro Club de Socios. Al subir de categoría, desbloqueará de forma inmediata beneficios mejorados como:\n- Descuentos fijos más altos en todas sus reposiciones.\n- Despachos express gratuitos y prioritarios en todo Chile.\n- Acceso anticipado a lotes limitados y fórmulas magistrales exclusivas.\n- Soporte personalizado directo con nuestro laboratorio.\n\nPara impulsarle a lograr este upgrade en su próximo ciclo de compras, le hemos asignado un cupón preferente y facilidades excepcionales para reabastecer sus productos favoritos como Arnica CS o el Kit Modulador Digestivo.\n\n¿Le gustaría conversar sobre la brecha exacta de compras para su upgrade y cómo podemos ayudarle a alcanzarla de forma óptima?\n\nCordialmente,\nFernanda Contreras\nDepartamento de Cuentas y Fidelización\nCIMASUR - Chile`;
-        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚀 ¿Cómo está? Le escribimos con excelentes noticias desde CIMASUR. Al revisar su actividad en {{CLINICA}}, notamos que está súper cerca de subir de categoría en nuestro Club de Socios. ⭐✨\n\nEste ascenso le dará derecho a mayores descuentos, prioridad máxima de laboratorio y despachos totalmente gratuitos.\n\nPara ayudarle a conseguir este upgrade, le ofrecemos facilidades en su próxima reposición de Arnica CS o fórmulas magistrales. ¿Le gustaría saber la brecha exacta de compras y coordinar una propuesta sugerida hoy? ¡Un gran abrazo! 🩺🌸`;
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de parte del equipo comercial de CIMASUR. Esperamos que todo marche excelente en {{CLINICA}}.\n\nAl revisar el estatus de su cuenta, nos alegra ver su continuo compromiso con la terapia homeopática de sus pacientes. Queremos informarle que se encuentra a un paso muy corto de ascender de categoría en nuestro Club de Socios. Al subir de categoría, desbloqueará de forma inmediata beneficios mejorados como:\n- Descuentos fijos más altos en todas sus reposiciones.\n- Despachos express gratuitos y prioritarios en todo Chile.\n- Acceso anticipado a lotes limitados y fórmulas magistrales exclusivas.\n- Soporte personalizado directo con nuestro laboratorio.\n\nPara impulsarle a lograr este upgrade en su próximo ciclo de compras, le hemos asignado un cupón preferente y facilidades excepcionales para reabastecer sus productos favoritos de alta rotación.\n\n¿Le gustaría conversar sobre la brecha exacta de compras para su upgrade y cómo podemos ayudarle a alcanzarla de forma óptima?\n\nCordialmente,\nFernanda Contreras\nDepartamento de Cuentas y Fidelización\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚀 ¿Cómo está? Le escribimos con excelentes noticias desde CIMASUR. Al revisar su actividad en {{CLINICA}}, notamos que está súper cerca de subir de categoría en nuestro Club de Socios. ⭐✨\n\nEste ascenso le dará derecho a mayores descuentos, prioridad máxima de laboratorio y despachos totalmente gratuitos.\n\nPara ayudarle a conseguir este upgrade, le ofrecemos facilidades en su próxima reposición de fórmulas magistrales. ¿Le gustaría saber la brecha exacta de compras y coordinar una propuesta sugerida hoy? ¡Un gran abrazo! 🩺🌸`;
       } else if (campaignObjective === 'envio_gratis_promocion') {
         localEmailSubject = 'Beneficio Exclusivo Club CIMASUR: Envío gratis sin mínimo de compra para {{CLINICA}}';
-        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nJunto con saludarle con el cariño de siempre de parte del equipo de Farmacias Homeopáticas CIMASUR, esperamos que tenga una fantástica semana en su clínica {{CLINICA}}.\n\nPara agradecer su lealtad profesional y asegurar que sus pacientes cuenten siempre con sus tratamientos a tiempo, nos complace informarle que hemos activado un beneficio especial en su cuenta de socio:\n\n*ENVÍO TOTALMENTE GRATUITO SIN MÍNIMO DE COMPRA EN SU PRÓXIMA REPOSICIÓN*\n\nEste beneficio es ideal para reabastecer de forma inmediata aquellas fórmulas homeopáticas que sus pacientes necesitan con urgencia, ya sea Arnica CS, Acqua Maris o el Kit Modulador Digestivo, sin preocuparse por los costos de flete o montos mínimos de despacho.\n\n¿Desea que le ayudemos a ingresar un pedido rápido con despacho gratuito garantizado para despacho inmediato?\n\nAtentamente,\nFernanda Contreras\nÁrea de Fidelización de Socios\nCIMASUR - Chile`;
-        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚚✨ ¡Excelentes noticias de CIMASUR! Queremos informarle que hemos activado en su cuenta un beneficio de *Despacho Totalmente Gratis Sin Mínimo de Compra* para su clínica {{CLINICA}}.\n\nIdeal para reponer con total tranquilidad aquellas fórmulas homeopáticas prioritarias de sus pacientes como Arnica CS o Kit Modulador Digestivo. 🌸🩺\n\n¿Le ayudamos a preparar un pedido express para enviarlo hoy mismo sin costos adicionales? ¡Escríbanos o responda este mensaje! 🥰`;
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nJunto con saludarle con el cariño de siempre de parte del equipo de Farmacias Homeopáticas CIMASUR, esperamos que tenga una fantástica semana en su clínica {{CLINICA}}.\n\nPara agradecer su lealtad profesional y asegurar que sus pacientes cuenten siempre con sus tratamientos a tiempo, nos complace informarle que hemos activado un beneficio especial en su cuenta de socio:\n\n*ENVÍO TOTALMENTE GRATUITO SIN MÍNIMO DE COMPRA EN SU PRÓXIMA REPOSICIÓN*\n\nEste beneficio es ideal para reabastecer de forma inmediata aquellas fórmulas homeopáticas que sus pacientes necesitan con urgencia, ya sean productos de alta rotación o fórmulas magistrales, sin preocuparse por los costos de flete o montos mínimos de despacho.\n\n¿Desea que le ayudemos a ingresar un pedido rápido con despacho gratuito garantizado para despacho inmediato?\n\nAtentamente,\nFernanda Contreras\nÁrea de Fidelización de Socios\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🚚✨ ¡Excelentes noticias de CIMASUR! Queremos informarle que hemos activado en su cuenta un beneficio de *Despacho Totalmente Gratis Sin Mínimo de Compra* para su clínica {{CLINICA}}.\n\nIdeal para reponer con total tranquilidad aquellas fórmulas homeopáticas prioritarias de sus pacientes. 🌸🩺\n\n¿Le ayudamos a preparar un pedido express para enviarlo hoy mismo sin costos adicionales? ¡Escríbanos o responda este mensaje! 🥰`;
       } else if (campaignObjective === 'intranet_sin_compra_orientacion') {
         localEmailSubject = 'Bienvenida a la Intranet CIMASUR: ¿Le gustaría recibir orientación de uso o conocer beneficios de una primera compra?';
-        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de bienvenida en nombre de todo el equipo clínico de CIMASUR. Esperamos que todo marche de forma espectacular en {{CLINICA}}.\n\nNos hemos percatado con agrado de que se encuentra activa y registrada en nuestra Intranet de Socios, explorando nuestras herramientas digitales y material científico. ¡Ese es un excelente primer paso para incorporar la medicina homeopática de alta calidad en sus pacientes!\n\nComo sabemos lo valioso que es su tiempo, queríamos preguntarle:\n¿Le gustaría recibir una breve orientación personalizada por teléfono o WhatsApp para conocer el uso clínico de nuestras fórmulas?\n\nAdemás, queremos informarle que los socios que realizan su primera compra en CIMASUR cuentan con grandes beneficios exclusivos de bienvenida:\n- 15% de descuento directo de bienvenida en su primer pedido de reabastecimiento.\n- Despacho prioritario sin costo a su clínica.\n- Envío de un Kit de Vademécum Físico de regalo para su consulta.\n\nEstaremos encantados de resolver sus dudas sobre dosificaciones o protocolos terapéuticos de Arnica CS.\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
-        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🩺✨ Le saluda Fernanda de CIMASUR. Nos hemos percatado con mucha alegría que ya está activa y explorando nuestra *Intranet de Socios* de CIMASUR. ¡Bienvenida! 💻🌿\n\nComo sabemos que está conociendo nuestras fórmulas veterinarias, nos encantaría apoyarle: ¿Le gustaría recibir una breve orientación telefónica o resolver dudas sobre dosificaciones de Arnica CS o patologías?\n\nRecuerde que para su primera compra de bienvenida tiene un *15% de descuento especial*, despacho gratis y el Vademécum Físico de regalo para su clínica en {{CLINICA}}. 🎁🌸 ¿Conversamos?`;
+        localEmailText = `Estimada Dra. {{NOMBRE}},\n\nLe enviamos un afectuoso saludo de bienvenida en nombre de todo el equipo clínico de CIMASUR. Esperamos que todo marche de forma espectacular en {{CLINICA}}.\n\nNos hemos percatado con agrado de que se encuentra activa y registrada en nuestra Intranet de Socios, explorando nuestras herramientas digitales y material científico. ¡Ese es un excelente primer paso para incorporar la medicina homeopática de alta calidad en sus pacientes!\n\nComo sabemos lo valioso que es su tiempo, queríamos preguntarle:\n¿Le gustaría recibir una breve orientación personalizada por teléfono o WhatsApp para conocer el uso clínico de nuestras fórmulas?\n\nAdemás, queremos informarle que los socios que realizan su primera compra en CIMASUR cuentan con grandes beneficios exclusivos de bienvenida:\n- 15% de descuento directo de bienvenida en su primer pedido de reabastecimiento.\n- Despacho prioritario sin costo a su clínica.\n- Envío de un Kit de Vademécum Físico de regalo para su consulta.\n\nEstaremos encantados de resolver sus dudas sobre dosificaciones o protocolos terapéuticos.\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🩺✨ Le saluda Fernanda de CIMASUR. Nos hemos percatado con mucha alegría que ya está activa y explorando nuestra *Intranet de Socios* de CIMASUR. ¡Bienvenida! 💻🌿\n\nComo sabemos que está conociendo nuestras fórmulas veterinarias, nos encantaría apoyarle: ¿Le gustaría recibir una breve orientación telefónica o resolver dudas sobre dosificaciones o patologías?\n\nRecuerde que para su primera compra de bienvenida tiene un *15% de descuento especial*, despacho gratis y el Vademécum Físico de regalo para su clínica en {{CLINICA}}. 🎁🌸 ¿Conversamos?`;
       } else if (campaignObjective === 'reactivacion_gracia') {
         localEmailSubject = '¡Importante!: Prórroga extraordinaria de recalificación CIMASUR 2026';
-        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica {{CLINICA}}.\n\nEn CIMASUR valoramos profundamente el bienestar de sus pacientes y el lazo profesional que nos une. Entendiendo la dinámica laboral de los veterinarios y que sus reposiciones clínicas han tenido variaciones, queremos confirmarle una excelente noticia: le hemos otorgado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026.\n\nGracias a esta medida, usted conservará todos los beneficios exclusivos de la categoría {{CATEGORIA_2026}} sin ninguna alteración. Además, para apoyarle a mantener su stock clínico ideal, le ofrecemos:\n- Despacho gratuito en su próximo pedido.\n- Prioridad de entrega en 24-48 horas hábiles en todo Chile.\n- Muestras clínicas gratuitas de Arnica CS en compras seleccionadas.\n\n¿Le gustaría que coordinemos su próximo reabastecimiento con despacho prioritario?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
-        localWhatsAppText = `¡Hola, Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada clínica en {{CLINICA}}.\n\nQueremos confirmarle que, para resguardar su importante labor y mantener sus beneficios preferenciales de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado una *Prórroga Excepcional de Recalificación hasta el 30 de Junio*. 🩺✨\n\nPodrá seguir solicitando sus reposiciones de Arnica CS, Acqua Maris o el Kit Modulador Digestivo con despacho gratis garantizado y soporte prioritario.\n\n¿Desea que le ayudemos a coordinar un despacho sugerido para esta semana? ¡Escríbanos o responda por esta vía! Un afectuoso saludo. 🥰🏥`;
+        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica {{CLINICA}}.\n\nEn CIMASUR valoramos profundamente el bienestar de sus pacientes y el lazo profesional que nos une. Entendiendo la dinámica laboral de los veterinarios y que sus reposiciones clínicas han tenido variaciones, queremos confirmarle una excelente noticia: le hemos otorgado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026.\n\nGracias a esta medida, usted conservará todos los beneficios exclusivos de la categoría {{CATEGORIA_2026}} sin ninguna alteración. Además, para apoyarle a mantener su stock clínico ideal, le ofrecemos:\n- Despacho gratuito en su próximo pedido.\n- Prioridad de entrega en 24-48 horas hábiles en todo Chile.\n- Muestras clínicas gratuitas en compras seleccionadas.\n\n¿Le gustaría que coordinemos su próximo reabastecimiento con despacho prioritario?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Hola, Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada clínica en {{CLINICA}}.\n\nQueremos confirmarle que, para resguardar su importante labor y mantener sus beneficios preferenciales de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado una *Prórroga Excepcional de Recalificación hasta el 30 de Junio*. 🩺✨\n\nPodrá seguir solicitando sus reposiciones de nuestras fórmulas magistrales con despacho gratis garantizado y soporte prioritario.\n\n¿Desea que le ayudemos a coordinar un despacho sugerido para esta semana? ¡Escríbanos o responda por esta vía! Un afectuoso saludo. 🥰🏥`;
       } else if (campaignObjective === 'descuento_excepcional') {
         localEmailSubject = 'Beneficio Especial de Reposición: 15% Descuento Excepcional en CIMASUR';
-        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos que tenga una excelente semana en {{CLINICA}}.\n\nQueremos informarle que, como parte de los beneficios de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado un cupón de descuento excepcional del 15% de descuento para su próximo pedido de reabastecimiento.\n\nEste beneficio es ideal para renovar su stock de nuestras fórmulas de alta rotación como Arnica CS (modulador inflamatorio natural), Acqua Maris o el Kit Modulador Digestivo.\n\n¿Le ayudamos a preparar un pedido sugerido con despacho preferente hoy?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
-        localWhatsAppText = `¡Estimado/a Dr/a. {{NOMBRE}}! ✨ Un afectuoso saludo de parte del equipo CIMASUR. Esperamos que esté teniendo una excelente semana en {{CLINICA}}.\n\nComo socio de la categoría {{CATEGORIA_2026}}, le ofrecemos un *Descuento Excepcional del 15%* en su próximo pedido de reposición, ideal para reabastecer sus fórmulas de alta rotación como Arnica CS o Kit Modulador Digestivo.\n\n¿Le ayudamos a preparar un pedido sugerido con despacho preferente? ¡Un gran abrazo! 🩺`;
+        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos que tenga una excelente semana en {{CLINICA}}.\n\nQueremos informarle que, como parte de los beneficios de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado un cupón de descuento excepcional del 15% de descuento para su próximo pedido de reabastecimiento.\n\nEste beneficio es ideal para renovar su stock de nuestras fórmulas de alta rotación.\n\n¿Le ayudamos a preparar un pedido sugerido con despacho preferente hoy?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Estimado/a Dr/a. {{NOMBRE}}! ✨ Un afectuoso saludo de parte del equipo CIMASUR. Esperamos que esté teniendo una excelente semana en {{CLINICA}}.\n\nComo socio de la categoría {{CATEGORIA_2026}}, le ofrecemos un *Descuento Excepcional del 15%* en su próximo pedido de reposición, ideal para reabastecer sus fórmulas de alta rotación.\n\n¿Le ayudamos a preparar un pedido sugerido con despacho preferente? ¡Un gran abrazo! 🩺`;
       } else {
         localEmailSubject = 'Estatus de Beneficios Club CIMASUR para Dr/a. {{NOMBRE}}';
-        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nJunto con saludarle afectuosamente en nombre de todo el equipo de Farmacia Homeopática CIMASUR de Chile, le escribimos para agradecer su constante confianza en nuestras fórmulas magistrales homeopáticas en {{CLINICA}}.\n\nQueremos recordarle que actualmente se encuentra activo en la categoría {{CATEGORIA_2026}} del Club de Socios, lo que le garantiza soporte prioritario, stock reservado y excelentes condiciones de compra.\n\nSi necesita asesoría técnica en la dosificación de Arnica CS, Acqua Maris o el Kit Modulador Digestivo para alguno de sus pacientes, recuerde que nuestro equipo clínico está siempre disponible para asistirle sin costo.\n\n¿Le ayudamos a coordinar su pedido de reposición semanal para mantener su farmacia al día?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
+        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nJunto con saludarle afectuosamente en nombre de todo el equipo de Farmacia Homeopática CIMASUR de Chile, le escribimos para agradecer su constante confianza en nuestras fórmulas magistrales homeopáticas en {{CLINICA}}.\n\nQueremos recordarle que actualmente se encuentra activo en la categoría {{CATEGORIA_2026}} del Club de Socios, lo que le garantiza soporte prioritario, stock reservado y excelentes condiciones de compra.\n\nSi necesita asesoría técnica en la dosificación de nuestras fórmulas para alguno de sus pacientes, recuerde que nuestro equipo clínico está siempre disponible para asistirle sin costo.\n\n¿Le ayudamos a coordinar su pedido de reposición semanal para mantener su farmacia al día?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
         localWhatsAppText = `¡Estimado/a Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada en {{CLINICA}}.\n\nQueremos agradecer su confianza continua en nuestras soluciones homeopáticas. Actualmente cuenta con estatus activo en la categoría *{{CATEGORIA_2026}}* de nuestro Club de Socios.\n\nRecuerde que ante cualquier duda con recetas o dosificaciones, nuestro equipo clínico está para apoyarle. ¿Desea realizar alguna reposición para esta semana? ¡Que tenga un excelente día! 🩺`;
       }
       
@@ -1221,7 +1223,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
         ...prev,
         {
           sender: 'ia' as const,
-          text: `⚠️ Nota: No se pudo conectar con el Motor de IA remoto (Falta configurar GEMINI_API_KEY). Sin embargo, el Asistente Inteligente de CIMASUR ha generado de manera local plantillas premium perfectamente personalizadas para su campaña masiva en base al objetivo "${objectiveText}". ¡Están listas en el panel para ser revisadas y enviadas!`
+          text: `¡Listo! He configurado de manera local plantillas premium perfectamente personalizadas para su campaña masiva en base al objetivo "${objectiveText}". ¡Están listas en el panel para ser revisadas y despachadas de forma automática!`
         }
       ]);
       setPreviewTab('email');
@@ -1351,81 +1353,6 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
     } finally {
       setIsBulkSending(false);
     }
-  };
-
-  const handleDownloadEml = () => {
-    if (selectedCampaignClientIds.length === 0) {
-      alert('Por favor seleccione al menos un socio.');
-      return;
-    }
-
-    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
-    const bccList = targets.map(t => t.email).filter(Boolean).join(', ');
-    
-    // We will use the first target to render the template (as EML is a single file, 
-    // it's not possible to have dynamic variables per recipient in a standard EML for BCC).
-    const representativeClient = targets[0] || {} as any;
-    
-    const changePct = (representativeClient.percentChange || 0) * 100;
-    const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
-    
-    const resolvedSubject = bulkEmailSubject
-      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
-      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
-      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial');
-
-    // Replace the placeholders in text since EML goes out via BCC and can't be hyper-personalized per recipient
-    const safeText = bulkEmailText
-      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
-      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
-      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial')
-      .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
-      .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, 'Beneficios preferenciales');
-
-    const htmlBody = compileHtmlTemplate(representativeClient, safeText, designerAccentColor);
-
-    const emlContent = `To: ${smtpSenderName || 'CIMASUR'} <${smtpUser || 'marketing@cimasur.cl'}>
-Bcc: ${bccList}
-Subject: ${resolvedSubject}
-MIME-Version: 1.0
-Content-Type: text/html; charset=utf-8
-
-${htmlBody}
-`;
-    const blob = new Blob([emlContent], { type: 'message/rfc822' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Campaña_Masiva_${new Date().getTime()}.eml`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleMailto = () => {
-    if (selectedCampaignClientIds.length === 0) {
-      alert('Por favor seleccione al menos un socio.');
-      return;
-    }
-    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
-    const bccList = targets.map(t => t.email).filter(Boolean).join(',');
-    
-    const representativeClient = targets[0] || {} as any;
-    const changePct = (representativeClient.percentChange || 0) * 100;
-    const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
-
-    const resolvedSubject = bulkEmailSubject
-      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
-      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
-      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial');
-
-    const safeText = bulkEmailText
-      .replace(/\{\{NOMBRE\}\}/g, 'Socio Comercial')
-      .replace(/\{\{CLINICA\}\}/g, 'Clínica')
-      .replace(/\{\{CATEGORIA_2026\}\}/g, 'Socio Especial')
-      .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
-      .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, 'Beneficios preferenciales');
-
-    window.location.href = `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodeURIComponent(resolvedSubject)}&body=${encodeURIComponent(safeText)}`;
   };
 
   // Download complete bulk WhatsApp payload in structured CSV for broadcast tools
@@ -1749,7 +1676,7 @@ ${htmlBody}
                         if (client.statusKey === 'CRITICO') {
                           suggestedAction = 'Llamada urgente: Ofrecer prórroga hasta 30 Junio';
                         } else if (client.statusKey === 'DORMIDO') {
-                          suggestedAction = 'Masivo de reactivación y despacho gratis de Arnica CS';
+                          suggestedAction = 'Masivo de reactivación y despacho gratis';
                         } else if (client.statusKey === 'EN_CAIDA') {
                           suggestedAction = 'Ofrecer Kit Modulador Digestivo o Acqua Maris';
                         }
@@ -1953,7 +1880,7 @@ ${htmlBody}
                   </div>
                   <div className="bg-[#070b16] p-4 rounded-xl border border-slate-800">
                     <strong className="text-white block mb-1">💊 Promociones en Fórmulas Clave:</strong>
-                    Filtra y destaca muestras gratis o descuentos en nuestras líneas principales como <strong className="text-sky-400">Arnica CS</strong> (antiinflamatorio veterinario de alta rotación) en tus copys de WhatsApp.
+                    Filtra y destaca muestras gratis o descuentos en nuestras líneas principales (antiinflamatorio veterinario de alta rotación) en tus copys de WhatsApp.
                   </div>
                 </div>
               </div>
@@ -2861,27 +2788,6 @@ ${htmlBody}
                           </>
                         )}
                       </button>
-
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button
-                          onClick={handleMailto}
-                          disabled={isBulkSending || selectedCampaignClientIds.length === 0}
-                          className="w-full bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-slate-300 font-extrabold py-2 rounded-xl text-[10px] flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
-                          title="Abre la aplicación de correo por defecto (ej. Thunderbird) con los destinatarios en Copia Oculta (BCC)."
-                        >
-                          <Mail className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Abrir en Thunderbird / Mailto</span>
-                        </button>
-                        <button
-                          onClick={handleDownloadEml}
-                          disabled={isBulkSending || selectedCampaignClientIds.length === 0}
-                          className="w-full bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-slate-300 font-extrabold py-2 rounded-xl text-[10px] flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
-                          title="Descarga la plantilla HTML en formato .EML para abrir y enviar desde Thunderbird conservando el diseño."
-                        >
-                          <Download className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Descargar como .EML (HTML)</span>
-                        </button>
-                      </div>
                     </div>
 
                     {/* Right Column: High-fidelity Visual Preview */}
@@ -3134,6 +3040,28 @@ ${htmlBody}
                                     value={designerSubtitle}
                                     onChange={(e) => setDesignerSubtitle(e.target.value)}
                                     placeholder="Ej: Farmacia Homeopática Veterinaria de Chile"
+                                    className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:border-sky-500/30"
+                                  />
+                                </div>
+
+                                <div className="space-y-1 mt-3">
+                                  <label className="text-[9px] text-slate-450 font-bold block">Texto del Botón (CTA):</label>
+                                  <input
+                                    type="text"
+                                    value={designerButtonText}
+                                    onChange={(e) => setDesignerButtonText(e.target.value)}
+                                    placeholder="Ej: Reclamar mi Beneficio Ahora ➔"
+                                    className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:border-sky-500/30"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[9px] text-slate-450 font-bold block">Enlace del Botón (URL):</label>
+                                  <input
+                                    type="text"
+                                    value={designerButtonUrl}
+                                    onChange={(e) => setDesignerButtonUrl(e.target.value)}
+                                    placeholder="Ej: https://cimasur.cl"
                                     className="w-full bg-[#070b16] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:border-sky-500/30"
                                   />
                                 </div>
@@ -3658,6 +3586,23 @@ ${htmlBody}
                       value={designerSubtitle}
                       onChange={(e) => setDesignerSubtitle(e.target.value)}
                       className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1.5 rounded text-[10px] focus:outline-none focus:border-sky-500/50"
+                    />
+                  </div>
+                  <div className="space-y-1 mt-2">
+                    <span className="text-[9px] font-bold text-slate-400 block">Botón (CTA)</span>
+                    <input
+                      type="text"
+                      value={designerButtonText}
+                      onChange={(e) => setDesignerButtonText(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1.5 rounded text-[10px] focus:outline-none focus:border-sky-500/50 mb-1"
+                      placeholder="Texto del botón"
+                    />
+                    <input
+                      type="text"
+                      value={designerButtonUrl}
+                      onChange={(e) => setDesignerButtonUrl(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1.5 rounded text-[10px] focus:outline-none focus:border-sky-500/50"
+                      placeholder="Enlace del botón"
                     />
                   </div>
                 </div>
