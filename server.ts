@@ -44,15 +44,18 @@ async function startServer() {
     }
 
     try {
+      const portInt = parseInt(config.smtpPort, 10);
       const transporter = nodemailer.createTransport({
         host: config.smtpServer,
-        port: parseInt(config.smtpPort),
-        secure: config.smtpPort === '465',
+        port: portInt,
+        secure: portInt === 465,
         auth: {
           user: config.smtpUser,
           pass: config.smtpPass,
         },
-      });
+        tls: { rejectUnauthorized: false },
+        family: 4
+      } as any);
 
       // Verify connection configuration
       await transporter.verify();

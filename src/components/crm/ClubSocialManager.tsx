@@ -3334,6 +3334,14 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                               {showPassword ? "Ocultar" : "Mostrar"}
                             </button>
                           </div>
+                          {smtpHost.includes('gmail.com') && (
+                            <p className="text-[10px] text-sky-400/80 leading-tight mt-1">
+                              ⚠️ Para Gmail/Google Workspace, debes usar una <strong>"Contraseña de aplicación"</strong> (16 dígitos), no tu contraseña de correo normal.{' '}
+                              <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="underline hover:text-sky-300">
+                                Generar aquí
+                              </a>.
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -3361,6 +3369,11 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                         {testSmtpResult && (
                           <div className={`p-2.5 rounded-lg border text-[11px] leading-relaxed font-medium ${testSmtpResult.success ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-400' : 'bg-red-950/20 border-red-900/40 text-red-400'}`}>
                             {testSmtpResult.success ? '✔ ' : '❌ '} {testSmtpResult.message}
+                            {!testSmtpResult.success && testSmtpResult.message.includes('timeout') && (
+                              <div className="mt-2 text-yellow-400">
+                                💡 Tip: Si el puerto 465 falla por timeout, intenta usar el puerto <strong>587</strong>. (Dependiendo de la red, algunos puertos SMTP pueden estar bloqueados).
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
