@@ -50,12 +50,8 @@ async function startServer() {
     try {
       const portInt = parseInt(config.smtpPort, 10);
       
-      // Resolve IPv4 manually to bypass IPv6 ENETUNREACH errors in sandbox
-      const { address: ipv4Address } = await dns.promises.lookup(config.smtpServer, { family: 4 });
-      console.log(`[SMTP] User requested ${config.smtpServer}, resolved to IPv4: ${ipv4Address}`);
-
       const transporter = nodemailer.createTransport({
-        host: ipv4Address || config.smtpServer,
+        host: config.smtpServer,
         port: portInt,
         secure: portInt === 465,
         connectionTimeout: 10000,
@@ -67,7 +63,6 @@ async function startServer() {
         },
         tls: { 
           rejectUnauthorized: false,
-          servername: config.smtpServer // Important for SNI when using IP as host
         },
       } as any);
 
