@@ -143,8 +143,8 @@ export function ClubSocialManager() {
   
   // Segment and upgrade states for Opportunities & Campaigns
   const [opportunityViewType, setOpportunityViewType] = useState<'alertas' | 'upgrades'>('alertas');
-  const [upgradeSegmentFilter, setUpgradeSegmentFilter] = useState<'bronce_oro' | 'plata_platinum'>('bronce_oro');
-  const [recipientFilterSegment, setRecipientFilterSegment] = useState<'critical' | 'bronce_to_gold' | 'silver_to_platinum' | 'intranet_sin_compras' | 'sin_categorias' | 'bronce' | 'plata' | 'oro' | 'platinum' | 'all'>('critical');
+  const [upgradeSegmentFilter, setUpgradeSegmentFilter] = useState<'sin_categoria_bronce' | 'bronce_plata' | 'plata_oro' | 'oro_platinum'>('sin_categoria_bronce');
+  const [recipientFilterSegment, setRecipientFilterSegment] = useState<'critical' | 'bronce_to_gold' | 'silver_to_platinum' | 'intranet_sin_compras' | 'sin_categorias' | 'bronce' | 'plata' | 'oro' | 'platinum' | 'all' | 'sin_categoria_bronce' | 'bronce_plata' | 'plata_oro' | 'oro_platinum'>('critical');
   
   // Navigation Tabs matching user sidebar mockup
   const [activeTab, setActiveTab] = useState<'dashboard' | 'individual' | 'tiers' | 'designer' | 'masivo' | 'oportunidades'>('oportunidades');
@@ -470,15 +470,20 @@ export function ClubSocialManager() {
     return allClubClients.filter(c => c.isCritical);
   }, [allClubClients]);
 
-  // Candidates for category upgrade (Bronze -> Gold, Silver -> Platinum)
+  // Candidates for category upgrade (supporting 4 segments as requested by the user)
   const upgradeCandidates = useMemo(() => {
     const rawList = allClubClients.filter(c => {
       const tierName = (c.calculatedTier?.name || '').toLowerCase();
-      if (upgradeSegmentFilter === 'bronce_oro') {
+      if (upgradeSegmentFilter === 'sin_categoria_bronce') {
+        return tierName === 'sin categoría' || tierName === 'sin categoria' || tierName === '';
+      } else if (upgradeSegmentFilter === 'bronce_plata') {
         return tierName === 'bronce';
-      } else {
+      } else if (upgradeSegmentFilter === 'plata_oro') {
         return tierName === 'plata';
+      } else if (upgradeSegmentFilter === 'oro_platinum') {
+        return tierName === 'oro';
       }
+      return false;
     });
     return rawList.filter(c => {
       const matchesSearch = 
@@ -498,6 +503,17 @@ export function ClubSocialManager() {
       rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
     } else if (recipientFilterSegment === 'silver_to_platinum') {
       rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else if (recipientFilterSegment === 'sin_categoria_bronce') {
+      rawList = allClubClients.filter(c => {
+        const tier = (c.calculatedTier?.name || '').toLowerCase();
+        return tier === 'sin categoría' || tier === 'sin categoria' || tier === '';
+      });
+    } else if (recipientFilterSegment === 'bronce_plata') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce');
+    } else if (recipientFilterSegment === 'plata_oro') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
+    } else if (recipientFilterSegment === 'oro_platinum') {
+      rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'oro');
     } else if (recipientFilterSegment === 'intranet_sin_compras') {
       rawList = allClubClients.filter(c => {
         const isIntranet = (c.intranet || '').toLowerCase().startsWith('si') || (c.intranet || '').toLowerCase().startsWith('sí');
@@ -687,7 +703,7 @@ export function ClubSocialManager() {
       if (channel === 'whatsapp') {
         let text = '';
         if (selectedClient.statusKey === 'CRITICO') {
-          text = `¡Estimado/a Dr/a. ${clientName}! 🏥 Le saluda Fernanda de Fidelización de CIMASUR. Esperamos de corazón que todo marche excelente en ${clinica}.\n\nRevisando nuestro registro, notamos que sus reposiciones clínicas han disminuido este ciclo (${changePct}%). Para nosotros su alianza es invaluable, por lo que le hemos asignado una *Prórroga Excepcional de Recalificación automática hasta el 30 de Junio* para mantener sus beneficios activos.\n\nAdemás, queremos apoyarle con un descuento o condiciones especiales en su próximo pedido de fórmulas magistrales. ¿Podemos coordinar una llamada para asistirle? Quedamos a su total servicio. 🌸`;
+          text = `¡Estimado/a Dr/a. ${clientName}! 🏥 Le saluda Fernanda de Fidelización de CIMASUR. Esperamos de corazón que todo marche excelente en ${clinica}.\n\nRevisando nuestro registro, notamos que sus reposiciones clínicas han disminuido este ciclo (${changePct}%). Para nosotros su alianza es invaluable, por lo que le hemos asignado una *Prórroga Excepcional de Recalificación automática hasta el 30 de Julio* para mantener sus beneficios activos.\n\nAdemás, queremos apoyarle con un descuento o condiciones especiales en su próximo pedido de fórmulas magistrales. ¿Podemos coordinar una llamada para asistirle? Quedamos a su total servicio. 🌸`;
         } else if (selectedClient.statusKey === 'DORMIDO') {
           text = `¡Hola, Dr/a. ${clientName}! 🌿 Le escribimos con mucho cariño de CIMASUR. Hace un tiempo que no sabemos de usted en ${clinica} y le extrañamos mucho en nuestro Club de Socios.\n\nQueremos reactivar su cuenta ofreciéndole un beneficio exclusivo de bienvenida: *Despacho gratuito sin mínimo de compra* en su próximo pedido. Además, contamos con stock renovado de todas nuestras reconocidas fórmulas homeopáticas.\n\n¿Le gustaría que le enviemos nuestro Vademécum digital actualizado para revisar dosificaciones de nuestras fórmulas? ¡Estaremos felices de conversar! 🥰`;
         } else if (selectedClient.statusKey === 'EN_CAIDA') {
@@ -724,7 +740,7 @@ export function ClubSocialManager() {
 
         if (selectedClient.statusKey === 'CRITICO') {
           subject = `CIMASUR Apoyo Clínico: Prórroga de Recalificación y beneficios exclusivos para Dr/a. ${clientName}`;
-          body = `Estimado/a Doctor/a ${clientName},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica ${clinica}.\n\nNos ponemos en contacto con usted porque para CIMASUR su alianza profesional y la salud de sus pacientes son de máxima prioridad. Revisando nuestro sistema comercial, notamos una disminución inusual en el volumen de sus reposiciones de medicamentos homeopáticos este ciclo (${changePct}%).\n\nEntendemos plenamente que el sector veterinario enfrenta desafíos constantes. Por ello, queremos brindarle nuestro respaldo completo. Le informamos que de manera automática le hemos asignado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026 para que conserve intactos todos sus beneficios de la categoría ${category}.\n\nAdicionalmente, le ofrecemos un descuento especial del 15% en su próximo pedido de fórmulas de alta rotación, junto con despacho prioritario gratuito.\n\n¿Le gustaría que coordinemos una breve llamada o asesoría sin costo hoy?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+          body = `Estimado/a Doctor/a ${clientName},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica ${clinica}.\n\nNos ponemos en contacto con usted porque para CIMASUR su alianza profesional y la salud de sus pacientes son de máxima prioridad. Revisando nuestro sistema comercial, notamos una disminución inusual en el volumen de sus reposiciones de medicamentos homeopáticos este ciclo (${changePct}%).\n\nEntendemos plenamente que el sector veterinario enfrenta desafíos constantes. Por ello, queremos brindarle nuestro respaldo completo. Le informamos que de manera automática le hemos asignado una Prórroga Excepcional de Recalificación hasta el 30 de Julio de 2026 para que conserve intactos todos sus beneficios de la categoría ${category}.\n\nAdicionalmente, le ofrecemos un descuento especial del 15% en su próximo pedido de fórmulas de alta rotación, junto con despacho prioritario gratuito.\n\n¿Le gustaría que coordinemos una breve llamada o asesoría sin costo hoy?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
         } else if (selectedClient.statusKey === 'DORMIDO') {
           subject = `¡Le extrañamos en el Club CIMASUR! Beneficios de reactivación exclusivos para ${clinica} 🌸`;
           body = `Estimado/a Doctor/a ${clientName},\n\nEsperamos que se encuentre excelente. Le saludamos con mucho cariño de parte de todo el equipo de Farmacias Homeopáticas CIMASUR.\n\nHace un tiempo que no registramos sus pedidos habituales de reabastecimiento en ${clinica}, y queremos expresarle que su presencia en nuestra comunidad de veterinarios es muy importante para nosotros.\n\nPara celebrar su retorno y facilitarle el cuidado homeopático de sus pacientes, este mes hemos activado despacho 100% gratuito sin mínimo de compra en su próximo pedido, y el envío de regalo de nuestro nuevo Vademécum Físico si programa compras sobre 30 unidades.\n\nContamos con stock completo de nuestras fórmulas magistrales líderes.\n\n¿Le gustaría que le enviemos la lista de precios vigente y nuestro vademécum digital de apoyo terapéutico?\n\nCordialmente,\nFernanda Contreras\nÁrea de Fidelización de Socios\nCIMASUR - Chile`;
@@ -1527,8 +1543,8 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
         localWhatsAppText = `¡Estimada Dra. {{NOMBRE}}! 🩺✨ Le saluda Fernanda de CIMASUR. Nos hemos percatado con mucha alegría que ya está activa y explorando nuestra *Intranet de Socios* de CIMASUR. ¡Bienvenida! 💻🌿\n\nComo sabemos que está conociendo nuestras fórmulas veterinarias, nos encantaría apoyarle: ¿Le gustaría recibir una breve orientación telefónica o resolver dudas sobre dosificaciones o patologías?\n\nRecuerde que para su primera compra de bienvenida tiene un *15% de descuento especial*, despacho gratis y el Vademécum Físico de regalo para su clínica en {{CLINICA}}. 🎁🌸 ¿Conversamos?`;
       } else if (campaignObjective === 'reactivacion_gracia') {
         localEmailSubject = '¡Importante!: Prórroga extraordinaria de recalificación CIMASUR 2026';
-        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica {{CLINICA}}.\n\nEn CIMASUR valoramos profundamente el bienestar de sus pacientes y el lazo profesional que nos une. Entendiendo la dinámica laboral de los veterinarios y que sus reposiciones clínicas han tenido variaciones, queremos confirmarle una excelente noticia: le hemos otorgado una Prórroga Excepcional de Recalificación hasta el 30 de Junio de 2026.\n\nGracias a esta medida, usted conservará todos los beneficios exclusivos de la categoría {{CATEGORIA_2026}} sin ninguna alteración. Además, para apoyarle a mantener su stock clínico ideal, le ofrecemos:\n- Despacho gratuito en su próximo pedido.\n- Prioridad de entrega en 24-48 horas hábiles en todo Chile.\n- Muestras clínicas gratuitas en compras seleccionadas.\n\n¿Le gustaría que coordinemos su próximo reabastecimiento con despacho prioritario?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
-        localWhatsAppText = `¡Hola, Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada clínica en {{CLINICA}}.\n\nQueremos confirmarle que, para resguardar su importante labor y mantener sus beneficios preferenciales de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado una *Prórroga Excepcional de Recalificación hasta el 30 de Junio*. 🩺✨\n\nPodrá seguir solicitando sus reposiciones de nuestras fórmulas magistrales con despacho gratis garantizado y soporte prioritario.\n\n¿Desea que le ayudemos a coordinar un despacho sugerido para esta semana? ¡Escríbanos o responda por esta vía! Un afectuoso saludo. 🥰🏥`;
+        localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos de todo corazón que se encuentre muy bien en su clínica {{CLINICA}}.\n\nEn CIMASUR valoramos profundamente el bienestar de sus pacientes y el lazo profesional que nos une. Entendiendo la dinámica laboral de los veterinarios y que sus reposiciones clínicas han tenido variaciones, queremos confirmarle una excelente noticia: le hemos otorgado una Prórroga Excepcional de Recalificación hasta el 30 de Julio de 2026.\n\nGracias a esta medida, usted conservará todos los beneficios exclusivos de la categoría {{CATEGORIA_2026}} sin ninguna alteración. Además, para apoyarle a mantener su stock clínico ideal, le ofrecemos:\n- Despacho gratuito en su próximo pedido.\n- Prioridad de entrega en 24-48 horas hábiles en todo Chile.\n- Muestras clínicas gratuitas en compras seleccionadas.\n\n¿Le gustaría que coordinemos su próximo reabastecimiento con despacho prioritario?\n\nAtentamente,\nFernanda Contreras\nDepartamento de Relaciones Clínicas y Fidelización\nCIMASUR - Chile`;
+        localWhatsAppText = `¡Hola, Dr/a. {{NOMBRE}}! 🌸 Le saluda Fernanda de CIMASUR. Esperamos que tenga una provechosa jornada clínica en {{CLINICA}}.\n\nQueremos confirmarle que, para resguardar su importante labor y mantener sus beneficios preferenciales de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado una *Prórroga Excepcional de Recalificación hasta el 30 de Julio*. 🩺✨\n\nPodrá seguir solicitando sus reposiciones de nuestras fórmulas magistrales con despacho gratis garantizado y soporte prioritario.\n\n¿Desea que le ayudemos a coordinar un despacho sugerido para esta semana? ¡Escríbanos o responda por esta vía! Un afectuoso saludo. 🥰🏥`;
       } else if (campaignObjective === 'descuento_excepcional') {
         localEmailSubject = 'Beneficio Especial de Reposición: 15% Descuento Excepcional en CIMASUR';
         localEmailText = `Estimado/a Doctor/a {{NOMBRE}},\n\nEsperamos que tenga una excelente semana en {{CLINICA}}.\n\nQueremos informarle que, como parte de los beneficios de la categoría {{CATEGORIA_2026}} en nuestro Club de Socios, le hemos activado un cupón de descuento excepcional del 15% de descuento para su próximo pedido de reabastecimiento.\n\nEste beneficio es ideal para renovar su stock de nuestras fórmulas de alta rotación.\n\n¿Le ayudamos a preparar un pedido sugerido con despacho preferente hoy?\n\nAtentamente,\nFernanda Contreras\nCIMASUR - Chile`;
@@ -1849,7 +1865,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
               📈 <strong className="text-slate-300">Categoría 2026:</strong> Sirve para predeterminar el estatus comercial en el ciclo <strong className="text-purple-400">2027 (Proyectado)</strong>.
             </p>
             <p>
-              🕒 <strong className="text-slate-300">Plazo Extraordinario:</strong> Se puede otorgar prórroga excepcional de recalificación hasta el <strong className="text-emerald-400">30 de Junio</strong> de cada año.
+              🕒 <strong className="text-slate-300">Plazo Extraordinario:</strong> Se puede otorgar prórroga excepcional de recalificación hasta el <strong className="text-emerald-400">30 de Julio</strong> de cada año.
             </p>
           </div>
         </div>
@@ -1871,34 +1887,62 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                 </div>
                 
                 {/* View Switcher segment controller */}
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  <button
-                    onClick={() => setOpportunityViewType('alertas')}
-                    className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 border ${opportunityViewType === 'alertas' ? 'bg-red-500/10 border-red-500/35 text-red-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                    <span>Alertas de Retención ({criticalClients.length})</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOpportunityViewType('upgrades');
-                      setUpgradeSegmentFilter('bronce_oro');
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'bronce_oro' ? 'bg-yellow-500/10 border-yellow-500/35 text-yellow-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
-                  >
-                    <Award className="w-3.5 h-3.5 text-yellow-400" />
-                    <span>Objetivo: Bronce ➔ Oro ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOpportunityViewType('upgrades');
-                      setUpgradeSegmentFilter('plata_platinum');
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'plata_platinum' ? 'bg-purple-500/10 border-purple-500/35 text-purple-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
-                  >
-                    <Award className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Objetivo: Plata ➔ Platinum ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</span>
-                  </button>
+                <div className="flex flex-col xl:flex-row xl:items-center gap-4 w-full xl:w-auto">
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    <button
+                      onClick={() => setOpportunityViewType('alertas')}
+                      className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 border ${opportunityViewType === 'alertas' ? 'bg-red-500/10 border-red-500/35 text-red-400 font-black' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                      <span>Alertas de Retención ({criticalClients.length})</span>
+                    </button>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1 w-full xl:w-auto">
+                    <span className="text-[9px] uppercase font-bold text-slate-500 font-mono tracking-wider">Oportunidades de Ascenso (Hasta el 30 de Julio)</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => {
+                          setOpportunityViewType('upgrades');
+                          setUpgradeSegmentFilter('sin_categoria_bronce');
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'sin_categoria_bronce' ? 'bg-sky-500/10 border-sky-500/35 text-sky-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
+                      >
+                        <Award className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Sin Cat ➔ Bronce ({allClubClients.filter(c => ['sin categoría', 'sin categoria', ''].includes((c.calculatedTier?.name || '').toLowerCase())).length})</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOpportunityViewType('upgrades');
+                          setUpgradeSegmentFilter('bronce_plata');
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'bronce_plata' ? 'bg-yellow-500/10 border-yellow-500/35 text-yellow-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
+                      >
+                        <Award className="w-3.5 h-3.5 text-yellow-400" />
+                        <span>Bronce ➔ Plata ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOpportunityViewType('upgrades');
+                          setUpgradeSegmentFilter('plata_oro');
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'plata_oro' ? 'bg-amber-500/10 border-amber-500/35 text-amber-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
+                      >
+                        <Award className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Plata ➔ Oro ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOpportunityViewType('upgrades');
+                          setUpgradeSegmentFilter('oro_platinum');
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 border ${opportunityViewType === 'upgrades' && upgradeSegmentFilter === 'oro_platinum' ? 'bg-purple-500/10 border-purple-500/35 text-purple-400' : 'bg-[#070b16] border-slate-850 text-slate-400 hover:text-white'}`}
+                      >
+                        <Award className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Oro ➔ Platinum ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'oro').length})</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1927,18 +1971,24 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                   <div className="space-y-1">
                     <h4 className="text-xs font-black text-white uppercase flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
-                      <span>{upgradeSegmentFilter === 'bronce_oro' ? 'Campaña de Estímulo: Bronce ➔ Oro' : 'Campaña de Estímulo: Plata ➔ Platinum'}</span>
+                      <span>
+                        {upgradeSegmentFilter === 'sin_categoria_bronce' && 'Campaña de Estímulo: Sin Categoría ➔ Bronce'}
+                        {upgradeSegmentFilter === 'bronce_plata' && 'Campaña de Estímulo: Bronce ➔ Plata'}
+                        {upgradeSegmentFilter === 'plata_oro' && 'Campaña de Estímulo: Plata ➔ Oro'}
+                        {upgradeSegmentFilter === 'oro_platinum' && 'Campaña de Estímulo: Oro ➔ Platinum'}
+                      </span>
                     </h4>
                     <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                      {upgradeSegmentFilter === 'bronce_oro' 
-                        ? 'Socios en nivel Bronce ($500K - $1.99M). Impúlselos a alcanzar un total de $5.000.000 acumulado este ciclo para obtener los beneficios preferenciales de la categoría ORO.'
-                        : 'Socios en nivel Plata ($2M - $4.99M). Impúlselos a alcanzar un total de $12.000.000 acumulado para obtener estatus PLATINUM y liberar despachos gratis ilimitados.'}
+                      {upgradeSegmentFilter === 'sin_categoria_bronce' && 'Socios sin compras o sin categoría activa. Impúlselos a alcanzar un total de $500.000 acumulado para obtener estatus BRONCE y comenzar a disfrutar de los beneficios del Club.'}
+                      {upgradeSegmentFilter === 'bronce_plata' && 'Socios en nivel Bronce ($500K - $1.99M). Impúlselos a alcanzar un total de $2.000.000 acumulado para calificar en la categoría PLATA y obtener condiciones comerciales mejoradas.'}
+                      {upgradeSegmentFilter === 'plata_oro' && 'Socios en nivel Plata ($2M - $4.99M). Impúlselos a alcanzar un total de $5.000.000 acumulado para ascender a la categoría ORO, con prioridad de despacho y mayor descuento.'}
+                      {upgradeSegmentFilter === 'oro_platinum' && 'Socios en nivel Oro ($5M - $11.99M). Impúlselos a calificar en la categoría superior PLATINUM ($12.000.000) para asegurar la máxima prioridad y despachos gratis ilimitados.'}
                     </p>
                   </div>
                   <button
                     onClick={() => {
-                      setCampaignObjective(upgradeSegmentFilter === 'bronce_oro' ? 'upgrade_bronce_oro' : 'upgrade_plata_platinum');
-                      setRecipientFilterSegment(upgradeSegmentFilter === 'bronce_oro' ? 'bronce_to_gold' : 'silver_to_platinum');
+                      setCampaignObjective('subir_categoria_incentivo');
+                      setRecipientFilterSegment(upgradeSegmentFilter);
                       setActiveTab('masivo');
                     }}
                     className="bg-sky-500 hover:bg-sky-450 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs shrink-0 flex items-center gap-2 transition-all shadow-md shadow-sky-500/10"
@@ -1955,7 +2005,9 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                   <thead>
                     <tr className="bg-[#090f1d] border-b border-slate-800 text-slate-400 uppercase font-extrabold text-[10px] tracking-wider">
                       <th className="p-4">Cliente Veterinario</th>
-                      <th className="p-4 text-right">Facturación 2026</th>
+                      <th className="p-4 text-right">
+                        {opportunityViewType === 'alertas' ? 'Facturación 2026' : 'Facturación 2025 (Calificación)'}
+                      </th>
                       <th className="p-4 text-center">Estatus Actual</th>
                       <th className="p-4 text-center">Meta Propuesta</th>
                       <th className="p-4">Brecha Comercial</th>
@@ -1996,7 +2048,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
 
                         let suggestedAction = 'Ofrecer prórroga excepcional de recalificación';
                         if (client.statusKey === 'CRITICO') {
-                          suggestedAction = 'Llamada urgente: Ofrecer prórroga hasta 30 Junio';
+                          suggestedAction = 'Llamada urgente: Ofrecer prórroga hasta 30 Julio';
                         } else if (client.statusKey === 'DORMIDO') {
                           suggestedAction = 'Masivo de reactivación y despacho gratis';
                         } else if (client.statusKey === 'EN_CAIDA') {
@@ -2044,19 +2096,28 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                     ) : upgradeCandidates.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="p-8 text-center text-slate-500 font-bold font-sans text-xs">
-                          No se encontraron socios en la categoría actual {upgradeSegmentFilter === 'bronce_oro' ? 'Bronce' : 'Plata'} con brechas activas.
+                          No se encontraron socios en la categoría actual {
+                            upgradeSegmentFilter === 'sin_categoria_bronce' ? 'Sin Categoría' :
+                            upgradeSegmentFilter === 'bronce_plata' ? 'Bronce' :
+                            upgradeSegmentFilter === 'plata_oro' ? 'Plata' : 'Oro'
+                          } con brechas activas.
                         </td>
                       </tr>
                     ) : (
                       upgradeCandidates.map((client) => {
                         const sales = client.ventas || { v2024: 0, v2025: 0, v2026: 0 };
-                        const v2026 = Number(sales.v2026 || 0);
+                        const v2025 = Number(sales.v2025 || 0);
                         
-                        const targetTierObj = tiersList.find(t => t.name === (upgradeSegmentFilter === 'bronce_oro' ? 'Oro' : 'Platinum')) || TIERS_DEFAULT[3];
+                        const targetTierName = 
+                          upgradeSegmentFilter === 'sin_categoria_bronce' ? 'Bronce' :
+                          upgradeSegmentFilter === 'bronce_plata' ? 'Plata' :
+                          upgradeSegmentFilter === 'plata_oro' ? 'Oro' : 'Platinum';
+                        
+                        const targetTierObj = tiersList.find(t => t.name.toLowerCase() === targetTierName.toLowerCase()) || TIERS_DEFAULT[1];
                         const targetMin = targetTierObj.min;
-                        const gap = targetMin - v2026;
+                        const gap = targetMin - v2025;
                         
-                        const currentTier = client.calculatedTier || TIERS_DEFAULT[1];
+                        const currentTier = client.calculatedTier || TIERS_DEFAULT[0];
                         
                         return (
                           <tr key={client.id} className="hover:bg-sky-500/5 transition-all">
@@ -2066,11 +2127,11 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                               <div className="text-[9.5px] text-slate-500 font-mono mt-0.5">{client.rut}</div>
                             </td>
                             <td className="p-4 text-right font-mono font-bold text-white">
-                              {formatCLP(v2026)}
+                              {formatCLP(v2025)}
                             </td>
                             <td className="p-4 text-center">
                               <span className="text-slate-300 font-bold block bg-slate-850 px-2.5 py-1 rounded-lg text-[10px] w-fit mx-auto border border-slate-800">
-                                {currentTier.name}
+                                {currentTier.name || 'Sin Categoría'}
                               </span>
                             </td>
                             <td className="p-4 text-center">
@@ -2100,7 +2161,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                                   onClick={() => {
                                     setSelectedClientId(client.id);
                                     setChannel('whatsapp');
-                                    setCampaignObjective(upgradeSegmentFilter === 'bronce_oro' ? 'upgrade_bronce_oro' : 'upgrade_plata_platinum');
+                                    setCampaignObjective('subir_categoria_incentivo');
                                     setActiveTab('individual');
                                   }}
                                   className="bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-slate-900 border border-sky-500/30 font-black px-2.5 py-1.5 rounded-xl text-[10.5px] transition-all flex items-center gap-1 shadow-sm"
@@ -2111,8 +2172,8 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                                 </button>
                                 <button
                                   onClick={() => {
-                                    setCampaignObjective(upgradeSegmentFilter === 'bronce_oro' ? 'upgrade_bronce_oro' : 'upgrade_plata_platinum');
-                                    setRecipientFilterSegment(upgradeSegmentFilter === 'bronce_oro' ? 'bronce_to_gold' : 'silver_to_platinum');
+                                    setCampaignObjective('subir_categoria_incentivo');
+                                    setRecipientFilterSegment(upgradeSegmentFilter);
                                     setActiveTab('masivo');
                                   }}
                                   className="bg-purple-500/15 hover:bg-purple-500 text-purple-400 hover:text-white border border-purple-500/30 font-black px-2.5 py-1.5 rounded-xl text-[10.5px] transition-all flex items-center gap-1 shadow-sm"
@@ -2159,7 +2220,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                   <div className="text-2xl font-mono font-black text-yellow-400">
                     {criticalClients.filter(c => (c.ventas?.v2026 || 0) < (c.calculatedTier?.min || 0)).length}
                   </div>
-                  <p className="text-[9.5px] text-slate-500 mt-1">Aptos para plazo de gracia hasta junio</p>
+                  <p className="text-[9.5px] text-slate-500 mt-1">Aptos para plazo de gracia hasta julio</p>
                 </div>
               </div>
 
@@ -2959,7 +3020,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
 
                   <input
                     type="text"
-                    placeholder={uploadedImageB64 ? "Dile a la IA qué cambiar en este diseño..." : "Dile a la IA qué mejorar (ej: 'agrega una prórroga de recalificación de aquí a junio de 2026')..."}
+                    placeholder={uploadedImageB64 ? "Dile a la IA qué cambiar en este diseño..." : "Dile a la IA qué mejorar (ej: 'agrega una prórroga de recalificación de aquí a julio de 2026')..."}
                     value={userChatMessage}
                     onChange={(e) => setUserChatMessage(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleSendChatMessage(); }}
