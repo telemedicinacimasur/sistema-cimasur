@@ -1274,7 +1274,7 @@ export function ClubSocialManager() {
 
   // Open individual WhatsApp message with variable substitution for "one by one" dispatch
   const handleOpenIndividualWhatsApp = async (clientId: string) => {
-    const client = criticalClients.find(c => c.id === clientId);
+    const client = allClubClients.find(c => c.id === clientId);
     if (!client) return;
 
     let cleanPhone = (client.phone || '').replace(/[^0-9+]/g, '');
@@ -1326,7 +1326,7 @@ export function ClubSocialManager() {
 
   // Open email bulk compose in local email client (Thunderbird, Outlook, etc) via mailto with BCC
   const handleOpenThunderbirdMailto = () => {
-    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    const targets = allClubClients.filter(c => selectedCampaignClientIds.includes(c.id));
     if (targets.length === 0) {
       alert('Por favor seleccione al menos un socio comercial.');
       return;
@@ -1378,7 +1378,7 @@ export function ClubSocialManager() {
 
   // Copy full rich text (HTML) of active campaign to clipboard for direct Thunderbird paste
   const handleCopyRichHtmlToClipboard = async () => {
-    const previewClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+    const previewClient = allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0];
     if (!previewClient) {
       alert('Por favor seleccione al menos un socio comercial de la lista para previsualizar y copiar el diseño gráfico.');
       return;
@@ -1420,7 +1420,7 @@ export function ClubSocialManager() {
 
   // Copy full raw HTML code of active campaign to clipboard
   const handleCopyRawHtmlToClipboard = async () => {
-    const previewClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+    const previewClient = allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0];
     if (!previewClient) {
       alert('Por favor seleccione al menos un socio comercial de la lista para previsualizar y copiar el código.');
       return;
@@ -1574,7 +1574,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
     setBulkProgress(0);
     setBulkResults([]);
 
-    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    const targets = allClubClients.filter(c => selectedCampaignClientIds.includes(c.id));
     const emailsPayload = [];
 
     for (const client of targets) {
@@ -1684,7 +1684,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
       return;
     }
     
-    const targets = criticalClients.filter(c => selectedCampaignClientIds.includes(c.id));
+    const targets = allClubClients.filter(c => selectedCampaignClientIds.includes(c.id));
     let csvContent = "data:text/csv;charset=utf-8,Nombre;Telefono;MensajePersonalizado\n";
     
     const stampDate = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
@@ -1728,7 +1728,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
   };
 
   const handleSelectAllCampaignClients = () => {
-    setSelectedCampaignClientIds(criticalClients.map(c => c.id));
+    setSelectedCampaignClientIds(bulkCampaignRecipients.map(c => c.id));
   };
 
   const handleSelectNoneCampaignClients = () => {
@@ -3191,7 +3191,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                       <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
                         <span>Previsualización Gráfica para Socios</span>
                         {selectedCampaignClientIds.length > 0 && (
-                          <span className="text-sky-400 font-extrabold">Vista de: {criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio Comercial'}</span>
+                          <span className="text-sky-400 font-extrabold">Vista de: {allClubClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio Comercial'}</span>
                         )}
                       </div>
 
@@ -3229,10 +3229,10 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                               <iframe
                                 title="Live Email Graphic Preview"
                                 srcDoc={compileHtmlTemplate(
-                                  criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0], 
-                                  bulkEmailText, 
-                                  designerAccentColor
-                                )}
+                                allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0], 
+                                bulkEmailText, 
+                                designerAccentColor
+                              )}
                                 className="w-full h-full border-0 bg-white"
                               />
                             </div>
@@ -3509,7 +3509,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                             </p>
                           ) : (
                             <div className="max-h-[220px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
-                              {criticalClients
+                              {allClubClients
                                 .filter(client => selectedCampaignClientIds.includes(client.id))
                                 .map((client) => {
                                   const isDispatched = dispatchedWhatsAppIds.includes(client.id);
@@ -3585,7 +3585,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                       <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
                         <span>Simulación en Teléfono Móvil</span>
                         {selectedCampaignClientIds.length > 0 && (
-                          <span className="text-emerald-400 font-extrabold">Mensaje para: {criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio'}</span>
+                          <span className="text-emerald-400 font-extrabold">Mensaje para: {allClubClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio'}</span>
                         )}
                       </div>
 
@@ -3605,10 +3605,10 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                           {/* WhatsApp Chat Header */}
                           <div className="bg-[#075e54] pt-6 pb-2.5 px-4 text-white flex items-center gap-2.5 shrink-0 select-none z-10">
                             <div className="w-8 h-8 rounded-full bg-[#128c7e] border border-[#25d366]/40 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
-                              {criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name.substring(0, 2) || 'SO'}
+                              {allClubClients.find(c => selectedCampaignClientIds.includes(c.id))?.name.substring(0, 2) || 'SO'}
                             </div>
                             <div className="min-w-0">
-                              <span className="text-xs font-extrabold block truncate leading-none mb-0.5">{criticalClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio Comercial'}</span>
+                              <span className="text-xs font-extrabold block truncate leading-none mb-0.5">{allClubClients.find(c => selectedCampaignClientIds.includes(c.id))?.name || 'Socio Comercial'}</span>
                               <span className="text-[8.5px] text-[#25d366] font-bold block leading-none">En Línea</span>
                             </div>
                           </div>
@@ -3618,7 +3618,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                             
                             {/* WhatsApp Image Attachment Bubble (Diseño en Imagen) */}
                             {(() => {
-                              const targetClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                              const targetClient = allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0];
                               
                               return (
                                 <div className="bg-[#056162]/40 border border-slate-800/40 p-1.5 rounded-xl max-w-[90%] self-end shadow-sm flex flex-col gap-1 text-[9px] text-slate-300">
@@ -3695,7 +3695,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                             <div className="bg-[#056162] text-slate-100 p-2.5 rounded-xl rounded-tr-none max-w-[90%] text-[10px] leading-relaxed self-end shadow border border-[#0b4e4f] relative">
                               <div className="whitespace-pre-wrap font-sans font-medium">
                                 {(() => {
-                                  const targetClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                                  const targetClient = allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0];
                                   const changePct = (targetClient.percentChange || 0) * 100;
                                   const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
                                   return bulkWhatsAppText
@@ -3995,7 +3995,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                 <button
                   type="button"
                   onClick={() => {
-                    const activeClientForCode = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                    const activeClientForCode = allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0];
                     const fullHtml = compileHtmlTemplate(activeClientForCode, bulkEmailText, designerAccentColor);
                     navigator.clipboard.writeText(fullHtml);
                     setCopiedHtmlTimer(true);
@@ -4126,7 +4126,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                     <span>Socio Comercial de Prueba</span>
                   </div>
                   {(() => {
-                    const targetClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+                    const targetClient = allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0];
                     if (!targetClient) return <div className="text-slate-500">Ninguno seleccionado</div>;
                     return (
                       <div className="space-y-1 text-slate-300 leading-normal">
@@ -4182,7 +4182,7 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                     <iframe
                       title="Large Email Graphic Preview iFrame"
                       srcDoc={compileHtmlTemplate(
-                        criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0], 
+                        allClubClients.find(c => selectedCampaignClientIds.includes(c.id)) || bulkCampaignRecipients[0] || allClubClients[0], 
                         bulkEmailText, 
                         designerAccentColor
                       )}
