@@ -500,18 +500,16 @@ export function ClubSocialManager() {
       rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
     } else if (recipientFilterSegment === 'intranet_sin_compras') {
       rawList = allClubClients.filter(c => {
-        const isIntranet = c.intranet === 'Si';
+        const isIntranet = (c.intranet || '').toLowerCase().startsWith('si') || (c.intranet || '').toLowerCase().startsWith('sí');
         const tierName = (c.calculatedTier?.name || '').toLowerCase();
         const dbCat = (c.categoria || '').toLowerCase();
         const hasNoCategory = 
-          tierName === 'sin categoría' || 
-          tierName === 'sin categoria' || 
+          tierName.includes('sin') || 
           tierName === '' ||
-          dbCat === 'sin categoría' || 
-          dbCat === 'sin categoria' || 
+          dbCat.includes('sin') || 
           dbCat === '';
         const noPurchases = (c.ventas?.v2026 || 0) === 0;
-        return isIntranet && hasNoCategory && noPurchases;
+        return isIntranet && (hasNoCategory || noPurchases);
       });
     } else if (recipientFilterSegment === 'sin_categorias') {
       rawList = allClubClients.filter(c => {
@@ -578,18 +576,16 @@ export function ClubSocialManager() {
       targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
     } else if (recipientFilterSegment === 'intranet_sin_compras') {
       targetList = allClubClients.filter(c => {
-        const isIntranet = c.intranet === 'Si';
+        const isIntranet = (c.intranet || '').toLowerCase().startsWith('si') || (c.intranet || '').toLowerCase().startsWith('sí');
         const tierName = (c.calculatedTier?.name || '').toLowerCase();
         const dbCat = (c.categoria || '').toLowerCase();
         const hasNoCategory = 
-          tierName === 'sin categoría' || 
-          tierName === 'sin categoria' || 
+          tierName.includes('sin') || 
           tierName === '' ||
-          dbCat === 'sin categoría' || 
-          dbCat === 'sin categoria' || 
+          dbCat.includes('sin') || 
           dbCat === '';
         const noPurchases = (c.ventas?.v2026 || 0) === 0;
-        return isIntranet && hasNoCategory && noPurchases;
+        return isIntranet && (hasNoCategory || noPurchases);
       });
     } else if (recipientFilterSegment === 'sin_categorias') {
       targetList = allClubClients.filter(c => {
@@ -2760,18 +2756,16 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                   <option value="critical">Alerta Retención Crítica ({criticalClients.length})</option>
                   <option value="intranet_sin_compras">
                     Prospectos Intranet (Sin Compra ni Categoría) ({allClubClients.filter(c => {
-                      const isIntranet = c.intranet === 'Si';
+                      const isIntranet = (c.intranet || '').toLowerCase().startsWith('si') || (c.intranet || '').toLowerCase().startsWith('sí');
                       const tierName = (c.calculatedTier?.name || '').toLowerCase();
                       const dbCat = (c.categoria || '').toLowerCase();
                       const hasNoCategory = 
-                        tierName === 'sin categoría' || 
-                        tierName === 'sin categoria' || 
+                        tierName.includes('sin') || 
                         tierName === '' ||
-                        dbCat === 'sin categoría' || 
-                        dbCat === 'sin categoria' || 
+                        dbCat.includes('sin') || 
                         dbCat === '';
                       const noPurchases = (c.ventas?.v2026 || 0) === 0;
-                      return isIntranet && hasNoCategory && noPurchases;
+                      return isIntranet && (hasNoCategory || noPurchases);
                     }).length})
                   </option>
                   <option value="sin_categorias">Sin Categorías ({allClubClients.filter(c => ['sin categoría', 'sin categoria', ''].includes((c.calculatedTier?.name || '').toLowerCase())).length})</option>
