@@ -499,7 +499,20 @@ export function ClubSocialManager() {
     } else if (recipientFilterSegment === 'silver_to_platinum') {
       rawList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
     } else if (recipientFilterSegment === 'intranet_sin_compras') {
-      rawList = allClubClients.filter(c => c.intranet === 'Si' && (c.ventas?.v2026 || 0) === 0);
+      rawList = allClubClients.filter(c => {
+        const isIntranet = c.intranet === 'Si';
+        const tierName = (c.calculatedTier?.name || '').toLowerCase();
+        const dbCat = (c.categoria || '').toLowerCase();
+        const hasNoCategory = 
+          tierName === 'sin categoría' || 
+          tierName === 'sin categoria' || 
+          tierName === '' ||
+          dbCat === 'sin categoría' || 
+          dbCat === 'sin categoria' || 
+          dbCat === '';
+        const noPurchases = (c.ventas?.v2026 || 0) === 0;
+        return isIntranet && hasNoCategory && noPurchases;
+      });
     } else if (recipientFilterSegment === 'sin_categorias') {
       rawList = allClubClients.filter(c => {
         const tier = (c.calculatedTier?.name || '').toLowerCase();
@@ -564,7 +577,20 @@ export function ClubSocialManager() {
     } else if (recipientFilterSegment === 'silver_to_platinum') {
       targetList = allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata');
     } else if (recipientFilterSegment === 'intranet_sin_compras') {
-      targetList = allClubClients.filter(c => c.intranet === 'Si' && (c.ventas?.v2026 || 0) === 0);
+      targetList = allClubClients.filter(c => {
+        const isIntranet = c.intranet === 'Si';
+        const tierName = (c.calculatedTier?.name || '').toLowerCase();
+        const dbCat = (c.categoria || '').toLowerCase();
+        const hasNoCategory = 
+          tierName === 'sin categoría' || 
+          tierName === 'sin categoria' || 
+          tierName === '' ||
+          dbCat === 'sin categoría' || 
+          dbCat === 'sin categoria' || 
+          dbCat === '';
+        const noPurchases = (c.ventas?.v2026 || 0) === 0;
+        return isIntranet && hasNoCategory && noPurchases;
+      });
     } else if (recipientFilterSegment === 'sin_categorias') {
       targetList = allClubClients.filter(c => {
         const tier = (c.calculatedTier?.name || '').toLowerCase();
@@ -1296,6 +1322,67 @@ export function ClubSocialManager() {
     window.location.href = mailtoUrl;
 
     alert(`¡Redirección exitosa! Se ha abierto su cliente de correo predeterminado (como Thunderbird) con ${emailsList.length} destinatarios cargados en copia oculta (BCC) para resguardar la privacidad. Las bitácoras individuales de los socios han sido actualizadas.`);
+  };
+
+  // Copy full rich text (HTML) of active campaign to clipboard for direct Thunderbird paste
+  const handleCopyRichHtmlToClipboard = async () => {
+    const previewClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+    if (!previewClient) {
+      alert('Por favor seleccione al menos un socio comercial de la lista para previsualizar y copiar el diseño gráfico.');
+      return;
+    }
+
+    const fullHtml = compileHtmlTemplate(previewClient, bulkEmailText, designerAccentColor);
+
+    try {
+      const blobHtml = new Blob([fullHtml], { type: 'text/html' });
+      const changePct = (previewClient.percentChange || 0) * 100;
+      const changeStr = changePct < 0 ? `${changePct.toFixed(0)}%` : `+${changePct.toFixed(0)}%`;
+
+      const resolvedPlaintext = bulkEmailText
+        .replace(/\{\{NOMBRE\}\}/g, previewClient.name || 'Doctor/a')
+        .replace(/\{\{CLINICA\}\}/g, previewClient.clinica || previewClient.clinic || 'su Centro Clínico')
+        .replace(/\{\{CATEGORIA_2026\}\}/g, previewClient.calculatedTier?.name || previewClient.category2026 || 'Socio Especial')
+        .replace(/\{\{VARIACION_VENTAS\}\}/g, changeStr)
+        .replace(/\{\{BENEFICIO_PRINCIPAL\}\}/g, previewClient.calculatedTier?.primaryBenefit || 'beneficios preferentes del Club');
+
+      const blobText = new Blob([resolvedPlaintext], { type: 'text/plain' });
+
+      if (typeof window !== 'undefined' && navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new window.ClipboardItem({
+            'text/html': blobHtml,
+            'text/plain': blobText
+          })
+        ]);
+        alert('📋 ¡Diseño Gráfico (HTML Enriquecido) copiado al portapapeles! Ahora vaya a Thunderbird u Outlook, inicie el mensaje y presione Pegar (Ctrl+V) en el cuerpo del correo. Se insertará el diseño idéntico al de la previsualización (con logo, colores, columnas e imágenes).');
+      } else {
+        await navigator.clipboard.writeText(resolvedPlaintext);
+        alert('📋 Copiado en texto plano debido a restricciones del navegador.');
+      }
+    } catch (err: any) {
+      console.error('Error copying Rich HTML:', err);
+      alert('No se pudo copiar como diseño gráfico automáticamente. Intente seleccionar el contenido visual de la derecha directamente, presionar Ctrl+C y luego pegar en su correo.');
+    }
+  };
+
+  // Copy full raw HTML code of active campaign to clipboard
+  const handleCopyRawHtmlToClipboard = async () => {
+    const previewClient = criticalClients.find(c => selectedCampaignClientIds.includes(c.id)) || criticalClients[0];
+    if (!previewClient) {
+      alert('Por favor seleccione al menos un socio comercial de la lista para previsualizar y copiar el código.');
+      return;
+    }
+
+    const fullHtml = compileHtmlTemplate(previewClient, bulkEmailText, designerAccentColor);
+
+    try {
+      await navigator.clipboard.writeText(fullHtml);
+      alert('💻 ¡Código Fuente HTML copiado al portapapeles! En Thunderbird, vaya a "Insertar" -> "HTML" y pegue este código para cargar el diseño gráfico con exactitud matemática.');
+    } catch (err: any) {
+      console.error('Error copying Raw HTML:', err);
+      alert('No se pudo copiar el código HTML.');
+    }
   };
 
   // Generate Group Campaign templates with Gemini IA
@@ -2615,7 +2702,22 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                   className="w-full bg-[#0d162d] border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:border-sky-500/40 font-bold"
                 >
                   <option value="critical">Alerta Retención Crítica ({criticalClients.length})</option>
-                  <option value="intranet_sin_compras">Intranet Activo Sin Compras ({allClubClients.filter(c => c.intranet === 'Si' && (c.ventas?.v2026 || 0) === 0).length})</option>
+                  <option value="intranet_sin_compras">
+                    Prospectos Intranet (Sin Compra ni Categoría) ({allClubClients.filter(c => {
+                      const isIntranet = c.intranet === 'Si';
+                      const tierName = (c.calculatedTier?.name || '').toLowerCase();
+                      const dbCat = (c.categoria || '').toLowerCase();
+                      const hasNoCategory = 
+                        tierName === 'sin categoría' || 
+                        tierName === 'sin categoria' || 
+                        tierName === '' ||
+                        dbCat === 'sin categoría' || 
+                        dbCat === 'sin categoria' || 
+                        dbCat === '';
+                      const noPurchases = (c.ventas?.v2026 || 0) === 0;
+                      return isIntranet && hasNoCategory && noPurchases;
+                    }).length})
+                  </option>
                   <option value="sin_categorias">Sin Categorías ({allClubClients.filter(c => ['sin categoría', 'sin categoria', ''].includes((c.calculatedTier?.name || '').toLowerCase())).length})</option>
                   <option value="bronce">Categoría: Bronce ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'bronce').length})</option>
                   <option value="plata">Categoría: Plata ({allClubClients.filter(c => (c.calculatedTier?.name || '').toLowerCase() === 'plata').length})</option>
@@ -2975,6 +3077,38 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                           <Send className="w-4 h-4" />
                           <span>📬 Abrir en Cliente de Correo Local (Thunderbird / Outlook) con BCC ({selectedCampaignClientIds.length} Socios)</span>
                         </button>
+
+                        {/* Thunderbird Graphic HTML Helpers */}
+                        <div className="bg-[#0b132b]/50 border border-blue-500/20 rounded-xl p-3.5 space-y-2 text-[10.5px]">
+                          <p className="font-extrabold text-blue-400 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                            <span>💡 ¿CÓMO ENVIAR EL DISEÑO GRÁFICO (CON LOGO Y FOTOS) EN THUNDERBIRD?</span>
+                          </p>
+                          <p className="text-slate-300 leading-relaxed">
+                            Los enlaces de apertura automática como el de arriba solo transmiten texto plano por limitaciones externas del protocolo de Windows/macOS. Para que tu correo tenga el <strong>diseño gráfico oficial e idéntico de la derecha</strong>, presiona uno de estos botones y pégalo en tu Thunderbird:
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleCopyRichHtmlToClipboard}
+                              disabled={selectedCampaignClientIds.length === 0}
+                              className="bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 border border-sky-500/30 font-extrabold py-2 px-3 rounded-lg text-[9.5px] flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-40"
+                              title="Copia el correo formateado para pegarlo con Ctrl+V directamente en Thunderbird"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>📋 Copiar Diseño (Pega con Ctrl+V)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCopyRawHtmlToClipboard}
+                              disabled={selectedCampaignClientIds.length === 0}
+                              className="bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 border border-indigo-500/30 font-extrabold py-2 px-3 rounded-lg text-[9.5px] flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-40"
+                              title="Copia el código fuente HTML del diseño"
+                            >
+                              <Code className="w-3.5 h-3.5" />
+                              <span>💻 Copiar Código Fuente HTML</span>
+                            </button>
+                          </div>
+                        </div>
 
                         <div className="flex items-center my-2 select-none">
                           <div className="flex-grow border-t border-slate-800"></div>
