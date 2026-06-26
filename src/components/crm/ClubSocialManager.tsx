@@ -300,8 +300,8 @@ export function ClubSocialManager() {
   };
 
   // SMTP Config state (Pre-filled with CIMASUR defaults)
-  const [smtpHost, setSmtpHost] = useState<string>('smtp.cimasur.cl');
-  const [smtpPort, setSmtpPort] = useState<string>('587');
+  const [smtpHost, setSmtpHost] = useState<string>('smtp.gmail.com');
+  const [smtpPort, setSmtpPort] = useState<string>('465');
   const [smtpUser, setSmtpUser] = useState<string>('contacto@cimasur.cl');
   const [smtpPass, setSmtpPass] = useState<string>('');
   const [smtpSenderName, setSmtpSenderName] = useState<string>('Club CIMASUR 👑');
@@ -539,8 +539,15 @@ export function ClubSocialManager() {
     const savedUser = localStorage.getItem('smtp_user');
     const savedPass = localStorage.getItem('smtp_pass');
     const savedName = localStorage.getItem('smtp_sender_name');
-    if (savedHost) setSmtpHost(savedHost);
-    if (savedPort) setSmtpPort(savedPort);
+    if (savedHost) {
+      if (savedHost === 'smtp.cimasur.cl') {
+        setSmtpHost('smtp.gmail.com');
+        setSmtpPort('465');
+      } else {
+        setSmtpHost(savedHost);
+        if (savedPort) setSmtpPort(savedPort);
+      }
+    }
     if (savedUser) setSmtpUser(savedUser);
     if (savedPass) setSmtpPass(savedPass);
     if (savedName) setSmtpSenderName(savedName);
@@ -3378,6 +3385,11 @@ Instrucciones estratégicas adicionales: "${campaignPrompt || 'Ninguna (Usa el m
                             {!testSmtpResult.success && testSmtpResult.message.includes('timeout') && (
                               <div className="mt-2 text-yellow-400">
                                 💡 Tip: Intenta usar el puerto <strong>465</strong> (con SSL/TLS) en lugar del puerto 587. El puerto 465 suele funcionar mejor con Google Workspace.
+                              </div>
+                            )}
+                            {!testSmtpResult.success && testSmtpResult.message.includes('ENOTFOUND') && (
+                              <div className="mt-2 text-yellow-400">
+                                💡 Tip: Parece que el servidor SMTP "{smtpHost}" no existe. Si usas Google Workspace o Gmail, el servidor SMTP debe ser obligatoriamente <strong>smtp.gmail.com</strong>.
                               </div>
                             )}
                           </div>

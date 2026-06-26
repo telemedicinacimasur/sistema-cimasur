@@ -6,6 +6,10 @@ import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
 import { GoogleGenAI, Type } from "@google/genai";
+import dns from 'dns';
+
+// Force IPv4 resolution for environments without proper IPv6 routing
+dns.setDefaultResultOrder('ipv4first');
 
 let computedFilename = '';
 try {
