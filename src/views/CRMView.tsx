@@ -422,8 +422,19 @@ export default function CRMView() {
   return (
     <CRMLayout activeView={activeView} setActiveView={setActiveView}>
       {activeView === 'inicio' && <DashboardView clients={records} />}
-      {activeView === 'club' && <CimasurCRM clients={records} />}
-      {activeView !== 'inicio' && activeView !== 'club' && (
+      {activeView === 'crm_register' && <CRMRegister />}
+      {activeView === 'crm_list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
+      {activeView === 'crm_activities' && <CRMActivities />}
+      {activeView === 'crm_club' && <CimasurCRM clients={records} />}
+      {activeView === 'crm_intranet' && (
+        <CRMIntranetTable 
+          clients={intranetClients} 
+          onImportFromIntranet={handleImportFromIntranet} 
+          onImportSingle={handleImportSingleFromIntranet}
+        />
+      )}
+      {/* Fallback/Legacy if needed */}
+      {activeView !== 'inicio' && activeView !== 'crm_register' && activeView !== 'crm_list' && activeView !== 'crm_activities' && activeView !== 'crm_club' && activeView !== 'crm_intranet' && (
         <div className="space-y-6">
            {/* Legacy content goes here */}
         </div>

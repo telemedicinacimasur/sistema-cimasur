@@ -1,13 +1,15 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Zap, Mail, Bot, CalendarDays, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Zap, Mail, Bot, CalendarDays, Settings, FilePlus, Laptop } from 'lucide-react';
 
 export const CRMLayout: React.FC<{ children: React.ReactNode, activeView: string, setActiveView: (v: string) => void }> = ({ children, activeView, setActiveView }) => {
   const menuItems = [
     { id: 'inicio', label: 'Inicio', icon: LayoutDashboard },
-    { id: 'clientes', label: 'Clientes', icon: Users },
-    { id: 'oportunidades', label: 'Oportunidades', icon: Zap },
-    { id: 'campanas', label: 'Campañas', icon: Mail },
+    { id: 'crm_register', label: 'Ficha Registro', icon: FilePlus },
+    { id: 'crm_list', label: 'Cartera Clientes', icon: Users },
+    { id: 'crm_activities', label: 'Registro Actividades', icon: CalendarDays },
+    { id: 'crm_club', label: 'Club Social', icon: Zap },
+    { id: 'crm_intranet', label: 'Intranet', icon: Laptop },
     { id: 'ia', label: 'IA Comercial', icon: Bot },
     { id: 'agenda', label: 'Agenda', icon: CalendarDays },
     { id: 'config', label: 'Configuración', icon: Settings },
