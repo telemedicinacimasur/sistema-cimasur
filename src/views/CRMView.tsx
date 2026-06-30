@@ -29,6 +29,9 @@ import { addNotification } from '../lib/notifications';
 import { CimasurCRM } from '../components/crm/CimasurCRM';
 import { CRMLayout } from '../components/crm/CRMLayout';
 import { DashboardView } from '../components/crm/DashboardView';
+import { IAComercialView } from '../components/crm/IAComercialView';
+import { AgendaView } from '../components/crm/AgendaView';
+import { ConfigView } from '../components/crm/ConfigView';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -433,8 +436,11 @@ export default function CRMView() {
           onImportSingle={handleImportSingleFromIntranet}
         />
       )}
+      {activeView === 'ia' && <IAComercialView />}
+      {activeView === 'agenda' && <AgendaView />}
+      {activeView === 'config' && <ConfigView />}
       {/* Fallback/Legacy if needed */}
-      {activeView !== 'inicio' && activeView !== 'crm_register' && activeView !== 'crm_list' && activeView !== 'crm_activities' && activeView !== 'crm_club' && activeView !== 'crm_intranet' && (
+      {activeView !== 'inicio' && activeView !== 'crm_register' && activeView !== 'crm_list' && activeView !== 'crm_activities' && activeView !== 'crm_club' && activeView !== 'crm_intranet' && activeView !== 'ia' && activeView !== 'agenda' && activeView !== 'config' && (
         <div className="space-y-6">
            {/* Legacy content goes here */}
         </div>
