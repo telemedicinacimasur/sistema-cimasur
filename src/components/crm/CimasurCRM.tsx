@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
 import { ClubClient, classifyClients } from '../../lib/crmLogic';
 import { Mail, Phone, Users, Laptop } from 'lucide-react';
+import { useBenefits } from '../../context/BenefitsContext';
 
 export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => {
   const [activeTab, setActiveTab] = useState<'club' | 'intranet'>('club');
   const { clientesARecuperar, veterinariosIntranet, subitDeCategoria, zonaVIP } = classifyClients(clients);
+  const { benefits } = useBenefits();
 
   const formatCLP = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(val);
 
   const getMessage = (client: ClubClient, pillar: string) => {
     const name = client.name;
-    const body = pillar === 'recuperar' ? `Estimado/a ${name}, le extrañamos en CIMASUR. ¿Le gustaría renovar su stock de Echinac A o Silimarina para recuperar su stock?` :
-                 pillar === 'intranet' ? `Estimado/a ${name}, active su acceso médico a la Intranet de CIMASUR y pruebe nuestra línea homeopática.` :
-                 pillar === 'subir' ? `Estimado/a ${name}, está a pasos de subir de categoría y obtener más beneficios.` :
-                 `Estimado/a ${name}, gracias por ser parte de nuestra zona VIP Platinum.`;
+    const cat = (client.categoria || 'sin categoría').toLowerCase();
+    const beneficio = benefits[cat] || '';
+    const body = pillar === 'recuperar' ? `Estimado/a ${name}, le extrañamos en CIMASUR. ¿Le gustaría renovar su stock de Echinac A o Silimarina? ${beneficio}` :
+                 pillar === 'intranet' ? `Estimado/a ${name}, active su acceso médico a la Intranet de CIMASUR.` :
+                 pillar === 'subir' ? `Estimado/a ${name}, está a pasos de subir de categoría. ${beneficio}` :
+                 `Estimado/a ${name}, gracias por ser parte de nuestra zona VIP Platinum. ${beneficio}`;
     return `subject=Cimasur Comercial&body=${body}`;
   };
 

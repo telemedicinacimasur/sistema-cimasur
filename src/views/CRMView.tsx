@@ -32,6 +32,7 @@ import { DashboardView } from '../components/crm/DashboardView';
 import { IAComercialView } from '../components/crm/IAComercialView';
 import { AgendaView } from '../components/crm/AgendaView';
 import { ConfigView } from '../components/crm/ConfigView';
+import { BenefitsProvider } from '../context/BenefitsContext';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -423,33 +424,34 @@ export default function CRMView() {
   const [activeView, setActiveView] = useState('inicio');
 
   return (
-    <CRMLayout activeView={activeView} setActiveView={setActiveView}>
-      {activeView === 'inicio' && <DashboardView clients={records} />}
-      {activeView === 'crm_register' && <CRMRegister />}
-      {activeView === 'crm_list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
-      {activeView === 'crm_activities' && <CRMActivities />}
-      {activeView === 'crm_club' && <CimasurCRM clients={records} />}
-      {activeView === 'crm_intranet' && (
-        <CRMIntranetTable 
-          clients={intranetClients} 
-          onImportFromIntranet={handleImportFromIntranet} 
-          onImportSingle={handleImportSingleFromIntranet}
-        />
-      )}
-      {activeView === 'ia' && <IAComercialView />}
-      {activeView === 'agenda' && <AgendaView />}
-      {activeView === 'config' && <ConfigView />}
-      {/* Fallback/Legacy if needed */}
-      {activeView !== 'inicio' && activeView !== 'crm_register' && activeView !== 'crm_list' && activeView !== 'crm_activities' && activeView !== 'crm_club' && activeView !== 'crm_intranet' && activeView !== 'ia' && activeView !== 'agenda' && activeView !== 'config' && (
-        <div className="space-y-6">
-           {/* Legacy content goes here */}
-        </div>
-      )}
-    </CRMLayout>
+    <BenefitsProvider>
+      <CRMLayout activeView={activeView} setActiveView={setActiveView}>
+        {activeView === 'inicio' && <DashboardView clients={records} setActiveView={setActiveView} />}
+        {activeView === 'crm_register' && <CRMRegister />}
+        {activeView === 'crm_list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
+        {activeView === 'crm_activities' && <CRMActivities />}
+        {activeView === 'crm_club' && <CimasurCRM clients={records} />}
+        {activeView === 'crm_intranet' && (
+          <CRMIntranetTable 
+            clients={intranetClients} 
+            onImportFromIntranet={handleImportFromIntranet} 
+            onImportSingle={handleImportSingleFromIntranet}
+          />
+        )}
+        {activeView === 'ia' && <IAComercialView />}
+        {activeView === 'agenda' && <AgendaView />}
+        {activeView === 'config' && <ConfigView />}
+        {/* Fallback/Legacy if needed */}
+        {activeView !== 'inicio' && activeView !== 'crm_register' && activeView !== 'crm_list' && activeView !== 'crm_activities' && activeView !== 'crm_club' && activeView !== 'crm_intranet' && activeView !== 'ia' && activeView !== 'agenda' && activeView !== 'config' && (
+          <div className="space-y-6">
+             {/* Legacy content goes here */}
+          </div>
+        )}
+      </CRMLayout>
+    </BenefitsProvider>
   );
-
-  // ... rest of CRMView code ...
 }
+
 const REGIONES = [
   'Todas', 'Arica y Parinacota', 'Tarapacá', 'Antofagasta', 'Atacama', 'Coquimbo', 'Valparaíso',
   'Metropolitana', 'O\'Higgins', 'Maule', 'Ñuble', 'Biobío', 'Araucanía', 'Los Ríos',
