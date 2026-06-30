@@ -29,7 +29,8 @@ export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => 
         <div className="text-[9.5px] text-slate-500 font-mono mt-0.5">{client.rut}</div>
       </td>
       <td className="p-4 text-right font-mono font-bold text-white text-xs">
-        {formatCLP((client.ventas?.v2026 || 0))}
+        <div>2026: {formatCLP((client.ventas?.v2026 || 0))}</div>
+        <div className="text-[10px] text-slate-500">2025: {formatCLP((client.ventas?.v2025 || 0))}</div>
       </td>
       <td className="p-4 text-center">
         <span className={`font-bold block px-2.5 py-1 rounded-lg text-[10px] w-fit mx-auto border ${status === 'critico' ? 'bg-red-950/40 text-red-400 border-red-900/30' : status === 'sin_compra' ? 'bg-slate-800 text-slate-350 border-slate-700' : status === 'vip' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-green-950/40 text-green-400 border-green-900/30'}`}>
