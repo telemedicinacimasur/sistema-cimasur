@@ -1,7 +1,8 @@
 
 export interface ClientVentas {
-  v2025: number; // Activo actual (2025)
-  v2026: number; // Meta/Proyección (2026 para 2027)
+  v2024: number;
+  v2025: number; 
+  v2026: number; 
 }
 
 export interface Benefit {

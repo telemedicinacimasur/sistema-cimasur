@@ -185,6 +185,39 @@ async function startServer() {
 
   console.log('Iniciando servidor CIMASUR...');
 
+  app.post('/api/ai/chat', async (req, res) => {
+    console.log('API call: POST /api/ai/chat');
+    try {
+      const { message, history } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
+      }
+
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+
+      const model = "gemini-3.5-flash";
+      const chat = ai.models.startChat({
+        model,
+        history: history.map((h: any) => ({
+          role: h.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: h.text }]
+        }))
+      });
+
+      const result = await chat.sendMessage(message);
+      const response = await result.response;
+      res.json({ reply: response.text() });
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Error en chat IA' });
+    }
+  });
+
   // --- PERSISTENCE IN FIRESTORE ---
   let db: admin.firestore.Firestore | null = null;
   const DATA_DIR = path.join(__dirname, 'data');
