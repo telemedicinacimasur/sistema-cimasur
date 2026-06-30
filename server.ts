@@ -200,9 +200,8 @@ async function startServer() {
         httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
       });
 
-      const model = "gemini-3.5-flash";
-      const chat = ai.models.startChat({
-        model,
+      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const chat = model.startChat({
         history: history.map((h: any) => ({
           role: h.sender === 'user' ? 'user' : 'model',
           parts: [{ text: h.text }]

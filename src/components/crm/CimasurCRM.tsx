@@ -7,10 +7,21 @@ export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => 
   const [activeTab, setActiveTab] = useState<'club' | 'intranet'>('club');
   const { clientesARecuperar, veterinariosIntranet, subitDeCategoria, zonaVIP } = classifyClients(clients);
   const { benefits } = useBenefits();
+  const [showImport, setShowImport] = useState(false);
+  const [importRUT, setImportRUT] = useState('');
+  const [importYear, setImportYear] = useState('2026');
+  const [importAmount, setImportAmount] = useState('');
 
   const formatCLP = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(val);
 
+  const handleImport = () => {
+    alert(`Importando $${importAmount} para ${importRUT} en el año ${importYear}`);
+    setShowImport(false);
+  };
+
   const getMessage = (client: ClubClient, pillar: string) => {
+    // ...
+
     const name = client.name;
     const cat = (client.categoria || 'sin categoría').toLowerCase();
     const beneficio = benefits[cat] || '';
@@ -52,10 +63,30 @@ export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => 
 
   return (
     <div className="p-6 bg-[#050914] text-slate-200 min-h-screen">
-      <div className="flex gap-4 mb-8">
-        <button onClick={() => setActiveTab('club')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase ${activeTab === 'club' ? 'bg-sky-500 text-slate-950' : 'bg-[#0d162d] text-slate-400 border border-slate-800'}`}><Users size={16}/>Club Comercial</button>
-        <button onClick={() => setActiveTab('intranet')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase ${activeTab === 'intranet' ? 'bg-sky-500 text-slate-950' : 'bg-[#0d162d] text-slate-400 border border-slate-800'}`}><Laptop size={16}/>Intranet Prospectos</button>
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex gap-4">
+          <button onClick={() => setActiveTab('club')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase ${activeTab === 'club' ? 'bg-sky-500 text-slate-950' : 'bg-[#0d162d] text-slate-400 border border-slate-800'}`}><Users size={16}/>Club Comercial</button>
+          <button onClick={() => setActiveTab('intranet')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase ${activeTab === 'intranet' ? 'bg-sky-500 text-slate-950' : 'bg-[#0d162d] text-slate-400 border border-slate-800'}`}><Laptop size={16}/>Intranet Prospectos</button>
+        </div>
+        <button onClick={() => setShowImport(true)} className="bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-xs">Importar Ventas</button>
       </div>
+
+      {showImport && (
+        <div className="bg-[#0D1527] p-6 rounded-2xl border border-[#1E293B] mb-8">
+          <h3 className="text-white font-bold mb-4">Importar Ventas (RUT, Año, Monto)</h3>
+          <div className="flex gap-4">
+            <input placeholder="RUT" value={importRUT} onChange={e => setImportRUT(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm" />
+            <select value={importYear} onChange={e => setImportYear(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm">
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
+              <option value="2026">2026</option>
+            </select>
+            <input placeholder="Monto" value={importAmount} onChange={e => setImportAmount(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm" />
+            <button onClick={handleImport} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Guardar</button>
+            <button onClick={() => setShowImport(false)} className="bg-slate-700 text-white px-4 py-2 rounded-lg font-bold text-sm">Cancelar</button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-[#0d162d] border border-slate-850 rounded-2xl p-2">
         <table className="w-full">
