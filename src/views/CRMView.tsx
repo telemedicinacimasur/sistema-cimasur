@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { GrowthEngineBridge } from '../services/GrowthEngineBridge';
 import { localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDate, parseExcelDate, safe, formatDateForExcel } from '../lib/utils';
@@ -33,6 +34,7 @@ import { IAComercialView } from '../components/crm/IAComercialView';
 import { AgendaView } from '../components/crm/AgendaView';
 import { ConfigView } from '../components/crm/ConfigView';
 import { BenefitsProvider } from '../context/BenefitsContext';
+import { CampaignCenterView } from '../components/crm/CampaignCenterView';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -196,7 +198,17 @@ export default function CRMView() {
   const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
   const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
 
-  const [activeTab, setActiveTab] = useState<'register' | 'list' | 'activities' | 'intranet' | 'smart' | 'club'>('register');
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const engineBridge = useMemo(() => new GrowthEngineBridge(), []);
+
+  useEffect(() => {
+    const loadEngineData = async () => {
+      const data = await engineBridge.getDashboardSummary();
+      setDashboardData(data);
+    };
+    loadEngineData();
+  }, [engineBridge]);
+
   const [records, setRecords] = useState<any[]>([]);
   const [intranetClients, setIntranetClients] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
@@ -421,33 +433,63 @@ export default function CRMView() {
     }
   };
 
-  const [activeView, setActiveView] = useState('inicio');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const tabs = [
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'crecimiento', label: '🚀 Crecimiento' },
+    { id: 'clientes', label: '👥 Clientes' },
+    { id: 'oportunidades', label: '🎯 Oportunidades' },
+    { id: 'campanas', label: '📧 Campañas' },
+    { id: 'whatsapp', label: '💬 WhatsApp' },
+    { id: 'email', label: '✉️ Email Marketing' },
+    { id: 'ia', label: '🤖 IA Comercial' },
+    { id: 'reportes', label: '📈 Reportes' },
+  ];
 
   return (
     <BenefitsProvider>
-      <CRMLayout activeView={activeView} setActiveView={setActiveView}>
-        {activeView === 'inicio' && <DashboardView clients={records} setActiveView={setActiveView} />}
-        {activeView === 'crm_register' && <CRMRegister />}
-        {activeView === 'crm_list' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
-        {activeView === 'crm_activities' && <CRMActivities />}
-        {activeView === 'crm_club' && <CimasurCRM clients={records} />}
-        {activeView === 'crm_intranet' && (
-          <CRMIntranetTable 
-            clients={intranetClients} 
-            onImportFromIntranet={handleImportFromIntranet} 
-            onImportSingle={handleImportSingleFromIntranet}
-          />
-        )}
-        {activeView === 'ia' && <IAComercialView />}
-        {activeView === 'agenda' && <AgendaView />}
-        {activeView === 'config' && <ConfigView />}
-        {/* Fallback/Legacy if needed */}
-        {activeView !== 'inicio' && activeView !== 'crm_register' && activeView !== 'crm_list' && activeView !== 'crm_activities' && activeView !== 'crm_club' && activeView !== 'crm_intranet' && activeView !== 'ia' && activeView !== 'agenda' && activeView !== 'config' && (
-          <div className="space-y-6">
-             {/* Legacy content goes here */}
+      <div className="flex flex-col h-full">
+        <div className="bg-[#0D1527] p-4 border-b border-[#1E293B]">
+          <h1 className="text-xl font-bold text-white mb-4">Centro de Crecimiento Comercial CIMASUR</h1>
+          <div className="flex overflow-x-auto">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "px-4 py-2 text-xs font-bold transition-all whitespace-nowrap",
+                  activeTab === tab.id 
+                    ? "text-sky-400 border-b-2 border-sky-400 bg-sky-500/5" 
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-        )}
-      </CRMLayout>
+        </div>
+        
+        <div className="flex-1 overflow-auto">
+          {activeTab === 'dashboard' && <DashboardView dashboardData={dashboardData} setActiveView={setActiveTab} />}
+          {activeTab === 'clientes' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
+          {activeTab === 'crecimiento' && (
+            <div className="p-6 text-white">
+              <h1 className="text-2xl font-bold mb-4">Motor de Crecimiento</h1>
+            </div>
+          )}
+          {activeTab === 'oportunidades' && (
+            <div className="p-6 text-white">
+              <h1 className="text-2xl font-bold mb-4">Centro de Oportunidades</h1>
+            </div>
+          )}
+          {activeTab === 'campanas' && (
+            <CampaignCenterView dashboardData={dashboardData} />
+          )}
+          {activeTab === 'ia' && <IAComercialView />}
+          {/* Implement other views as needed */}
+        </div>
+      </div>
     </BenefitsProvider>
   );
 }

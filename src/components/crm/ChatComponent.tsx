@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 
 export const ChatComponent: React.FC = () => {
-  const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string }[]>([]);
+  const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string; actions?: { label: string; type: string; payload: any }[] }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +20,12 @@ export const ChatComponent: React.FC = () => {
         body: JSON.stringify({ message: userMsg, history: messages })
       });
       const data = await response.json();
-      setMessages(prev => [...prev, { sender: 'ai', text: data.reply }]);
+      try {
+        const parsedReply = JSON.parse(data.reply);
+        setMessages(prev => [...prev, { sender: 'ai', text: parsedReply.text, actions: parsedReply.actions }]);
+      } catch (e) {
+        setMessages(prev => [...prev, { sender: 'ai', text: data.reply }]);
+      }
     } catch (e) {
       console.error(e);
       setMessages(prev => [...prev, { sender: 'ai', text: 'Error al conectar con IA.' }]);
@@ -38,7 +43,16 @@ export const ChatComponent: React.FC = () => {
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`p-3 rounded-lg text-sm ${m.sender === 'user' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-200'}`}>
-              {m.text}
+              <div>{m.text}</div>
+              {m.actions && m.actions.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {m.actions.map((action, ai) => (
+                    <button key={ai} onClick={() => console.log('Action triggered:', action)} className="bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold px-3 py-1 rounded">
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}

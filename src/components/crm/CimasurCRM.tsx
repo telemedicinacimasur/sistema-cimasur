@@ -8,14 +8,19 @@ export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => 
   const { clientesARecuperar, veterinariosIntranet, subitDeCategoria, zonaVIP } = classifyClients(clients);
   const { benefits } = useBenefits();
   const [showImport, setShowImport] = useState(false);
-  const [importRUT, setImportRUT] = useState('');
-  const [importYear, setImportYear] = useState('2026');
-  const [importAmount, setImportAmount] = useState('');
+  const [bulkImportData, setBulkImportData] = useState('');
 
   const formatCLP = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(val);
 
   const handleImport = () => {
-    alert(`Importando $${importAmount} para ${importRUT} en el año ${importYear}`);
+    const lines = bulkImportData.split('\n');
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      const [rut, year, amount] = line.split(',').map(s => s.trim());
+      console.log(`Importando $${amount} para ${rut} en el año ${year}`);
+    });
+    alert(`Procesadas ${lines.length} líneas de datos.`);
+    setBulkImportData('');
     setShowImport(false);
   };
 
@@ -73,15 +78,15 @@ export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => 
 
       {showImport && (
         <div className="bg-[#0D1527] p-6 rounded-2xl border border-[#1E293B] mb-8">
-          <h3 className="text-white font-bold mb-4">Importar Ventas (RUT, Año, Monto)</h3>
+          <h3 className="text-white font-bold mb-4">Importar Ventas Masivas (Formato: RUT, Año, MontoMensual)</h3>
+          <textarea 
+            placeholder="Ejemplo: 12345678-9, 2026, 150000&#10;98765432-1, 2026, 200000"
+            value={bulkImportData}
+            onChange={e => setBulkImportData(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm mb-4"
+            rows={5}
+          />
           <div className="flex gap-4">
-            <input placeholder="RUT" value={importRUT} onChange={e => setImportRUT(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm" />
-            <select value={importYear} onChange={e => setImportYear(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm">
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
-            </select>
-            <input placeholder="Monto" value={importAmount} onChange={e => setImportAmount(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm" />
             <button onClick={handleImport} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Guardar</button>
             <button onClick={() => setShowImport(false)} className="bg-slate-700 text-white px-4 py-2 rounded-lg font-bold text-sm">Cancelar</button>
           </div>

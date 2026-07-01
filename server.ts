@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, FunctionDeclaration, GenerateContentResponse } from "@google/genai";
 import dns from 'dns';
 
 // Force IPv4 resolution for environments without proper IPv6 routing
@@ -185,6 +185,27 @@ async function startServer() {
 
   console.log('Iniciando servidor CIMASUR...');
 
+// Tool Definitions
+const crmTools: FunctionDeclaration[] = [
+  {
+    name: "get_inactive_clients",
+    description: "Gets a list of clients who have not purchased in the last 90 days.",
+    parameters: { type: Type.OBJECT, properties: {} },
+  },
+  {
+    name: "create_campaign",
+    description: "Creates a new marketing campaign for a category of clients.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        category: { type: Type.STRING, description: "The category of clients (e.g., 'Oro', 'Plata')." },
+        name: { type: Type.STRING, description: "Name of the campaign." }
+      },
+      required: ["category", "name"]
+    }
+  }
+];
+
   app.post('/api/ai/chat', async (req, res) => {
     console.log('API call: POST /api/ai/chat');
     try {
@@ -194,23 +215,84 @@ async function startServer() {
         return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
       }
 
-      const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({
         apiKey,
         httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
       });
 
-      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const chat = model.startChat({
-        history: history.map((h: any) => ({
-          role: h.sender === 'user' ? 'user' : 'model',
-          parts: [{ text: h.text }]
-        }))
+      const contents = history.map((h: any) => ({
+        role: h.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: h.text }]
+      }));
+      contents.push({
+        role: 'user',
+        parts: [{ text: `${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client", payload: "some_data" }] }.` }]
       });
 
-      const result = await chat.sendMessage(message);
-      const response = await result.response;
-      res.json({ reply: response.text() });
+      // Helper to execute tools
+      const executeTool = async (name: string, args: any) => {
+        console.log(`Executing tool: ${name} with`, args);
+        try {
+          if (name === 'get_inactive_clients') {
+            const clients = await readRecords('clients');
+            const now = new Date();
+            const inactive = clients.filter((c: any) => {
+              if (!c.lastPurchaseDate) return true; // Assume new or never purchased
+              const lastDate = new Date(c.lastPurchaseDate);
+              const diffTime = Math.abs(now.getTime() - lastDate.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              return diffDays > 90;
+            });
+            return { result: JSON.stringify(inactive.map((c: any) => ({id: c.id, name: c.name, clinica: c.clinica}))) };
+          }
+          if (name === 'create_campaign') {
+            const campaigns = await readRecords('campaigns');
+            const newCampaign = {
+              id: Date.now().toString(),
+              name: args.name,
+              category: args.category,
+              status: 'pending',
+              createdAt: new Date().toISOString()
+            };
+            campaigns.push(newCampaign);
+            await writeRecords('campaigns', campaigns);
+            return { result: `Campaign '${args.name}' created successfully for category ${args.category}.` };
+          }
+          return { error: `Tool ${name} not implemented.` };
+        } catch (e: any) {
+          return { error: e.message };
+        }
+      };
+
+      let response = await ai.models.generateContent({
+        model: "gemini-1.5-flash-latest",
+        contents: contents,
+        config: {
+          tools: [{ functionDeclarations: crmTools }]
+        }
+      });
+
+      // Handle tool calls
+      if (response.functionCalls) {
+        const toolCalls = response.functionCalls;
+        const toolResults = [];
+        
+        for (const call of toolCalls) {
+          const result = await executeTool(call.name, call.args);
+          toolResults.push({
+            role: 'tool',
+            parts: [{ functionResponse: { name: call.name, response: result } }]
+          });
+        }
+        
+        // Send tool results back to model
+        response = await ai.models.generateContent({
+          model: "gemini-1.5-flash-latest",
+          contents: [...contents, response.candidates![0].content, ...toolResults]
+        });
+      }
+
+      res.json({ reply: response.text });
     } catch (e: any) {
       console.error(e);
       res.status(500).json({ error: e.message || 'Error en chat IA' });

@@ -1,64 +1,166 @@
 
-import React from 'react';
-import { ClubClient } from '../../lib/crmLogic';
-import { TrendingUp, Users, AlertTriangle, ArrowUpCircle, Bell } from 'lucide-react';
-import { useBenefits } from '../../context/BenefitsContext';
+import React, { useMemo } from 'react';
+import { ArrowUpCircle, AlertTriangle, UserPlus, Bell, TrendingUp, BarChart3, Users, DollarSign, Activity, Zap, CheckCircle2, ShoppingCart } from 'lucide-react';
 
-export const DashboardView: React.FC<{ clients: ClubClient[], setActiveView: (view: string) => void }> = ({ clients, setActiveView }) => {
-  const { benefits } = useBenefits();
-  // Simple calculations for demo purposes
-  const totalClients = clients.length;
-  const activeClients = clients.filter(c => (c.ventas?.v2026 || 0) > 0).length;
-  const criticalClients = clients.filter(c => (c.ventas?.v2026 || 0) === 0 && (c.ventas?.v2025 || 0) > 0).length;
-  const growingClients = clients.filter(c => (c.ventas?.v2026 || 0) > (c.ventas?.v2025 || 0)).length;
+export const DashboardView: React.FC<{ dashboardData: any, setActiveView: (view: string) => void }> = ({ dashboardData, setActiveView }) => {
+  const isNoData = dashboardData?.status === "NO_DATA";
+  
+  const opportunities: any[] = useMemo(() => dashboardData?.opportunities || [], [dashboardData]);
+  const metrics = dashboardData?.metrics;
+  const cycle = dashboardData?.cycle || 'Ciclo Actual';
 
-  const metricCards = [
-    { title: 'Ventas Ciclo', value: '$85.0M', icon: TrendingUp, color: 'text-emerald-400' },
-    { title: 'Clientes Activos', value: activeClients.toString(), icon: Users, color: 'text-sky-400' },
-    { title: 'Alertas Críticas', value: criticalClients.toString(), icon: AlertTriangle, color: 'text-red-400' },
-    { title: 'Clientes Creciendo', value: growingClients.toString(), icon: ArrowUpCircle, color: 'text-green-400' },
-  ];
+  const formatCurrency = (val: number) => `$${(val / 1000000).toFixed(1)}M`;
+  const formatPercent = (val: number) => `${val.toFixed(1)}%`;
+
+  if (isNoData) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4">
+        <Activity size={48} className="text-slate-500 mb-4" />
+        <h2 className="text-xl font-bold text-white">Esperando datos del Growth Engine</h2>
+        <p className="text-slate-400">No hay información suficiente para el análisis comercial.</p>
+        <p className="text-sm text-slate-500">{dashboardData.next_step}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-white">Panel Comercial Cimasur</h1>
-      <div className="grid grid-cols-4 gap-4">
-        {metricCards.map(m => (
-          <div key={m.title} className="bg-[#0D1527] p-6 rounded-2xl border border-[#1E293B] flex items-center gap-4">
-             <div className={`p-3 rounded-xl bg-slate-800 ${m.color}`}><m.icon size={24} /></div>
-             <div>
-               <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">{m.title}</div>
-               <div className="text-2xl font-black text-white">{m.value}</div>
-             </div>
-          </div>
-        ))}
+    <div className="p-6 space-y-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <BarChart3 className="text-sky-500" /> Centro de Operaciones Comerciales
+        </h1>
+        <div className="px-4 py-2 bg-sky-950/40 border border-sky-800 rounded-full text-sky-400 font-bold text-sm">
+          {cycle}
+        </div>
       </div>
       
-      <div className="bg-[#0D1527] p-6 rounded-2xl border border-[#1E293B]">
-        <h2 className="font-bold text-white mb-4 uppercase text-sm tracking-wider">Acciones de Hoy</h2>
-        <div className="space-y-3">
-           <div className="flex items-center justify-between p-4 bg-red-500/5 border border-red-500/20 rounded-xl">
-             <span className="text-slate-300">{criticalClients} clientes requieren atención crítica por caída en ventas.</span>
-             <button onClick={() => setActiveView('crm_club')} className="text-xs bg-red-500 text-white px-3 py-1 rounded-lg font-bold hover:bg-red-600">Actuar</button>
-           </div>
-           <div className="flex items-center justify-between p-4 bg-sky-500/5 border border-sky-500/20 rounded-xl">
-             <span className="text-slate-300">Clientes cercanos a subir de nivel detectados.</span>
-             <button onClick={() => setActiveView('crm_club')} className="text-xs bg-sky-500 text-white px-3 py-1 rounded-lg font-bold hover:bg-sky-600">Actuar</button>
-           </div>
+      {/* Metrics Section: Main Row */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <MetricCard 
+          title="Venta Potencial" 
+          value={metrics?.potentialRevenue ? formatCurrency(metrics.potentialRevenue) : '$0'} 
+          icon={<DollarSign size={20} className="text-emerald-400" />} 
+          highlight
+          onClick={() => setActiveView('campanas')}
+        />
+        <MetricCard 
+          title="Brecha Comercial" 
+          value={metrics?.brechaComercial ? formatCurrency(metrics.brechaComercial) : '$0'} 
+          icon={<TrendingUp size={20} className="text-purple-400" />} 
+          onClick={() => setActiveView('campanas')}
+        />
+        <MetricCard 
+          title="Ticket Promedio" 
+          value={metrics?.averageTicket ? formatCurrency(metrics.averageTicket) : '$0'} 
+          icon={<ShoppingCart size={20} className="text-blue-400" />} 
+        />
+        <MetricCard 
+          title="Clientes Activos" 
+          value={metrics?.activeClients || 0} 
+          icon={<CheckCircle2 size={20} className="text-emerald-400" />} 
+          onClick={() => setActiveView('clientes')}
+        />
+      </section>
+
+      {/* CRM Funnel Metrics Row */}
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <MiniMetricCard title="Prospectos sin compra" value={metrics?.journeyCounts?.['Prospecto'] || 0} />
+        <MiniMetricCard title="Primera compra" value={metrics?.journeyCounts?.['Primera Compra'] || 0} />
+        <MiniMetricCard title="Sin Categoría" value={metrics?.journeyCounts?.['Sin Categoría'] || 0} />
+        <MiniMetricCard title="Dormidos" value={metrics?.dormantCounts?.total || 0} textClass="text-amber-400" />
+        <MiniMetricCard title="Conversión Intranet" value={metrics?.intranetConversionRate ? formatPercent(metrics.intranetConversionRate) : '0%'} />
+      </section>
+
+      {/* Upgrade Opportunities Row */}
+      <section>
+         <h2 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2">
+          <ArrowUpCircle size={16} /> Próximos a Subir de Categoría
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <MiniMetricCard title="Cerca de Bronce" value={metrics?.nearUpgradeCounts?.bronce || 0} />
+          <MiniMetricCard title="Cerca de Plata" value={metrics?.nearUpgradeCounts?.plata || 0} />
+          <MiniMetricCard title="Cerca de Oro" value={metrics?.nearUpgradeCounts?.oro || 0} />
+          <MiniMetricCard title="Cerca de Platinum" value={metrics?.nearUpgradeCounts?.platinum || 0} />
         </div>
-      </div>
-      <div className="bg-[#0D1527] p-6 rounded-2xl border border-[#1E293B]">
-        <h2 className="font-bold text-white mb-4 uppercase text-sm tracking-wider">Beneficios por Categoría</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Object.entries(benefits).map(([cat, desc]) => (
-            <div key={cat} className="p-4 bg-slate-800/30 rounded-xl border border-slate-700">
-              <div className="text-sky-400 font-bold capitalize mb-1">{cat}</div>
-              <div className="text-slate-400 text-xs">{desc}</div>
-            </div>
-          ))}
+      </section>
+
+      {/* Oportunidades Section */}
+      <section>
+        <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-2">
+          <h2 className="text-xl font-bold text-slate-200">⚡ Acciones Comerciales Sugeridas</h2>
+          <span className="text-sm text-slate-500 font-mono">{opportunities.length} detectadas</span>
         </div>
-      </div>
+        
+        {opportunities.length === 0 ? (
+           <div className="text-slate-500 text-center py-8">No se encontraron oportunidades en este momento.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {opportunities.slice(0, 9).map((opp, idx) => (
+              <OpportunityCard key={opp.id || idx} opp={opp} setActiveView={setActiveView} formatCurrency={formatCurrency} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };
+
+const MetricCard: React.FC<{ title: string, value: string | number, icon: React.ReactNode, highlight?: boolean, onClick?: () => void }> = ({ title, value, icon, highlight, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`p-6 rounded-2xl border transition-all ${onClick ? 'cursor-pointer hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-900/10' : ''} ${highlight ? 'bg-sky-950/20 border-sky-800' : 'bg-[#0D1527] border-slate-800'}`}
+  >
+    <div className="flex items-center justify-between mb-4">
+      <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">{title}</div>
+      {icon}
+    </div>
+    <div className={`text-3xl font-black ${highlight ? 'text-sky-400' : 'text-white'}`}>{value}</div>
+  </div>
+);
+
+const MiniMetricCard: React.FC<{ title: string, value: string | number, textClass?: string }> = ({ title, value, textClass = 'text-white' }) => (
+  <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
+    <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2 leading-tight">{title}</div>
+    <div className={`text-2xl font-bold ${textClass}`}>{value}</div>
+  </div>
+);
+
+const OpportunityCard: React.FC<{ opp: any, setActiveView: any, formatCurrency: any }> = ({ opp, setActiveView, formatCurrency }) => (
+  <div className="bg-[#0D1527] p-6 rounded-2xl border border-slate-800 flex flex-col justify-between hover:border-sky-500/50 transition-all group">
+    <div>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-white font-bold text-lg mb-1">{opp.customerName}</h3>
+          <p className="text-slate-400 text-xs line-clamp-2">{opp.description}</p>
+        </div>
+        <div className="p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 shrink-0">
+           {opp.type === 'first_purchase' ? <UserPlus size={18} className="text-blue-400" /> :
+            opp.type === 'upgrade' ? <TrendingUp size={18} className="text-purple-400" /> :
+            opp.type === 'dormant' ? <AlertTriangle size={18} className="text-amber-400" /> :
+            <Bell size={18} />
+           }
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4 mb-6 bg-slate-900/50 p-3 rounded-lg border border-slate-800/50">
+        <div>
+          <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Acción</div>
+          <div className="text-sm font-bold text-slate-200 truncate">{opp.recommendation?.action || 'Contactar'}</div>
+        </div>
+        <div>
+          <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Potencial</div>
+          <div className="text-sm font-black text-emerald-400">{formatCurrency(opp.potential)}</div>
+        </div>
+      </div>
+    </div>
+    <button 
+      onClick={() => setActiveView('campanas')} 
+      className="w-full flex items-center justify-center gap-2 text-sm bg-slate-800 text-white px-4 py-3 rounded-xl font-bold hover:bg-sky-600 transition-colors group-hover:shadow-lg group-hover:shadow-sky-900/20"
+    >
+      <Zap size={16} />
+      Ejecutar Campaña
+    </button>
+  </div>
+);
+
+
 
