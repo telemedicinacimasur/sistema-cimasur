@@ -209,7 +209,7 @@ const crmTools: FunctionDeclaration[] = [
   app.post('/api/ai/chat', async (req, res) => {
     console.log('API call: POST /api/ai/chat');
     try {
-      const { message, history } = req.body;
+      const { message, history, context } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
@@ -226,7 +226,7 @@ const crmTools: FunctionDeclaration[] = [
       }));
       contents.push({
         role: 'user',
-        parts: [{ text: `${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client", payload: "some_data" }] }.` }]
+        parts: [{ text: `Datos de contexto estructurado del CRM (Growth Engine):\n${JSON.stringify(context)}\n\nMensaje del usuario: ${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client", payload: "some_data" }] }.` }]
       });
 
       // Helper to execute tools

@@ -1,5 +1,6 @@
 import { localDB } from '../../lib/auth';
 import { SuggestedCampaign } from '../crm/CampaignStrategyService';
+import { AutomationEngineService } from './AutomationEngineService';
 
 export interface Campaign {
   id: string;
@@ -7,7 +8,7 @@ export interface Campaign {
   suggestedCampaignId?: string;
   segment: string;
   channel: 'email' | 'whatsapp' | 'both';
-  status: 'draft' | 'ready' | 'executed' | 'cancelled';
+  status: 'draft' | 'ready' | 'scheduled' | 'running' | 'paused' | 'completed' | 'cancelled' | 'error';
   scheduledDate?: string;
   targetCount: number;
   potentialRevenue: number;
@@ -34,7 +35,13 @@ export class CampaignEngineService {
   }
 
   public async saveCampaign(campaign: Campaign): Promise<void> {
-    await localDB.setDocument('campaigns', campaign.id, campaign);
+    const campaigns = await this.getCampaignHistory();
+    const existingIndex = campaigns.findIndex(c => c.id === campaign.id);
+    if (existingIndex >= 0) {
+      await localDB.updateInCollection('campaigns', campaign.id, campaign);
+    } else {
+      await localDB.saveToCollection('campaigns', campaign);
+    }
   }
 
   public async createFromSuggestion(suggestion: SuggestedCampaign, channel: 'email' | 'whatsapp' | 'both', template: string): Promise<Campaign> {
@@ -67,15 +74,16 @@ export class CampaignEngineService {
   public async executeCampaign(campaignId: string, user: string = 'Sistema'): Promise<void> {
     const campaigns = await this.getCampaignHistory();
     const campaign = campaigns.find(c => c.id === campaignId);
+    
     if (campaign && (campaign.status === 'draft' || campaign.status === 'ready')) {
-      campaign.status = 'executed';
-      campaign.executedAt = new Date().toISOString();
+      campaign.status = 'scheduled';
       campaign.executedBy = user;
-      campaign.metrics.sent = campaign.targetCount;
-      // Simulated initial metrics
-      campaign.metrics.opened = Math.floor(campaign.targetCount * 0.4);
-      campaign.metrics.clicked = Math.floor(campaign.metrics.opened * 0.2);
       await this.saveCampaign(campaign);
+      
+      const automationEngine = new AutomationEngineService();
+      
+      // We don't await this, let it run in the background just like a queue
+      automationEngine.executeCampaign(campaign).catch(console.error);
     }
   }
 

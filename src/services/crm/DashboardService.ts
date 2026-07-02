@@ -21,6 +21,7 @@ export interface DashboardSummary {
   activeClients: number;
   averageTicket: number;
   intranetConversionRate: number;
+  totalRevenue: number;
 }
 
 export class DashboardService {
@@ -111,7 +112,8 @@ export class DashboardService {
       brechaComercial,
       activeClients,
       averageTicket,
-      intranetConversionRate
+      intranetConversionRate,
+      totalRevenue: totalSalesVolume
     };
   }
 }

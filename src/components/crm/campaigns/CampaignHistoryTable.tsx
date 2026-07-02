@@ -52,8 +52,15 @@ export const CampaignHistoryTable: React.FC<{ campaigns: Campaign[] }> = ({ camp
                   <div className="font-mono text-emerald-400 font-bold">${(c.brechaEconomica || c.potentialRevenue || 0).toLocaleString('es-CL')}</div>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <div className="text-xs text-slate-300"><span className="text-slate-500">Env:</span> {c.metrics?.sent || 0}</div>
-                  <div className="text-xs text-emerald-400 font-bold"><span className="text-slate-500 font-normal">Ape:</span> {c.metrics?.opened || 0} ({(c.metrics?.sent > 0 ? ((c.metrics?.opened/c.metrics?.sent)*100).toFixed(0) : 0)}%)</div>
+                  <div className="text-xs text-slate-300">
+                    <span className="text-slate-500">Env:</span> {c.metrics?.sent || 0}
+                  </div>
+                  <div className="text-xs text-emerald-400 font-bold">
+                    <span className="text-slate-500 font-normal">Ape:</span> {c.metrics?.opened || 0} ({(c.metrics?.sent > 0 ? ((c.metrics?.opened/c.metrics?.sent)*100).toFixed(0) : 0)}%)
+                  </div>
+                  <div className="text-xs text-sky-400 font-bold">
+                    <span className="text-slate-500 font-normal">ROI:</span> ${(c.metrics?.roi || 0).toLocaleString('es-CL')}
+                  </div>
                 </td>
               </tr>
             ))

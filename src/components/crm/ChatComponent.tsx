@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 
-export const ChatComponent: React.FC = () => {
+export const ChatComponent: React.FC<{ contextData?: any }> = ({ contextData }) => {
   const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string; actions?: { label: string; type: string; payload: any }[] }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export const ChatComponent: React.FC = () => {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, history: messages })
+        body: JSON.stringify({ message: userMsg, history: messages, context: contextData })
       });
       const data = await response.json();
       try {

@@ -6,6 +6,9 @@ import { RecommendationEngineService } from './RecommendationEngineService';
 import { DashboardService } from './DashboardService';
 import { ReportingService } from './ReportingService';
 import { CampaignStrategyService } from './CampaignStrategyService';
+import { CommercialIntelligenceService } from './CommercialIntelligenceService';
+import { PredictionService } from './PredictionService';
+import { GoalService } from './GoalService';
 
 export class GrowthEngine {
   private cycle = new CycleManagerService();
@@ -16,6 +19,9 @@ export class GrowthEngine {
   private dashboard = new DashboardService();
   private reporting = new ReportingService();
   private campaignStrategy = new CampaignStrategyService();
+  private commercialIntelligence = new CommercialIntelligenceService();
+  private prediction = new PredictionService();
+  private goals = new GoalService();
 
   public process(integratedData: any[]) {
     // 1. Customer Journey & Segmentation (assign state to each customer)
@@ -55,12 +61,20 @@ export class GrowthEngine {
     // 4. Calculate Dashboard Metrics
     const metrics = this.dashboard.calculateMetrics(processedCustomers, opportunitiesWithRecommendations);
 
+    // 5. Commercial Intelligence & Predictions
+    const intelligence = this.commercialIntelligence.analyzePortfolio(processedCustomers);
+    const prediction = this.prediction.generatePredictions(processedCustomers, metrics.totalRevenue);
+    const goals = this.goals.evaluateGoals(processedCustomers, metrics.totalRevenue, []);
+
     return {
       status: "SUCCESS",
       cycle: this.cycle.getCurrentCycle(),
       metrics,
       opportunities: opportunitiesWithRecommendations,
-      suggestedCampaigns
+      suggestedCampaigns,
+      intelligence,
+      prediction,
+      goals
     };
   }
 }

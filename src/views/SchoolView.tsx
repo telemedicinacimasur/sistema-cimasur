@@ -41,7 +41,6 @@ import { RecordActions } from '../components/RecordActions';
 import { Expediente } from '../components/Expediente';
 
 import { addNotification } from '../lib/notifications';
-import { SmartCampaigns } from '../components/crm/SmartCampaigns';
 import { syncStudentsToSchoolPayments } from '../lib/syncUtils';
 
 interface EstadoAcademicoInputProps {
@@ -149,7 +148,7 @@ export default function SchoolView() {
         {activeView === 'register' && <ContactRegister records={data} />}
         {activeView === 'students' && <StudentManager records={data} />}
         {activeView === 'tracking' && <TrackingView />}
-        {activeView === 'commercial' && <SmartCampaigns isSchool={true} />}
+        {activeView === 'commercial' && <div className="p-8 text-center text-slate-400">Motor de campañas desactivado.</div>}
         {activeView === 'activities' && <SchoolActivities />}
       </div>
     </div>

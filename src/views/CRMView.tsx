@@ -35,6 +35,9 @@ import { AgendaView } from '../components/crm/AgendaView';
 import { ConfigView } from '../components/crm/ConfigView';
 import { BenefitsProvider } from '../context/BenefitsContext';
 import { CampaignCenterView } from '../components/crm/CampaignCenterView';
+import { OperationsDashboardView } from '../components/crm/operations/OperationsDashboardView';
+import { ConfigurationCenterView } from '../components/crm/operations/ConfigurationCenterView';
+import { ExecutiveDashboardView } from '../components/crm/intelligence/ExecutiveDashboardView';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -207,6 +210,8 @@ export default function CRMView() {
       setDashboardData(data);
     };
     loadEngineData();
+    window.addEventListener('campaign-executed', loadEngineData);
+    return () => window.removeEventListener('campaign-executed', loadEngineData);
   }, [engineBridge]);
 
   const [records, setRecords] = useState<any[]>([]);
@@ -441,8 +446,9 @@ export default function CRMView() {
     { id: 'clientes', label: '👥 Clientes' },
     { id: 'oportunidades', label: '🎯 Oportunidades' },
     { id: 'campanas', label: '📧 Campañas' },
-    { id: 'whatsapp', label: '💬 WhatsApp' },
-    { id: 'email', label: '✉️ Email Marketing' },
+    { id: 'operaciones', label: '⚡ Operaciones' },
+    { id: 'inteligencia', label: '🧠 Inteligencia Comercial' },
+    { id: 'configuracion', label: '⚙️ Configuración' },
     { id: 'ia', label: '🤖 IA Comercial' },
     { id: 'reportes', label: '📈 Reportes' },
   ];
@@ -452,7 +458,7 @@ export default function CRMView() {
       <div className="flex flex-col h-full">
         <div className="bg-[#0D1527] p-4 border-b border-[#1E293B]">
           <h1 className="text-xl font-bold text-white mb-4">Centro de Crecimiento Comercial CIMASUR</h1>
-          <div className="flex overflow-x-auto">
+          <div className="flex overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -486,7 +492,10 @@ export default function CRMView() {
           {activeTab === 'campanas' && (
             <CampaignCenterView dashboardData={dashboardData} />
           )}
-          {activeTab === 'ia' && <IAComercialView />}
+          {activeTab === 'operaciones' && <OperationsDashboardView />}
+          {activeTab === 'inteligencia' && <ExecutiveDashboardView dashboardData={dashboardData} />}
+          {activeTab === 'configuracion' && <ConfigurationCenterView />}
+          {activeTab === 'ia' && <IAComercialView dashboardData={dashboardData} />}
           {/* Implement other views as needed */}
         </div>
       </div>

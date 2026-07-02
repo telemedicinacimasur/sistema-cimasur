@@ -5,6 +5,7 @@ import { SuggestedCampaign } from '../../services/crm/CampaignStrategyService';
 import { CampaignMetricsCards } from './campaigns/CampaignMetricsCards';
 import { CampaignSuggestionsPanel } from './campaigns/CampaignSuggestionsPanel';
 import { CampaignHistoryTable } from './campaigns/CampaignHistoryTable';
+import { CampaignPreviewModal } from './campaigns/CampaignPreviewModal';
 
 const engineBridge = new GrowthEngineBridge();
 
@@ -12,6 +13,8 @@ export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboard
   const [activeSubView, setActiveSubView] = useState<'create' | 'history'>('create');
   const [campaignsHistory, setCampaignsHistory] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
+  const [previewCampaign, setPreviewCampaign] = useState<SuggestedCampaign | null>(null);
+  const [previewChannel, setPreviewChannel] = useState<'email' | 'whatsapp' | 'both' | null>(null);
   
   // GrowthEngine delivers exactly what needs to be suggested
   const suggestedCampaigns = dashboardData?.suggestedCampaigns || [];
@@ -27,19 +30,24 @@ export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboard
     setMetrics(m);
   };
 
-  const executeCampaign = async (suggestion: SuggestedCampaign, channel: 'email' | 'whatsapp' | 'both') => {
-    if (!window.confirm(`¿Está seguro de ejecutar la campaña "${suggestion.name}" para ${suggestion.clientCount} clientes vía ${channel.toUpperCase()}?`)) {
-      return;
-    }
-    
-    const template = `Estimado(a), tenemos beneficios exclusivos para su cuenta categoría ${suggestion.targetCategory}.`;
+  const handleExecuteRequest = (suggestion: SuggestedCampaign, channel: 'email' | 'whatsapp' | 'both') => {
+    setPreviewCampaign(suggestion);
+    setPreviewChannel(channel);
+  };
+
+  const confirmExecution = async (template: string) => {
+    if (!previewCampaign || !previewChannel) return;
     
     // Motor de Ejecución ONLY
-    const campaign = await engineBridge.campaigns.createFromSuggestion(suggestion, channel, template);
+    const campaign = await engineBridge.campaigns.createFromSuggestion(previewCampaign, previewChannel, template);
     await engineBridge.campaigns.executeCampaign(campaign.id);
     
-    alert(`Campaña "${suggestion.name}" enviada exitosamente a ${suggestion.clientCount} clientes.`);
+    alert(`Campaña "${previewCampaign.name}" enviada exitosamente a ${previewCampaign.clientCount} clientes.`);
+    
+    setPreviewCampaign(null);
+    setPreviewChannel(null);
     loadCampaigns();
+    window.dispatchEvent(new Event('campaign-executed'));
     setActiveSubView('history');
   };
 
@@ -75,7 +83,7 @@ export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboard
           
           <CampaignSuggestionsPanel 
             suggestions={suggestedCampaigns} 
-            onExecute={executeCampaign} 
+            onExecute={handleExecuteRequest} 
           />
         </div>
       )}
@@ -85,6 +93,18 @@ export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboard
           <CampaignMetricsCards metrics={metrics} />
           <CampaignHistoryTable campaigns={campaignsHistory} />
         </div>
+      )}
+
+      {previewCampaign && previewChannel && (
+        <CampaignPreviewModal 
+          campaign={previewCampaign} 
+          channel={previewChannel} 
+          onClose={() => {
+            setPreviewCampaign(null);
+            setPreviewChannel(null);
+          }}
+          onConfirm={confirmExecution}
+        />
       )}
     </div>
   );
