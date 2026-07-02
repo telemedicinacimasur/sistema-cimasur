@@ -140,9 +140,9 @@ export const Expediente: React.FC<ExpedienteProps> = ({
       // Auto-update category value locally
       let derivedCategory = "Sin categoría";
       if (salesVal >= 12000000) derivedCategory = "Platinum";
-      else if (salesVal >= 5000000) derivedCategory = "Oro";
-      else if (salesVal >= 2000000) derivedCategory = "Plata";
-      else if (salesVal >= 500000) derivedCategory = "Bronce";
+      else if (salesVal >= 6600000) derivedCategory = "Oro";
+      else if (salesVal >= 2760000) derivedCategory = "Plata";
+      else if (salesVal >= 684000) derivedCategory = "Bronce";
 
       let salesObj = { v2024: 0, v2025: 0, v2026: 0 };
       if (selectedClient.clubVentasDetail) {

@@ -25,7 +25,6 @@ export class PointsEngine {
    */
   public getMultiplier(tier: string): number {
     const t = (tier || '').toLowerCase().trim();
-    if (t.includes('embajador')) return 2.0;
     if (t.includes('platinum')) return 1.8;
     if (t.includes('oro')) return 1.5;
     if (t.includes('plata')) return 1.2;

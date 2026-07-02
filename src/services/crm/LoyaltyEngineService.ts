@@ -154,8 +154,13 @@ export class LoyaltyEngineService {
     // Get current tier from the GrowthEngine
     const customers = await this.getProcessedCustomers();
     const client = customers.find(c => c.id === contactId || c.rut === account.rut);
-    const tier = client ? client.journeyState : 'Sin categoría';
+    
+    const segmentation = new SegmentationService();
     const totalSales = client ? (parseFloat(client.totalSales) || 0) : 0;
+    
+    // Get benefits and tier dynamically!
+    const goalsAndBenefits = segmentation.getBenefitsAndGoals(totalSales, client ? client.journeyState : 'Nuevos');
+    const tier = goalsAndBenefits.category;
 
     // Get points figures
     const { balance, expired, lifetime } = await this.pointsEngine.getContactBalance(contactId);
@@ -171,11 +176,17 @@ export class LoyaltyEngineService {
       .filter((r: any) => r.contactId === contactId)
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    // Compute progress to next tier
-    const progress = this.calculateTierProgress(tier, totalSales);
+    const progress = {
+      currentTier: tier,
+      nextTier: goalsAndBenefits.nextLevel,
+      targetSales: goalsAndBenefits.targetAmount,
+      salesNeeded: goalsAndBenefits.missingAmountToUpgrade,
+      progressPercentage: goalsAndBenefits.targetAmount > 0 
+        ? Math.min(100, Math.floor((totalSales / goalsAndBenefits.targetAmount) * 100)) 
+        : 100
+    };
 
-    // Retrieve active benefits for their tier (aligned exactly with CRM segmentation benefits)
-    const activeBenefits = client ? (client.benefits || []) : [];
+    const activeBenefits = goalsAndBenefits.currentBenefits;
 
     return {
       enrolled: true,
@@ -195,51 +206,6 @@ export class LoyaltyEngineService {
       activeBenefits,
       transactions: transactions.slice(0, 50), // Return last 50 for performance
       redemptions: redemptions.slice(0, 50)
-    };
-  }
-
-  /**
-   * Calculates thresholds and progress to the next commercial tier.
-   */
-  private calculateTierProgress(currentTier: string, totalSales: number): any {
-    const tiers = [
-      { name: 'Primera Compra', min: 0, max: 100000 },
-      { name: 'Sin categoría', min: 100000, max: 500000 },
-      { name: 'Bronce', min: 500000, max: 1000000 },
-      { name: 'Plata', min: 1000000, max: 2000000 },
-      { name: 'Oro', min: 2000000, max: 5000000 },
-      { name: 'Platinum', min: 5000000, max: 10000000 },
-      { name: 'Embajador', min: 10000000, max: Infinity }
-    ];
-
-    const currentIdx = tiers.findIndex(t => t.name.toLowerCase() === currentTier.toLowerCase());
-    
-    if (currentIdx === -1 || currentIdx === tiers.length - 1) {
-      return {
-        currentTier,
-        nextTier: 'Estatus Máximo',
-        targetSales: 0,
-        salesNeeded: 0,
-        progressPercentage: 100
-      };
-    }
-
-    const nextTier = tiers[currentIdx + 1];
-    const targetSales = nextTier.min;
-    const salesNeeded = Math.max(0, targetSales - totalSales);
-    
-    // Calculate progress ratio within current range
-    const currentTierMin = tiers[currentIdx].min;
-    const range = targetSales - currentTierMin;
-    const progressVal = totalSales - currentTierMin;
-    const percentage = range > 0 ? Math.min(100, Math.max(0, (progressVal / range) * 100)) : 0;
-
-    return {
-      currentTier,
-      nextTier: nextTier.name,
-      targetSales,
-      salesNeeded,
-      progressPercentage: parseFloat(percentage.toFixed(1))
     };
   }
 
@@ -284,8 +250,7 @@ export class LoyaltyEngineService {
       'Bronce': 0,
       'Plata': 0,
       'Oro': 0,
-      'Platinum': 0,
-      'Embajador': 0
+      'Platinum': 0
     };
 
     // Calculate Club Economic Value (Sum of sales of enrolled members vs total sales)

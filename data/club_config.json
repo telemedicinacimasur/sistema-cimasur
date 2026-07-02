@@ -1,0 +1,89 @@
+{
+  "evaluationCycle": {
+    "type": "annual",
+    "startMonth": 6,
+    "startDay": 1,
+    "firstCycleBaseYear": 2024,
+    "description": "Ciclo anual que inicia cada 1 de Julio y termina el 30 de Junio del año siguiente. El primer ciclo del programa se inició utilizando las ventas consolidadas del año 2024."
+  },
+  "tiers": [
+    {
+      "id": "sin_categoria",
+      "name": "Sin categoría",
+      "minMonthlyAverage": 0,
+      "maxMonthlyAverage": 56999,
+      "benefits": [
+        "Acceso general a catálogos online Cimasur",
+        "Boletín técnico mensual por correo electrónico"
+      ],
+      "discountPercent": 0,
+      "condition": "Compra promedio inferior a $57.000 CLP al mes",
+      "validityMonths": 12,
+      "nextLevel": "Bronce"
+    },
+    {
+      "id": "bronce",
+      "name": "Bronce",
+      "minMonthlyAverage": 57000,
+      "maxMonthlyAverage": 229999,
+      "benefits": [
+        "5% descuento fijo en la línea homeopática magistral",
+        "Invitación a webinars y capacitaciones gratis",
+        "Soporte clínico estándar vía WhatsApp"
+      ],
+      "discountPercent": 5,
+      "condition": "Compra promedio de $57.000 a $229.999 CLP al mes",
+      "validityMonths": 12,
+      "nextLevel": "Plata"
+    },
+    {
+      "id": "plata",
+      "name": "Plata",
+      "minMonthlyAverage": 230000,
+      "maxMonthlyAverage": 549999,
+      "benefits": [
+        "10% descuento fijo en la línea homeopática",
+        "Despacho gratis por compras superiores a $100k",
+        "Soporte clínico prioritario vía WhatsApp",
+        "3 muestras gratuitas de fórmulas nuevas al año"
+      ],
+      "discountPercent": 10,
+      "condition": "Compra promedio de $230.000 a $549.999 CLP al mes",
+      "validityMonths": 12,
+      "nextLevel": "Oro"
+    },
+    {
+      "id": "oro",
+      "name": "Oro",
+      "minMonthlyAverage": 550000,
+      "maxMonthlyAverage": 999999,
+      "benefits": [
+        "15% descuento fijo en todo el vademécum",
+        "Prioridad absoluta en despacho (entrega en < 24 hrs en RM)",
+        "Línea de crédito comercial básica autorizada",
+        "Atención personalizada con ejecutivo técnico"
+      ],
+      "discountPercent": 15,
+      "condition": "Compra promedio de $550.000 a $999.999 CLP al mes",
+      "validityMonths": 12,
+      "nextLevel": "Platinum"
+    },
+    {
+      "id": "platinum",
+      "name": "Platinum",
+      "minMonthlyAverage": 1000000,
+      "maxMonthlyAverage": 999999999,
+      "benefits": [
+        "20% descuento fijo de distribuidor preferente",
+        "Despacho gratuito express a nivel nacional sin mínimo",
+        "Línea de crédito comercial premium extendida",
+        "Capacitación clínica magistral exclusiva para su centro médico",
+        "Devoluciones y cambios garantizados sin costo"
+      ],
+      "discountPercent": 20,
+      "condition": "Compra promedio igual o superior a $1.000.000 CLP al mes",
+      "validityMonths": 12,
+      "nextLevel": "Estatus Máximo"
+    }
+  ]
+}

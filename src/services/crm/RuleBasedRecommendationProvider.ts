@@ -127,7 +127,7 @@ export class RuleBasedRecommendationProvider implements IRecommendationProvider 
     }
 
     // 5. Soporte VIP y Asesoría Clínica para cuentas Premium
-    if (['Oro', 'Platinum', 'Embajador'].includes(category)) {
+    if (['Oro', 'Platinum'].includes(category)) {
       recommendations.push({
         id: `rec_vip_advisor_${contactId}`,
         title: 'Agendar Sesión de Asesoría Médica Homeopática',

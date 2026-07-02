@@ -32,12 +32,12 @@ export class DashboardService {
     const journeyCounts: Record<string, number> = {
       'Prospecto': 0,
       'Primera Compra': 0,
+      'Sin categoría': 0,
       'Sin Categoría': 0,
       'Bronce': 0,
       'Plata': 0,
       'Oro': 0,
-      'Platinum': 0,
-      'Embajador': 0
+      'Platinum': 0
     };
 
     const dormantCounts = {
@@ -62,9 +62,14 @@ export class DashboardService {
     let convertedIntranetUsers = 0;
 
     customers.forEach(customer => {
-      const state = customer.journeyState || 'Sin Categoría';
+      let state = customer.journeyState || 'Sin categoría';
+      if (state.toLowerCase() === 'sin categoría' || state.toLowerCase() === 'sin categoria') {
+        state = 'Sin categoría';
+      }
       if (journeyCounts[state] !== undefined) {
         journeyCounts[state]++;
+      } else {
+        journeyCounts[state] = 1;
       }
       
       if (state.includes('Dormido (90d)')) { dormantCounts.d90++; dormantCounts.total++; }

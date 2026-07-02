@@ -1,4 +1,3 @@
-
 export interface ClientVentas {
   v2024: number;
   v2025: number; 
@@ -11,10 +10,10 @@ export interface Benefit {
 }
 
 export const CATEGORY_BENEFITS: Record<string, string> = {
-  'sin categoría': 'Acceso a lista de precios estándar. ¡Compra 6 frascos al mes para subir a Bronce!',
-  'bronce': '5% descuento en línea homeopática. ¡Sube a Plata para obtener 10%!',
-  'plata': '10% descuento + despacho gratis. ¡Sube a Oro para obtener 15%!',
-  'oro': '15% descuento fijo + prioridad en despacho.',
+  'sin categoría': 'Acceso general a catálogos online Cimasur y boletines. ¡Compra promedio de $57.000 CLP al mes para subir a Bronce!',
+  'bronce': '5% descuento fijo en línea homeopática magistral. ¡Compra promedio de $230.000 CLP al mes para subir a Plata!',
+  'plata': '10% descuento + despacho gratis > $100k. ¡Compra promedio de $550.000 CLP al mes para subir a Oro!',
+  'oro': '15% descuento fijo + despacho prioritario. ¡Compra promedio de $1.000.000 CLP al mes para subir a Platinum!',
   'platinum': '20% descuento + capacitación exclusiva + atención preferencial.'
 };
 
@@ -53,18 +52,21 @@ export function classifyClients(clients: ClubClient[]) {
     const cat = c.categoria.toLowerCase();
     return ['sin categoría', 'bronce', 'plata', 'oro'].includes(cat);
   }).map(c => {
-    let metaFaltante = 0;
     const cat = c.categoria.toLowerCase();
     
-    // Simplificación de metas basada en frascos (1 frasco = 20k)
-    const metaFrascos = cat === 'sin categoría' ? 72 : 120; // 6*12 vs 10*12
+    // Metas de promedio mensual expresadas en pesos mensuales
+    let metaPesosMensuales = 57000; // Bronce
+    if (cat === 'bronce') metaPesosMensuales = 230000; // Plata
+    else if (cat === 'plata') metaPesosMensuales = 550000; // Oro
+    else if (cat === 'oro') metaPesosMensuales = 1000000; // Platinum
+    
     const v2026 = c.ventas?.v2026 || 0;
-    metaFaltante = Math.max(0, Math.ceil((metaFrascos * 20000 - v2026) / 20000));
+    const metaFaltante = Math.max(0, Math.ceil(metaPesosMensuales * 12 - v2026));
     
     return { ...c, metaFaltante }; 
   });
   
-  const zonaVIP = clubMembers.filter(c => c.categoria.toLowerCase() === 'platinum');
+  const zonaVIP = clubMembers.filter(c => ['platinum'].includes(c.categoria.toLowerCase()));
 
   return { clientesARecuperar, veterinariosIntranet, subitDeCategoria, zonaVIP };
 }

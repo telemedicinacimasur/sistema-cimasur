@@ -1,5 +1,6 @@
 import { IntegrationService } from './IntegrationService';
 import { CycleManagerService } from './CycleManagerService';
+import { SegmentationService } from './SegmentationService';
 
 export interface TimelineEvent {
   id: string;
@@ -43,15 +44,8 @@ export class CustomerJourneyService {
       if (diffDays > 90) return 'Dormido (90d)';
     }
 
-    if (totalSales > 0 && totalSales < 100000) return 'Primera Compra';
-    if (totalSales >= 100000 && totalSales < 500000) return 'Sin Categoría';
-    if (totalSales >= 500000 && totalSales < 1000000) return 'Bronce';
-    if (totalSales >= 1000000 && totalSales < 2000000) return 'Plata';
-    if (totalSales >= 2000000 && totalSales < 5000000) return 'Oro';
-    if (totalSales >= 5000000 && totalSales < 10000000) return 'Platinum';
-    if (totalSales >= 10000000) return 'Embajador';
-
-    return 'Sin Categoría';
+    const segmentation = new SegmentationService();
+    return segmentation.categorize(totalSales);
   }
 
   /**

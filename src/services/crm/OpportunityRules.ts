@@ -52,19 +52,23 @@ export class TierUpgradeRule implements IOpportunityRule {
 
   public evaluate(context: any): RuleResult | null {
     const totalSales = context.totalVentasCiclo ?? 0;
-    const currentTier = context.categoriaActual || 'Sin Categoría';
+    const currentTier = context.categoriaActual || 'Sin categoría';
+    const normalizedTier = currentTier.trim().toLowerCase();
 
-    // Definición de umbrales en CLP
+    // Definición de umbrales en CLP (anualizados: promedio mensual * 12)
+    // Bronce: >= $57.000 promedio mensual = $684.000 CLP al año
+    // Plata: >= $230.000 promedio mensual = $2.760.000 CLP al año
+    // Oro: >= $550.000 promedio mensual = $6.600.000 CLP al año
+    // Platinum: >= $1.000.000 promedio mensual = $12.000.000 CLP al año
     const thresholds: Record<string, { threshold: number; next: string }> = {
-      'Primera Compra': { threshold: 100000, next: 'Sin Categoría' },
-      'Sin Categoría': { threshold: 500000, next: 'Bronce' },
-      'Bronce': { threshold: 1000000, next: 'Plata' },
-      'Plata': { threshold: 2000000, next: 'Oro' },
-      'Oro': { threshold: 5000000, next: 'Platinum' },
-      'Platinum': { threshold: 10000000, next: 'Embajador' }
+      'sin categoría': { threshold: 684000, next: 'Bronce' },
+      'sin categoria': { threshold: 684000, next: 'Bronce' },
+      'bronce': { threshold: 2760000, next: 'Plata' },
+      'plata': { threshold: 6600000, next: 'Oro' },
+      'oro': { threshold: 12000000, next: 'Platinum' }
     };
 
-    const target = thresholds[currentTier];
+    const target = thresholds[normalizedTier];
     if (!target) return null;
 
     const limit = target.threshold;
@@ -138,7 +142,7 @@ export class HighValueCustomerRule implements IOpportunityRule {
     const tier = context.categoriaActual || 'Sin Categoría';
     const totalSales = context.totalVentasCiclo ?? 0;
 
-    const isPremiumTier = ['Oro', 'Platinum', 'Embajador'].includes(tier);
+    const isPremiumTier = ['Oro', 'Platinum'].some(t => tier.toLowerCase().trim().includes(t.toLowerCase()));
     const isHighSales = totalSales >= 2000000;
 
     if (isPremiumTier || isHighSales) {

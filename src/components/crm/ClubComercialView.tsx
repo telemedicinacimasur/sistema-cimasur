@@ -80,6 +80,58 @@ export default function ClubComercialView() {
   const [redemptionResult, setRedemptionResult] = useState<any | null>(null);
   const [redemptionError, setRedemptionError] = useState<string | null>(null);
 
+  // Marketing Config State
+  const [clubConfig, setClubConfig] = useState<any>(null);
+  const [editingConfig, setEditingConfig] = useState<any>(null);
+  const [loadingConfig, setLoadingConfig] = useState<boolean>(false);
+  const [savingConfig, setSavingConfig] = useState<boolean>(false);
+  const [configSuccess, setConfigSuccess] = useState<string | null>(null);
+  const [selectedEditingTierId, setSelectedEditingTierId] = useState<string>('bronce');
+
+  const loadClubConfig = async () => {
+    setLoadingConfig(true);
+    setConfigSuccess(null);
+    try {
+      const res = await fetch('/api/loyalty/config');
+      if (res.ok) {
+        const data = await res.json();
+        setClubConfig(data);
+        setEditingConfig(data);
+      }
+    } catch (e) {
+      console.error('Error loading club config:', e);
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
+
+  const saveClubConfig = async (newConfig: any) => {
+    setSavingConfig(true);
+    setConfigSuccess(null);
+    try {
+      const res = await fetch('/api/loyalty/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClubConfig(newConfig);
+        setEditingConfig(newConfig);
+        setConfigSuccess('¡Configuración guardada exitosamente en el servidor! El sistema se ha re-parametrizado en caliente.');
+        setTimeout(() => setConfigSuccess(null), 8000);
+        // Refresh dashboard metrics
+        loadDashboardMetrics();
+      } else {
+        alert('Error al guardar la configuración.');
+      }
+    } catch (e: any) {
+      alert(`Error de red: ${e.message}`);
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
   // Load baseline contacts
   const loadContacts = async () => {
     try {
@@ -277,7 +329,7 @@ export default function ClubComercialView() {
           <SubTabButton active={activeSubTab === 'dashboard'} onClick={() => setActiveSubTab('dashboard')} icon={<Activity size={14} />} label="Dashboard General" />
           <SubTabButton active={activeSubTab === 'perfil'} onClick={() => setActiveSubTab('perfil')} icon={<Users size={14} />} label="Perfil del Cliente" />
           <SubTabButton active={activeSubTab === 'rewards'} onClick={() => setActiveSubTab('rewards')} icon={<Gift size={14} />} label="Catálogo de Premios" />
-          <SubTabButton active={activeSubTab === 'admin'} onClick={() => { setActiveSubTab('admin'); loadDashboardMetrics(); }} icon={<Layers size={14} />} label="Panel Administrativo" />
+          <SubTabButton active={activeSubTab === 'admin'} onClick={() => { setActiveSubTab('admin'); loadDashboardMetrics(); loadClubConfig(); }} icon={<Layers size={14} />} label="Panel Administrativo" />
         </div>
       </div>
 
@@ -908,6 +960,254 @@ export default function ClubComercialView() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* CONFIGURADOR DINÁMICO DE BENEFICIOS Y NIVELES DEL CLUB (MARKETING) */}
+            <div className="bg-[#0D1527] border border-slate-850 rounded-2xl p-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Sparkles size={18} className="text-yellow-400" />
+                    Configurador Paramétrico del Club (Área Marketing)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Gestione los beneficios, descuentos, condiciones, vigencias y rangos de promedio mensual sin necesidad de cambiar código.
+                  </p>
+                </div>
+                {configSuccess && (
+                  <div className="bg-emerald-950/40 border border-emerald-900/30 text-emerald-400 text-xs px-4 py-2 rounded-xl">
+                    {configSuccess}
+                  </div>
+                )}
+              </div>
+
+              {loadingConfig || !editingConfig ? (
+                <div className="text-center py-8 text-slate-500 text-xs">Cargando parámetros activos desde el servidor...</div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  {/* Selector Lateral de Niveles */}
+                  <div className="lg:col-span-4 space-y-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-3">Niveles de Fidelización</span>
+                    {editingConfig.tiers.map((t: any) => {
+                      const isActive = t.id === selectedEditingTierId;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => setSelectedEditingTierId(t.id)}
+                          className={`w-full text-left p-3.5 rounded-xl border transition-all flex justify-between items-center ${
+                            isActive
+                              ? 'bg-indigo-600/10 border-indigo-500 text-white font-bold shadow-lg shadow-indigo-950/20'
+                              : 'bg-[#050914] border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TIER_COLORS[t.name] || '#64748B' }}></span>
+                            <span className="text-xs">{t.name}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            &gt;= {formatCLP(t.minMonthlyAverage)}/mes
+                          </span>
+                        </button>
+                      );
+                    })}
+
+                    <div className="bg-[#050914] border border-slate-850 rounded-xl p-4 mt-6">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block mb-2">Parámetros del Ciclo</span>
+                      <div className="space-y-2 text-[11px] text-slate-400 leading-relaxed">
+                        <p><strong>Tipo:</strong> Anual (1 de Julio - 30 de Junio)</p>
+                        <p><strong>Criterio Oficial:</strong> Promedio Mensual de Ventas en Pesos (ventas del ciclo / 12 meses).</p>
+                        <p><strong>Primer Ciclo:</strong> Evaluado conforme a ventas del año base 2024.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Panel de Edición del Nivel Seleccionado */}
+                  <div className="lg:col-span-8 bg-[#050914] border border-slate-850 rounded-xl p-6 space-y-6">
+                    {(() => {
+                      const tierIndex = editingConfig.tiers.findIndex((t: any) => t.id === selectedEditingTierId);
+                      if (tierIndex === -1) return null;
+                      const tier = editingConfig.tiers[tierIndex];
+
+                      const updateField = (field: string, val: any) => {
+                        const copy = { ...editingConfig };
+                        copy.tiers[tierIndex][field] = val;
+                        setEditingConfig(copy);
+                      };
+
+                      const handleAddBenefit = () => {
+                        const copy = { ...editingConfig };
+                        if (!copy.tiers[tierIndex].benefits) {
+                          copy.tiers[tierIndex].benefits = [];
+                        }
+                        copy.tiers[tierIndex].benefits.push("Nuevo beneficio de Marketing");
+                        setEditingConfig(copy);
+                      };
+
+                      const handleUpdateBenefit = (bIndex: number, text: string) => {
+                        const copy = { ...editingConfig };
+                        copy.tiers[tierIndex].benefits[bIndex] = text;
+                        setEditingConfig(copy);
+                      };
+
+                      const handleRemoveBenefit = (bIndex: number) => {
+                        const copy = { ...editingConfig };
+                        copy.tiers[tierIndex].benefits.splice(bIndex, 1);
+                        setEditingConfig(copy);
+                      };
+
+                      return (
+                        <div className="space-y-6">
+                          <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+                            <h4 className="text-sm font-black text-white flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: TIER_COLORS[tier.name] || '#64748B' }}></span>
+                              Editar Parámetros de: <span className="text-indigo-400">{tier.name}</span>
+                            </h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                              ID: {tier.id}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Nombre Visual</label>
+                              <input
+                                type="text"
+                                className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none"
+                                value={tier.name || ''}
+                                onChange={(e) => updateField('name', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Descuento Asociado (%)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
+                                value={tier.discountPercent ?? 0}
+                                onChange={(e) => updateField('discountPercent', parseInt(e.target.value) || 0)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Mínimas ($ CLP/mes)</label>
+                              <input
+                                type="number"
+                                className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
+                                value={tier.minMonthlyAverage ?? 0}
+                                onChange={(e) => updateField('minMonthlyAverage', parseInt(e.target.value) || 0)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Máximas ($ CLP/mes)</label>
+                              <input
+                                type="number"
+                                className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
+                                value={tier.maxMonthlyAverage ?? 0}
+                                onChange={(e) => updateField('maxMonthlyAverage', parseInt(e.target.value) || 0)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Vigencia del Beneficio (Meses)</label>
+                              <input
+                                type="number"
+                                className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
+                                value={tier.validityMonths ?? 12}
+                                onChange={(e) => updateField('validityMonths', parseInt(e.target.value) || 12)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Siguiente Nivel de Escalamiento</label>
+                              <select
+                                className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none"
+                                value={tier.nextLevel || ''}
+                                onChange={(e) => updateField('nextLevel', e.target.value)}
+                              >
+                                <option value="Bronce">Bronce</option>
+                                <option value="Plata">Plata</option>
+                                <option value="Oro">Oro</option>
+                                <option value="Platinum">Platinum</option>
+                                <option value="Estatus Máximo">Estatus Máximo</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Condición Comercial de Acceso (Explicación para el cliente)</label>
+                            <input
+                              type="text"
+                              className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none"
+                              value={tier.condition || ''}
+                              onChange={(e) => updateField('condition', e.target.value)}
+                              placeholder="Ej: Compra promedio de 6 a 11 frascos mensuales"
+                            />
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Beneficios Asociados</span>
+                              <button
+                                type="button"
+                                onClick={handleAddBenefit}
+                                className="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2 py-1 rounded"
+                              >
+                                + Agregar Beneficio
+                              </button>
+                            </div>
+
+                            <div className="space-y-2">
+                              {tier.benefits && tier.benefits.map((benefit: string, bIdx: number) => (
+                                <div key={bIdx} className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    className="flex-1 bg-[#0D1527] border border-slate-800 rounded-lg p-2 text-xs text-white focus:border-indigo-500 outline-none"
+                                    value={benefit}
+                                    onChange={(e) => handleUpdateBenefit(bIdx, e.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveBenefit(bIdx)}
+                                    className="text-red-400 hover:text-red-300 p-1"
+                                    title="Eliminar"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              ))}
+                              {(!tier.benefits || tier.benefits.length === 0) && (
+                                <p className="text-[11px] text-slate-500 italic">No hay beneficios descritos para este nivel.</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
+                            <button
+                              type="button"
+                              onClick={loadClubConfig}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2 rounded-xl text-xs transition-colors"
+                            >
+                              Restablecer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveClubConfig(editingConfig)}
+                              disabled={savingConfig}
+                              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs transition-colors"
+                            >
+                              {savingConfig ? 'Guardando...' : 'Aplicar y Guardar Cambios'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

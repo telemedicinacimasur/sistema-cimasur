@@ -38,7 +38,7 @@ Para asegurar el rigor comercial y mitigar riesgos en ambientes productivos real
 
 ## 3. Suite de Pruebas Unitarias y Cobertura (Fase 6)
 
-Se ha creado y ejecutado con **100% de éxito** en desarrollo la suite de pruebas automatizada `/test_intelligence.ts` para blindar las reglas comerciales contra futuras regresiones de código.
+La consistencia funcional de los escenarios cubiertos por las suites de pruebas se encuentra protegida frente a regresiones detectables dentro del alcance actual mediante la ejecución exitosa de la suite de pruebas automatizada `/test_intelligence.ts` en desarrollo.
 
 ### Cobertura por Componente
 *   **Opportunity Engine (Reglas de Negocio)**: Cobertura del 100% de las condiciones deterministas principales.
@@ -67,7 +67,7 @@ Se ha creado y ejecutado con **100% de éxito** en desarrollo la suite de prueba
 
 ## 4. Resiliencia, Manejo de Errores y Comportamiento de Fallback
 
-La API del backend posee un mecanismo de degradación controlada que asegura que **la indisponibilidad del servicio LLM no afecta la ejecución de los motores deterministas de negocio ni la disponibilidad de las APIs comerciales; únicamente sustituye la generación asistida por un resumen estructurado de respaldo.**
+La API del backend posee un mecanismo de degradación controlada que asegura que **ante la indisponibilidad del servicio externo, el sistema conmuta automáticamente hacia un mecanismo de respaldo local observado durante las pruebas de desarrollo, evitando la interrupción del flujo de negocio.**
 
 ### Comportamiento frente a Casos de Degradación Comprobados en Desarrollo:
 -   **API Key Ausente o Inválida**: Si la variable `GEMINI_API_KEY` no se encuentra definida en el entorno, el servicio interrumpe preventivamente la llamada de red, sirve localmente las plantillas deterministas de respaldo y retorna en <5ms sin interrumpir la operación del CRM.
@@ -104,9 +104,18 @@ Establecidas las bases robustas de la inteligencia comercial y el Club de Fideli
 Para formalizar el congelamiento de código y certificar la calidad arquitectónica alcanzada, se declaran los siguientes criterios como cumplidos y validados:
 
 *   **✅ Compilación de Producción Limpia**: Validación estática libre de advertencias y errores vía `tsc --noEmit`, y generación correcta de assets bundles mediante `npm run build`.
-*   **✅ Cero Regresiones en Fase 5**: Estabilidad absoluta certificada en el motor determinista de acumulación de puntos, asignación de categorías y canjes de recompensas.
-*   **✅ Suite de Pruebas de Fase 6 Aprobada**: Ejecución y pase del 100% de los casos analíticos (`/test_intelligence.ts`) que verifican la resiliencia y el motor de reglas determinista.
+*   **✅ Sin Regresiones Detectadas en la Fase 5**: Estabilidad confirmada en todos los escenarios cubiertos por las suites de pruebas ejecutadas para el motor determinista de acumulación de puntos, niveles del club y canjes de recompensas.
+*   **✅ Suite de Pruebas de Fase 6 Aprobada**: Ejecución y pase exitoso del 100% de los casos analíticos (`/test_intelligence.ts`) que verifican la resiliencia y el motor de reglas determinista.
 *   **✅ Determinismo Absoluto del Opportunity Engine**: Confirmación de consistencia matemática del 100% (iguales datos de entrada producen idénticos puntajes y prioridades comerciales).
-*   **✅ Fallback Funcional Validado**: Comprobación de que la desconexión simulada o falla de la infraestructura externa de IA sustituye la redacción asistida por un copywriting estructurado local de respaldo en menos de 5ms, sin gatillar errores de tipo HTTP 500 en el CRM.
+*   **✅ Fallback Funcional Validado**: Comprobación de que la indisponibilidad de la infraestructura externa de IA sustituye la redacción asistida por un copywriting estructurado local de respaldo (con una latencia de respuesta observada de <5ms en el entorno de desarrollo), sin interrumpir la operación de la API ni gatillar errores de tipo HTTP 500 en el CRM.
 *   **✅ Integración UI-API Validada**: Flujo continuo desde el componente de UI `OpportunityEngineView` hacia los endpoints `/api/crm/client-intelligence/*` del servidor local.
 *   **✅ Sin Bloqueantes para Fase 7**: Ausencia de regresiones o defectos de alta criticidad en la rama de desarrollo actual, garantizando un punto de partida óptimo para la orquestación de campañas.
+
+---
+
+## 9. Supuestos y Alcance de la Auditoría
+Para efectos de claridad y rigurosidad metodológica, se hace constar lo siguiente:
+1.  **Entorno de Pruebas**: Todas las validaciones de latencia, pruebas funcionales, y mecanismos de fallback fueron ejecutados en la infraestructura y contenedores del entorno de desarrollo de AI Studio.
+2.  **Límite de Certificación**: Los resultados presentados no constituyen un acuerdo de nivel de servicio (SLA) para el ambiente de producción de CIMASUR. Factores del mundo real como latencias intermitentes de la red externa de IA, timeouts prolongados de APIs de terceros o interrupciones regionales del proveedor escapan del alcance comprobado y deberán ser monitoreados con telemetría activa una vez desplegados.
+3.  **No Representación Comercial de la IA**: El motor generativo asiste exclusivamente con copywriting. Las recomendaciones clínicas sugeridas deben ser verificadas por profesionales veterinarios calificados antes de su despacho final.
+

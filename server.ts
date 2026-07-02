@@ -643,6 +643,34 @@ const crmTools: FunctionDeclaration[] = [
     }
   });
 
+  app.get('/api/loyalty/config', async (req, res) => {
+    console.log('API call: GET /api/loyalty/config');
+    try {
+      const fs = await import('fs/promises');
+      const configPath = path.join(process.cwd(), 'data', 'club_config.json');
+      const data = await fs.readFile(configPath, 'utf-8');
+      res.json(JSON.parse(data));
+    } catch (e: any) {
+      console.warn('Config file not found or corrupted, generating default in segmentation service', e);
+      const { SegmentationService } = await import('./src/services/crm/SegmentationService');
+      const segmentation = new SegmentationService();
+      res.json(segmentation.getConfig());
+    }
+  });
+
+  app.post('/api/loyalty/config', async (req, res) => {
+    console.log('API call: POST /api/loyalty/config');
+    try {
+      const fs = await import('fs/promises');
+      const configPath = path.join(process.cwd(), 'data', 'club_config.json');
+      await fs.writeFile(configPath, JSON.stringify(req.body, null, 2));
+      res.json({ success: true, message: 'Configuración guardada exitosamente.' });
+    } catch (e: any) {
+      console.error('Error saving club config:', e);
+      res.status(500).json({ error: e.message || 'Error guardando configuración' });
+    }
+  });
+
   app.get('/api/loyalty/rewards', async (req, res) => {
     console.log('API call: GET /api/loyalty/rewards');
     try {

@@ -549,11 +549,11 @@ const getTiersList = () => {
     }
   }
   return [
-    { name: 'Sin categoría', min: 0, max: 499999, benefits: ['Acceso general a catálogos online Cimasur', 'Boletín técnico mensual por email'] },
-    { name: 'Bronce', min: 500000, max: 1999999, benefits: ['Descuento por volumen en Productos Base (**)', 'Invitación a eventos gratuitos en línea', 'Soporte técnico básico vía WhatsApp'] },
-    { name: 'Plata', min: 2000000, max: 4999999, benefits: ['Descuentos por volumen avanzados', '3 despachos gratuitos anuales', '5 muestras gratis anuales'] },
-    { name: 'Oro', min: 5000000, max: 11999999, benefits: ['Soporte prioritario online WhatsApp', 'Descuento en todas las especialidades', 'Devoluciones y reposiciones permitidas'] },
-    { name: 'Platinum', min: 12000000, max: Infinity, benefits: ['Descuento de distribuidor premium', 'Envío SIN COSTO ilimitado', '20 muestras de productos gratis anuales'] }
+    { name: 'Sin categoría', min: 0, max: 683999, benefits: ['Acceso general a catálogos online Cimasur', 'Boletín técnico mensual por correo electrónico'] },
+    { name: 'Bronce', min: 684000, max: 2759999, benefits: ['5% descuento fijo en la línea homeopática magistral', 'Invitación a webinars y capacitaciones gratis', 'Soporte clínico estándar vía WhatsApp'] },
+    { name: 'Plata', min: 2760000, max: 6599999, benefits: ['10% descuento fijo en la línea homeopática', 'Despacho gratis por compras superiores a $100k', 'Soporte clínico prioritario vía WhatsApp', '3 muestras gratuitas de fórmulas nuevas al año'] },
+    { name: 'Oro', min: 6600000, max: 11999999, benefits: ['15% descuento fijo en todo el vademécum', 'Prioridad absoluta en despacho (entrega en < 24 hrs en RM)', 'Línea de crédito comercial básica autorizada', 'Atención personalizada con ejecutivo técnico'] },
+    { name: 'Platinum', min: 12000000, max: Infinity, benefits: ['20% descuento fijo de distribuidor preferente', 'Despacho gratuito express a nivel nacional sin mínimo', 'Línea de crédito comercial premium extendida', 'Capacitación clínica magistral exclusiva para su centro médico', 'Devoluciones y cambios garantizados sin costo'] }
   ];
 };
 
