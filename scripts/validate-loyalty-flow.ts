@@ -220,8 +220,8 @@ async function runTests() {
   // Execute concurrent redemptions simulating rapid double-clicks
   console.log(`  ${YELLOW}➔ Despachando 2 solicitudes de canje concurrentes para el cliente: ${targetClient}...${RESET}`);
   
-  let p1Success = false;
-  let p2Success = false;
+  let p1Success: boolean = false;
+  let p2Success: boolean = false;
   let p2ErrorMessage = '';
 
   const promise1 = redemptionService.redeem(targetClient, testReward.id, 'concur_key_first')
@@ -237,8 +237,8 @@ async function runTests() {
 
   await Promise.all([promise1, promise2]);
 
-  assert(p1Success === true, 'La primera solicitud de canje concurrente debe ser aceptada exitosamente');
-  assert(p2Success === false, 'La segunda solicitud de canje concurrente debe bloquearse para evitar dobles canjes');
+  assert(p1Success, 'La primera solicitud de canje concurrente debe ser aceptada exitosamente');
+  assert(!p2Success, 'La segunda solicitud de canje concurrente debe bloquearse para evitar dobles canjes');
   assert(p2ErrorMessage.includes('Operación en progreso'), `Mensaje devuelto por el Mutex bloqueante: "${p2ErrorMessage}"`);
 
   // =========================================================================
