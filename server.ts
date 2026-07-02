@@ -8,6 +8,14 @@ import nodemailer from 'nodemailer';
 import { GoogleGenAI, Type, FunctionDeclaration, GenerateContentResponse } from "@google/genai";
 import dns from 'dns';
 
+// CRM Backend Imports
+import { IntegrationService } from './src/services/crm/IntegrationService';
+import { GrowthEngine } from './src/services/crm/GrowthEngine';
+import { LoyaltyEngineService } from './src/services/crm/LoyaltyEngineService';
+import { CatalogService } from './src/services/crm/CatalogService';
+import { RedemptionService } from './src/services/crm/RedemptionService';
+
+import { ServerAutomation } from './src/services/automation/ServerAutomation';
 // Force IPv4 resolution for environments without proper IPv6 routing
 dns.setDefaultResultOrder('ipv4first');
 
@@ -444,9 +452,158 @@ const crmTools: FunctionDeclaration[] = [
   });
 
   // Gestión de Registros
+
+  app.get('/api/automation/metrics', async (req, res) => {
+    console.log(`API call: GET /api/automation/metrics`);
+    try {
+      const campaigns = await readRecords('campaigns');
+      const totalSent = campaigns.reduce((sum: number, c: any) => sum + (c.metrics?.sent || 0), 0);
+      const totalOpened = campaigns.reduce((sum: number, c: any) => sum + (c.metrics?.opened || 0), 0);
+      const totalConverted = campaigns.reduce((sum: number, c: any) => sum + (c.metrics?.converted || 0), 0);
+      res.json({
+        totalCampaigns: campaigns.length,
+        totalSent,
+        openRate: totalSent > 0 ? (totalOpened / totalSent) * 100 : 0,
+        conversionRate: totalSent > 0 ? (totalConverted / totalSent) * 100 : 0,
+      });
+    } catch (e: any) {
+      console.error('Error fetching campaign metrics:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/automation/campaigns/:id/execute', async (req, res) => {
+    console.log(`API call: POST /api/automation/campaigns/${req.params.id}/execute`);
+    try {
+      const serverAutomation = new ServerAutomation(readRecords, writeRecords);
+      await serverAutomation.executeCampaign(req.params.id, req.body.user || 'Sistema');
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error('Error executing campaign:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/crm/intelligence', async (req, res) => {
+    console.log('API call: GET /api/crm/intelligence (Server-Side Growth Engine)');
+    try {
+      const salesData = await readRecords('sales');
+      const intranetData = await readRecords('intranet_clients');
+      
+      const integration = new IntegrationService();
+      const engine = new GrowthEngine();
+      
+      const integratedData = integration.integrate(intranetData, salesData);
+      const result = engine.process(integratedData);
+      
+      res.json(result);
+    } catch (e: any) {
+      console.error('Error running Growth Engine on server:', e);
+      res.status(500).json({
+        status: "NO_DATA",
+        reason: "Datos insuficientes o error de conexión.",
+        next_step: "Verificar conexión con la Base de Datos",
+        safe_render: true,
+        error: e.message
+      });
+    }
+  });
+
+  // =========================================================================
+  // CLUB COMERCIAL / FIDELIZACIÓN (FASE 5 CORE ENDPOINTS)
+  // =========================================================================
+
+  app.get('/api/loyalty/dashboard', async (req, res) => {
+    console.log('API call: GET /api/loyalty/dashboard');
+    try {
+      const loyaltyService = new LoyaltyEngineService(readRecords, writeRecords);
+      const metrics = await loyaltyService.getDashboardMetrics();
+      res.json(metrics);
+    } catch (e: any) {
+      console.error('Error fetching loyalty dashboard metrics:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/loyalty/member/:contactId', async (req, res) => {
+    console.log(`API call: GET /api/loyalty/member/${req.params.contactId}`);
+    try {
+      const loyaltyService = new LoyaltyEngineService(readRecords, writeRecords);
+      const details = await loyaltyService.getMemberDetails(req.params.contactId);
+      res.json(details);
+    } catch (e: any) {
+      console.error(`Error fetching loyalty details for contact ${req.params.contactId}:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/loyalty/rewards', async (req, res) => {
+    console.log('API call: GET /api/loyalty/rewards');
+    try {
+      const catalogService = new CatalogService(readRecords, writeRecords);
+      const rewards = await catalogService.getCatalog(true);
+      res.json(rewards);
+    } catch (e: any) {
+      console.error('Error fetching loyalty rewards catalog:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/loyalty/enroll', async (req, res) => {
+    console.log('API call: POST /api/loyalty/enroll', req.body);
+    try {
+      const { contactId, email } = req.body;
+      if (!contactId) {
+        return res.status(400).json({ error: 'El contactId es requerido para inscribirse en el Club.' });
+      }
+      
+      const loyaltyService = new LoyaltyEngineService(readRecords, writeRecords);
+      const account = await loyaltyService.enroll(contactId, email);
+      res.json(account);
+    } catch (e: any) {
+      console.error('Error enrolling contact in loyalty club:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/loyalty/redeem', async (req, res) => {
+    console.log('API call: POST /api/loyalty/redeem', req.body);
+    try {
+      const { contactId, rewardId, idempotencyKey } = req.body;
+      if (!contactId || !rewardId || !idempotencyKey) {
+        return res.status(400).json({ error: 'Faltan parámetros requeridos para el canje: contactId, rewardId e idempotencyKey.' });
+      }
+
+      const redemptionService = new RedemptionService(readRecords, writeRecords);
+      const result = await redemptionService.redeem(contactId, rewardId, idempotencyKey);
+      res.json(result);
+    } catch (e: any) {
+      console.error('Error redeeming loyalty reward:', e);
+      res.status(400).json({ error: e.message });
+    }
+  });
+
   app.get('/api/records/:collection', async (req, res) => {
-    console.log('API call: GET /api/records/:collection');
-    res.json(await readRecords(req.params.collection));
+    console.log('API call: GET /api/records/:collection', req.query);
+    const records = await readRecords(req.params.collection);
+    
+    // Support pagination
+    const page = parseInt(req.query.page as string);
+    const limit = parseInt(req.query.limit as string);
+    
+    if (!isNaN(page) && !isNaN(limit)) {
+      const startIndex = (page - 1) * limit;
+      const endIndex = page * limit;
+      res.json({
+        data: records.slice(startIndex, endIndex),
+        total: records.length,
+        page,
+        limit
+      });
+      return;
+    }
+    
+    res.json(records);
   });
 
   app.post('/api/records/:collection', async (req, res) => {

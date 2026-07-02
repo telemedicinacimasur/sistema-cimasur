@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { GrowthEngineBridge } from '../services/GrowthEngineBridge';
 import { localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDate, parseExcelDate, safe, formatDateForExcel } from '../lib/utils';
@@ -38,6 +37,7 @@ import { CampaignCenterView } from '../components/crm/CampaignCenterView';
 import { OperationsDashboardView } from '../components/crm/operations/OperationsDashboardView';
 import { ConfigurationCenterView } from '../components/crm/operations/ConfigurationCenterView';
 import { ExecutiveDashboardView } from '../components/crm/intelligence/ExecutiveDashboardView';
+import ClubComercialView from '../components/crm/ClubComercialView';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -202,17 +202,22 @@ export default function CRMView() {
   const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
 
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const engineBridge = useMemo(() => new GrowthEngineBridge(), []);
 
   useEffect(() => {
     const loadEngineData = async () => {
-      const data = await engineBridge.getDashboardSummary();
-      setDashboardData(data);
+      try {
+        const response = await fetch('/api/crm/intelligence');
+        if (!response.ok) throw new Error('Server error: ' + response.statusText);
+        const data = await response.json();
+        setDashboardData(data);
+      } catch (err) {
+        console.error('Failed to load growth engine data', err);
+      }
     };
     loadEngineData();
     window.addEventListener('campaign-executed', loadEngineData);
     return () => window.removeEventListener('campaign-executed', loadEngineData);
-  }, [engineBridge]);
+  }, []);
 
   const [records, setRecords] = useState<any[]>([]);
   const [intranetClients, setIntranetClients] = useState<any[]>([]);
@@ -450,6 +455,7 @@ export default function CRMView() {
     { id: 'inteligencia', label: '🧠 Inteligencia Comercial' },
     { id: 'configuracion', label: '⚙️ Configuración' },
     { id: 'ia', label: '🤖 IA Comercial' },
+    { id: 'fidelizacion', label: '👑 Club Comercial' },
     { id: 'reportes', label: '📈 Reportes' },
   ];
 
@@ -496,6 +502,7 @@ export default function CRMView() {
           {activeTab === 'inteligencia' && <ExecutiveDashboardView dashboardData={dashboardData} />}
           {activeTab === 'configuracion' && <ConfigurationCenterView />}
           {activeTab === 'ia' && <IAComercialView dashboardData={dashboardData} />}
+          {activeTab === 'fidelizacion' && <ClubComercialView />}
           {/* Implement other views as needed */}
         </div>
       </div>

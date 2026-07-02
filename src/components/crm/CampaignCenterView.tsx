@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Activity } from 'lucide-react';
-import { GrowthEngineBridge } from '../../services/GrowthEngineBridge';
+import { CampaignEngineService } from '../../services/automation/CampaignEngineService';
 import { SuggestedCampaign } from '../../services/crm/CampaignStrategyService';
 import { CampaignMetricsCards } from './campaigns/CampaignMetricsCards';
 import { CampaignSuggestionsPanel } from './campaigns/CampaignSuggestionsPanel';
 import { CampaignHistoryTable } from './campaigns/CampaignHistoryTable';
 import { CampaignPreviewModal } from './campaigns/CampaignPreviewModal';
 
-const engineBridge = new GrowthEngineBridge();
+const campaignEngine = new CampaignEngineService();
 
 export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboardData }) => {
   const [activeSubView, setActiveSubView] = useState<'create' | 'history'>('create');
@@ -24,9 +24,9 @@ export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboard
   }, [activeSubView]);
 
   const loadCampaigns = async () => {
-    const history = await engineBridge.campaigns.getCampaignHistory();
+    const history = await campaignEngine.getCampaignHistory();
     setCampaignsHistory(history || []);
-    const m = await engineBridge.campaigns.getCampaignMetrics();
+    const m = await campaignEngine.getCampaignMetrics();
     setMetrics(m);
   };
 
@@ -39,8 +39,8 @@ export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboard
     if (!previewCampaign || !previewChannel) return;
     
     // Motor de Ejecución ONLY
-    const campaign = await engineBridge.campaigns.createFromSuggestion(previewCampaign, previewChannel, template);
-    await engineBridge.campaigns.executeCampaign(campaign.id);
+    const campaign = await campaignEngine.createFromSuggestion(previewCampaign, previewChannel, template);
+    await campaignEngine.executeCampaign(campaign.id);
     
     alert(`Campaña "${previewCampaign.name}" enviada exitosamente a ${previewCampaign.clientCount} clientes.`);
     

@@ -1,6 +1,4 @@
-import { localDB } from '../../lib/auth';
 import { SuggestedCampaign } from '../crm/CampaignStrategyService';
-import { AutomationEngineService } from './AutomationEngineService';
 
 export interface Campaign {
   id: string;
@@ -30,17 +28,26 @@ export interface Campaign {
 
 export class CampaignEngineService {
   public async getCampaignHistory(): Promise<Campaign[]> {
-    const data = await localDB.getCollection('campaigns');
-    return data as Campaign[];
+    const response = await fetch('/api/records/campaigns');
+    if (!response.ok) return [];
+    return await response.json();
   }
 
   public async saveCampaign(campaign: Campaign): Promise<void> {
     const campaigns = await this.getCampaignHistory();
     const existingIndex = campaigns.findIndex(c => c.id === campaign.id);
     if (existingIndex >= 0) {
-      await localDB.updateInCollection('campaigns', campaign.id, campaign);
+      await fetch(`/api/records/campaigns/${campaign.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(campaign)
+      });
     } else {
-      await localDB.saveToCollection('campaigns', campaign);
+      await fetch(`/api/records/campaigns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(campaign)
+      });
     }
   }
 
@@ -72,31 +79,29 @@ export class CampaignEngineService {
   }
 
   public async executeCampaign(campaignId: string, user: string = 'Sistema'): Promise<void> {
-    const campaigns = await this.getCampaignHistory();
-    const campaign = campaigns.find(c => c.id === campaignId);
-    
-    if (campaign && (campaign.status === 'draft' || campaign.status === 'ready')) {
-      campaign.status = 'scheduled';
-      campaign.executedBy = user;
-      await this.saveCampaign(campaign);
+    try {
+      const response = await fetch(`/api/automation/campaigns/${campaignId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user })
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to execute campaign: ${response.statusText}`);
+      }
       
-      const automationEngine = new AutomationEngineService();
-      
-      // We don't await this, let it run in the background just like a queue
-      automationEngine.executeCampaign(campaign).catch(console.error);
+      // Wait a moment for the server to update the status to "running" or "scheduled" before dispatching
+      setTimeout(() => {
+        window.dispatchEvent(new Event('campaign-executed'));
+        window.dispatchEvent(new Event('db-change'));
+      }, 500);
+
+    } catch (error) {
+      console.error('Error executing campaign:', error);
     }
   }
 
   public async getCampaignMetrics(): Promise<any> {
-    const campaigns = await this.getCampaignHistory();
-    const totalSent = campaigns.reduce((sum, c) => sum + c.metrics.sent, 0);
-    const totalOpened = campaigns.reduce((sum, c) => sum + c.metrics.opened, 0);
-    const totalConverted = campaigns.reduce((sum, c) => sum + c.metrics.converted, 0);
-    return {
-      totalCampaigns: campaigns.length,
-      totalSent,
-      openRate: totalSent > 0 ? (totalOpened / totalSent) * 100 : 0,
-      conversionRate: totalSent > 0 ? (totalConverted / totalSent) * 100 : 0,
-    };
+    const response = await fetch('/api/automation/metrics');
+    return await response.json();
   }
 }
