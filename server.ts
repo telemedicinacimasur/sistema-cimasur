@@ -273,7 +273,7 @@ const crmTools: FunctionDeclaration[] = [
       };
 
       let response = await ai.models.generateContent({
-        model: "gemini-1.5-flash-latest",
+        model: "gemini-3.5-flash",
         contents: contents,
         config: {
           tools: [{ functionDeclarations: crmTools }]
@@ -295,7 +295,7 @@ const crmTools: FunctionDeclaration[] = [
         
         // Send tool results back to model
         response = await ai.models.generateContent({
-          model: "gemini-1.5-flash-latest",
+          model: "gemini-3.5-flash",
           contents: [...contents, response.candidates![0].content, ...toolResults]
         });
       }
@@ -506,6 +506,112 @@ const crmTools: FunctionDeclaration[] = [
         safe_render: true,
         error: e.message
       });
+    }
+  });
+
+  // =========================================================================
+  // INTELIGENCIA COMERCIAL / FASE 6 CORE ENDPOINTS
+  // =========================================================================
+
+  app.get('/api/opportunities/:contactId', async (req, res) => {
+    console.log(`API call: GET /api/opportunities/${req.params.contactId}`);
+    try {
+      const { OpportunityService } = await import('./src/services/crm/OpportunityService');
+      const opportunityService = new OpportunityService(readRecords, writeRecords);
+      const evaluation = await opportunityService.evaluateClient(req.params.contactId);
+      res.json(evaluation);
+    } catch (e: any) {
+      console.error(`Error calculating opportunities for ${req.params.contactId}:`, e);
+      res.status(500).json({ error: e.message || 'Error calculando oportunidades' });
+    }
+  });
+
+  app.post('/api/opportunities/evaluate', async (req, res) => {
+    console.log('API call: POST /api/opportunities/evaluate (Mass Evaluation)');
+    try {
+      const { OpportunityService } = await import('./src/services/crm/OpportunityService');
+      const opportunityService = new OpportunityService(readRecords, writeRecords);
+      const results = await opportunityService.evaluateAll();
+      res.json({ success: true, count: results.length, opportunities: results });
+    } catch (e: any) {
+      console.error('Error in bulk opportunities evaluation:', e);
+      res.status(500).json({ error: e.message || 'Error en evaluación masiva' });
+    }
+  });
+
+  app.get('/api/crm/client-intelligence/:contactId', async (req, res) => {
+    console.log(`API call: GET /api/crm/client-intelligence/${req.params.contactId}`);
+    try {
+      const { CustomerJourneyService } = await import('./src/services/crm/CustomerJourneyService');
+      const { RecommendationEngineService } = await import('./src/services/crm/RecommendationEngineService');
+      const { CommercialIntelligenceService } = await import('./src/services/crm/CommercialIntelligenceService');
+      const { OpportunityService } = await import('./src/services/crm/OpportunityService');
+      const { IntegrationService } = await import('./src/services/crm/IntegrationService');
+      const { SegmentationService } = await import('./src/services/crm/SegmentationService');
+      const { CycleManagerService } = await import('./src/services/crm/CycleManagerService');
+
+      const journeyService = new CustomerJourneyService(readRecords, writeRecords);
+      const recommendationService = new RecommendationEngineService(readRecords, writeRecords);
+      const intelligenceService = new CommercialIntelligenceService();
+      const opportunityService = new OpportunityService(readRecords, writeRecords);
+
+      // 1. Obtener oportunidades detectadas por el motor
+      let opportunity = null;
+      try {
+        opportunity = await opportunityService.evaluateClient(req.params.contactId);
+      } catch (err) {
+        console.warn(`No se pudo evaluar oportunidad para ${req.params.contactId}:`, err);
+      }
+
+      // 2. Obtener recomendaciones
+      const recommendations = await recommendationService.getRecommendationsForClient(req.params.contactId);
+
+      // 3. Obtener línea de tiempo del cliente (Customer Journey)
+      const timeline = await journeyService.getCustomerTimeline(req.params.contactId);
+
+      // 4. Obtener datos procesados del cliente
+      const salesData = await readRecords('sales');
+      const intranetData = await readRecords('intranet_clients');
+      
+      const integration = new IntegrationService();
+      const segmentation = new SegmentationService();
+      const integratedData = integration.integrate(intranetData, salesData);
+      
+      const customer = integratedData.find((c: any) => c.id === req.params.contactId || c.rut === req.params.contactId);
+      
+      let aiSummary = null;
+      if (customer) {
+        // Enriquecer cliente
+        const cycle = new CycleManagerService();
+        const cycleSales = (customer.sales || []).filter((s: any) => 
+          cycle.isInCurrentCycle(s.fecha || s.date || s.createdAt)
+        );
+        const totalSales = cycleSales.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
+        customer.totalSales = totalSales;
+        customer.category = segmentation.categorize(totalSales);
+        
+        const loyaltyAccounts = await readRecords('loyalty_accounts') || [];
+        customer.loyaltyAccount = loyaltyAccounts.find((a: any) => a.contactId === customer.id || a.contactId === customer.rut);
+
+        // Generar resumen con Gemini
+        aiSummary = await intelligenceService.generateClientAISummary(
+          customer,
+          timeline,
+          opportunity ? [opportunity] : [],
+          recommendations
+        );
+      }
+
+      res.json({
+        contactId: req.params.contactId,
+        opportunity,
+        recommendations,
+        timeline,
+        aiSummary
+      });
+    } catch (e: any) {
+      console.error(`Error compiling CRM intelligence for ${req.params.contactId}:`, e);
+      res.status(500).json({ error: e.message || 'Error compilando inteligencia de cliente' });
     }
   });
 

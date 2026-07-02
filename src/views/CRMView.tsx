@@ -38,6 +38,8 @@ import { OperationsDashboardView } from '../components/crm/operations/Operations
 import { ConfigurationCenterView } from '../components/crm/operations/ConfigurationCenterView';
 import { ExecutiveDashboardView } from '../components/crm/intelligence/ExecutiveDashboardView';
 import ClubComercialView from '../components/crm/ClubComercialView';
+import { OpportunityEngineView } from '../components/crm/OpportunityEngineView';
+
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -491,9 +493,7 @@ export default function CRMView() {
             </div>
           )}
           {activeTab === 'oportunidades' && (
-            <div className="p-6 text-white">
-              <h1 className="text-2xl font-bold mb-4">Centro de Oportunidades</h1>
-            </div>
+            <OpportunityEngineView />
           )}
           {activeTab === 'campanas' && (
             <CampaignCenterView dashboardData={dashboardData} />
