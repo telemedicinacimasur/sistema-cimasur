@@ -1,4 +1,7 @@
 import 'dotenv/config';
+
+console.log('--- SERVER STARTUP INITIALIZED ---');
+
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';

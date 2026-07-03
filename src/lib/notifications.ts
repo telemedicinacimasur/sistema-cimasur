@@ -1,5 +1,5 @@
 import { localDB } from './auth';
-import { db, isFirebaseReady } from './firebase';
+import { dbInstance as db, isFirebaseReady } from './firebase';
 import { collection, onSnapshot, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface Notification {

@@ -17,7 +17,8 @@ import {
   Award,
   ChevronLeft,
   DollarSign,
-  Clock
+  Clock,
+  Eye
 } from 'lucide-react';
 
 interface Opportunity {
@@ -75,7 +76,7 @@ interface ClientIntelligence {
   aiSummary: AISummary | null;
 }
 
-export const OpportunityEngineView: React.FC = () => {
+export const OpportunityEngineView: React.FC<{ onViewClient?: (id: string) => void }> = ({ onViewClient }) => {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
@@ -378,6 +379,14 @@ export const OpportunityEngineView: React.FC = () => {
                   <span className="text-[9px] font-black tracking-widest text-sky-400 uppercase">Ficha Inteligente del Socio</span>
                   <h3 className="text-lg font-black text-white mt-0.5">{opportunities.find(o => o.contactId === selectedContactId)?.customerName}</h3>
                   <p className="text-xs text-slate-400">{opportunities.find(o => o.contactId === selectedContactId)?.clinic || 'Socio Clínico Autorizado'}</p>
+                  {onViewClient && (
+                    <button
+                      onClick={() => onViewClient(selectedContactId)}
+                      className="mt-2 bg-slate-800 hover:bg-sky-600/20 text-slate-300 hover:text-sky-400 font-bold text-xs px-3.5 py-1.5 rounded-xl border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye size={12} className="text-sky-400" /> Ver Ficha Cliente 360°
+                    </button>
+                  )}
                 </div>
                 
                 <div className="flex items-center gap-2">

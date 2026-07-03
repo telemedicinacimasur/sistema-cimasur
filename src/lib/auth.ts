@@ -1,4 +1,4 @@
-import { auth, db, isFirebaseReady } from './firebase';
+import { authInstance as auth, dbInstance as db, isFirebaseReady } from './firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
 import { syncStudentsToSchoolPayments } from './syncUtils';

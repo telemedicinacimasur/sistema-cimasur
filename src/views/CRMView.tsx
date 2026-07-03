@@ -39,6 +39,10 @@ import { ConfigurationCenterView } from '../components/crm/operations/Configurat
 import { ExecutiveDashboardView } from '../components/crm/intelligence/ExecutiveDashboardView';
 import ClubComercialView from '../components/crm/ClubComercialView';
 import { OpportunityEngineView } from '../components/crm/OpportunityEngineView';
+import { Client360View } from '../components/crm/Client360View';
+import { ClientForm } from '../components/crm/ClientForm';
+import { ClientService } from '../services/crm/ClientService';
+import { CrecimientoView } from '../components/crm/CrecimientoView';
 
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
@@ -204,6 +208,8 @@ export default function CRMView() {
   const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
 
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
     const loadEngineData = async () => {
@@ -465,7 +471,15 @@ export default function CRMView() {
     <BenefitsProvider>
       <div className="flex flex-col h-full">
         <div className="bg-[#0D1527] p-4 border-b border-[#1E293B]">
-          <h1 className="text-xl font-bold text-white mb-4">Centro de Crecimiento Comercial CIMASUR</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-xl font-bold text-white">Centro de Crecimiento Comercial CIMASUR</h1>
+            <button
+              onClick={() => setIsFormOpen(true)}
+              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black px-4 py-2 rounded-xl transition-all active:scale-95 shadow-md cursor-pointer"
+            >
+              <span className="text-sm font-black">+</span> Inscribir Socio
+            </button>
+          </div>
           <div className="flex overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <button
@@ -485,27 +499,73 @@ export default function CRMView() {
         </div>
         
         <div className="flex-1 overflow-auto">
-          {activeTab === 'dashboard' && <DashboardView dashboardData={dashboardData} setActiveView={setActiveTab} />}
-          {activeTab === 'clientes' && <CRMTable records={records} filters={filters} setFilters={setFilters} onComment={(c: any) => setCommentTarget(c)} />}
+          {activeTab === 'dashboard' && (
+            <DashboardView 
+              dashboardData={dashboardData} 
+              setActiveView={setActiveTab} 
+              onViewClient={(id) => setSelectedClientId(id)} 
+            />
+          )}
+          {activeTab === 'clientes' && (
+            <CRMTable 
+              records={records} 
+              filters={filters} 
+              setFilters={setFilters} 
+              onComment={(c: any) => setCommentTarget(c)} 
+              onViewClient={(id) => setSelectedClientId(id)} 
+            />
+          )}
           {activeTab === 'crecimiento' && (
-            <div className="p-6 text-white">
-              <h1 className="text-2xl font-bold mb-4">Motor de Crecimiento</h1>
-            </div>
+            <CrecimientoView onViewClient={(id) => setSelectedClientId(id)} />
           )}
           {activeTab === 'oportunidades' && (
-            <OpportunityEngineView />
+            <OpportunityEngineView onViewClient={(id) => setSelectedClientId(id)} />
           )}
           {activeTab === 'campanas' && (
-            <CampaignCenterView dashboardData={dashboardData} />
+            <CampaignCenterView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />
           )}
-          {activeTab === 'operaciones' && <OperationsDashboardView />}
-          {activeTab === 'inteligencia' && <ExecutiveDashboardView dashboardData={dashboardData} />}
+          {activeTab === 'operaciones' && <OperationsDashboardView onViewClient={(id) => setSelectedClientId(id)} />}
+          {activeTab === 'inteligencia' && <ExecutiveDashboardView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}
           {activeTab === 'configuracion' && <ConfigurationCenterView />}
-          {activeTab === 'ia' && <IAComercialView dashboardData={dashboardData} />}
-          {activeTab === 'fidelizacion' && <ClubComercialView />}
-          {/* Implement other views as needed */}
+          {activeTab === 'ia' && <IAComercialView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}
+          {activeTab === 'fidelizacion' && (
+            <ClubComercialView onViewClient={(id) => setSelectedClientId(id)} />
+          )}
+          {activeTab === 'reportes' && (
+            <CRMActivities onViewClient={(id) => setSelectedClientId(id)} />
+          )}
         </div>
       </div>
+
+      {/* Unified Client 360 Overlay Backdrop */}
+      {selectedClientId && (
+        <Client360View 
+          clientId={selectedClientId} 
+          onClose={() => setSelectedClientId(null)} 
+          onSave={async () => {
+            // Re-fetch records immediately
+            const data = await localDB.getCollection('contacts');
+            setRecords(data);
+          }}
+        />
+      )}
+
+      {/* Unified Client Form Intake Overlay Backdrop */}
+      {isFormOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <ClientForm 
+              onSave={async () => {
+                setIsFormOpen(false);
+                // Re-fetch records immediately
+                const data = await localDB.getCollection('contacts');
+                setRecords(data);
+              }} 
+              onCancel={() => setIsFormOpen(false)} 
+            />
+          </div>
+        </div>
+      )}
     </BenefitsProvider>
   );
 }
@@ -898,7 +958,7 @@ function CRMRegister() {
   );
 }
 
-function CRMTable({ records, filters, setFilters, onComment }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void }) {
+function CRMTable({ records, filters, setFilters, onComment, onViewClient }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void, onViewClient?: (id: string) => void }) {
   const { user } = useAuth();
   const permissions = user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
@@ -1868,7 +1928,7 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
                          )}
                          <RecordActions 
                            module="crm"
-                           onView={() => setSelectedClient(r)}
+                           onView={() => onViewClient?.(r.id)}
                            onDownload={() => {
                              const expediteData = [
                                { label: 'Razón Social / Nombre', value: r.name },
@@ -1916,11 +1976,13 @@ function CRMTable({ records, filters, setFilters, onComment }: { records: any[],
 function CRMIntranetTable({ 
   clients, 
   onImportFromIntranet,
-  onImportSingle
+  onImportSingle,
+  onViewClient
 }: { 
   clients: any[], 
   onImportFromIntranet?: () => void,
-  onImportSingle?: (client: any) => void
+  onImportSingle?: (client: any) => void,
+  onViewClient?: (id: string) => void
 }) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2264,6 +2326,7 @@ function CRMIntranetTable({
                   <td className="p-5 text-right">
                      <RecordActions 
                        module="crm"
+                       onView={() => onViewClient?.(client.id)}
                        onDelete={async () => {
                          if (confirm("¿Está seguro de eliminar este registro de la base Intranet?")) {
                            await localDB.deleteFromCollection('intranet_clients', client.id);
@@ -2338,7 +2401,7 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
   );
 }
 
-function CRMActivities() {
+function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }) {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || ''];
 
@@ -2676,7 +2739,7 @@ function CRMActivities() {
                   <td className="p-4 text-right">
                     <RecordActions 
                       module="crm"
-                      onView={() => setDetailView(act)}
+                      onView={() => onViewClient?.(act.id)}
                       onEdit={() => handleEdit(act)}
                       onDelete={async () => {
                          try {

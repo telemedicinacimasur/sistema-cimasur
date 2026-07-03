@@ -1,6 +1,8 @@
 import { IntegrationService } from './IntegrationService';
 import { CycleManagerService } from './CycleManagerService';
 import { SegmentationService } from './SegmentationService';
+import { ClientService } from './ClientService';
+import { localDB } from '../../lib/auth';
 
 export interface TimelineEvent {
   id: string;
@@ -20,10 +22,16 @@ export interface TimelineEvent {
 export class CustomerJourneyService {
   private readRecords: any;
   private writeRecords: any;
+  private clientService: ClientService;
 
   constructor(readRecords?: any, writeRecords?: any) {
     this.readRecords = readRecords;
     this.writeRecords = writeRecords;
+    this.clientService = new ClientService(
+      (col) => localDB.getCollection(col),
+      (col, item) => localDB.saveToCollection(col, item),
+      (col, id, updates) => localDB.updateInCollection(col, id, updates)
+    );
   }
 
   /**
@@ -59,7 +67,7 @@ export class CustomerJourneyService {
     try {
       // 1. Cargar datos del cliente e historial de ventas
       const salesData = await this.readRecords('sales') || [];
-      const intranetData = await this.readRecords('intranet_clients') || [];
+      const intranetData = await this.clientService.getAllClients();
       const integration = new IntegrationService();
       const integratedData = integration.integrate(intranetData, salesData);
       

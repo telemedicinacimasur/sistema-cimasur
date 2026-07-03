@@ -1,13 +1,40 @@
 
 import React, { useMemo } from 'react';
-import { ArrowUpCircle, AlertTriangle, UserPlus, Bell, TrendingUp, BarChart3, Users, DollarSign, Activity, Zap, CheckCircle2, ShoppingCart } from 'lucide-react';
+import { ArrowUpCircle, AlertTriangle, UserPlus, Bell, TrendingUp, BarChart3, Users, DollarSign, Activity, Zap, CheckCircle2, ShoppingCart, Eye } from 'lucide-react';
+import { ClientService } from '../../services/crm/ClientService';
+import { localDB } from '../../lib/auth';
 
-export const DashboardView: React.FC<{ dashboardData: any, setActiveView: (view: string) => void }> = ({ dashboardData, setActiveView }) => {
+export const DashboardView: React.FC<{ 
+  dashboardData: any, 
+  setActiveView: (view: string) => void,
+  onViewClient?: (id: string) => void 
+}> = ({ dashboardData, setActiveView, onViewClient }) => {
   const isNoData = dashboardData?.status === "NO_DATA";
   
   const opportunities: any[] = useMemo(() => dashboardData?.opportunities || [], [dashboardData]);
   const metrics = dashboardData?.metrics;
   const cycle = dashboardData?.cycle || 'Ciclo Actual';
+
+  const clientService = useMemo(() => new ClientService(
+    (col) => localDB.getCollection(col),
+    (col, item) => localDB.saveToCollection(col, item),
+    (col, id, updates) => localDB.updateInCollection(col, id, updates)
+  ), []);
+
+  const handleViewClientByName = async (name: string) => {
+    if (!onViewClient) return;
+    const clients = await clientService.getAllClients();
+    const match = clients.find(c => 
+      c.name.toLowerCase().trim() === name.toLowerCase().trim() ||
+      c.name.toLowerCase().includes(name.toLowerCase()) || 
+      name.toLowerCase().includes(c.name.toLowerCase())
+    );
+    if (match) {
+      onViewClient(match.id);
+    } else {
+      alert(`No se encontró un socio comercial registrado con el nombre "${name}".`);
+    }
+  };
 
   const formatCurrency = (val: number) => `$${(val / 1000000).toFixed(1)}M`;
   const formatPercent = (val: number) => `${val.toFixed(1)}%`;
@@ -96,7 +123,13 @@ export const DashboardView: React.FC<{ dashboardData: any, setActiveView: (view:
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {opportunities.slice(0, 9).map((opp, idx) => (
-              <OpportunityCard key={opp.id || idx} opp={opp} setActiveView={setActiveView} formatCurrency={formatCurrency} />
+              <OpportunityCard 
+                key={opp.id || idx} 
+                opp={opp} 
+                setActiveView={setActiveView} 
+                formatCurrency={formatCurrency} 
+                onViewClient={handleViewClientByName}
+              />
             ))}
           </div>
         )}
@@ -125,12 +158,28 @@ const MiniMetricCard: React.FC<{ title: string, value: string | number, textClas
   </div>
 );
 
-const OpportunityCard: React.FC<{ opp: any, setActiveView: any, formatCurrency: any }> = ({ opp, setActiveView, formatCurrency }) => (
+const OpportunityCard: React.FC<{ 
+  opp: any, 
+  setActiveView: any, 
+  formatCurrency: any,
+  onViewClient?: (name: string) => void 
+}> = ({ opp, setActiveView, formatCurrency, onViewClient }) => (
   <div className="bg-[#0D1527] p-6 rounded-2xl border border-slate-800 flex flex-col justify-between hover:border-sky-500/50 transition-all group">
     <div>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
-          <h3 className="text-white font-bold text-lg mb-1">{opp.customerName}</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-white font-bold text-lg leading-tight">{opp.customerName}</h3>
+            {onViewClient && (
+              <button 
+                onClick={() => onViewClient(opp.customerName)}
+                className="p-1 bg-slate-900 hover:bg-sky-500/10 text-slate-400 hover:text-sky-400 rounded-lg border border-slate-800 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                title="Abrir Ficha Cliente 360°"
+              >
+                <Eye size={12} />
+              </button>
+            )}
+          </div>
           <p className="text-slate-400 text-xs line-clamp-2">{opp.description}</p>
         </div>
         <div className="p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 shrink-0">

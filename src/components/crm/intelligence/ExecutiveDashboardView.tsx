@@ -1,11 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { Shield, TrendingUp, AlertTriangle, Lightbulb, Users, Zap, Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Shield, TrendingUp, AlertTriangle, Lightbulb, Users, Zap, Target, ArrowUpRight, ArrowDownRight, Eye, Brain } from 'lucide-react';
+import { ClientService } from '../../../services/crm/ClientService';
+import { localDB } from '../../../lib/auth';
+import { Client } from '../../../services/crm/types';
 
-export const ExecutiveDashboardView: React.FC<{ dashboardData: any }> = ({ dashboardData }) => {
+interface ExecutiveDashboardViewProps {
+  dashboardData: any;
+  onViewClient?: (id: string) => void;
+}
+
+export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ dashboardData, onViewClient }) => {
+  const [clients, setClients] = useState<Client[]>([]);
+
+  const clientService = useMemo(() => new ClientService(
+    (col) => localDB.getCollection(col),
+    (col, item) => localDB.saveToCollection(col, item),
+    (col, id, updates) => localDB.updateInCollection(col, id, updates)
+  ), []);
+
+  useEffect(() => {
+    const loadClients = async () => {
+      const data = await clientService.getAllClients();
+      setClients(data || []);
+    };
+    loadClients();
+  }, []);
+
   if (!dashboardData || !dashboardData.intelligence) {
     return <div className="p-8 text-center text-slate-400">Procesando inteligencia comercial...</div>;
   }
@@ -14,13 +38,29 @@ export const ExecutiveDashboardView: React.FC<{ dashboardData: any }> = ({ dashb
   const { health, risks, opportunities } = intelligence;
 
   const formatCurrency = (val: number) => `$${(val / 1000000).toFixed(1)}M`;
+  const formatCLP = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
+
+  // Top clients with highest commercial gap
+  const gapClients = useMemo(() => {
+    return [...clients]
+      .filter(c => (c.brechaEconomica || 0) > 0)
+      .sort((a, b) => (b.brechaEconomica || 0) - (a.brechaEconomica || 0))
+      .slice(0, 3);
+  }, [clients]);
+
+  // Clients with inactive commercial status
+  const riskClients = useMemo(() => {
+    return [...clients]
+      .filter(c => !c.actividadComercial || c.actividadComercial === 'Inactivo')
+      .slice(0, 3);
+  }, [clients]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <Shield className="text-indigo-400" size={32} />
+            <Shield className="text-indigo-400 font-black" size={32} />
             Centro de Inteligencia Comercial
           </h1>
           <p className="text-slate-400 mt-1">Análisis estratégico, riesgos y oportunidades detectadas por IA</p>
@@ -51,16 +91,16 @@ export const ExecutiveDashboardView: React.FC<{ dashboardData: any }> = ({ dashb
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard title="Venta Actual" value={formatCurrency(metrics.totalRevenue)} icon={<TrendingUp />} trend="+5.2%" positive />
-        <MetricCard title="Proyección (Trimestre)" value={formatCurrency(prediction.expectedRevenue)} icon={<Zap />} trend="Optimista" positive />
-        <MetricCard title="Clientes Activos" value={health.activeClients} icon={<Users />} trend={`${health.monthlyGrowthRate}%`} positive />
-        <MetricCard title="Riesgo Abandono" value={health.dormantClients} icon={<AlertTriangle />} trend={`${health.lossRiskRate.toFixed(1)}%`} positive={false} />
+        <MetricCard title="Venta Actual" value={formatCurrency(metrics.totalRevenue)} icon={<TrendingUp className="text-emerald-400" />} trend="+5.2%" positive />
+        <MetricCard title="Proyección (Trimestre)" value={formatCurrency(prediction.expectedRevenue)} icon={<Zap className="text-amber-400" />} trend="Optimista" positive />
+        <MetricCard title="Clientes Activos" value={health.activeClients} icon={<Users className="text-sky-400" />} trend={`${health.monthlyGrowthRate}%`} positive />
+        <MetricCard title="Riesgo Abandono" value={health.dormantClients} icon={<AlertTriangle className="text-rose-400" />} trend={`${health.lossRiskRate.toFixed(1)}%`} positive={false} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-[#0D1527] border border-slate-800 rounded-2xl overflow-hidden">
           <div className="p-6 border-b border-slate-800 bg-slate-900/50 flex items-center gap-3">
-            <AlertTriangle className="text-amber-400" size={24} />
+            <AlertTriangle className="text-amber-400 animate-pulse" size={24} />
             <h2 className="text-xl font-bold text-white">Riesgos Detectados</h2>
           </div>
           <div className="p-6 space-y-4">
@@ -109,6 +149,72 @@ export const ExecutiveDashboardView: React.FC<{ dashboardData: any }> = ({ dashb
                 </div>
               ))
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* NEW INTERACTIVE CLIENT FOCUS SECTION IN COGNITIVE CRM */}
+      <div className="bg-[#0D1527] border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-slate-800 bg-slate-900/50 flex items-center gap-3">
+          <Brain className="text-purple-400" size={24} />
+          <div>
+            <h2 className="text-xl font-bold text-white">Socios Comerciales en Foco de Inteligencia</h2>
+            <p className="text-slate-400 text-xs mt-1">Cuentas con las mayores desviaciones que requieren atención proactiva inmediata</p>
+          </div>
+        </div>
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* High buy-gap focus */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Mayor Desvío / Brecha Comercial
+            </h3>
+            <div className="space-y-3">
+              {gapClients.map(client => (
+                <div key={client.id} className="bg-slate-900/50 border border-slate-800 p-4 rounded-xl flex justify-between items-center hover:border-slate-700 transition-colors">
+                  <div>
+                    <div className="font-bold text-white text-sm">{client.name}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{client.clinicName || 'Clínica Veterinaria'}</div>
+                    <div className="text-[10px] text-emerald-400 font-bold mt-1">Brecha: {formatCLP(client.brechaEconomica || 0)}</div>
+                  </div>
+                  {onViewClient && (
+                    <button
+                      onClick={() => onViewClient(client.id)}
+                      className="inline-flex items-center gap-1 bg-slate-800 hover:bg-sky-600/20 text-slate-300 hover:text-sky-400 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition-all cursor-pointer"
+                    >
+                      <Eye size={12} /> Ver Ficha 360°
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Inactive focus */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+              Alerta de Fuga / Cuentas Inactivas
+            </h3>
+            <div className="space-y-3">
+              {riskClients.map(client => (
+                <div key={client.id} className="bg-slate-900/50 border border-slate-800 p-4 rounded-xl flex justify-between items-center hover:border-slate-700 transition-colors">
+                  <div>
+                    <div className="font-bold text-white text-sm">{client.name}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{client.clinicName || 'Clínica Veterinaria'}</div>
+                    <div className="text-[10px] text-rose-400 font-bold mt-1">Actividad: Inactivo</div>
+                  </div>
+                  {onViewClient && (
+                    <button
+                      onClick={() => onViewClient(client.id)}
+                      className="inline-flex items-center gap-1 bg-slate-800 hover:bg-sky-600/20 text-slate-300 hover:text-sky-400 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition-all cursor-pointer"
+                    >
+                      <Eye size={12} /> Ver Ficha 360°
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

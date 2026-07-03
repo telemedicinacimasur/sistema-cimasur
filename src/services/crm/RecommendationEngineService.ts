@@ -5,6 +5,8 @@ import { IntegrationService } from './IntegrationService';
 import { CycleManagerService } from './CycleManagerService';
 import { CustomerJourneyService } from './CustomerJourneyService';
 import { SegmentationService } from './SegmentationService';
+import { ClientService } from './ClientService';
+import { localDB } from '../../lib/auth';
 
 export interface Recommendation {
   action: 'Campaña' | 'Llamada' | 'WhatsApp';
@@ -21,10 +23,16 @@ export class RecommendationEngineService {
   private readRecords: any;
   private writeRecords: any;
   private providers: IRecommendationProvider[] = [];
+  private clientService: ClientService;
 
   constructor(readRecords?: any, writeRecords?: any) {
     this.readRecords = readRecords;
     this.writeRecords = writeRecords;
+    this.clientService = new ClientService(
+      (col) => localDB.getCollection(col),
+      (col, item) => localDB.saveToCollection(col, item),
+      (col, id, updates) => localDB.updateInCollection(col, id, updates)
+    );
     
     // Registrar el proveedor por defecto basado en reglas de negocio
     this.providers.push(new RuleBasedRecommendationProvider());
@@ -78,7 +86,7 @@ export class RecommendationEngineService {
 
     try {
       const salesData = await this.readRecords('sales');
-      const intranetData = await this.readRecords('intranet_clients');
+      const intranetData = await this.clientService.getAllClients();
       const loyaltyAccounts = await this.readRecords('loyalty_accounts') || [];
       
       const integration = new IntegrationService();

@@ -54,7 +54,7 @@ const TIER_GRADIENTS: Record<string, string> = {
   'Primera Compra': 'from-sky-950/20 to-blue-950/20 border-sky-800/40 text-sky-400'
 };
 
-export default function ClubComercialView() {
+export default function ClubComercialView({ onViewClient }: { onViewClient?: (id: string) => void }) {
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'perfil' | 'rewards' | 'admin'>('dashboard');
   
   // Search & Selector state for Perfil View
@@ -634,6 +634,16 @@ export default function ClubComercialView() {
                             </div>
                             <p className="text-xs text-slate-400 font-medium">{memberDetails.account?.email || 'Sin correo electrónico registrado'}</p>
                             <span className="text-[10px] font-mono text-slate-500 mt-1 block">RUT: {memberDetails.account?.rut || 'Sin RUT'}</span>
+                            {
+                              onViewClient && (
+                                <button
+                                  onClick={() => onViewClient(selectedContactId)}
+                                  className="mt-3 bg-slate-800 hover:bg-sky-600/20 text-slate-300 hover:text-sky-400 font-bold text-xs px-3.5 py-2 rounded-xl border border-slate-750 transition-all flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <span>👁️</span> Ver Ficha Cliente 360°
+                                </button>
+                              )
+                            }
                           </div>
                         </div>
 

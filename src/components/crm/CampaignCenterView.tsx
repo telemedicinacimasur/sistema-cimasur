@@ -9,7 +9,7 @@ import { CampaignPreviewModal } from './campaigns/CampaignPreviewModal';
 
 const campaignEngine = new CampaignEngineService();
 
-export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboardData }) => {
+export const CampaignCenterView: React.FC<{ dashboardData: any; onViewClient?: (id: string) => void }> = ({ dashboardData, onViewClient }) => {
   const [activeSubView, setActiveSubView] = useState<'create' | 'history'>('create');
   const [campaignsHistory, setCampaignsHistory] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
@@ -84,6 +84,7 @@ export const CampaignCenterView: React.FC<{ dashboardData: any }> = ({ dashboard
           <CampaignSuggestionsPanel 
             suggestions={suggestedCampaigns} 
             onExecute={handleExecuteRequest} 
+            onViewClient={onViewClient}
           />
         </div>
       )}

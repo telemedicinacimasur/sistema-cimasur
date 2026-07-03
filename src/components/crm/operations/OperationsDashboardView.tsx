@@ -1,15 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Users, DollarSign, Zap } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Users, DollarSign, Zap, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { CampaignEngineService, Campaign } from '../../../services/automation/CampaignEngineService';
+import { ClientService } from '../../../services/crm/ClientService';
+import { localDB } from '../../../lib/auth';
+import { Client } from '../../../services/crm/types';
 
 const campaignEngine = new CampaignEngineService();
 
-export const OperationsDashboardView: React.FC = () => {
+interface OperationsDashboardViewProps {
+  onViewClient?: (id: string) => void;
+}
+
+export const OperationsDashboardView: React.FC<OperationsDashboardViewProps> = ({ onViewClient }) => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   
+  const clientService = useMemo(() => new ClientService(
+    (col) => localDB.getCollection(col),
+    (col, item) => localDB.saveToCollection(col, item),
+    (col, id, updates) => localDB.updateInCollection(col, id, updates)
+  ), []);
+
   const loadData = async () => {
     const data = await campaignEngine.getCampaignHistory();
     setCampaigns(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    
+    const clientData = await clientService.getAllClients();
+    setClients(clientData || []);
   };
 
   useEffect(() => {
@@ -34,15 +52,20 @@ export const OperationsDashboardView: React.FC = () => {
 
   const formatCurrency = (val: number) => `$${(val / 1000000).toFixed(1)}M`;
 
+  const getMatchedClientsForSegment = (segmentName: string) => {
+    if (!segmentName) return [];
+    return clients.filter(c => c.categoria === segmentName);
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <Activity className="text-indigo-400" size={32} />
+            <Activity className="text-indigo-400 font-black" size={32} />
             Panel de Operaciones
           </h1>
-          <p className="text-slate-400 mt-1">Monitoreo en tiempo real de ejecuciones comerciales</p>
+          <p className="text-slate-400 mt-1">Monitoreo en tiempo real de ejecuciones comerciales y colas de entrega</p>
         </div>
       </div>
 
@@ -69,9 +92,9 @@ export const OperationsDashboardView: React.FC = () => {
             <tr>
               <th className="px-6 py-4">Campaña</th>
               <th className="px-6 py-4 text-center">Estado</th>
-              <th className="px-6 py-4 text-center">Canal</th>
+              <th className="px-6 py-4 text-center">Canal Target</th>
               <th className="px-6 py-4 text-right">Métricas</th>
-              <th className="px-6 py-4 text-right">Actualización</th>
+              <th className="px-6 py-4 text-right">Destinatarios</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
@@ -82,33 +105,76 @@ export const OperationsDashboardView: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              campaigns.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-white mb-1">{c.name}</div>
-                    <div className="text-xs text-slate-500">{c.targetCount} Clientes</div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <StatusBadge status={c.status} />
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="uppercase text-xs font-bold text-slate-400">{c.channel}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right text-xs">
-                    {c.status === 'completed' ? (
-                      <div>
-                        <div className="text-slate-300">Env: {c.metrics.sent} | Ape: {c.metrics.opened}</div>
-                        <div className="text-emerald-400 font-bold mt-1">ROI: ${(c.metrics.roi || 0).toLocaleString('es-CL')}</div>
-                      </div>
-                    ) : (
-                      <span className="text-slate-500">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right text-slate-500 font-mono text-xs">
-                    {new Date(c.updatedAt || c.createdAt).toLocaleString()}
-                  </td>
-                </tr>
-              ))
+              campaigns.flatMap((c) => {
+                const matchedClients = getMatchedClientsForSegment(c.segment);
+                const isExpanded = expandedCampaignId === c.id;
+
+                return [
+                  <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-white mb-1">{c.name}</div>
+                      <div className="text-xs text-slate-500">Segmento: <span className="text-sky-400 font-semibold">{c.segment || 'Todos'}</span></div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <StatusBadge status={c.status} />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="uppercase text-xs font-bold text-slate-400">{c.channel}</span>
+                    </td>
+                    <td className="px-6 py-4 text-right text-xs">
+                      {c.status === 'completed' ? (
+                        <div>
+                          <div className="text-slate-300">Env: {c.metrics.sent} | Ape: {c.metrics.opened}</div>
+                          <div className="text-emerald-400 font-bold mt-1">ROI: ${(c.metrics.roi || 0).toLocaleString('es-CL')}</div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => setExpandedCampaignId(isExpanded ? null : c.id)}
+                        className="inline-flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-700 cursor-pointer"
+                      >
+                        {matchedClients.length} Clientes
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                    </td>
+                  </tr>,
+                  isExpanded && (
+                    <tr key={`${c.id}-expanded`} className="bg-slate-950/40">
+                      <td colSpan={5} className="px-8 py-4">
+                        <div className="border-l-2 border-sky-500/50 pl-4 py-2 space-y-2">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clientes del Segmento {c.segment} Impactados:</h4>
+                          {matchedClients.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic">No hay clientes registrados en este segmento.</p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {matchedClients.map(client => (
+                                <div key={client.id} className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl flex justify-between items-center">
+                                  <div>
+                                    <div className="text-xs font-bold text-white">{client.name}</div>
+                                    <div className="text-[10px] text-slate-500">{client.clinicName || 'Clínica Veterinaria'}</div>
+                                  </div>
+                                  {onViewClient && (
+                                    <button
+                                      onClick={() => onViewClient(client.id)}
+                                      className="p-1 bg-slate-850 hover:bg-sky-500/10 text-slate-400 hover:text-sky-400 rounded border border-slate-750 cursor-pointer flex items-center justify-center shrink-0"
+                                      title="Ver Ficha 360°"
+                                    >
+                                      <Eye size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                ];
+              })
             )}
           </tbody>
         </table>
