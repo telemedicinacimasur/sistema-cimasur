@@ -147,11 +147,14 @@ export class SegmentationService {
     return 'Sin categoría';
   }
 
-  public getBenefitsAndGoals(annualSales: number, currentState: string) {
+  public getBenefitsAndGoals(annualSales: number, currentState: string, averageMonthly: number = 0) {
     this.loadConfig(); // Refresh active configuration from disk
-    const category = this.categorize(annualSales);
-    const monthlyAverage = annualSales / 12;
-
+    
+    // Si pasamos un promedio mensual explícito, usamos ese.
+    // De lo contrario, calculamos usando annualSales / 12 (comportamiento legacy fallback).
+    const monthlyAverage = averageMonthly > 0 ? averageMonthly : (annualSales / 12);
+    const category = averageMonthly > 0 ? this.categorizeByMonthlyAverage(monthlyAverage) : this.categorize(annualSales);
+    
     const tiers = this.config.tiers || this.getDefaultConfig().tiers;
     const currentTierData = tiers.find((t: any) => t.name.toLowerCase() === category.toLowerCase()) || tiers[0];
     

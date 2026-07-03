@@ -1,0 +1,47 @@
+[
+  {
+    "id": "c1",
+    "rut": "11.111.111-1",
+    "name": "Dr. Marco Antonio Vilches",
+    "email": "marco@veterinaria.cl",
+    "accesoAprobado": "Si",
+    "ventasHistoricas": 1500000,
+    "categoria": "Sin Categoría"
+  },
+  {
+    "id": "c2",
+    "rut": "22.222.222-2",
+    "name": "Dra. Ana Silva",
+    "email": "ana@clinicasur.cl",
+    "accesoAprobado": "Si",
+    "ventasHistoricas": 500000,
+    "categoria": "Sin Categoría"
+  },
+  {
+    "id": "c3",
+    "rut": "33.333.333-3",
+    "name": "Dr. Juan Pérez",
+    "email": "juan@vetperez.cl",
+    "accesoAprobado": "No",
+    "ventasHistoricas": 0,
+    "categoria": "Sin Categoría"
+  },
+  {
+    "id": "c4",
+    "rut": "44.444.444-4",
+    "name": "Dra. Laura Gómez",
+    "email": "laura@vetgomez.cl",
+    "accesoAprobado": "Si",
+    "ventasHistoricas": 0,
+    "categoria": "Sin Categoría"
+  },
+  {
+    "id": "c5",
+    "rut": "55.555.555-5",
+    "name": "Dr. Pedro Rojas",
+    "email": "pedro@rojasvet.cl",
+    "accesoAprobado": "Si",
+    "ventasHistoricas": 100000,
+    "categoria": "Sin Categoría"
+  }
+]

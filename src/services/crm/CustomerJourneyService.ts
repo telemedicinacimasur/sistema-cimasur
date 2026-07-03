@@ -64,22 +64,7 @@ export class CustomerJourneyService {
    * Identifica la etapa actual del cliente en el viaje comercial (Fase 5 Core)
    */
   public determineState(customer: any, totalSales: number): string {
-    if (!customer.isClient) return 'Prospecto';
-    if (customer.isClient && totalSales === 0) return 'Prospecto';
-    
-    // Si ha estado inactivo más de lo razonable
-    if (customer.lastPurchaseDate) {
-      const now = new Date();
-      const lastDate = new Date(customer.lastPurchaseDate);
-      const diffDays = (now.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000);
-      
-      if (diffDays > 365) return 'Dormido (365d)';
-      if (diffDays > 180) return 'Dormido (180d)';
-      if (diffDays > 90) return 'Dormido (90d)';
-    }
-
-    const segmentation = new SegmentationService();
-    return segmentation.categorize(totalSales);
+    return customer.journeyState || customer.categoria || 'Prospecto';
   }
 
   /**

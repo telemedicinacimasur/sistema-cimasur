@@ -1,4 +1,5 @@
 import { IOpportunityRule, RuleResult } from './types';
+import { SegmentationService } from './SegmentationService';
 
 /**
  * Regla 1: Cliente Inactivo (Reactivación)
@@ -53,25 +54,18 @@ export class TierUpgradeRule implements IOpportunityRule {
   public evaluate(context: any): RuleResult | null {
     const totalSales = context.totalVentasCiclo ?? 0;
     const currentTier = context.categoriaActual || 'Sin categoría';
-    const normalizedTier = currentTier.trim().toLowerCase();
-
-    // Definición de umbrales en CLP (anualizados: promedio mensual * 12)
-    // Bronce: >= $57.000 promedio mensual = $684.000 CLP al año
-    // Plata: >= $230.000 promedio mensual = $2.760.000 CLP al año
-    // Oro: >= $550.000 promedio mensual = $6.600.000 CLP al año
-    // Platinum: >= $1.000.000 promedio mensual = $12.000.000 CLP al año
-    const thresholds: Record<string, { threshold: number; next: string }> = {
-      'sin categoría': { threshold: 684000, next: 'Bronce' },
-      'sin categoria': { threshold: 684000, next: 'Bronce' },
-      'bronce': { threshold: 2760000, next: 'Plata' },
-      'plata': { threshold: 6600000, next: 'Oro' },
-      'oro': { threshold: 12000000, next: 'Platinum' }
-    };
-
-    const target = thresholds[normalizedTier];
-    if (!target) return null;
-
-    const limit = target.threshold;
+    const segmentation = new SegmentationService();
+    const config = segmentation.getConfig();
+    const tiers = config.tiers || [];
+    
+    const currentTierIndex = tiers.findIndex((t: any) => t.name.toLowerCase() === currentTier.toLowerCase().trim());
+    
+    if (currentTierIndex === -1 || currentTierIndex >= tiers.length - 1) return null;
+    
+    const nextTier = tiers[currentTierIndex + 1];
+    const limit = nextTier.minMonthlyAverage * 12; // Anualizado
+    const targetNext = nextTier.name;
+    
     const progress = totalSales / limit;
 
     // Si ha completado entre el 70% y el 99.9% del umbral del nivel
@@ -80,12 +74,12 @@ export class TierUpgradeRule implements IOpportunityRule {
       const scoreDelta = Math.round(progress * 40); // Más cerca, mayor puntaje
       return {
         scoreDelta,
-        reason: `Cercano a subir de categoría: El cliente se encuentra al ${(progress * 100).toFixed(0)}% del límite para ascender a la categoría ${target.next}. Falta $${rest.toLocaleString('es-CL')} CLP en compras.`,
+        reason: `Cercano a subir de categoría: El cliente se encuentra al ${(progress * 100).toFixed(0)}% del límite para ascender a la categoría ${targetNext}. Falta $${rest.toLocaleString('es-CL')} CLP en compras.`,
         confidence: 0.95,
         recommendedAction: 'Campaña',
         metadata: {
           currentTier,
-          nextTier: target.next,
+          nextTier: targetNext,
           limit,
           missingAmount: rest
         }

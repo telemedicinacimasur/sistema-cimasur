@@ -33,7 +33,7 @@ export class GrowthEngine {
       const journeyState = this.journey.determineState(customer, totalSales);
       
       // Calculate benefits
-      const benefits = this.segmentation.getBenefitsAndGoals(totalSales, journeyState);
+      const benefits = this.segmentation.getBenefitsAndGoals(totalSales, journeyState, customer.promedioMensual);
       
       return {
         ...customer,

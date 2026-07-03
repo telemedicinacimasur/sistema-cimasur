@@ -129,7 +129,7 @@ export class RecommendationEngineService {
       const cycleSales = sales.filter((s: any) => cycle.isInCurrentCycle(s.fecha || s.date || s.createdAt));
       const totalSales = cycleSales.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
       const journeyState = journey.determineState(customer, totalSales);
-      const category = segmentation.categorize(totalSales);
+      const category = customer.categoria || 'Sin categoría';
       
       const loyaltyAccount = loyaltyAccounts.find((a: any) => a.contactId === customer.id || a.contactId === customer.rut);
       

@@ -96,6 +96,19 @@ export class IntegrationService {
       // Categoría dinámica según promedio mensual
       const category = segmentation.categorizeByMonthlyAverage(promedioMensual);
 
+      let journeyState = category;
+      if (sales.length === 0) {
+        journeyState = 'Prospecto';
+      } else if (lastPurchaseDate) {
+        const diffDays = (new Date().getTime() - new Date(lastPurchaseDate).getTime()) / (24 * 60 * 60 * 1000);
+        if (diffDays > 365) journeyState = 'Dormido (365d)';
+        else if (diffDays > 180) journeyState = 'Dormido (180d)';
+        else if (diffDays > 90) journeyState = 'Dormido (90d)';
+        else if (frecuencia === 1) journeyState = 'Primera Compra';
+      } else if (totalSales === 0 && historicalSalesVal === 0) {
+        journeyState = 'Prospecto';
+      }
+
       integratedMap.set(rut, {
         ...vet,
         id: vet.id || vet.rut,
@@ -114,7 +127,7 @@ export class IntegrationService {
         ejecutivoComercial,
         estadoComercial,
         categoria: category,
-        journeyState: category
+        journeyState
       });
     });
 
@@ -143,6 +156,15 @@ export class IntegrationService {
       const promedioMensual = Math.max(totalSales / 12, evaluationTotal / 12);
         const category = segmentation.categorizeByMonthlyAverage(promedioMensual);
 
+        let journeyState = category;
+        if (lastPurchaseDate) {
+          const diffDays = (new Date().getTime() - new Date(lastPurchaseDate).getTime()) / (24 * 60 * 60 * 1000);
+          if (diffDays > 365) journeyState = 'Dormido (365d)';
+          else if (diffDays > 180) journeyState = 'Dormido (180d)';
+          else if (diffDays > 90) journeyState = 'Dormido (90d)';
+          else if (frecuencia === 1) journeyState = 'Primera Compra';
+        }
+
         integratedMap.set(rut, {
           rut: rut,
           id: rut,
@@ -163,7 +185,7 @@ export class IntegrationService {
           ejecutivoComercial: 'Sin Asignar',
           estadoComercial: 'Activo',
           categoria: category,
-          journeyState: category
+          journeyState
         });
       }
     });

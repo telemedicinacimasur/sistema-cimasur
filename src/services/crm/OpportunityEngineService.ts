@@ -20,7 +20,7 @@ export class OpportunityEngineService {
     customers.forEach(customer => {
       // Use the pre-calculated totalSales for the current cycle
       const totalSales = customer.totalSales || 0;
-      const category = this.segmentation.categorize(totalSales);
+      const category = customer.categoria || 'Sin categoría';
       const name = customer.name || customer.nombre || 'Sin Nombre';
       
       // 1. Clientes Dormidos (90, 180, 365 días)
@@ -53,25 +53,28 @@ export class OpportunityEngineService {
       }
 
       // 3. Oportunidad de Upgrade (lógica más robusta)
-      const nextCategoryThresholds: Record<string, number> = {
-        'Primera Compra': 100000,
-        'Sin Categoría': 500000,
-        'Bronce': 1000000,
-        'Plata': 2000000,
-        'Oro': 5000000,
-        'Platinum': 10000000
-      };
-
-      const threshold = nextCategoryThresholds[category] || nextCategoryThresholds['Sin Categoría'];
-      if (threshold && totalSales > (threshold * 0.7) && totalSales < threshold) {
-        opportunities.push({
-          id: `upgrade_${customer.rut}`,
-          type: 'upgrade',
-          customerId: customer.rut,
-          customerName: name,
-          potential: threshold - totalSales,
-          description: `Cliente ${name} está a $${(threshold - totalSales).toLocaleString('es-CL')} de subir de categoría.`
-        });
+      const currentAvg = customer.promedioMensual || (totalSales / 12);
+      const config = this.segmentation.getConfig();
+      const tiers = config.tiers || [];
+      const currentTierIndex = tiers.findIndex((t: any) => t.name.toLowerCase() === category.toLowerCase());
+      
+      if (currentTierIndex !== -1 && currentTierIndex < tiers.length - 1) {
+        const nextTier = tiers[currentTierIndex + 1];
+        const thresholdMonthly = nextTier.minMonthlyAverage;
+        
+        if (currentAvg > (thresholdMonthly * 0.7) && currentAvg < thresholdMonthly) {
+          const missingMonthly = thresholdMonthly - currentAvg;
+          const missingAnnual = missingMonthly * 12;
+          
+          opportunities.push({
+            id: `upgrade_${customer.rut}`,
+            type: 'upgrade',
+            customerId: customer.rut,
+            customerName: name,
+            potential: missingAnnual,
+            description: `Cliente ${name} está a $${Math.round(missingMonthly).toLocaleString('es-CL')} de promedio mensual para subir a categoría ${nextTier.name}.`
+          });
+        }
       }
     });
 
