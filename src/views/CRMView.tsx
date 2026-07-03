@@ -530,7 +530,7 @@ export default function CRMView() {
           )}
           {activeTab === 'operaciones' && <OperationsDashboardView onViewClient={(id) => setSelectedClientId(id)} />}
           {activeTab === 'inteligencia' && <ExecutiveDashboardView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}
-          {activeTab === 'configuracion' && <ConfigurationCenterView />}
+          {activeTab === 'configuracion' && <ConfigurationCenterView onViewClient={(id) => setSelectedClientId(id)} />}
           {activeTab === 'ia' && <IAComercialView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}
           {activeTab === 'fidelizacion' && (
             <ClubComercialView onViewClient={(id) => setSelectedClientId(id)} />
