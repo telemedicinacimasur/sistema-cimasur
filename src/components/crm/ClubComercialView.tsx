@@ -203,7 +203,21 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
     loadContacts();
     loadDashboardMetrics();
     loadRewardsCatalog();
-  }, []);
+
+    const handleDbChange = () => {
+      loadContacts();
+      loadDashboardMetrics();
+      loadRewardsCatalog();
+      if (selectedContactId) {
+        loadMemberDetails(selectedContactId);
+      }
+    };
+
+    window.addEventListener('db-change', handleDbChange);
+    return () => {
+      window.removeEventListener('db-change', handleDbChange);
+    };
+  }, [selectedContactId, loadMemberDetails]);
 
   // Fetch member details when selector changes
   useEffect(() => {

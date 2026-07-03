@@ -105,6 +105,15 @@ export const OpportunityEngineView: React.FC<{ onViewClient?: (id: string) => vo
 
   useEffect(() => {
     loadOpportunities();
+
+    const handleDbChange = () => {
+      loadOpportunities();
+    };
+
+    window.addEventListener('db-change', handleDbChange);
+    return () => {
+      window.removeEventListener('db-change', handleDbChange);
+    };
   }, []);
 
   // Re-evaluación masiva de la cartera
@@ -152,6 +161,11 @@ export const OpportunityEngineView: React.FC<{ onViewClient?: (id: string) => vo
     };
 
     loadClientIntelligence();
+
+    window.addEventListener('db-change', loadClientIntelligence);
+    return () => {
+      window.removeEventListener('db-change', loadClientIntelligence);
+    };
   }, [selectedContactId]);
 
   // Copiar borrador de mensaje al portapapeles

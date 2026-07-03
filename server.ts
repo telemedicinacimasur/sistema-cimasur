@@ -491,7 +491,7 @@ const crmTools: FunctionDeclaration[] = [
     console.log('API call: GET /api/crm/intelligence (Server-Side Growth Engine)');
     try {
       const salesData = await readRecords('sales');
-      const intranetData = await readRecords('intranet_clients');
+      const intranetData = await readRecords('contacts');
       
       const integration = new IntegrationService();
       const engine = new GrowthEngine();
@@ -574,7 +574,7 @@ const crmTools: FunctionDeclaration[] = [
 
       // 4. Obtener datos procesados del cliente
       const salesData = await readRecords('sales');
-      const intranetData = await readRecords('intranet_clients');
+      const intranetData = await readRecords('contacts');
       
       const integration = new IntegrationService();
       const segmentation = new SegmentationService();

@@ -224,7 +224,11 @@ export default function CRMView() {
     };
     loadEngineData();
     window.addEventListener('campaign-executed', loadEngineData);
-    return () => window.removeEventListener('campaign-executed', loadEngineData);
+    window.addEventListener('db-change', loadEngineData);
+    return () => {
+      window.removeEventListener('campaign-executed', loadEngineData);
+      window.removeEventListener('db-change', loadEngineData);
+    };
   }, []);
 
   const [records, setRecords] = useState<any[]>([]);

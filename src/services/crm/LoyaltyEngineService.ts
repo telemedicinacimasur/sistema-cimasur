@@ -41,7 +41,7 @@ export class LoyaltyEngineService {
    */
   private async getProcessedCustomers(): Promise<any[]> {
     const salesData = await this.readRecords('sales');
-    const intranetData = await this.readRecords('intranet_clients');
+    const intranetData = await this.readRecords('contacts');
     
     const integration = new IntegrationService();
     const cycle = new CycleManagerService();

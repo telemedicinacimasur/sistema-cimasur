@@ -9,7 +9,7 @@ export class ClientService {
   ) {}
 
   async getAllClients(): Promise<Client[]> {
-    return await this.getCollection('intranet_clients');
+    return await this.getCollection('contacts');
   }
 
   async getClientById(id: string): Promise<Client | undefined> {
@@ -33,10 +33,10 @@ export class ClientService {
   }
 
   async saveClient(client: Client): Promise<void> {
-    await this.saveItem('intranet_clients', client);
+    await this.saveItem('contacts', client);
   }
 
   async updateClient(id: string, updates: Partial<Client>): Promise<void> {
-    await this.updateItem('intranet_clients', id, updates);
+    await this.updateItem('contacts', id, updates);
   }
 }
