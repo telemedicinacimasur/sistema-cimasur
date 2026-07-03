@@ -1,5 +1,4 @@
 import { Client } from './types';
-import { localDB } from '../../lib/auth';
 
 export class ClientService {
   constructor(
@@ -21,8 +20,8 @@ export class ClientService {
     const client = await this.getClientById(id);
     if (!client) return undefined;
 
-    const sales = await localDB.getCollection('sales');
-    const loyalty = await localDB.getCollection('loyalty_accounts');
+    const sales = await this.getCollection('sales');
+    const loyalty = await this.getCollection('loyalty_accounts');
     
     // Merge data
     return {

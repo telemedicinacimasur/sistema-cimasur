@@ -18,11 +18,37 @@ export class OpportunityService {
     this.readRecords = readRecords;
     this.writeRecords = writeRecords;
     this.opportunityEngine = new OpportunityEngine();
-    this.clientService = new ClientService(
-      (col) => localDB.getCollection(col),
-      (col, item) => localDB.saveToCollection(col, item),
-      (col, id, updates) => localDB.updateInCollection(col, id, updates)
-    );
+    
+    if (readRecords && writeRecords) {
+      this.clientService = new ClientService(
+        async (col) => await readRecords(col),
+        async (col, item) => {
+          const records = await readRecords(col);
+          const index = records.findIndex((r: any) => r.id === item.id);
+          if (index > -1) {
+            records[index] = { ...records[index], ...item };
+          } else {
+            records.push(item);
+          }
+          await writeRecords(col, records);
+          return item;
+        },
+        async (col, id, updates) => {
+          const records = await readRecords(col);
+          const index = records.findIndex((r: any) => r.id === id);
+          if (index > -1) {
+            records[index] = { ...records[index], ...updates };
+            await writeRecords(col, records);
+          }
+        }
+      );
+    } else {
+      this.clientService = new ClientService(
+        (col) => localDB.getCollection(col),
+        (col, item) => localDB.saveToCollection(col, item),
+        (col, id, updates) => localDB.updateInCollection(col, id, updates)
+      );
+    }
   }
 
   /**
