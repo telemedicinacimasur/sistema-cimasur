@@ -46,7 +46,7 @@ export class IntegrationService {
           sales = [...vet.sales];
         } else {
           // Reconstruir desde los campos directos totalSales o montoAcumulado del contacto
-          const totalVal = parseFloat(vet.totalSales) || parseFloat(vet.montoAcumulado) || parseFloat(vet.compras) || 0;
+          const totalVal = parseFloat(vet.totalSales) || parseFloat(vet.montoAcumulado) || parseFloat(vet.compras) || parseFloat(vet.ventasHistoricas) || 0;
           if (totalVal > 0) {
             sales = [{
               id: `v_sale_${vet.id || vet.rut}`,
@@ -62,6 +62,7 @@ export class IntegrationService {
 
       // Filtrar ventas del ciclo activo
       const cycleSales = sales.filter((s: any) => cycle.isInCurrentCycle(s.fecha || s.date || s.createdAt));
+      const evaluationSales = sales.filter((s: any) => cycle.isInEvaluationPeriod(s.fecha || s.date || s.createdAt));
       const totalSales = cycleSales.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
       
       // Filtrar ventas históricas (fuera de este ciclo o acumulados del contacto)
@@ -89,7 +90,8 @@ export class IntegrationService {
       const estadoComercial = vet.estadoComercial || vet.estado || (sales.length > 0 ? 'Activo' : 'Inactivo');
       
       // Promedio mensual (REGLAMENTO: promedio = ventas del ciclo / 12)
-      const promedioMensual = totalSales / 12;
+      const evaluationTotal = evaluationSales.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
+      const promedioMensual = Math.max(totalSales / 12, evaluationTotal / 12);
 
       // Categoría dinámica según promedio mensual
       const category = segmentation.categorizeByMonthlyAverage(promedioMensual);
@@ -123,6 +125,7 @@ export class IntegrationService {
         const sales = salesInfo.sales;
 
         const cycleSales = sales.filter((s: any) => cycle.isInCurrentCycle(s.fecha || s.date || s.createdAt));
+      const evaluationSales = sales.filter((s: any) => cycle.isInEvaluationPeriod(s.fecha || s.date || s.createdAt));
         const totalSales = cycleSales.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
         
         const historicalSalesList = sales.filter((s: any) => !cycle.isInCurrentCycle(s.fecha || s.date || s.createdAt));
@@ -136,7 +139,8 @@ export class IntegrationService {
         const ticketPromedio = frecuencia > 0 ? totalSales / frecuencia : 0;
         const productosComprados = sales.flatMap(s => s.productos || s.items || []);
         
-        const promedioMensual = totalSales / 12;
+        const evaluationTotal = evaluationSales.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
+      const promedioMensual = Math.max(totalSales / 12, evaluationTotal / 12);
         const category = segmentation.categorizeByMonthlyAverage(promedioMensual);
 
         integratedMap.set(rut, {
