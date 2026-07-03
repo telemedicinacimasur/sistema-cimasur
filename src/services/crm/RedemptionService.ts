@@ -62,7 +62,6 @@ export class RedemptionService {
     const allRedemptions = await this.readRecords('redemptions');
     const existing = allRedemptions.find((r: any) => r.idempotencyKey === idempotencyKey);
     if (existing) {
-      console.log(`[RedemptionService] Redemption already processed for key ${idempotencyKey}`);
       return existing;
     }
 

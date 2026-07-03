@@ -17,7 +17,6 @@ export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => 
     lines.forEach(line => {
       if (!line.trim()) return;
       const [rut, year, amount] = line.split(',').map(s => s.trim());
-      console.log(`Importando $${amount} para ${rut} en el año ${year}`);
     });
     alert(`Procesadas ${lines.length} líneas de datos.`);
     setBulkImportData('');

@@ -18,7 +18,7 @@ import { LoyaltyEngineService } from './src/services/crm/LoyaltyEngineService';
 import { CatalogService } from './src/services/crm/CatalogService';
 import { RedemptionService } from './src/services/crm/RedemptionService';
 
-import { ServerAutomation } from './src/services/automation/ServerAutomation';
+import { AutomationCore } from './src/services/automation/AutomationCore';
 // Force IPv4 resolution for environments without proper IPv6 routing
 dns.setDefaultResultOrder('ipv4first');
 
@@ -478,9 +478,27 @@ const crmTools: FunctionDeclaration[] = [
   app.post('/api/automation/campaigns/:id/execute', async (req, res) => {
     console.log(`API call: POST /api/automation/campaigns/${req.params.id}/execute`);
     try {
-      const serverAutomation = new ServerAutomation(readRecords, writeRecords);
-      await serverAutomation.executeCampaign(req.params.id, req.body.user || 'Sistema');
-      res.json({ success: true });
+      const core = new AutomationCore(readRecords, writeRecords);
+      // Mock enqueue campaign as a job (idempotent)
+      // Phase 7: We just record the job for the queue instead of running it
+      const campaigns = await readRecords('campaigns') || [];
+      const campaign = campaigns.find((c: any) => c.id === req.params.id);
+      
+      if (campaign) {
+        // Enqueue through JobManager
+        const jobManager = new (require('./src/services/automation/JobEngine').JobManager)(readRecords, writeRecords);
+        await jobManager.createJob({
+          createdBy: req.body.user || 'Sistema',
+          origin: 'Manual Campaign Trigger',
+          priority: 'high',
+          maxRetries: 3,
+          actionType: campaign.channel === 'both' ? 'email' : campaign.channel, // Simplified for now
+          payload: { campaignId: campaign.id, templateId: campaign.template },
+          idempotencyKey: `camp_exec_${campaign.id}_${Date.now()}` // Allow multiple manual executions for testing, or lock it.
+        });
+      }
+      
+      res.json({ success: true, message: 'Campaña encolada para ejecución' });
     } catch (e: any) {
       console.error('Error executing campaign:', e);
       res.status(500).json({ error: e.message });

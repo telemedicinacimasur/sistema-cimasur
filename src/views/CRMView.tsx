@@ -43,7 +43,7 @@ import { Client360View } from '../components/crm/Client360View';
 import { ClientForm } from '../components/crm/ClientForm';
 import { ClientService } from '../services/crm/ClientService';
 import { CrecimientoView } from '../components/crm/CrecimientoView';
-
+import { AutomationDashboardView } from '../components/automation/AutomationDashboardView';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -464,6 +464,7 @@ export default function CRMView() {
     { id: 'oportunidades', label: '🎯 Oportunidades' },
     { id: 'campanas', label: '📧 Campañas' },
     { id: 'operaciones', label: '⚡ Operaciones' },
+    { id: 'automatizacion', label: '⚙️ Automatización (F7)' },
     { id: 'inteligencia', label: '🧠 Inteligencia Comercial' },
     { id: 'configuracion', label: '⚙️ Configuración' },
     { id: 'ia', label: '🤖 IA Comercial' },
@@ -529,6 +530,7 @@ export default function CRMView() {
             <CampaignCenterView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />
           )}
           {activeTab === 'operaciones' && <OperationsDashboardView onViewClient={(id) => setSelectedClientId(id)} />}
+          {activeTab === 'automatizacion' && <AutomationDashboardView />}
           {activeTab === 'inteligencia' && <ExecutiveDashboardView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}
           {activeTab === 'configuracion' && <ConfigurationCenterView onViewClient={(id) => setSelectedClientId(id)} />}
           {activeTab === 'ia' && <IAComercialView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}

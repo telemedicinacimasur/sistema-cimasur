@@ -47,7 +47,7 @@ export const ChatComponent: React.FC<{ contextData?: any }> = ({ contextData }) 
               {m.actions && m.actions.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
                   {m.actions.map((action, ai) => (
-                    <button key={ai} onClick={() => console.log('Action triggered:', action)} className="bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold px-3 py-1 rounded">
+                    <button key={ai} className="bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold px-3 py-1 rounded">
                       {action.label}
                     </button>
                   ))}

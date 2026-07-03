@@ -115,7 +115,6 @@ export class PointsEngine {
     const allTx = await this.readRecords('points_transactions');
     const existing = allTx.find((t: any) => t.idempotencyKey === idempotencyKey);
     if (existing) {
-      console.log(`[PointsEngine] Accumulation already processed for key ${idempotencyKey}`);
       return existing;
     }
 
@@ -167,7 +166,6 @@ export class PointsEngine {
     const allTx = await this.readRecords('points_transactions');
     const existing = allTx.find((t: any) => t.idempotencyKey === idempotencyKey);
     if (existing) {
-      console.log(`[PointsEngine] Deduction already processed for key ${idempotencyKey}`);
       return existing;
     }
 
