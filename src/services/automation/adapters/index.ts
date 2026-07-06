@@ -1,5 +1,7 @@
 export interface IConnectorAdapter {
   name: string;
+  // This is a contract, not an implementation.
+  // The actual communication logic will be injected when a provider is selected.
   send(payload: any): Promise<ConnectorResponse>;
 }
 
@@ -10,42 +12,40 @@ export interface ConnectorResponse {
   error?: string;
 }
 
+// These are placeholders for the future integration.
+// No implementation logic exists here.
+
 export class EmailAdapter implements IConnectorAdapter {
   public name = 'EmailAdapter';
   async send(payload: any): Promise<ConnectorResponse> {
-    // Decoupled Email Sending Logic
-    return { success: true, messageId: `email_${Date.now()}` };
+    throw new Error('Email provider not configured');
   }
 }
 
 export class WhatsAppAdapter implements IConnectorAdapter {
   public name = 'WhatsAppAdapter';
   async send(payload: any): Promise<ConnectorResponse> {
-    // Decoupled WhatsApp Sending Logic
-    return { success: true, messageId: `wa_${Date.now()}` };
+    throw new Error('WhatsApp provider not configured');
   }
 }
 
 export class SMSAdapter implements IConnectorAdapter {
   public name = 'SMSAdapter';
   async send(payload: any): Promise<ConnectorResponse> {
-    // Decoupled SMS Logic
-    return { success: true, messageId: `sms_${Date.now()}` };
+    throw new Error('SMS provider not configured');
   }
 }
 
 export class PushAdapter implements IConnectorAdapter {
   public name = 'PushAdapter';
   async send(payload: any): Promise<ConnectorResponse> {
-    // Decoupled Push Notification Logic
-    return { success: true, messageId: `push_${Date.now()}` };
+    throw new Error('Push provider not configured');
   }
 }
 
 export class APIAdapter implements IConnectorAdapter {
   public name = 'APIAdapter';
   async send(payload: any): Promise<ConnectorResponse> {
-    // Decoupled External API Request Logic
-    return { success: true, messageId: `api_${Date.now()}` };
+    throw new Error('API provider not configured');
   }
 }

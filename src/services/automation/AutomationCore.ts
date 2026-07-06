@@ -1,6 +1,6 @@
 import { IdempotencyGuard, HistoryManager, JobManager, MessageQueue, Scheduler } from './JobEngine';
 import { RuleEngine } from './RuleEngine';
-import { Job, AutomationHistoryRecord } from './types';
+import { AutomationWorkflow, WorkflowStep, AutomationTemplate } from './types';
 import { EmailAdapter, WhatsAppAdapter, SMSAdapter, PushAdapter, APIAdapter, IConnectorAdapter } from './adapters';
 
 export class AutomationCore {
@@ -28,84 +28,86 @@ export class AutomationCore {
     this.ruleEngine = new RuleEngine(readRecords, writeRecords);
   }
 
-  // Phase 7 Base: Fire events to trigger rules
   public async triggerEvent(eventType: string, context: any, user: string): Promise<void> {
     const rules = await this.ruleEngine.evaluate(context, eventType);
     
     for (const rule of rules) {
-      const idempotencyKey = `rule_${rule.id}_context_${context.id || Date.now()}`;
-      
-      const isNew = await this.idempotencyGuard.checkAndLock(idempotencyKey, 'pending_creation');
-      if (!isNew) continue; // Already fired
+      const workflow: AutomationWorkflow = (await this.readRecords('automation_workflows')).find((w: any) => w.id === rule.workflowId);
+      if (!workflow || !workflow.isActive) continue;
 
+      // Start workflow
+      const firstStep = workflow.steps[workflow.startStepId];
+      await this.executeStep(workflow, firstStep, context, user);
+    }
+  }
+
+  private async executeStep(workflow: AutomationWorkflow, step: WorkflowStep, context: any, user: string): Promise<void> {
+    if (step.type === 'action') {
+      // Create job
       const jobData = {
         createdBy: user,
-        origin: 'RuleEngine',
+        origin: `Workflow:${workflow.id}`,
         priority: 'medium' as any,
         maxRetries: 3,
-        actionType: rule.action.type,
+        actionType: step.actionType || 'api',
         payload: {
-          ...rule.action.payloadTemplate,
-          contextId: context.id
+          contextId: context.id,
+          templateId: step.templateId
         },
-        idempotencyKey
+        idempotencyKey: `step_${step.id}_context_${context.id}`
       };
-
+      await this.jobManager.createJob(jobData);
+    } else if (step.type === 'wait' && step.waitTimeDays) {
+      // Schedule next step
+      const nextStep = workflow.steps[step.nextStepId!];
+      const scheduledTime = new Date();
+      scheduledTime.setDate(scheduledTime.getDate() + step.waitTimeDays);
+      
+      const jobData = {
+        createdBy: user,
+        origin: `Workflow:${workflow.id}:Wait`,
+        priority: 'low' as any,
+        maxRetries: 0,
+        actionType: 'internal_wait',
+        payload: { contextId: context.id, nextStepId: step.nextStepId, workflowId: workflow.id },
+        idempotencyKey: `wait_${step.id}_${context.id}`,
+        scheduledAt: scheduledTime.toISOString()
+      };
       await this.jobManager.createJob(jobData);
     }
   }
 
-  // Dispatcher Worker Simulator
   public async processQueue(): Promise<void> {
-    // Check scheduled jobs first
     await this.scheduler.processScheduledJobs();
-
-    // Pull next job
     const job = await this.messageQueue.peekNextPending();
-    if (!job) return; // Queue is empty
+    if (!job) return;
 
     await this.jobManager.updateJobState(job.id, 'running');
 
-    const startTime = Date.now();
     try {
-      const adapter = this.adapters[job.actionType];
-      if (!adapter) {
-        throw new Error(`Adapter for actionType ${job.actionType} not found`);
-      }
-
-      const response = await adapter.send(job.payload);
-
-      if (response.success) {
-        await this.jobManager.updateJobState(job.id, 'completed', undefined, Date.now() - startTime);
+      if (job.actionType === 'internal_wait') {
+        // Logic for handling waiting steps
+        await this.jobManager.updateJobState(job.id, 'completed');
+      } else {
+        const adapter = this.adapters[job.actionType];
+        if (!adapter) throw new Error(`Adapter not configured for ${job.actionType}`);
+        await adapter.send(job.payload);
+        
+        await this.jobManager.updateJobState(job.id, 'completed');
         
         await this.historyManager.logExecution({
           clientId: job.payload.contextId || 'unknown',
-          campaignId: job.payload.campaignId,
+          workflowId: job.origin.split(':')[1],
+          stepId: job.id,
           channel: job.actionType,
-          template: job.payload.templateId || 'dynamic',
+          templateId: job.payload.templateId || 'dynamic',
           user: job.createdBy,
-          reason: 'Triggered by Automation Engine',
           result: 'success',
-          executionTimeMs: Date.now() - startTime,
-          providerResponse: response.providerDetails
+          executionTimeMs: 0
         });
-      } else {
-        throw new Error(response.error || 'Unknown provider error');
       }
-
     } catch (e: any) {
       await this.jobManager.failJobWithRetry(job.id, e.message);
-      await this.historyManager.logExecution({
-        clientId: job.payload.contextId || 'unknown',
-        campaignId: job.payload.campaignId,
-        channel: job.actionType,
-        template: job.payload.templateId || 'dynamic',
-        user: job.createdBy,
-        reason: 'Failed execution',
-        result: 'error',
-        executionTimeMs: Date.now() - startTime,
-        providerResponse: { error: e.message }
-      });
     }
   }
 }

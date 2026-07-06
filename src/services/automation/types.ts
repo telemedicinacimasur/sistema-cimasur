@@ -24,38 +24,66 @@ export interface AutomationHistoryRecord {
   id: string;
   timestamp: string;
   clientId: string;
-  campaignId?: string;
+  workflowId: string;
+  stepId: string;
   channel: string;
-  template: string;
+  templateId: string;
   user: string;
-  reason: string;
   result: 'success' | 'error';
   executionTimeMs: number;
   providerResponse?: any;
 }
 
-export interface IdempotencyRecord {
+// 1. Template
+export interface AutomationTemplate {
   id: string;
-  key: string;
-  timestamp: string;
-  jobId: string;
+  name: string;
+  objective: string;
+  variables: string[];
+  content: string; // The template content (e.g., mustache format)
+  status: 'draft' | 'active' | 'archived';
+  version: number;
+  lastUpdated: string;
+}
+
+// 2. Workflow
+export interface WorkflowStep {
+  id: string;
+  type: 'action' | 'wait';
+  actionType?: string; // e.g., 'email', 'whatsapp', 'internal_update'
+  templateId?: string;
+  waitTimeDays?: number;
+  nextStepId?: string;
+}
+
+export interface AutomationWorkflow {
+  id: string;
+  name: string;
+  steps: Record<string, WorkflowStep>;
+  startStepId: string;
+  isActive: boolean;
+}
+
+// 3. Dynamic Segment
+export interface AutomationSegment {
+  id: string;
+  name: string;
+  conditions: AutomationCondition[];
 }
 
 export type RuleOperator = 'equals' | 'greaterThan' | 'lessThan' | 'contains' | 'in';
+export interface AutomationCondition {
+  field: string;
+  operator: RuleOperator;
+  value: any;
+}
 
+// 4. Rule Engine (Triggers Workflows)
 export interface AutomationRule {
   id: string;
   name: string;
-  description: string;
-  triggerEvent: string; // e.g., 'tier_upgrade', 'cart_abandoned', 'inactive_90d'
-  conditions: {
-    field: string;
-    operator: RuleOperator;
-    value: any;
-  }[];
-  action: {
-    type: string; // e.g., 'send_email', 'create_opportunity', 'notify_exec'
-    payloadTemplate: any;
-  };
+  triggerEvent: string; 
+  conditions: AutomationCondition[];
+  workflowId: string; // Trigger this workflow
   isActive: boolean;
 }
