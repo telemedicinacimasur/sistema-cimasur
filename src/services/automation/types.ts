@@ -20,6 +20,13 @@ export interface Job {
   idempotencyKey: string;
 }
 
+export interface IdempotencyRecord {
+  id: string;
+  key: string;
+  timestamp: string;
+  jobId: string;
+}
+
 export interface AutomationHistoryRecord {
   id: string;
   timestamp: string;

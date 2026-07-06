@@ -1,4 +1,4 @@
-import { Job, JobState, IdempotencyRecord, AutomationHistoryRecord } from '../types';
+import { Job, JobState, IdempotencyRecord, AutomationHistoryRecord } from './types';
 
 export class IdempotencyGuard {
   constructor(private readRecords: any, private writeRecords: any) {}
