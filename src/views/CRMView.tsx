@@ -26,24 +26,17 @@ import { CommentDialog } from '../components/CommentDialog';
 
 import { addNotification } from '../lib/notifications';
 
-import { CimasurCRM } from '../components/crm/CimasurCRM';
-import { CRMLayout } from '../components/crm/CRMLayout';
+import { NewLayout } from '../components/crm/NewLayout';
 import { DashboardView } from '../components/crm/DashboardView';
-import { IAComercialView } from '../components/crm/IAComercialView';
-import { AgendaView } from '../components/crm/AgendaView';
-import { ConfigView } from '../components/crm/ConfigView';
 import { BenefitsProvider } from '../context/BenefitsContext';
 import { CampaignCenterView } from '../components/crm/CampaignCenterView';
-import { OperationsDashboardView } from '../components/crm/operations/OperationsDashboardView';
 import { ConfigurationCenterView } from '../components/crm/operations/ConfigurationCenterView';
-import { ExecutiveDashboardView } from '../components/crm/intelligence/ExecutiveDashboardView';
 import ClubComercialView from '../components/crm/ClubComercialView';
 import { OpportunityEngineView } from '../components/crm/OpportunityEngineView';
 import { Client360View } from '../components/crm/Client360View';
 import { ClientForm } from '../components/crm/ClientForm';
-import { ClientService } from '../services/crm/ClientService';
-import { CrecimientoView } from '../components/crm/CrecimientoView';
-import { AutomationDashboardView } from '../components/automation/AutomationDashboardView';
+import { CommercialEngine } from '../services/crm/CommercialEngine';
+import { PortfolioView } from './PortfolioView';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -474,79 +467,54 @@ export default function CRMView() {
 
   return (
     <BenefitsProvider>
-      <div className="flex flex-col h-full">
-        <div className="bg-[#0D1527] p-4 border-b border-[#1E293B]">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-xl font-bold text-white">Centro de Crecimiento Comercial CIMASUR</h1>
+      <NewLayout activeView={activeTab} setActiveView={setActiveTab}>
+        <div className="p-8">
+          <div className="flex justify-between items-center mb-8">
+             <h1 className="text-2xl font-black text-white">
+                {activeTab === 'dashboard' && 'Dashboard Comercial'}
+                {activeTab === 'clientes' && 'Cartera Comercial'}
+                {activeTab === 'marketing' && 'Marketing'}
+                {activeTab === 'ia' && 'IA Comercial'}
+                {activeTab === 'oportunidades' && 'Oportunidades'}
+                {activeTab === 'fidelizacion' && 'Club Comercial'}
+                {activeTab === 'configuracion' && 'Configuración'}
+             </h1>
             <button
               onClick={() => setIsFormOpen(true)}
-              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black px-4 py-2 rounded-xl transition-all active:scale-95 shadow-md cursor-pointer"
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-6 py-3 rounded-2xl transition-all active:scale-95 shadow-lg"
             >
-              <span className="text-sm font-black">+</span> Inscribir Socio
+              + Inscribir Socio
             </button>
           </div>
-          <div className="flex overflow-x-auto scrollbar-hide">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "px-4 py-2 text-xs font-bold transition-all whitespace-nowrap",
-                  activeTab === tab.id 
-                    ? "text-sky-400 border-b-2 border-sky-400 bg-sky-500/5" 
-                    : "text-slate-400 hover:text-slate-200"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        <div className="flex-1 overflow-auto">
+          
           {activeTab === 'dashboard' && (
             <DashboardView 
-              dashboardData={dashboardData} 
               setActiveView={setActiveTab} 
               onViewClient={(id) => setSelectedClientId(id)} 
             />
           )}
           {activeTab === 'clientes' && (
-            <CRMTable 
-              records={records} 
-              filters={filters} 
-              setFilters={setFilters} 
-              onComment={(c: any) => setCommentTarget(c)} 
+            <PortfolioView 
               onViewClient={(id) => setSelectedClientId(id)} 
             />
-          )}
-          {activeTab === 'crecimiento' && (
-            <CrecimientoView onViewClient={(id) => setSelectedClientId(id)} />
           )}
           {activeTab === 'oportunidades' && (
             <OpportunityEngineView onViewClient={(id) => setSelectedClientId(id)} />
           )}
-          {activeTab === 'campanas' && (
+          {activeTab === 'marketing' && (
             <CampaignCenterView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />
           )}
-          {activeTab === 'operaciones' && <OperationsDashboardView onViewClient={(id) => setSelectedClientId(id)} />}
-          {activeTab === 'automatizacion' && <AutomationDashboardView />}
-          {activeTab === 'inteligencia' && <ExecutiveDashboardView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}
-          {activeTab === 'configuracion' && <ConfigurationCenterView onViewClient={(id) => setSelectedClientId(id)} />}
-          {activeTab === 'ia' && <IAComercialView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />}
           {activeTab === 'fidelizacion' && (
             <ClubComercialView onViewClient={(id) => setSelectedClientId(id)} />
           )}
-          {activeTab === 'reportes' && (
-            <CRMActivities onViewClient={(id) => setSelectedClientId(id)} />
-          )}
+          {activeTab === 'configuracion' && <ConfigurationCenterView onViewClient={(id) => setSelectedClientId(id)} />}
         </div>
-      </div>
+      </NewLayout>
 
       {/* Unified Client 360 Overlay Backdrop */}
-      {selectedClientId && (
+      {selectedClientId && records.find(c => c.id === selectedClientId) && (
         <Client360View 
-          clientId={selectedClientId} 
+          client={CommercialEngine.calculateClientProfile(records.find(c => c.id === selectedClientId)!)}
           onClose={() => setSelectedClientId(null)} 
           onSave={async () => {
             // Re-fetch records immediately

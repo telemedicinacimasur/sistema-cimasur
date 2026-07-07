@@ -14,6 +14,7 @@ import dns from 'dns';
 // CRM Backend Imports
 import { IntegrationService } from './src/services/crm/IntegrationService';
 import { GrowthEngine } from './src/services/crm/GrowthEngine';
+import { CommercialEngine } from './src/services/crm/CommercialEngine';
 import { LoyaltyEngineService } from './src/services/crm/LoyaltyEngineService';
 import { CatalogService } from './src/services/crm/CatalogService';
 import { RedemptionService } from './src/services/crm/RedemptionService';
@@ -527,6 +528,23 @@ const crmTools: FunctionDeclaration[] = [
         safe_render: true,
         error: e.message
       });
+    }
+  });
+
+  app.get('/api/crm/dashboard-data', async (req, res) => {
+    console.log('API call: GET /api/crm/dashboard-data');
+    try {
+      const clients = await readRecords('contacts');
+      const profiles = clients.map((c: any) => CommercialEngine.calculateClientProfile(c));
+      
+      res.json({
+        nearUpgrade: CommercialEngine.getClientsNearUpgrade(profiles),
+        atRisk: CommercialEngine.getClientsAtRisk(profiles),
+        highIntranetPotential: CommercialEngine.getClientsIntranetHighPotential(profiles),
+      });
+    } catch (e: any) {
+      console.error('Error fetching dashboard data from CIE:', e);
+      res.status(500).json({ error: e.message });
     }
   });
 
