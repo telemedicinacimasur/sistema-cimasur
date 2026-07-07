@@ -75,6 +75,12 @@ export class WorkflowEngine {
   }
   
   public async registerCompletion(executionId: string, result: 'success' | 'error', channel: string, templateId: string, user: string): Promise<void> {
+      // Check if already logged
+      const existingHistory = await this.readRecords('automation_history') || [];
+      if (existingHistory.find((h: any) => h.stepId === executionId && h.channel === channel)) {
+          return;
+      }
+      
       await this.historyManager.logExecution({
           clientId: 'contextId', // Need context
           workflowId: 'workflowId', // Need workflowId

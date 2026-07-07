@@ -128,3 +128,53 @@ export const BirthdayRule: AutomationRule = {
     conditions: [],
     workflowId: 'wf_birthday'
 };
+
+export const PointsWorkflow: AutomationWorkflow = {
+  id: 'wf_points',
+  name: 'Puntos Otorgados y Canjeados',
+  isActive: true,
+  startStepId: 'step_1',
+  steps: {
+    'step_1': {
+        id: 'step_1',
+        type: 'action',
+        actionType: 'email',
+        templateId: 'tpl_points',
+        nextStepId: undefined
+    }
+  }
+};
+
+export const PointsRule: AutomationRule = {
+    id: 'rule_points',
+    name: 'Puntos Otorgados y Canjeados',
+    isActive: true,
+    triggerEvent: 'points_earned',
+    conditions: [],
+    workflowId: 'wf_points'
+};
+
+export const OpportunityWorkflow: AutomationWorkflow = {
+  id: 'wf_opportunity',
+  name: 'Oportunidades CRM',
+  isActive: true,
+  startStepId: 'step_1',
+  steps: {
+    'step_1': {
+        id: 'step_1',
+        type: 'action',
+        actionType: 'email',
+        templateId: 'tpl_opportunity',
+        nextStepId: undefined
+    }
+  }
+};
+
+export const OpportunityRule: AutomationRule = {
+    id: 'rule_opportunity',
+    name: 'Oportunidades CRM',
+    isActive: true,
+    triggerEvent: 'crm_opportunity_created',
+    conditions: [],
+    workflowId: 'wf_opportunity'
+};
