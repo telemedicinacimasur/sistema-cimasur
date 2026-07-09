@@ -154,21 +154,29 @@ ${htmlContent}`;
     URL.revokeObjectURL(url);
   };
 
-  const handleSendWhatsApp = (client: Client) => {
-    const waBodyText = (document.getElementById('wa-body-text') as HTMLTextAreaElement)?.value || '';
-    
-    // Replace the variable and cleanly encode it once.
-    // The image URL concatenation was removed to ensure a clean message body.
-    let processedText = waBodyText
-      .replace(/\{\{nombre\}\}/g, client.name || 'Cliente')
-      .replace(/\{\{categoria_club\}\}/g, client.categoria || client.clubCategory || client.clubComercial?.categoria || 'Sin Categoría')
-      .replace(/\{\{frascos_comprados\}\}/g, (client.compras || 0).toString())
-      .replace(/\{\{promedio_mensual\}\}/g, (client.promedio || 0).toString())
-      .replace(/\{\{estado_origen\}\}/g, client.region || client.ciudad || 'N/A');
-    
-    const message = encodeURIComponent(processedText);
-    
-    window.open(`https://wa.me/${client.telefono || ''}?text=${message}`, '_blank');
+  const handleSendWhatsApp = (client: any) => {
+    // 1. Capturar el texto REAL que el usuario escribió en el editor (textarea)
+    const whatsappMessage = (document.getElementById('wa-body-text') as HTMLTextAreaElement)?.value || '';
+    let textToSend = whatsappMessage || "";
+
+    // 2. Reemplazar las variables dinámicas con los datos reales del cliente seleccionado
+    textToSend = textToSend
+      .replace(/{{nombre}}/g, client.name || client.contacto || "Doctor/a")
+      .replace(/{{frascos_comprados}}/g, String(client.compras || client.frascos || 0))
+      .replace(/{{promedio_mensual}}/g, String(client.promedio || 0))
+      .replace(/{{categoria_club}}/g, client.categoria || "Sin Categoría");
+
+    // 3. Codificar correctamente manteniendo los asteriscos (*) limpios para las negritas de WhatsApp
+    const encodedText = encodeURIComponent(textToSend)
+      .replace(/%2A/g, '*'); // Asegura que las negritas funcionen en WhatsApp
+
+    // 4. Limpiar el teléfono (eliminar espacios o caracteres raros) y generar la URL limpia
+    const cleanPhoneVal = client.phone || client.telefono || "";
+    const cleanPhone = cleanPhoneVal ? String(cleanPhoneVal).replace(/\s+/g, '') : "";
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedText}`;
+
+    // 5. Abrir WhatsApp Business de inmediato
+    window.open(whatsappUrl, '_blank');
   };
 
   return (
@@ -245,6 +253,7 @@ ${htmlContent}`;
               activeChannel={channel} 
               preloadedTemplate={preloadedTemplate}
               clearPreloadedTemplate={clearPreloadedTemplate}
+              selectedClients={selectedClients}
             />
         </div>
 

@@ -72,12 +72,14 @@ export default function MarketingBuilder({
   preloadedTemplate, 
   clearPreloadedTemplate,
   isEmbedded = false,
-  activeChannel
+  activeChannel,
+  selectedClients = []
 }: { 
   preloadedTemplate?: string | null; 
   clearPreloadedTemplate?: () => void;
   isEmbedded?: boolean;
   activeChannel?: 'email' | 'whatsapp';
+  selectedClients?: any[];
 } = {}) {
   // ==========================================
   // Component State
@@ -85,6 +87,19 @@ export default function MarketingBuilder({
   const [internalTab, setInternalTab] = useState<'email' | 'whatsapp'>('email');
   const activeTab = activeChannel || internalTab;
   const setActiveTab = setInternalTab;
+
+  const [previewClientIndex, setPreviewClientIndex] = useState<number>(0);
+
+  // Sync index to stay in-bounds when selected list changes
+  useEffect(() => {
+    if (selectedClients && selectedClients.length > 0) {
+      if (previewClientIndex >= selectedClients.length) {
+        setPreviewClientIndex(0);
+      }
+    } else {
+      setPreviewClientIndex(0);
+    }
+  }, [selectedClients, previewClientIndex]);
   
   // Email Editor States
   const [emailSubject, setEmailSubject] = useState('🌟 Oferta Especial Club de Socios CIMASUR (2026)');
@@ -249,11 +264,34 @@ export default function MarketingBuilder({
   // ==========================================
 
   // Replace tags with simulated real data or keep tags
+  const currentPreviewClient = selectedClients && selectedClients.length > 0 ? selectedClients[previewClientIndex] : null;
+
+  const getClientVariableValue = (client: any, tag: string, fallbackMock: string): string => {
+    if (!client) return fallbackMock;
+    switch (tag) {
+      case '{{nombre}}':
+        return client.name || client.nombre || 'Socio Veterinario';
+      case '{{categoria_club}}':
+        return client.categoria || client.clubCategory || client.clubComercial?.categoria || 'Sin Categoría';
+      case '{{frascos_comprados}}':
+        return `${client.compras || 0} frascos`;
+      case '{{promedio_mensual}}':
+        const val = client.promedio || client.promedioMensual || 0;
+        return `$${Math.round(val).toLocaleString('es-CL')} CLP`;
+      case '{{estado_origen}}':
+        return client.region || client.region_origen || client.ciudad || 'Región Metropolitana';
+      default:
+        return fallbackMock;
+    }
+  };
+
   const processVariables = (text: string): string => {
     if (!text) return '';
     let result = text;
     DYNAMIC_VARIABLES.forEach(v => {
-      const replacement = useMockValues ? v.mockValue : v.tag;
+      const replacement = useMockValues 
+        ? getClientVariableValue(currentPreviewClient, v.tag, v.mockValue) 
+        : v.tag;
       result = result.replace(new RegExp(v.tag, 'g'), replacement);
     });
     return result;
@@ -738,25 +776,58 @@ export default function MarketingBuilder({
               Haga clic sobre cualquier variable para inyectarla en la posición activa de su editor de {activeTab === 'email' ? 'Email (bloque seleccionado)' : 'WhatsApp'}.
             </p>
 
-            <div className="grid grid-cols-1 gap-2">
-              {DYNAMIC_VARIABLES.map(v => (
-                <button
-                  key={v.tag}
-                  onClick={() => insertVariable(v.tag)}
-                  className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500/40 text-left transition-all group"
+            {selectedClients && selectedClients.length > 0 && (
+              <div className="mb-4 bg-slate-900/60 p-3 rounded-lg border border-slate-700/80 space-y-2">
+                <label htmlFor="preview-client-select" className="block text-xs font-semibold text-teal-400 uppercase tracking-wider">
+                  Socio Seleccionado para Previsualizar:
+                </label>
+                <select
+                  id="preview-client-select"
+                  value={previewClientIndex}
+                  onChange={(e) => setPreviewClientIndex(parseInt(e.target.value))}
+                  className="w-full bg-slate-800 border border-slate-700 text-xs text-white rounded px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
                 >
-                  <div className="space-y-0.5">
-                    <span className="font-mono text-xs text-teal-400 font-bold bg-teal-950/80 px-1.5 py-0.5 rounded border border-teal-500/10 group-hover:border-teal-500/30">
-                      {v.tag}
-                    </span>
-                    <p className="text-[11px] text-slate-400 pl-1">{v.label}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-500 italic block">Simula:</span>
-                    <span className="text-xs font-semibold text-slate-300 block">{v.mockValue}</span>
-                  </div>
-                </button>
-              ))}
+                  {selectedClients.map((client, idx) => (
+                    <option key={client.id || idx} value={idx}>
+                      {client.name || client.nombre || `Socio ${idx + 1}`} ({client.categoria || client.clubCategory || client.clubComercial?.categoria || 'Sin cat.'})
+                    </option>
+                  ))}
+                </select>
+                <div className="text-[10px] text-slate-400 flex justify-between">
+                  <span>{selectedClients.length} socios listos</span>
+                  <span className="text-emerald-400 font-medium">Previsualizando #{previewClientIndex + 1}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-2">
+              {DYNAMIC_VARIABLES.map(v => {
+                const activeValue = currentPreviewClient 
+                  ? getClientVariableValue(currentPreviewClient, v.tag, v.mockValue) 
+                  : v.mockValue;
+                return (
+                  <button
+                    key={v.tag}
+                    onClick={() => insertVariable(v.tag)}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500/40 text-left transition-all group"
+                  >
+                    <div className="space-y-0.5">
+                      <span className="font-mono text-xs text-teal-400 font-bold bg-teal-950/80 px-1.5 py-0.5 rounded border border-teal-500/10 group-hover:border-teal-500/30">
+                        {v.tag}
+                      </span>
+                      <p className="text-[11px] text-slate-400 pl-1">{v.label}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-500 italic block">
+                        {currentPreviewClient ? 'Valor Socio:' : 'Simula:'}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-300 block max-w-[140px] truncate" title={activeValue}>
+                        {activeValue}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Simulated Data Toggle Switch */}
