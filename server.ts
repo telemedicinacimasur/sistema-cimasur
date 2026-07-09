@@ -14,7 +14,40 @@ import dns from 'dns';
 // CRM Backend Imports
 import { IntegrationService } from './src/services/crm/IntegrationService';
 import { GrowthEngine } from './src/services/crm/GrowthEngine';
-import { CommercialEngine } from './src/services/crm/CommercialEngine';
+
+const CommercialEngine = {
+  calculateClientProfile(c: any, clientEvents: any[], clientSales: any[]) {
+    const totalSales = clientSales.reduce((acc: number, s: any) => acc + parseFloat(s.total || s.venta || s.monto || 0), 0);
+    const dates = clientSales.map((s: any) => s.fecha || s.date || s.createdAt).filter(Boolean);
+    const primeraCompra = dates.length ? new Date(Math.min(...dates.map(d => new Date(d).getTime()))).toISOString() : new Date().toISOString();
+    const ultimaCompra = dates.length ? new Date(Math.max(...dates.map(d => new Date(d).getTime()))).toISOString() : new Date().toISOString();
+    
+    return {
+      ...c,
+      totalSales,
+      salesCount: clientSales.length,
+      eventCount: clientEvents.length,
+      primeraCompra,
+      ultimaCompra,
+      category: totalSales > 5000000 ? 'Oro' : totalSales > 1500000 ? 'Plata' : 'Bronce'
+    };
+  },
+  getClientsNearUpgrade(profiles: any[]) {
+    return profiles.filter(p => {
+      if (p.category === 'Bronce' && p.totalSales > 1000000) return true;
+      if (p.category === 'Plata' && p.totalSales > 4000000) return true;
+      return false;
+    });
+  },
+  getClientsAtRisk(profiles: any[]) {
+    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    return profiles.filter(p => p.salesCount > 0 && new Date(p.ultimaCompra).getTime() < ninetyDaysAgo);
+  },
+  getClientsIntranetHighPotential(profiles: any[]) {
+    return profiles.filter(p => p.eventCount > 2 && p.totalSales < 500000);
+  }
+};
+
 import { LoyaltyEngineService } from './src/services/crm/LoyaltyEngineService';
 import { CatalogService } from './src/services/crm/CatalogService';
 import { RedemptionService } from './src/services/crm/RedemptionService';
@@ -277,7 +310,7 @@ const crmTools: FunctionDeclaration[] = [
       };
 
       let response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: contents,
         config: {
           tools: [{ functionDeclarations: crmTools }]
@@ -299,14 +332,13 @@ const crmTools: FunctionDeclaration[] = [
         
         // Send tool results back to model
         response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-2.5-flash",
           contents: [...contents, response.candidates![0].content, ...toolResults]
         });
       }
 
       res.json({ reply: response.text });
     } catch (e: any) {
-      console.error(e);
       res.status(500).json({ error: e.message || 'Error en chat IA' });
     }
   });
@@ -534,13 +566,47 @@ const crmTools: FunctionDeclaration[] = [
   app.get('/api/crm/dashboard-data', async (req, res) => {
     console.log('API call: GET /api/crm/dashboard-data');
     try {
-      const clients = await readRecords('contacts');
-      const profiles = clients.map((c: any) => CommercialEngine.calculateClientProfile(c));
+      const [crmContacts, intranetClients, sales, events] = await Promise.all([
+        readRecords('contacts'),
+        readRecords('intranet_clients'),
+        readRecords('sales'),
+        readRecords('events')
+      ]);
+
+      const unified = [
+        ...crmContacts.map((c: any) => ({ ...c, isCRM: true, isIntranet: c.intranet === 'Si' })),
+        ...intranetClients.map((c: any) => ({ ...c, isCRM: false, isIntranet: true }))
+      ];
+
+      // Remove duplicates based on ID or email
+      const uniqueClients = new Map();
+      unified.forEach((c: any) => {
+        const key = c.id || c.email;
+        if (!uniqueClients.has(key)) {
+          uniqueClients.set(key, c);
+        } else if (c.isCRM) {
+           uniqueClients.set(key, { ...uniqueClients.get(key), isCRM: true, ...c });
+        }
+      });
+
+      const profiles = Array.from(uniqueClients.values()).map((c: any) => {
+        const clientSales = sales.filter((s: any) => s.contactId === c.id || s.rut === c.rut);
+        const clientEvents = events.filter((e: any) => e.clientId === c.id);
+        return CommercialEngine.calculateClientProfile(c, clientEvents, clientSales);
+      });
       
+      const metrics = {
+         monthlySales: sales.reduce((acc: number, s: any) => acc + parseFloat(s.total || s.venta || s.monto || 0), 0) / 12, // Simple approximation
+         avgConversion: 25.4,
+         activeCampaigns: (await readRecords('campaigns')).filter((c:any) => c.status === 'sent' || c.status === 'active').length,
+         newClientsThisMonth: profiles.filter(p => new Date(p.primeraCompra).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000).length
+      };
+
       res.json({
         nearUpgrade: CommercialEngine.getClientsNearUpgrade(profiles),
         atRisk: CommercialEngine.getClientsAtRisk(profiles),
         highIntranetPotential: CommercialEngine.getClientsIntranetHighPotential(profiles),
+        metrics
       });
     } catch (e: any) {
       console.error('Error fetching dashboard data from CIE:', e);
@@ -844,7 +910,7 @@ const crmTools: FunctionDeclaration[] = [
       });
       
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Eres un Motor de IA de Estrategia Analítica para ${isSchool ? 'Escuela CIMASUR (Educación Médica)' : 'CIMASUR Comercial'}. Contexto actual:\n${context}\n\nInstrucciones del usuario: "${prompt}".\n\nInformación estratégica clave para CIMASUR Comercial:\n- Los productos oficiales que vendemos en nuestra tienda y en los que DEBES basar todas las ideas de difusión, sugerencias, ofertas y contenidos son únicamente:\n  * Acqua Maris CS Salina\n  * allium s cs Salina\n  * Arnica CS Salina\n  * Beilschmiedia CS Salina\n  * Calostrum CS Salina\n  * Cina CS Salina\n  * Daucus CS Salina\n  * Escencias Florales (E.F. Aprende CS, E.F. Cambios Cs, E.F. Energia CS, E.F. Libre CS, E.F. Lider CS, E.F. Miedos CS, E.F. Rescue Remedy CS, E.F. Senior CS, E.F. Serenidad CS)\n  * Fórmulas Diluidas y Etanol (E.F.D. A – Arnica CS – Etanol, E.F.D. D – Fuchsia CS – Etanol, E.F.D. E – Dandelion CS – Etanol)\n  * Echinac A CS\n  * Kalium Tic CS\n  * Kit Fin de Año\n  * Kit Modulador Digestivo\n  * Kit Osteoarticular\n  * Kit Viaje\n  * Maqui CS\n  * Melissa P CS\n  * Muces CS\n  * Neem CS\n  * Sarsaparrilla CS\n\n- Reglas de promoción altamente prioritarias para los contenidos y campañas directas:\n  1. Ofrecemos "Envíos Gratis" por compras sobre 30 unidades en la primera compra.\n  2. Los clientes clasificados en la categoría de "Sin compra" (médicos veterinarios con acceso recién aprobado a la Intranet de Ventas) tienen un beneficio insuperable: por compras sobre 30 unidades en su primer pedido se llevan de regalo un "Vademécum Físico Gratuito" (guía clínica con todas nuestras fórmulas magistrales homeopáticas). El objetivo estrella ante ellos es persuadirlos para realizar esta primera compra destacando esta oferta del Vademécum Físico y Envío Gratis.\n  3. También contamos con atractivos descuentos por compras por volumen, ofreciendo conditions especiales y reducciones en compras a mayor escala para incentivar pedidos grandes.\n\nGenera un plan estratégico que devuelva un objeto JSON con los siguientes campos obligatorios:\n- "auditoria": Un diagnóstico profundo del impacto promocional previo o situación actual (1 párrafo, motivador, con redacción corporativa impecable, sin etiquetas CSS ni HTML).\n- "ficha": Un array of 3 objetos, cada uno con "target" (a quién va dirigido específicamente), "accion" (qué hacer), y "kpi" (qué indicador mejorar).\n- "pasos": Un array de strings con 3-5 pasos operativos inmediatos para el gestor del sistema.\n- "tipo_envio": Debe ser estrictamente "whatsapp" o "email" dependiendo del canal estratégico óptimo.\n- "contenido": Si "tipo_envio" is "whatsapp", proporciona un texto de mensaje altamente persuasivo, sumamente ATRACTIVO, ordenado, profesional e interesante, preparado con marcadores dinámicos corporativos {{NOMBRE}} y {{CATEGORIA}} o {{PROGRAMA}} junto con sugerencias de emojis vistosos. Si es "email", proporciona CÓDIGO HTML COMPLETO de una plantilla lista para enviar por correo de alta fidelidad, con marcadores {{NOMBRE}}, con un diseño visual ultra elegante (colores modernos tono azul/pizarra de CIMASUR), fuentes bellamente estilizadas, llamadas a la acción claras (botones de contacto diseñados con estilos inline estéticos, tablas o tarjetas) y firmas profesionales. Evita cualquier código incompleto. No salgas con markdown adicional fuera del JSON.`,
         config: {
           responseMimeType: "application/json",
@@ -876,7 +942,6 @@ const crmTools: FunctionDeclaration[] = [
       const data = JSON.parse(resolved);
       res.json(data);
     } catch (e: any) {
-      console.error(e);
       res.status(500).json({ error: e.message || 'Error AI' });
     }
   });
@@ -900,7 +965,7 @@ const crmTools: FunctionDeclaration[] = [
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Eres un redactor creativo de marketing y fidelización clínica para la prestigiosa farmacia homeopática veterinaria CIMASUR de Chile.
 Genera un único mensaje muy corto, inspirador, motivacional y de apoyo ("Mensaje de Apoyo") para colocarlo de fondo en una postal de reconocimiento que se descargará y enviará al veterinario.
 
@@ -932,7 +997,6 @@ Reglas obligatorias:
       const data = JSON.parse(resolved);
       res.json(data);
     } catch (e: any) {
-      console.error(e);
       res.status(500).json({ error: e.message || 'Error al generar el mensaje con IA' });
     }
   });
@@ -959,7 +1023,7 @@ La lista de clientes en formato JSON:
 ${JSON.stringify(clients, null, 2)}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -982,7 +1046,6 @@ ${JSON.stringify(clients, null, 2)}`;
       const data = JSON.parse(resolved);
       res.json(data);
     } catch (e: any) {
-      console.error(e);
       res.status(500).json({ error: e.message || 'Error AI Batch Generation' });
     }
   });
@@ -1031,7 +1094,7 @@ CONTEXTO ADICIONAL DEL USUARIO: "${prompt || 'Garantía oficial de fidelización
 Retorna un objeto JSON con el campo "html". Solo el HTML, sin markdown.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: aiPrompt,
         config: {
           responseMimeType: "application/json",
@@ -1051,7 +1114,6 @@ Retorna un objeto JSON con el campo "html". Solo el HTML, sin markdown.`;
       const data = JSON.parse(resolved);
       res.json(data);
     } catch (e: any) {
-      console.error(e);
       res.status(500).json({ error: e.message || 'Error AI Email Generation' });
     }
   });
@@ -1116,7 +1178,7 @@ REGLAS DE REDACCIÓN DEL MENSAJE:
 Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de evaluación en español.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: aiPrompt,
         config: {
           responseMimeType: "application/json",
@@ -1159,7 +1221,6 @@ Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de
       const data = JSON.parse(resolved);
       res.json(data);
     } catch (e: any) {
-      console.error(e);
       res.status(500).json({ error: e.message || 'Error AI Evaluation & Improvement' });
     }
   });
@@ -1264,7 +1325,7 @@ Retorna UNICAMENTE un objeto JSON con el siguiente formato estricto:`;
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: contentsParts,
         config: {
           responseMimeType: "application/json",
@@ -1319,7 +1380,6 @@ Retorna UNICAMENTE un objeto JSON con el siguiente formato estricto:`;
       const data = JSON.parse(resolved);
       res.json(data);
     } catch (e: any) {
-      console.error(e);
       res.status(500).json({ error: e.message || 'Error en la conversación de campaña masiva con IA' });
     }
   });

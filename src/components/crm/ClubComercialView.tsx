@@ -685,7 +685,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                         <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
                           <span>Ventas Facturadas: {formatCLP(memberDetails.totalSales || 0)}</span>
                           {memberDetails.progress?.salesNeeded > 0 ? (
-                            <span className="text-amber-400">Faltan {formatCLP(memberDetails.progress.salesNeeded)} de compra</span>
+                            <span className="text-amber-400">Faltan {Math.ceil(memberDetails.progress.salesNeeded / 25000)} frascos para subir a {memberDetails.progress.nextTier}</span>
                           ) : (
                             <span className="text-emerald-400">¡Estatus Máximo Alcanzado!</span>
                           )}

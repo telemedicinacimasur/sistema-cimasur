@@ -23,8 +23,8 @@ export const CampaignPreviewModal: React.FC<CampaignPreviewModalProps> = ({ camp
       const nextCategoryMap: Record<string, string> = {
         'Bronce': 'Plata',
         'Plata': 'Oro',
-        'Oro': 'Diamante',
-        'Diamante': 'Diamante',
+        'Oro': 'Platinum',
+        'Platinum': 'Platinum',
         'Zafiro': 'Rubí' // example
       };
       
@@ -117,8 +117,8 @@ export const CampaignPreviewModal: React.FC<CampaignPreviewModalProps> = ({ camp
                   const nextCategoryMap: Record<string, string> = {
                     'Bronce': 'Plata',
                     'Plata': 'Oro',
-                    'Oro': 'Diamante',
-                    'Diamante': 'Diamante'
+                    'Oro': 'Platinum',
+                    'Platinum': 'Platinum'
                   };
                   
                   const exampleVariables = {

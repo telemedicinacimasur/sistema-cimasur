@@ -40,23 +40,26 @@ export const ClientForm: React.FC<ClientFormProps> = ({ client, onSave, onCancel
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.rut || !formData.email) {
+    const email = formData.email?.trim() || '';
+
+    if (!formData.name || !formData.rut || !email) {
       alert("Por favor complete los campos obligatorios (*)");
       return;
     }
     
     // Simple email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       alert("Email inválido");
       return;
     }
 
     try {
       if (formData.id) {
-        await clientService.updateClient(formData.id, formData);
+        await clientService.updateClient(formData.id, { ...formData, email });
       } else {
         const newClient: Client = {
           ...formData,
+          email,
           id: Date.now().toString(),
           contactos: [],
           veterinarios: [],

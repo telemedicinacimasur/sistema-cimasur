@@ -57,7 +57,15 @@ export const localAuth = {
         return { uid: docSnap.id, ...docSnap.data() } as UserProfile;
       }
     } else {
-      const res = await fetch('/api/users');
+      let res = await fetch('/api/users');
+      if (!res.ok) {
+        if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
+           console.warn('Rate limit exceeded, retrying in 2 seconds...');
+           await new Promise(resolve => setTimeout(resolve, 2000));
+           res = await fetch('/api/users');
+        }
+        if (!res.ok) throw new Error(await res.text());
+      }
       const users: any[] = await res.json();
       return users.find(u => u.uid === uid) || null;
     }
@@ -69,7 +77,15 @@ export const localAuth = {
       const snapshot = await getDocs(collection(db, 'users'));
       return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() })) as UserProfile[];
     } else {
-      const res = await fetch('/api/users');
+      let res = await fetch('/api/users');
+      if (!res.ok) {
+        if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
+           console.warn('Rate limit exceeded, retrying in 2 seconds...');
+           await new Promise(resolve => setTimeout(resolve, 2000));
+           res = await fetch('/api/users');
+        }
+        if (!res.ok) throw new Error(await res.text());
+      }
       return await res.json();
     }
   },
@@ -212,15 +228,33 @@ export const localDB = {
       const result = await fetchPromise;
       return [...result];
     } else {
-      const res = await fetch(`/api/records/${name}`);
-      let data = await res.json();
-      if (options && options.dateField && options.startDate && options.endDate) {
-        data = data.filter((item: any) => {
-          const val = item[options.dateField!];
-          return val >= options.startDate! && val <= options.endDate!;
-        });
+      try {
+        let res = await fetch(`/api/records/${name}`);
+        if (!res.ok) {
+          if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
+             console.warn('Rate limit exceeded, retrying in 2 seconds...');
+             await new Promise(resolve => setTimeout(resolve, 2000));
+             res = await fetch(`/api/records/${name}`);
+          }
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Failed to fetch ${name}: ${text}`);
+          }
+        }
+        let data = await res.json();
+        if (options && options.dateField && options.startDate && options.endDate) {
+          data = data.filter((item: any) => {
+            const val = item[options.dateField!];
+            return val >= options.startDate! && val <= options.endDate!;
+          });
+        }
+        return data;
+      } catch (err: any) {
+        console.error(`Error in localDB.getCollection(${name}):`, err);
+        // Devuelve un arreglo vacío para prevenir Unhandled Promise Rejections
+        // en caso de que el servidor se esté reiniciando (error de red).
+        return [];
       }
-      return data;
     }
   },
   saveToCollection: async (name: string, item: any) => {
@@ -312,8 +346,22 @@ export const localDB = {
         }
       } else {
         const res = await fetch(`/api/records/${name}`);
-        const list = await res.json();
-        recordToDelete = list.find((item: any) => item.id === id);
+        if (!res.ok) {
+          if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
+             // Basic retry
+             console.warn('Rate limit exceeded, retrying in 2 seconds...');
+             await new Promise(resolve => setTimeout(resolve, 2000));
+             const retryRes = await fetch(`/api/records/${name}`);
+             if (!retryRes.ok) throw new Error(await retryRes.text());
+             const list = await retryRes.json();
+             recordToDelete = list.find((item: any) => item.id === id);
+          } else {
+             throw new Error(await res.text());
+          }
+        } else {
+          const list = await res.json();
+          recordToDelete = list.find((item: any) => item.id === id);
+        }
       }
 
       if (recordToDelete) {

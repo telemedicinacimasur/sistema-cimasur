@@ -26,17 +26,27 @@ import { CommentDialog } from '../components/CommentDialog';
 
 import { addNotification } from '../lib/notifications';
 
-import { NewLayout } from '../components/crm/NewLayout';
-import { DashboardView } from '../components/crm/DashboardView';
+import { CimasurCRM } from '../components/crm/CimasurCRM';
+import { CRMLayout } from '../components/crm/CRMLayout';
+import { CommercialDashboard } from '../modules/crm/CommercialDashboard';
+import { IAComercialView } from '../components/crm/IAComercialView';
+import { AgendaView } from '../components/crm/AgendaView';
+import { ConfigView } from '../components/crm/ConfigView';
 import { BenefitsProvider } from '../context/BenefitsContext';
 import { CampaignCenterView } from '../components/crm/CampaignCenterView';
+import { OperationsDashboardView } from '../components/crm/operations/OperationsDashboardView';
 import { ConfigurationCenterView } from '../components/crm/operations/ConfigurationCenterView';
+import { ExecutiveDashboardView } from '../components/crm/intelligence/ExecutiveDashboardView';
 import ClubComercialView from '../components/crm/ClubComercialView';
 import { OpportunityEngineView } from '../components/crm/OpportunityEngineView';
 import { Client360View } from '../components/crm/Client360View';
 import { ClientForm } from '../components/crm/ClientForm';
-import { CommercialEngine } from '../services/crm/CommercialEngine';
-import { PortfolioView } from './PortfolioView';
+import { ClientService } from '../services/crm/ClientService';
+import { CrecimientoView } from '../components/crm/CrecimientoView';
+import { AutomationDashboardView } from '../components/automation/AutomationDashboardView';
+
+import CommercialPortfolio from '../modules/crm/CommercialPortfolio';
+import CampaignsBuilder from '../modules/crm/CampaignsBuilder';
 
 export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (!nameA || !nameB) return false;
@@ -227,6 +237,8 @@ export default function CRMView() {
   const [records, setRecords] = useState<any[]>([]);
   const [intranetClients, setIntranetClients] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
+  const [clientesSubTab, setClientesSubTab] = useState<'cartera' | 'intranet'>('cartera');
+  const [preloadedTemplate, setPreloadedTemplate] = useState<string | null>(null);
   const [commentTarget, setCommentTarget] = useState<any | null>(null);
   const [filters, setFilters] = useState({
     search: '',
@@ -452,69 +464,136 @@ export default function CRMView() {
   
   const tabs = [
     { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'crecimiento', label: '🚀 Crecimiento' },
     { id: 'clientes', label: '👥 Clientes' },
-    { id: 'oportunidades', label: '🎯 Oportunidades' },
     { id: 'campanas', label: '📧 Campañas' },
-    { id: 'operaciones', label: '⚡ Operaciones' },
-    { id: 'automatizacion', label: '⚙️ Automatización (F7)' },
-    { id: 'inteligencia', label: '🧠 Inteligencia Comercial' },
-    { id: 'configuracion', label: '⚙️ Configuración' },
-    { id: 'ia', label: '🤖 IA Comercial' },
+    { id: 'ia', label: '🤖 Asistente IA CIMASUR' },
     { id: 'fidelizacion', label: '👑 Club Comercial' },
-    { id: 'reportes', label: '📈 Reportes' },
+    { id: 'registro_campanas', label: '📈 Registro de Campañas Internas' },
   ];
 
   return (
     <BenefitsProvider>
-      <NewLayout activeView={activeTab} setActiveView={setActiveTab}>
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-8">
-             <h1 className="text-2xl font-black text-white">
-                {activeTab === 'dashboard' && 'Dashboard Comercial'}
-                {activeTab === 'clientes' && 'Cartera Comercial'}
-                {activeTab === 'marketing' && 'Marketing'}
-                {activeTab === 'ia' && 'IA Comercial'}
-                {activeTab === 'oportunidades' && 'Oportunidades'}
-                {activeTab === 'fidelizacion' && 'Club Comercial'}
-                {activeTab === 'configuracion' && 'Configuración'}
-             </h1>
+      <div className="flex flex-col h-full">
+        <div className="bg-[#0D1527] p-4 border-b border-[#1E293B]">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-xl font-bold text-white">Centro de Crecimiento Comercial CIMASUR</h1>
             <button
               onClick={() => setIsFormOpen(true)}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-6 py-3 rounded-2xl transition-all active:scale-95 shadow-lg"
+              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black px-4 py-2 rounded-xl transition-all active:scale-95 shadow-md cursor-pointer"
             >
-              + Inscribir Socio
+              <span className="text-sm font-black">+</span> Inscribir Socio
             </button>
           </div>
-          
+          <div className="flex overflow-x-auto scrollbar-hide">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "px-4 py-2 text-xs font-bold transition-all whitespace-nowrap",
+                  activeTab === tab.id 
+                    ? "text-sky-400 border-b-2 border-sky-400 bg-sky-500/5" 
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-auto">
           {activeTab === 'dashboard' && (
-            <DashboardView 
-              setActiveView={setActiveTab} 
+            <CommercialDashboard 
+              dashboardData={dashboardData} 
               onViewClient={(id) => setSelectedClientId(id)} 
+              onDesignInEditor={(client, reason) => {
+                setPreloadedTemplate(`Asunto: Campaña para ${client.customerName}\n\nEstimado/a ${client.customerName},\n\nMotivo: ${reason}\n\n[Personalice su mensaje aquí]`);
+                setActiveTab('marketing_visual');
+              }}
             />
           )}
           {activeTab === 'clientes' && (
-            <PortfolioView 
+            <div className="flex flex-col h-full space-y-4 p-4 animate-in fade-in duration-300">
+              <div className="flex bg-[#111A2E] p-1.5 rounded-xl border border-[#1E293B] self-start space-x-1.5 shadow-md">
+                <button 
+                  onClick={() => setClientesSubTab('cartera')}
+                  className={cn(
+                    "px-4 py-2 text-xs font-black rounded-lg transition-all cursor-pointer border",
+                    clientesSubTab === 'cartera' 
+                      ? "bg-[#1E3A5F] text-sky-400 border-sky-500/30 font-extrabold shadow-sm" 
+                      : "text-slate-400 hover:text-slate-200 border-transparent"
+                  )}
+                >
+                  💼 Cartera Única CIE
+                </button>
+                <button 
+                  onClick={() => setClientesSubTab('intranet')}
+                  className={cn(
+                    "px-4 py-2 text-xs font-black rounded-lg transition-all cursor-pointer border",
+                    clientesSubTab === 'intranet' 
+                      ? "bg-[#1E3A5F] text-sky-400 border-sky-500/30 font-extrabold shadow-sm" 
+                      : "text-slate-400 hover:text-slate-200 border-transparent"
+                  )}
+                >
+                  🌐 Clientes de Plataforma Intranet
+                </button>
+              </div>
+
+              <div className="flex-1">
+                {clientesSubTab === 'cartera' && (
+                  <CRMTable 
+                    records={records} 
+                    filters={filters} 
+                    setFilters={setFilters} 
+                    onComment={(c: any) => setCommentTarget(c)} 
+                    onViewClient={(id) => setSelectedClientId(id)} 
+                    onAddClient={() => setIsFormOpen(true)}
+                  />
+                )}
+                {clientesSubTab === 'intranet' && (
+                  <CRMIntranetTable 
+                    clients={intranetClients} 
+                    onImportFromIntranet={handleImportFromIntranet} 
+                    onImportSingle={handleImportSingleFromIntranet} 
+                    onViewClient={(id) => setSelectedClientId(id)} 
+                  />
+                )}
+              </div>
+            </div>
+          )}
+          {activeTab === 'campanas' && (
+            <CampaignsBuilder 
+              dashboardData={dashboardData} 
               onViewClient={(id) => setSelectedClientId(id)} 
+              preloadedTemplate={preloadedTemplate}
+              clearPreloadedTemplate={() => setPreloadedTemplate(null)}
             />
           )}
-          {activeTab === 'oportunidades' && (
-            <OpportunityEngineView onViewClient={(id) => setSelectedClientId(id)} />
-          )}
-          {activeTab === 'marketing' && (
-            <CampaignCenterView dashboardData={dashboardData} onViewClient={(id) => setSelectedClientId(id)} />
+          {activeTab === 'ia' && (
+            <IAComercialView 
+              dashboardData={dashboardData} 
+              onViewClient={(id) => setSelectedClientId(id)} 
+              onNavigateToEditor={(text) => {
+                // Preloading logic should be handled by CampaignsBuilder or passed down
+                setPreloadedTemplate(text);
+                setActiveTab('campanas');
+              }}
+            />
           )}
           {activeTab === 'fidelizacion' && (
             <ClubComercialView onViewClient={(id) => setSelectedClientId(id)} />
           )}
-          {activeTab === 'configuracion' && <ConfigurationCenterView onViewClient={(id) => setSelectedClientId(id)} />}
+          {activeTab === 'registro_campanas' && (
+            <CRMActivities onViewClient={(id) => setSelectedClientId(id)} />
+          )}
         </div>
-      </NewLayout>
+      </div>
 
       {/* Unified Client 360 Overlay Backdrop */}
-      {selectedClientId && records.find(c => c.id === selectedClientId) && (
+      {selectedClientId && (
         <Client360View 
-          client={CommercialEngine.calculateClientProfile(records.find(c => c.id === selectedClientId)!)}
+          clientId={selectedClientId} 
           onClose={() => setSelectedClientId(null)} 
           onSave={async () => {
             // Re-fetch records immediately
@@ -932,7 +1011,7 @@ function CRMRegister() {
   );
 }
 
-function CRMTable({ records, filters, setFilters, onComment, onViewClient }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void, onViewClient?: (id: string) => void }) {
+function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAddClient }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void, onViewClient?: (id: string) => void, onAddClient?: () => void }) {
   const { user } = useAuth();
   const permissions = user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
@@ -1539,7 +1618,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient }: { r
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
-      <div className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+      <div className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 

@@ -9,12 +9,14 @@ import { CampaignPreviewModal } from './campaigns/CampaignPreviewModal';
 
 const campaignEngine = new CampaignEngineService();
 
-export const CampaignCenterView: React.FC<{ dashboardData: any; onViewClient?: (id: string) => void }> = ({ dashboardData, onViewClient }) => {
+export const CampaignCenterView: React.FC<{ 
+  dashboardData: any; 
+  onViewClient?: (id: string) => void;
+  onNavigateToEditor: (campaign: SuggestedCampaign, channel: 'email' | 'whatsapp' | 'both') => void;
+}> = ({ dashboardData, onViewClient, onNavigateToEditor }) => {
   const [activeSubView, setActiveSubView] = useState<'create' | 'history'>('create');
   const [campaignsHistory, setCampaignsHistory] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
-  const [previewCampaign, setPreviewCampaign] = useState<SuggestedCampaign | null>(null);
-  const [previewChannel, setPreviewChannel] = useState<'email' | 'whatsapp' | 'both' | null>(null);
   
   // GrowthEngine delivers exactly what needs to be suggested
   const suggestedCampaigns = dashboardData?.suggestedCampaigns || [];
@@ -31,24 +33,7 @@ export const CampaignCenterView: React.FC<{ dashboardData: any; onViewClient?: (
   };
 
   const handleExecuteRequest = (suggestion: SuggestedCampaign, channel: 'email' | 'whatsapp' | 'both') => {
-    setPreviewCampaign(suggestion);
-    setPreviewChannel(channel);
-  };
-
-  const confirmExecution = async (template: string) => {
-    if (!previewCampaign || !previewChannel) return;
-    
-    // Motor de Ejecución ONLY
-    const campaign = await campaignEngine.createFromSuggestion(previewCampaign, previewChannel, template);
-    await campaignEngine.executeCampaign(campaign.id);
-    
-    alert(`Campaña "${previewCampaign.name}" enviada exitosamente a ${previewCampaign.clientCount} clientes.`);
-    
-    setPreviewCampaign(null);
-    setPreviewChannel(null);
-    loadCampaigns();
-    window.dispatchEvent(new Event('campaign-executed'));
-    setActiveSubView('history');
+    onNavigateToEditor(suggestion, channel);
   };
 
   return (
@@ -94,18 +79,6 @@ export const CampaignCenterView: React.FC<{ dashboardData: any; onViewClient?: (
           <CampaignMetricsCards metrics={metrics} />
           <CampaignHistoryTable campaigns={campaignsHistory} />
         </div>
-      )}
-
-      {previewCampaign && previewChannel && (
-        <CampaignPreviewModal 
-          campaign={previewCampaign} 
-          channel={previewChannel} 
-          onClose={() => {
-            setPreviewCampaign(null);
-            setPreviewChannel(null);
-          }}
-          onConfirm={confirmExecution}
-        />
       )}
     </div>
   );

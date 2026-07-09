@@ -17,13 +17,19 @@ function initFirebase() {
     return;
   }
 
+  const getEnv = (key: string) => {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) return process.env[key];
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) return (import.meta as any).env[key];
+    return undefined;
+  };
+
   const firebaseConfig = {
-    apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY,
-    authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: (import.meta as any).env.VITE_FIREBASE_APP_ID,
+    apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+    authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+    projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
+    storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+    appId: getEnv('VITE_FIREBASE_APP_ID'),
   };
 
   const isConfigValid = !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey !== '');
@@ -31,7 +37,7 @@ function initFirebase() {
   if (isConfigValid) {
     try {
       app = initializeApp(firebaseConfig);
-      const dbId = (import.meta as any).env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)";
+      const dbId = getEnv('VITE_FIREBASE_FIRESTORE_DATABASE_ID') || "(default)";
       db = getFirestore(app, dbId);
       auth = getAuth(app);
     } catch (error) {
