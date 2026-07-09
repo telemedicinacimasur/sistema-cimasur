@@ -154,6 +154,26 @@ ${htmlContent}`;
     URL.revokeObjectURL(url);
   };
 
+  const getClientVariableValue = (client: any, tag: string): string => {
+    if (!client) return '';
+    switch (tag) {
+      case '{{nombre}}':
+        return client.name || client.nombre || client.contacto || 'Socio Veterinario';
+      case '{{categoria_club}}':
+        return client.categoria || client.clubCategory || client.clubComercial?.categoria || 'Sin Categoría';
+      case '{{frascos_comprados}}':
+        const compras = client.compras !== undefined ? client.compras : (client.frascos !== undefined ? client.frascos : 0);
+        return `${compras} frascos`;
+      case '{{promedio_mensual}}':
+        const val = client.promedio || client.promedioMensual || 0;
+        return `$${Math.round(val).toLocaleString('es-CL')} CLP`;
+      case '{{estado_origen}}':
+        return client.region || client.region_origen || client.ciudad || 'Región Metropolitana';
+      default:
+        return '';
+    }
+  };
+
   const handleSendWhatsApp = (client: any) => {
     // 1. Capturar el texto REAL que el usuario escribió en el editor (textarea)
     const whatsappMessage = (document.getElementById('wa-body-text') as HTMLTextAreaElement)?.value || '';
@@ -161,10 +181,11 @@ ${htmlContent}`;
 
     // 2. Reemplazar las variables dinámicas con los datos reales del cliente seleccionado
     textToSend = textToSend
-      .replace(/{{nombre}}/g, client.name || client.contacto || "Doctor/a")
-      .replace(/{{frascos_comprados}}/g, String(client.compras || client.frascos || 0))
-      .replace(/{{promedio_mensual}}/g, String(client.promedio || 0))
-      .replace(/{{categoria_club}}/g, client.categoria || "Sin Categoría");
+      .replace(/{{nombre}}/g, getClientVariableValue(client, '{{nombre}}'))
+      .replace(/{{categoria_club}}/g, getClientVariableValue(client, '{{categoria_club}}'))
+      .replace(/{{frascos_comprados}}/g, getClientVariableValue(client, '{{frascos_comprados}}'))
+      .replace(/{{promedio_mensual}}/g, getClientVariableValue(client, '{{promedio_mensual}}'))
+      .replace(/{{estado_origen}}/g, getClientVariableValue(client, '{{estado_origen}}'));
 
     // 3. Codificar correctamente manteniendo los asteriscos (*) limpios para las negritas de WhatsApp
     const encodedText = encodeURIComponent(textToSend)
