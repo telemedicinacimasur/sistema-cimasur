@@ -271,7 +271,7 @@ const crmTools: FunctionDeclaration[] = [
       }));
       contents.push({
         role: 'user',
-        parts: [{ text: `Datos de contexto estructurado del CRM (Growth Engine):\n${JSON.stringify(context)}\n\nMensaje del usuario: ${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client", payload: "some_data" }] }.` }]
+        parts: [{ text: `Datos de contexto estructurado del CRM (Growth Engine):\n${JSON.stringify(context)}\n\nMensaje del usuario: ${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client" | "navigate", payload: "some_data" }] }.\n\nSi el usuario te pide modificar, reescribir, resumir, redactar, cambiar el saludo, hacer más formal/cercano o generar una plantilla/mensaje de campaña, genera el texto solicitado y añade SIEMPRE una acción en la lista de actions con el tipo "navigate" para que el usuario pueda cargarlo directamente en el editor de campañas, por ejemplo:\n{ "label": "🎨 Diseñar en Editor de Campañas", "type": "navigate", "payload": { "text": "<aquí el texto modificado o redactado completo>" } }` }]
       });
 
       // Helper to execute tools

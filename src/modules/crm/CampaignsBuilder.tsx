@@ -4,7 +4,7 @@ import { SuggestedCampaign } from '../../services/crm/CampaignStrategyService';
 import { ClientService } from '../../services/crm/ClientService';
 import { localDB } from '../../lib/auth';
 import { Client } from '../../services/crm/types';
-import { Users, Mail, Send, CheckSquare, Square, Trash2, MessageSquare, Laptop } from 'lucide-react';
+import { Users, Mail, Send, CheckSquare, Square, Trash2, MessageSquare, Laptop, Copy, Image as ImageIcon, ExternalLink, X, Check, Download, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function CampaignsBuilder({ 
   dashboardData, 
@@ -23,6 +23,10 @@ export default function CampaignsBuilder({
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
 
+  const [activeHelperClient, setActiveHelperClient] = useState<any | null>(null);
+  const [copyImageSuccess, setCopyImageSuccess] = useState<boolean>(false);
+  const [copyTextSuccess, setCopyTextSuccess] = useState<boolean>(false);
+
   const suggestedCampaigns = dashboardData?.suggestedCampaigns || [];
   const clientService = useMemo(() => new ClientService(
     (col) => localDB.getCollection(col),
@@ -30,13 +34,55 @@ export default function CampaignsBuilder({
     (col, id, updates) => localDB.updateInCollection(col, id, updates)
   ), []);
 
-  const categories = useMemo(() => {
-    const cats = new Set(allClients.map(c => {
-      const cat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoria';
-      return typeof cat === 'string' ? cat : 'Sin Categoria';
-    }));
-    return ['Todos', ...Array.from(cats)];
-  }, [allClients]);
+  const categories = ['Todos', 'Sin Compra', 'Sin Categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
+
+  const getFilteredClients = (camp: SuggestedCampaign | null, catFilter: string, clientsList: Client[] = allClients) => {
+    if (!camp) return [];
+    
+    // GrowthEngine attaches specific opportunities to each campaign.
+    // Use those to accurately find the clients instead of guessing by category strings.
+    const targetIds = new Set(camp.opportunities?.map((o: any) => o.customerId) || []);
+    
+    let clients = clientsList.filter(c => {
+      return targetIds.has(c.rut) || targetIds.has(c.id);
+    });
+
+    // Fallback logic if the campaign doesn't have specific opportunities (e.g. general campaigns)
+    if (clients.length === 0 && camp.targetCategory) {
+      clients = clientsList.filter(c => {
+        const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
+        const cat = typeof rawCat === 'string' ? rawCat.toUpperCase() : '';
+        const target = typeof camp.targetCategory === 'string' ? camp.targetCategory.toUpperCase() : '';
+        const name = typeof camp.name === 'string' ? camp.name.toUpperCase() : '';
+        
+        // Special Logic for "Primera Compra" or "SIN COMPRA"
+        if (target === 'SIN COMPRA' || name.includes('PRIMERA COMPRA') || target === 'SIN CATEGORÍA' || target === 'SIN CATEGORIA') {
+          const isSinCompra = cat === 'SIN COMPRA' || cat === 'SIN CATEGORIA' || cat === 'SIN CATEGORÍA';
+          const isInactiveIntranet = (c.intranet === true || c.intranet === 'true') && 
+            (c.estado === 'Inactivo' || c.estadoCrm === 'Inactivo' || !c.compras || c.compras === 0);
+          return isSinCompra || isInactiveIntranet;
+        }
+        
+        return cat.includes(target) || target.includes(cat);
+      });
+    }
+
+    if (catFilter !== 'Todos') {
+        clients = clients.filter(c => {
+          const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
+          const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+          const normB = typeof catFilter === 'string' ? catFilter.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+          return normA === normB || normA.includes(normB) || normB.includes(normA);
+        });
+    }
+
+    return clients;
+  };
+
+  const applyFiltersAndSelectAll = (camp: SuggestedCampaign | null, catFilter: string, clientsList: Client[] = allClients) => {
+    const clients = getFilteredClients(camp, catFilter, clientsList);
+    setSelectedClientIds(new Set(clients.map(c => c.id)));
+  };
 
   useEffect(() => {
     const loadClients = async () => {
@@ -62,7 +108,21 @@ export default function CampaignsBuilder({
           }
         });
         
-        setAllClients(Array.from(uniqueClients.values()));
+        const clientsList = Array.from(uniqueClients.values());
+        setAllClients(clientsList);
+
+        // Preload template check or default suggested campaign selection
+        if (preloadedTemplate && preloadedTemplate.toLowerCase().includes('veterinario')) {
+          const vets = clientsList.filter(c => c.intranet === true || c.categoria?.toLowerCase().includes('veterinario') || c.name?.toLowerCase().includes('veterinari'));
+          setSelectedClientIds(new Set(vets.map(c => c.id)));
+        } else if (suggestedCampaigns.length > 0) {
+          const defaultCamp = selectedCampaign || suggestedCampaigns[0];
+          if (!selectedCampaign) {
+            setSelectedCampaign(defaultCamp);
+          }
+          const clients = getFilteredClients(defaultCamp, selectedCategory, clientsList);
+          setSelectedClientIds(new Set(clients.map(c => c.id)));
+        }
       } catch (e) {
         console.error("Error loading unified clients", e);
       }
@@ -70,46 +130,16 @@ export default function CampaignsBuilder({
     loadClients();
   }, [clientService]);
 
+  // Handle template preloading trigger for veterinarians
+  useEffect(() => {
+    if (preloadedTemplate && preloadedTemplate.toLowerCase().includes('veterinario') && allClients.length > 0) {
+      const vets = allClients.filter(c => c.intranet === true || c.categoria?.toLowerCase().includes('veterinario') || c.name?.toLowerCase().includes('veterinari'));
+      setSelectedClientIds(new Set(vets.map(c => c.id)));
+    }
+  }, [preloadedTemplate, allClients]);
+
   const filteredClients = useMemo(() => {
-    if (!selectedCampaign) return [];
-    
-    // GrowthEngine attaches specific opportunities to each campaign.
-    // Use those to accurately find the clients instead of guessing by category strings.
-    const targetIds = new Set(selectedCampaign.opportunities?.map((o: any) => o.customerId) || []);
-    
-    let clients = allClients.filter(c => {
-      // Opportunites are linked by client rut or id
-      return targetIds.has(c.rut) || targetIds.has(c.id);
-    });
-
-    // Fallback logic if the campaign doesn't have specific opportunities (e.g. general campaigns)
-    if (clients.length === 0 && selectedCampaign.targetCategory) {
-      clients = allClients.filter(c => {
-        const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
-        const cat = typeof rawCat === 'string' ? rawCat.toUpperCase() : '';
-        const target = typeof selectedCampaign.targetCategory === 'string' ? selectedCampaign.targetCategory.toUpperCase() : '';
-        const name = typeof selectedCampaign.name === 'string' ? selectedCampaign.name.toUpperCase() : '';
-        
-        // Special Logic for "Primera Compra" or "SIN COMPRA"
-        if (target === 'SIN COMPRA' || name.includes('PRIMERA COMPRA') || target === 'SIN CATEGORÍA' || target === 'SIN CATEGORIA') {
-          const isSinCompra = cat === 'SIN COMPRA' || cat === 'SIN CATEGORIA' || cat === 'SIN CATEGORÍA';
-          const isInactiveIntranet = (c.intranet === true || c.intranet === 'true') && 
-            (c.estado === 'Inactivo' || c.estadoCrm === 'Inactivo' || !c.compras || c.compras === 0);
-          return isSinCompra || isInactiveIntranet;
-        }
-        
-        return cat.includes(target) || target.includes(cat);
-      });
-    }
-
-    if (selectedCategory !== 'Todos') {
-        clients = clients.filter(c => {
-          const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
-          return rawCat === selectedCategory;
-        });
-    }
-
-    return clients;
+    return getFilteredClients(selectedCampaign, selectedCategory);
   }, [allClients, selectedCampaign, selectedCategory]);
 
   const selectedClients = useMemo(() => allClients.filter(c => selectedClientIds.has(c.id)), [allClients, selectedClientIds]);
@@ -174,12 +204,11 @@ ${htmlContent}`;
     }
   };
 
-  const handleSendWhatsApp = (client: any) => {
-    // 1. Capturar el texto REAL que el usuario escribió en el editor (textarea)
+  const getProcessedTextForClient = (client: any) => {
     const whatsappMessage = (document.getElementById('wa-body-text') as HTMLTextAreaElement)?.value || '';
+
     let textToSend = whatsappMessage || "";
 
-    // 2. Reemplazar las variables dinámicas con los datos reales del cliente seleccionado
     textToSend = textToSend
       .replace(/{{nombre}}/g, getClientVariableValue(client, '{{nombre}}'))
       .replace(/{{categoria_club}}/g, getClientVariableValue(client, '{{categoria_club}}'))
@@ -187,17 +216,81 @@ ${htmlContent}`;
       .replace(/{{promedio_mensual}}/g, getClientVariableValue(client, '{{promedio_mensual}}'))
       .replace(/{{estado_origen}}/g, getClientVariableValue(client, '{{estado_origen}}'));
 
-    // 3. Codificar correctamente manteniendo los asteriscos (*) limpios para las negritas de WhatsApp
-    const encodedText = encodeURIComponent(textToSend)
-      .replace(/%2A/g, '*'); // Asegura que las negritas funcionen en WhatsApp
+    // Limpieza de caracteres corruptos de reemplazo (U+FFFD)
+    textToSend = textToSend.replace(/\uFFFD/g, '');
 
-    // 4. Limpiar el teléfono (eliminar espacios o caracteres raros) y generar la URL limpia
+    return textToSend;
+  };
+
+  const handleQuickSendWhatsApp = (client: any) => {
+    const textToSend = getProcessedTextForClient(client);
+    const encodedText = encodeURIComponent(textToSend).replace(/%2A/g, '*');
     const cleanPhoneVal = client.phone || client.telefono || "";
     const cleanPhone = cleanPhoneVal ? String(cleanPhoneVal).replace(/\s+/g, '') : "";
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedText}`;
-
-    // 5. Abrir WhatsApp Business de inmediato
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
     window.open(whatsappUrl, '_blank');
+  };
+
+  const handleCopyImageToClipboard = async (imageUrl: string) => {
+    try {
+      setCopyImageSuccess(false);
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      let copyBlob = blob;
+      // Convertir a PNG para garantizar soporte nativo de la API de Portapapeles (ClipboardItem)
+      if (blob.type !== 'image/png') {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = imageUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+          if (pngBlob) {
+            copyBlob = pngBlob;
+          }
+        }
+      }
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [copyBlob.type]: copyBlob
+        })
+      ]);
+      setCopyImageSuccess(true);
+      setTimeout(() => setCopyImageSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error al copiar imagen:', err);
+      // Fallback: descargar imagen para que la arrastren
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = 'cabecera_promocional.jpg';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setCopyImageSuccess(true);
+      setTimeout(() => setCopyImageSuccess(false), 3000);
+    }
+  };
+
+  const handleCopyTextToClipboard = (text: string) => {
+    setCopyTextSuccess(false);
+    navigator.clipboard.writeText(text);
+    setCopyTextSuccess(true);
+    setTimeout(() => setCopyTextSuccess(false), 3000);
+  };
+
+  const handleSendWhatsApp = (client: any) => {
+    setActiveHelperClient(client);
   };
 
   return (
@@ -208,7 +301,11 @@ ${htmlContent}`;
         
         <select 
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+          onChange={(e) => {
+            const nextCat = e.target.value;
+            setSelectedCategory(nextCat);
+            applyFiltersAndSelectAll(selectedCampaign, nextCat);
+          }}
           className="bg-slate-800 text-sm p-2 rounded-lg border border-slate-700"
         >
           {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -220,7 +317,7 @@ ${htmlContent}`;
               key={camp.id}
               onClick={() => {
                 setSelectedCampaign(camp);
-                setSelectedClientIds(new Set());
+                applyFiltersAndSelectAll(camp, selectedCategory);
               }}
               className={`p-3 rounded-lg text-left border transition-all text-sm ${
                 selectedCampaign?.id === camp.id 
@@ -305,6 +402,152 @@ ${htmlContent}`;
             )}
         </div>
       </div>
+
+      {/* WhatsApp Send Pro Helper Modal */}
+      {activeHelperClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white font-sans">Asistente de Envío de Alta Fidelidad</h3>
+                  <p className="text-[10px] text-slate-400 font-sans">Canal exclusivo WhatsApp • {activeHelperClient.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setActiveHelperClient(null);
+                  setCopyImageSuccess(false);
+                  setCopyTextSuccess(false);
+                }}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1 font-sans">
+              
+              {/* Context / Explicación */}
+              <div className="p-3.5 bg-slate-850 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-2">
+                <span className="font-bold text-teal-400 flex items-center gap-1">
+                  <Sparkles size={13} /> ¿Por qué usar este asistente?
+                </span>
+                <p className="leading-relaxed">
+                  Las URLs comunes de imágenes en WhatsApp se envían como enlaces de texto que se ven feos. 
+                  Con este método rápido, puedes enviar la <strong>imagen promocional real incrustada</strong> (como un archivo nativo adjunto) con tu mensaje personalizado como leyenda, tal como en la vista previa y sin ningún enlace largo de por medio.
+                </p>
+              </div>
+
+              {/* 3 Step Guide */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Guía de 3 Pasos Rápidos</h4>
+
+                {/* Paso 1 */}
+                <div className="flex gap-3 items-start">
+                  <div className="w-6 h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center shrink-0 mt-0.5 border border-slate-700">
+                    1
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-200">Copiar la Imagen de Cabecera</p>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Copia el diseño gráfico. Si tu navegador bloquea el copiado directo por seguridad, se descargará automáticamente para que la arrastres a WhatsApp.
+                    </p>
+                    <button
+                      onClick={() => handleCopyImageToClipboard(
+                        (document.getElementById('wa-header-image') as HTMLInputElement)?.value || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800'
+                      )}
+                      className={`py-2 px-3.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+                        copyImageSuccess 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                      }`}
+                    >
+                      {copyImageSuccess ? <Check size={14} /> : <ImageIcon size={14} />}
+                      {copyImageSuccess ? '¡Imagen copiada! (o descargada)' : 'Copiar Imagen promocional'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Paso 2 */}
+                <div className="flex gap-3 items-start">
+                  <div className="w-6 h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center shrink-0 mt-0.5 border border-slate-700">
+                    2
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-200">Copiar el Mensaje de Texto Personalizado</p>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Copia el mensaje de texto comercial con los datos del socio <strong>{activeHelperClient.name}</strong> listos y procesados de manera automática.
+                    </p>
+                    <button
+                      onClick={() => handleCopyTextToClipboard(getProcessedTextForClient(activeHelperClient))}
+                      className={`py-2 px-3.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+                        copyTextSuccess 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                      }`}
+                    >
+                      {copyTextSuccess ? <Check size={14} /> : <Copy size={14} />}
+                      {copyTextSuccess ? '¡Mensaje Copiado!' : 'Copiar Texto para WhatsApp'}
+                    </button>
+
+                    {/* Collapsible preview of text */}
+                    <div className="p-2.5 bg-slate-950 rounded-lg text-[10px] font-mono text-slate-400 whitespace-pre-wrap max-h-24 overflow-y-auto border border-slate-800/80">
+                      {getProcessedTextForClient(activeHelperClient)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Paso 3 */}
+                <div className="flex gap-3 items-start">
+                  <div className="w-6 h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center shrink-0 mt-0.5 border border-slate-700">
+                    3
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-200">Abrir WhatsApp y Pegar</p>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Abre el chat de WhatsApp. Presiona <strong>Ctrl + V</strong> (o Pegar). Verás que la imagen se adjunta como un archivo de verdad; luego, pega el texto copiado en el comentario de la imagen. ¡Eso es todo!
+                    </p>
+                    <button
+                      onClick={() => {
+                        const cleanPhoneVal = activeHelperClient.phone || activeHelperClient.telefono || "";
+                        const cleanPhone = cleanPhoneVal ? String(cleanPhoneVal).replace(/\s+/g, '') : "";
+                        window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}`, '_blank');
+                      }}
+                      className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-950/20"
+                    >
+                      <ExternalLink size={14} /> Abrir Chat de WhatsApp
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Opción B/Alternativa */}
+              <div className="border-t border-slate-800 pt-4 flex flex-col gap-2">
+                <span className="text-[10px] uppercase font-bold text-slate-500">¿Tienes Prisa?</span>
+                <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-lg border border-slate-800">
+                  <p className="text-[10px] text-slate-400">
+                    Puedes realizar el envío rápido directo (se envía como un enlace largo de texto con la URL de la imagen).
+                  </p>
+                  <button
+                    onClick={() => handleQuickSendWhatsApp(activeHelperClient)}
+                    className="text-[10px] font-bold text-sky-400 hover:text-sky-300 underline shrink-0 flex items-center gap-0.5"
+                  >
+                    Envío Rápido Directo <ExternalLink size={10} />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

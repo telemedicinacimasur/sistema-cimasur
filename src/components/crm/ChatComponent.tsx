@@ -1,13 +1,40 @@
-import React, { useState } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Send, Bot, User, Trash2 } from 'lucide-react';
 
 export const ChatComponent: React.FC<{ 
   contextData?: any; 
   onNavigateToEditor?: (text: string) => void;
 }> = ({ contextData, onNavigateToEditor }) => {
-  const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string; actions?: { label: string; type: string; payload: any }[] }[]>([]);
+  const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string; actions?: { label: string; type: string; payload: any }[] }[]>(() => {
+    try {
+      const saved = localStorage.getItem('cimasur_ai_chat_messages');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Error loading chat messages:', e);
+      return [];
+    }
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('cimasur_ai_chat_messages', JSON.stringify(messages));
+    } catch (e) {
+      console.error('Error saving chat messages:', e);
+    }
+  }, [messages]);
+
+  const handleClearChat = () => {
+    if (window.confirm('¿Está seguro de que desea vaciar la conversación?')) {
+      setMessages([]);
+      try {
+        localStorage.removeItem('cimasur_ai_chat_messages');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -73,8 +100,19 @@ Puede presionar el botón de abajo para cargar esta propuesta directamente en nu
 
   return (
     <div className="flex flex-col h-full bg-[#0D1527] rounded-2xl border border-[#1E293B] overflow-hidden">
-      <div className="p-4 border-b border-[#1E293B] font-bold text-white flex items-center gap-2">
-        <Bot className="text-sky-400" /> Asistente IA CIMASUR
+      <div className="p-4 border-b border-[#1E293B] font-bold text-white flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bot className="text-sky-400" /> Asistente IA CIMASUR
+        </div>
+        {messages.length > 0 && (
+          <button 
+            onClick={handleClearChat}
+            className="text-[10px] font-black uppercase text-red-400 hover:text-red-300 transition-colors flex items-center gap-1.5 cursor-pointer bg-red-950/20 px-2.5 py-1 rounded-lg border border-red-500/20"
+          >
+            <Trash2 size={12} />
+            Vaciar Conversación
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((m, i) => (

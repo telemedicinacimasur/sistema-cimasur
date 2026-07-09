@@ -80,7 +80,46 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await clientService.updateClient(client.id, editForm);
+      const finalCategory = editForm.categoria || 'Sin categoría';
+      const parsedCompraAnual = Number(editForm.compraAnual || 0);
+      const parsedCompras = Number(editForm.compras !== undefined ? editForm.compras : (editForm.frascos !== undefined ? editForm.frascos : 0));
+
+      const contactUpdates = {
+        ...editForm,
+        categoria: finalCategory,
+        compraAnual: parsedCompraAnual,
+        compras: parsedCompras,
+        frascos: parsedCompras,
+        frascosComprados: parsedCompras,
+      };
+
+      await clientService.updateClient(client.id, contactUpdates);
+
+      // Sincronizar con loyalty_accounts
+      try {
+        const loyaltyCollection = await localDB.getCollection('loyalty_accounts') || [];
+        const existingLoyaltyIndex = loyaltyCollection.findIndex((l: any) => l.contactId === client.id);
+        if (existingLoyaltyIndex !== -1) {
+          const updatedLoyalty = {
+            ...loyaltyCollection[existingLoyaltyIndex],
+            categoria: finalCategory,
+            puntos: Number(editForm.puntos || loyaltyCollection[existingLoyaltyIndex].puntos || 0)
+          };
+          await localDB.updateInCollection('loyalty_accounts', loyaltyCollection[existingLoyaltyIndex].id, updatedLoyalty);
+        } else {
+          await localDB.saveToCollection('loyalty_accounts', {
+            id: `loy-${Date.now()}`,
+            contactId: client.id,
+            categoria: finalCategory,
+            puntos: Number(editForm.puntos || 0),
+            estado: 'Inscrito',
+            beneficios: []
+          });
+        }
+      } catch (lErr) {
+        console.error('Error al sincronizar loyalty_accounts:', lErr);
+      }
+
       await loadData();
       setIsEditing(false);
       if (onSave) onSave();
@@ -150,7 +189,6 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const tabs = [
     { id: 'general', label: 'General', icon: <Building2 size={14} /> },
     { id: 'contactos', label: 'Contactos & Vets', icon: <User size={14} /> },
-    { id: 'ventas', label: 'Ventas', icon: <DollarSign size={14} /> },
     { id: 'club', label: 'Club Comercial', icon: <Award size={14} /> },
     { id: 'oportunidades', label: 'Oportunidades', icon: <Megaphone size={14} /> },
     { id: 'ia', label: 'Inteligencia IA', icon: <Brain size={14} /> },
@@ -347,6 +385,46 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                         <option value="Inactivo">Inactivo</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Categoría del Club</label>
+                      <select 
+                        value={editForm.categoria || 'Sin categoría'} 
+                        onChange={e => setEditForm({...editForm, categoria: e.target.value})}
+                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white"
+                      >
+                        <option value="Sin compra">Sin compra</option>
+                        <option value="Sin categoría">Sin categoría</option>
+                        <option value="Bronce">Bronce</option>
+                        <option value="Plata">Plata</option>
+                        <option value="Oro">Oro</option>
+                        <option value="Platinum">Platinum</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Monto Compra Anual ($)</label>
+                      <input 
+                        type="number" 
+                        value={editForm.compraAnual !== undefined ? editForm.compraAnual : ''} 
+                        onChange={e => setEditForm({...editForm, compraAnual: e.target.value ? Number(e.target.value) : 0})}
+                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
+                        placeholder="Ej: 1500000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Consumo de Frascos</label>
+                      <input 
+                        type="number" 
+                        value={editForm.compras !== undefined ? editForm.compras : (editForm.frascos !== undefined ? editForm.frascos : '')} 
+                        onChange={e => setEditForm({
+                          ...editForm, 
+                          compras: e.target.value ? Number(e.target.value) : 0,
+                          frascos: e.target.value ? Number(e.target.value) : 0,
+                          frascosComprados: e.target.value ? Number(e.target.value) : 0
+                        })}
+                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
+                        placeholder="Ej: 24"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Observaciones Internas</label>
@@ -380,6 +458,9 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   <DetailField label="Sitio Web" value={client.sitioWeb} icon={<Globe className="text-teal-400" />} />
                   <DetailField label="Ejecutivo Comercial" value={client.ejecutivoComercial || 'Sin asignar'} icon={<User className="text-orange-400" />} />
                   <DetailField label="Responsable Intranet" value={client.responsable || 'Sistema'} icon={<Layers className="text-sky-400" />} />
+                  <DetailField label="Categoría Club" value={client.categoria || 'Sin categoría'} icon={<Award className="text-yellow-500" />} />
+                  <DetailField label="Compra Anual" value={client.compraAnual !== undefined ? `$${client.compraAnual.toLocaleString('es-CL')}` : '$0'} icon={<DollarSign className="text-emerald-500" />} />
+                  <DetailField label="Consumo de Frascos" value={`${client.compras !== undefined ? client.compras : (client.frascos !== undefined ? client.frascos : 0)} frascos`} icon={<Activity className="text-orange-500" />} />
                   
                   <div className="md:col-span-2 lg:col-span-3 bg-slate-900/30 p-5 rounded-2xl border border-slate-850">
                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Observaciones Internas</span>
@@ -550,64 +631,6 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                 </div>
               </div>
 
-            </div>
-          )}
-
-          {/* TAB: VENTAS */}
-          {activeTab === 'ventas' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-[#050914] border border-slate-850 p-5 rounded-2xl">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Compras Consolidadas 2026</span>
-                  <div className="text-2xl font-black text-emerald-400">
-                    {formatCLP(client.ventas?.reduce((sum, v) => sum + (v.total || 0), 0) || 0)}
-                  </div>
-                </div>
-                <div className="bg-[#050914] border border-slate-850 p-5 rounded-2xl">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total de Transacciones</span>
-                  <div className="text-2xl font-black text-white">
-                    {client.ventas?.length || 0}
-                  </div>
-                </div>
-                <div className="bg-[#050914] border border-slate-850 p-5 rounded-2xl">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Frecuencia de Compra</span>
-                  <div className="text-2xl font-black text-sky-400">
-                    {client.ventas?.length ? `${(365 / client.ventas.length).toFixed(0)} días` : 'N/A'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-[#0D1527] border border-slate-800 rounded-2xl overflow-hidden">
-                <div className="p-4 bg-slate-900/50 border-b border-slate-800 font-bold text-xs text-slate-300">
-                  Historial de Transacciones Facturadas
-                </div>
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#050914] text-slate-400 uppercase tracking-wider text-[10px] font-bold border-b border-slate-800">
-                    <tr>
-                      <th className="px-6 py-4">ID Factura / Ref</th>
-                      <th className="px-6 py-4">Fecha</th>
-                      <th className="px-6 py-4">Método de Pago</th>
-                      <th className="px-6 py-4 text-right">Monto Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 text-slate-300">
-                    {!client.ventas || client.ventas.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500 font-medium">No hay compras registradas para este socio en el ciclo comercial actual.</td>
-                      </tr>
-                    ) : (
-                      client.ventas.map((v, idx) => (
-                        <tr key={idx} className="hover:bg-slate-850/20 transition-colors">
-                          <td className="px-6 py-4 font-mono font-bold text-white">{v.id || v.invoiceId || `FA-${1000 + idx}`}</td>
-                          <td className="px-6 py-4">{v.fecha || v.date}</td>
-                          <td className="px-6 py-4 capitalize">{v.metodoPago || v.paymentMethod || 'Transferencia'}</td>
-                          <td className="px-6 py-4 text-right font-black text-emerald-400">{formatCLP(v.total)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
             </div>
           )}
 
