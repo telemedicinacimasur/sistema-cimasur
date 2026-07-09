@@ -91,7 +91,15 @@ export const DashboardView: React.FC<{
 
       {/* CRM Funnel Metrics Row */}
       <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <MiniMetricCard title="Prospectos sin compra" value={metrics?.journeyCounts?.['Prospecto'] || 0} />
+        <MiniMetricCard 
+          title="Clientes Sin Compra" 
+          value={metrics?.journeyCounts?.['Sin Compra'] || 0} 
+          textClass="text-rose-400"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('preload-campaign', { detail: 'Primera Compra' }));
+            setActiveView('campanas');
+          }}
+        />
         <MiniMetricCard title="Primera compra" value={metrics?.journeyCounts?.['Primera Compra'] || 0} />
         <MiniMetricCard title="Sin Categoría" value={metrics?.journeyCounts?.['Sin Categoría'] || 0} />
         <MiniMetricCard title="Dormidos" value={metrics?.dormantCounts?.total || 0} textClass="text-amber-400" />
@@ -151,8 +159,11 @@ const MetricCard: React.FC<{ title: string, value: string | number, icon: React.
   </div>
 );
 
-const MiniMetricCard: React.FC<{ title: string, value: string | number, textClass?: string }> = ({ title, value, textClass = 'text-white' }) => (
-  <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
+const MiniMetricCard: React.FC<{ title: string, value: string | number, textClass?: string, onClick?: () => void }> = ({ title, value, textClass = 'text-white', onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col justify-between transition-all ${onClick ? 'cursor-pointer hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-900/10' : ''}`}
+  >
     <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2 leading-tight">{title}</div>
     <div className={`text-2xl font-bold ${textClass}`}>{value}</div>
   </div>

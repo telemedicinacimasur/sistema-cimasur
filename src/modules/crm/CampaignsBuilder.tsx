@@ -19,9 +19,11 @@ export default function CampaignsBuilder({
 }) {
   const [selectedCampaign, setSelectedCampaign] = useState<SuggestedCampaign | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['Todos']);
   const [channel, setChannel] = useState<'email' | 'whatsapp'>('email');
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
+  const [redemptions, setRedemptions] = useState<any[]>([]);
 
   const [activeHelperClient, setActiveHelperClient] = useState<any | null>(null);
   const [copyImageSuccess, setCopyImageSuccess] = useState<boolean>(false);
@@ -36,7 +38,74 @@ export default function CampaignsBuilder({
 
   const categories = ['Todos', 'Sin Compra', 'Sin Categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
 
-  const getFilteredClients = (camp: SuggestedCampaign | null, catFilter: string, clientsList: Client[] = allClients) => {
+  const BENEFITS_BY_CATEGORY: Record<string, string[]> = {
+    'Sin Compra': [
+      'Cupón de inducción: 5% de descuento fijo en su primera compra de fórmulas magistrales homeopáticas.',
+      'Asesoramiento inicial sin costo en la prescripción de fórmulas medicinales.',
+      'Soporte comercial prioritario vía WhatsApp.'
+    ],
+    'Sin Categoría': [
+      'Soporte estándar por correo electrónico.',
+      'Acceso al catálogo digital de productos homeopáticos y fitoterapéuticos.',
+      'Invitación a boletines mensuales informativos.'
+    ],
+    'Bronce': [
+      '5% de descuento en el total de compras del ciclo activo.',
+      'Acceso gratuito a 1 capacitación del catálogo educativo anual de CIMASUR.',
+      'Puntos acumulativos para canje: 1 punto por cada $1,000 CLP de compra.'
+    ],
+    'Plata': [
+      '10% de descuento fijo en todas las fórmulas homeopáticas magistrales.',
+      'Acceso libre a 3 charlas de capacitación técnica veterinaria en vivo.',
+      'Prioridad media en soporte técnico veterinario y clínico.',
+      'Puntos acumulativos para canje: 1.2 puntos por cada $1,000 CLP de compra.'
+    ],
+    'Oro': [
+      '15% de descuento en fórmulas y catálogo premium de fitoterapia.',
+      'Invitación preferencial a seminarios científicos anuales y eventos exclusivos.',
+      'Acceso ilimitado a todas las capacitaciones y certificaciones de CIMASUR.',
+      'Soporte clínico inmediato (médico veterinario dedicado).',
+      'Puntos acumulativos para canje: 1.5 puntos por cada $1,000 CLP de compra.'
+    ],
+    'Platinum': [
+      '20% de descuento total y permanente en el catálogo de CIMASUR.',
+      'Material de marketing personalizado gratuito para su clínica o consultorio.',
+      'Envíos gratuitos garantizados a todo Chile en un plazo máximo de 48 horas sin costo adicional.',
+      'Soporte prioritario VIP de nivel corporativo 24/7.',
+      'Puntos acumulativos para canje: 2 puntos por cada $1,000 CLP de compra.'
+    ]
+  };
+
+  const getBenefitsTextForSelected = (selectedCats: string[]) => {
+    let text = `📱 *Club de Socios CIMASUR (2026)* 📱\n\nEstimado/a Doctor/a,\n\nQueremos presentarle de forma detallada los beneficios que tiene asignados según su nivel comercial de membresía:\n\n`;
+    selectedCats.forEach(cat => {
+      if (cat === 'Todos') return;
+      const list = BENEFITS_BY_CATEGORY[cat] || [];
+      if (list.length > 0) {
+        text += `👑 *Nivel: Club ${cat.toUpperCase()}*\n`;
+        list.forEach(benefit => {
+          text += `• ${benefit}\n`;
+        });
+        text += `\n`;
+      }
+    });
+    text += `¡No deje pasar sus privilegios comerciales! Escriba *CLUB2026* o póngase en contacto con su ejecutivo asignado hoy mismo para empezar a canjear sus premios premium.`;
+    return text;
+  };
+
+  useEffect(() => {
+    const loadRedemptions = async () => {
+      try {
+        const data = await localDB.getCollection('redemptions');
+        setRedemptions(data || []);
+      } catch (e) {
+        console.error("Error loading redemptions", e);
+      }
+    };
+    loadRedemptions();
+  }, []);
+
+  const getFilteredClients = (camp: SuggestedCampaign | null, catFilterOrList: string | string[], clientsList: Client[] = allClients) => {
     if (!camp) return [];
     
     // GrowthEngine attaches specific opportunities to each campaign.
@@ -67,20 +136,24 @@ export default function CampaignsBuilder({
       });
     }
 
-    if (catFilter !== 'Todos') {
+    const filtersArray = Array.isArray(catFilterOrList) ? catFilterOrList : [catFilterOrList];
+
+    if (!filtersArray.includes('Todos') && filtersArray.length > 0) {
         clients = clients.filter(c => {
           const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
           const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
-          const normB = typeof catFilter === 'string' ? catFilter.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
-          return normA === normB || normA.includes(normB) || normB.includes(normA);
+          return filtersArray.some(filter => {
+            const normB = typeof filter === 'string' ? filter.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+            return normA === normB || normA.includes(normB) || normB.includes(normA);
+          });
         });
     }
 
     return clients;
   };
 
-  const applyFiltersAndSelectAll = (camp: SuggestedCampaign | null, catFilter: string, clientsList: Client[] = allClients) => {
-    const clients = getFilteredClients(camp, catFilter, clientsList);
+  const applyFiltersAndSelectAll = (camp: SuggestedCampaign | null, catFilterOrList: string | string[], clientsList: Client[] = allClients) => {
+    const clients = getFilteredClients(camp, catFilterOrList, clientsList);
     setSelectedClientIds(new Set(clients.map(c => c.id)));
   };
 
@@ -115,6 +188,18 @@ export default function CampaignsBuilder({
         if (preloadedTemplate && preloadedTemplate.toLowerCase().includes('veterinario')) {
           const vets = clientsList.filter(c => c.intranet === true || c.categoria?.toLowerCase().includes('veterinario') || c.name?.toLowerCase().includes('veterinari'));
           setSelectedClientIds(new Set(vets.map(c => c.id)));
+        } else if (preloadedTemplate && preloadedTemplate.toLowerCase() === 'primera compra') {
+          setSelectedCategory('Sin Compra');
+          const pcCamp = suggestedCampaigns.find((c: any) => 
+            c.name?.toLowerCase().includes('primera') || 
+            c.targetCategory?.toLowerCase().includes('compra') || 
+            c.name?.toLowerCase().includes('prospect')
+          ) || suggestedCampaigns[0];
+          if (pcCamp) {
+            setSelectedCampaign(pcCamp);
+            const clients = getFilteredClients(pcCamp, 'Sin Compra', clientsList);
+            setSelectedClientIds(new Set(clients.map(c => c.id)));
+          }
         } else if (suggestedCampaigns.length > 0) {
           const defaultCamp = selectedCampaign || suggestedCampaigns[0];
           if (!selectedCampaign) {
@@ -130,17 +215,33 @@ export default function CampaignsBuilder({
     loadClients();
   }, [clientService]);
 
-  // Handle template preloading trigger for veterinarians
+  // Handle template preloading trigger for veterinarians & Primera Compra
   useEffect(() => {
     if (preloadedTemplate && preloadedTemplate.toLowerCase().includes('veterinario') && allClients.length > 0) {
       const vets = allClients.filter(c => c.intranet === true || c.categoria?.toLowerCase().includes('veterinario') || c.name?.toLowerCase().includes('veterinari'));
       setSelectedClientIds(new Set(vets.map(c => c.id)));
+    } else if (preloadedTemplate && preloadedTemplate.toLowerCase() === 'primera compra' && allClients.length > 0) {
+      setSelectedCategory('Sin Compra');
+      setSelectedCategories(['Sin Compra']);
+      const pcCamp = suggestedCampaigns.find((c: any) => 
+        c.name?.toLowerCase().includes('primera') || 
+        c.targetCategory?.toLowerCase().includes('compra') || 
+        c.name?.toLowerCase().includes('prospect')
+      ) || suggestedCampaigns[0];
+      if (pcCamp) {
+        setSelectedCampaign(pcCamp);
+        const clients = getFilteredClients(pcCamp, 'Sin Compra', allClients);
+        setSelectedClientIds(new Set(clients.map(c => c.id)));
+      }
+      if (clearPreloadedTemplate) {
+        clearPreloadedTemplate();
+      }
     }
-  }, [preloadedTemplate, allClients]);
+  }, [preloadedTemplate, allClients, suggestedCampaigns]);
 
   const filteredClients = useMemo(() => {
-    return getFilteredClients(selectedCampaign, selectedCategory);
-  }, [allClients, selectedCampaign, selectedCategory]);
+    return getFilteredClients(selectedCampaign, selectedCategories);
+  }, [allClients, selectedCampaign, selectedCategories]);
 
   const selectedClients = useMemo(() => allClients.filter(c => selectedClientIds.has(c.id)), [allClients, selectedClientIds]);
 
@@ -296,39 +397,137 @@ ${htmlContent}`;
   return (
     <div className="w-full min-h-screen grid grid-cols-12 gap-4 bg-slate-950 text-slate-100 p-4">
       
-      <div className="col-span-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col gap-4">
+      <div className="col-span-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-2rem)]">
         <h2 className="text-lg font-bold text-white">1. Seleccionar Segmento</h2>
         
-        <select 
-          value={selectedCategory}
-          onChange={(e) => {
-            const nextCat = e.target.value;
-            setSelectedCategory(nextCat);
-            applyFiltersAndSelectAll(selectedCampaign, nextCat);
-          }}
-          className="bg-slate-800 text-sm p-2 rounded-lg border border-slate-700"
-        >
-          {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-        </select>
+        <div className="space-y-1 bg-[#050914] p-3 rounded-xl border border-slate-850">
+          <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Filtrar Categorías (Multi-selección)</label>
+          <div className="grid grid-cols-2 gap-2">
+            {categories.map(cat => {
+              const isChecked = selectedCategories.includes(cat);
+              return (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    let nextCats: string[];
+                    if (cat === 'Todos') {
+                      nextCats = ['Todos'];
+                      setSelectedCategory('Todos');
+                    } else {
+                      // Remove Todos
+                      const base = selectedCategories.filter(c => c !== 'Todos');
+                      if (isChecked) {
+                        nextCats = base.filter(c => c !== cat);
+                        if (nextCats.length === 0) {
+                          nextCats = ['Todos'];
+                          setSelectedCategory('Todos');
+                        }
+                      } else {
+                        nextCats = [...base, cat];
+                        setSelectedCategory(cat); // maintain single compatible state
+                      }
+                    }
+                    setSelectedCategories(nextCats);
+                    applyFiltersAndSelectAll(selectedCampaign, nextCats);
+                  }}
+                  className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-left text-xs font-bold transition-all cursor-pointer ${
+                    isChecked
+                      ? 'bg-sky-950/40 border-sky-500 text-sky-400'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  {isChecked ? <CheckSquare size={13} className="text-sky-400" /> : <Square size={13} className="text-slate-500" />}
+                  <span className="truncate">{cat}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 gap-2">
+        <div className="grid grid-cols-1 gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">Campañas Sugeridas IA</span>
           {suggestedCampaigns.map((camp: SuggestedCampaign) => (
             <button 
               key={camp.id}
               onClick={() => {
                 setSelectedCampaign(camp);
-                applyFiltersAndSelectAll(camp, selectedCategory);
+                applyFiltersAndSelectAll(camp, selectedCategories);
               }}
-              className={`p-3 rounded-lg text-left border transition-all text-sm ${
+              className={`p-2.5 rounded-lg text-left border transition-all text-xs cursor-pointer ${
                 selectedCampaign?.id === camp.id 
                   ? 'bg-sky-900/40 border-sky-500' 
                   : 'bg-slate-800 border-slate-700 hover:border-slate-600'
               }`}
             >
-              <div className="font-bold">{camp.name}</div>
+              <div className="font-bold text-white">{camp.name}</div>
               <div className="text-[10px] text-slate-400">{camp.targetCategory} • {camp.clientCount} clientes</div>
             </button>
           ))}
+        </div>
+
+        {/* Panel de Beneficios y Premios del Segmento */}
+        <div className="bg-[#050914] border border-slate-850 rounded-xl p-3 space-y-2.5">
+          <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <Sparkles size={12} className="text-yellow-400 animate-pulse" />
+            Beneficios del Segmento
+          </h3>
+          
+          <div className="space-y-2 max-h-36 overflow-y-auto">
+            {selectedCategories.includes('Todos') ? (
+              <p className="text-[10px] text-slate-500 italic">Seleccione categorías específicas para visualizar los beneficios del catálogo asignados.</p>
+            ) : (
+              selectedCategories.map(cat => {
+                const list = BENEFITS_BY_CATEGORY[cat] || [];
+                if (list.length === 0) return null;
+                return (
+                  <div key={cat} className="space-y-1">
+                    <span className="text-[10px] font-extrabold text-sky-400 uppercase">{cat}</span>
+                    <ul className="list-disc pl-3 text-[10px] text-slate-300 space-y-0.5">
+                      {list.map((b, idx) => <li key={idx}>{b}</li>)}
+                    </ul>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="border-t border-slate-800 pt-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 block mb-1">Registro de Canjes Realizados</span>
+            <div className="space-y-1 max-h-24 overflow-y-auto">
+              {(() => {
+                const clientRutsOrIds = new Set(filteredClients.map(c => c.rut || c.id));
+                const activeRedemptions = redemptions.filter(r => clientRutsOrIds.has(r.contactId));
+                if (activeRedemptions.length === 0) {
+                  return <p className="text-[9px] text-slate-500 italic">Ningún cliente del segmento seleccionado ha canjeado premios aún.</p>;
+                }
+                return activeRedemptions.map(r => {
+                  const client = allClients.find(c => c.rut === r.contactId || c.id === r.contactId);
+                  const rewardName = r.rewardId === 'r_desc_10' ? 'Cupón 10% Descuento' : r.rewardId === 'r_desc_20' ? 'Cupón 20% Descuento' : r.rewardId === 'r_prod_base' ? 'Set 3 Frascos Gratuitos' : r.rewardId === 'r_envio_gratis' ? 'Despacho Gratis (6 Meses)' : 'Vademécum Impreso Premium';
+                  return (
+                    <div key={r.id} className="text-[9px] bg-slate-950/40 p-1.5 rounded border border-slate-900 flex justify-between items-center">
+                      <span className="text-slate-300 font-bold max-w-[120px] truncate">{client?.name || 'Cliente'}</span>
+                      <span className="text-yellow-400 truncate">{rewardName}</span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+
+          {/* Botón interactivo para cargar beneficios */}
+          {!selectedCategories.includes('Todos') && selectedCategories.length > 0 && (
+            <button
+              onClick={() => {
+                const text = getBenefitsTextForSelected(selectedCategories);
+                window.dispatchEvent(new CustomEvent('assistant-update-editor', {
+                  detail: { whatsappMessage: text, emailBody: text }
+                }));
+              }}
+              className="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-black text-xs py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer mt-1"
+            >
+              <Copy size={12} /> Cargar Beneficios en Editor
+            </button>
+          )}
         </div>
 
         {selectedCampaign && (

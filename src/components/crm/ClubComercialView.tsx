@@ -203,11 +203,13 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
     loadContacts();
     loadDashboardMetrics();
     loadRewardsCatalog();
+    loadClubConfig();
 
     const handleDbChange = () => {
       loadContacts();
       loadDashboardMetrics();
       loadRewardsCatalog();
+      loadClubConfig();
       if (selectedContactId) {
         loadMemberDetails(selectedContactId);
       }
@@ -336,13 +338,13 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
             <Award className="text-yellow-400 animate-bounce" size={28} />
             Club Comercial CIMASUR®
           </h2>
-          <p className="text-xs text-slate-400 mt-1 font-medium">Programa de Fidelización, canje de recompensas y acumulación de puntos comerciales en tiempo real.</p>
+          <p className="text-xs text-slate-400 mt-1 font-medium">Programa de Fidelización basado en niveles, categorías y activación de beneficios comerciales.</p>
         </div>
         
         <div className="flex gap-2 bg-[#050914]/80 p-1 rounded-xl border border-slate-850">
           <SubTabButton active={activeSubTab === 'dashboard'} onClick={() => setActiveSubTab('dashboard')} icon={<Activity size={14} />} label="Dashboard General" />
           <SubTabButton active={activeSubTab === 'perfil'} onClick={() => setActiveSubTab('perfil')} icon={<Users size={14} />} label="Perfil del Cliente" />
-          <SubTabButton active={activeSubTab === 'rewards'} onClick={() => setActiveSubTab('rewards')} icon={<Gift size={14} />} label="Catálogo de Premios" />
+          <SubTabButton active={activeSubTab === 'rewards'} onClick={() => setActiveSubTab('rewards')} icon={<Gift size={14} />} label="Catálogo de Beneficios" />
           <SubTabButton active={activeSubTab === 'admin'} onClick={() => { setActiveSubTab('admin'); loadDashboardMetrics(); loadClubConfig(); }} icon={<Layers size={14} />} label="Panel Administrativo" />
         </div>
       </div>
@@ -355,28 +357,28 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
               {/* Executive Metrics Overview */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <KPICard 
-                  title="Miembros del Club" 
-                  value={dashboardMetrics?.kpis?.totalMembers || 0} 
-                  subText="Clientes inscritos activamente" 
-                  icon={<Users className="text-sky-400" size={24} />} 
+                  title="Beneficios Activos" 
+                  value={dashboardMetrics?.kpis?.totalBenefitsActive || 0} 
+                  subText="Convenios vigentes y descuentos" 
+                  icon={<ShieldCheck className="text-sky-400" size={24} />} 
                 />
                 <KPICard 
-                  title="Puntos Emitidos" 
-                  value={(dashboardMetrics?.kpis?.totalPointsActive || 0) + (dashboardMetrics?.kpis?.totalPointsUsed || 0) + (dashboardMetrics?.kpis?.totalPointsExpired || 0)} 
-                  subText="Puntos históricos otorgados" 
-                  icon={<Coins className="text-yellow-400" size={24} />} 
+                  title="Uso de Convenios" 
+                  value={dashboardMetrics?.kpis?.totalConveniosUsed || 0} 
+                  subText="Actividad de beneficios registrados" 
+                  icon={<Activity className="text-yellow-400" size={24} />} 
                 />
                 <KPICard 
-                  title="Puntos en Circulación" 
-                  value={dashboardMetrics?.kpis?.totalPointsActive || 0} 
-                  subText="Saldo de puntos activo acumulado" 
-                  icon={<Sparkles className="text-purple-400" size={24} />} 
+                  title="Categoría Promedio" 
+                  value={dashboardMetrics?.kpis?.averageTier || 'Plata'} 
+                  subText="Segmentación de la cartera" 
+                  icon={<Award className="text-purple-400" size={24} />} 
                 />
                 <KPICard 
-                  title="Puntos Canjeados" 
-                  value={dashboardMetrics?.kpis?.totalPointsUsed || 0} 
-                  subText={`Tasa de canje (Burn Rate): ${dashboardMetrics?.kpis?.redemptionRate || 0}%`} 
-                  icon={<Gift className="text-emerald-400" size={24} />} 
+                  title="Alertas de Auditoría" 
+                  value={dashboardMetrics?.kpis?.auditAlerts || 0} 
+                  subText="Revisiones de cumplimiento necesarias" 
+                  icon={<AlertTriangle className="text-emerald-400" size={24} />} 
                 />
               </div>
 
@@ -482,7 +484,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <Gift size={18} className="text-yellow-400" />
-                    Últimos Canjes de Premios Registrados
+                    Registro de Beneficios y Convenios Activados
                   </h3>
                   <button 
                     onClick={() => setActiveSubTab('admin')} 
@@ -498,8 +500,8 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                       <tr className="border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider">
                         <th className="py-3 px-4">ID Canje</th>
                         <th className="py-3 px-4">Cliente / ID</th>
-                        <th className="py-3 px-4">Premio</th>
-                        <th className="py-3 px-4 text-right">Puntos Usados</th>
+                        <th className="py-3 px-4">Beneficio</th>
+                        <th className="py-3 px-4 text-right">Categoría Validada</th>
                         <th className="py-3 px-4 text-center">Estado</th>
                         <th className="py-3 px-4">Fecha</th>
                       </tr>
@@ -517,7 +519,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                               <span className="font-bold text-slate-200 block">{r.contactId}</span>
                             </td>
                             <td className="py-3 px-4 text-slate-300">{r.rewardId === 'r_desc_10' ? 'Cupón 10% Descuento' : r.rewardId === 'r_desc_20' ? 'Cupón 20% Descuento' : r.rewardId === 'r_prod_base' ? 'Set 3 Frascos Gratuitos' : r.rewardId === 'r_envio_gratis' ? 'Despacho Gratis (6 Meses)' : 'Vademécum Impreso Premium'}</td>
-                            <td className="py-3 px-4 text-right font-black text-rose-400 font-mono">-{r.pointsSpent} pts</td>
+                            <td className="py-3 px-4 text-right font-bold text-sky-400 font-mono">{r.tier || 'Plata'}</td>
                             <td className="py-3 px-4 text-center">
                               <span className="bg-emerald-950/40 text-emerald-400 border border-emerald-900/30 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
                                 Completado
@@ -683,9 +685,9 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                         </div>
 
                         <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
-                          <span>Ventas Facturadas: {formatCLP(memberDetails.totalSales || 0)}</span>
+                          <span>Promedio de Frascos: {Number((((memberDetails.totalSales || 0) / 12) / 10000).toFixed(1))} frascos/mes</span>
                           {memberDetails.progress?.salesNeeded > 0 ? (
-                            <span className="text-amber-400">Faltan {Math.ceil(memberDetails.progress.salesNeeded / 25000)} frascos para subir a {memberDetails.progress.nextTier}</span>
+                            <span className="text-amber-400">Faltan {Math.ceil(memberDetails.progress.salesNeeded / 10000)} frascos para subir a {memberDetails.progress.nextTier}</span>
                           ) : (
                             <span className="text-emerald-400">¡Estatus Máximo Alcanzado!</span>
                           )}
@@ -783,16 +785,16 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
             {/* Header / Selector information */}
             <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="space-y-1">
-                <h3 className="text-lg font-black text-white">Catálogo Oficial de Recompensas de CIMASUR®</h3>
-                <p className="text-xs text-slate-400">Canjea puntos acumulados por fabulosos cupones de descuento, despachos gratis, sets de frascos y ediciones limitadas del Vademécum.</p>
+                <h3 className="text-lg font-black text-white">Catálogo de Beneficios de CIMASUR®</h3>
+                <p className="text-xs text-slate-400">Accede a convenios de descuento, despachos preferenciales y herramientas exclusivas según tu categoría de socio.</p>
               </div>
 
               {selectedContactId && memberDetails?.enrolled && (
                 <div className="bg-[#050914] border border-slate-850 px-5 py-3 rounded-2xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Puntos Disponibles del Socio</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Categoría Actual del Socio</span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-slate-400 truncate max-w-[150px] font-bold block">{memberDetails.account?.name}:</span>
-                    <span className="text-xl font-black text-yellow-400 font-mono">{memberDetails.pointsSummary?.balance || 0} pts</span>
+                    <span className="text-sm font-black text-white font-mono">{memberDetails.tier || 'Plata'}</span>
                   </div>
                 </div>
               )}
@@ -801,10 +803,8 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
             {loadingRewards ? renderSkeleton() : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rewardsCatalog.map(reward => {
-                  const pointsBalance = memberDetails?.pointsSummary?.balance || 0;
-                  const hasPoints = pointsBalance >= reward.pointsCost;
                   const hasStock = reward.stock > 0;
-                  const isEnrolled = memberDetails?.enrolled === true;
+                  const isEnrolled = true; // Always allow redemption for existing CRM clients
                   
                   // Business rule: Check required tier
                   let meetsTier = true;
@@ -820,7 +820,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                     meetsTier = false; // requires Plata or up
                   }
 
-                  const canRedeem = isEnrolled && hasPoints && hasStock && meetsTier;
+                  const canRedeem = hasStock && meetsTier;
 
                   let requiredTierLabel = 'Bronce';
                   if (reward.id === 'r_desc_20') requiredTierLabel = 'Plata';
@@ -840,10 +840,6 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                             <span className="inline-block p-4 bg-slate-900/80 rounded-full border border-slate-800 text-sky-400">
                               {reward.category === 'Descuento' ? <Percent size={32} /> : reward.category === 'Producto' ? <ShoppingBag size={32} /> : reward.category === 'Servicio' ? <Building size={32} /> : <Award size={32} />}
                             </span>
-                          </div>
-                          
-                          <div className="absolute top-3 right-3 z-20 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 font-black font-mono px-3 py-1 rounded-full text-xs">
-                            {reward.pointsCost} pts
                           </div>
                         </div>
 
@@ -876,7 +872,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                           }}
                           className={`w-full font-black text-xs uppercase py-3 rounded-xl transition-all shadow-md ${canRedeem ? 'bg-sky-500 hover:bg-sky-600 text-slate-950' : 'bg-[#050914] text-slate-500 border border-slate-850 cursor-not-allowed'}`}
                         >
-                          {!isEnrolled ? 'Inscriba al Socio Primero' : !hasStock ? 'Sin stock' : !meetsTier ? 'Requiere mayor nivel' : !hasPoints ? 'Puntos Insuficientes' : 'Canjear Premio'}
+                          {!isEnrolled ? 'Inscriba al Socio Primero' : !hasStock ? 'Sin stock' : !meetsTier ? 'Requiere mayor nivel' : 'Solicitar Beneficio'}
                         </button>
                       </div>
                     </div>
@@ -944,6 +940,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                       <th className="py-3 px-4">Socio / RUT</th>
                       <th className="py-3 px-4">Correo</th>
                       <th className="py-3 px-4">Inscrito El</th>
+                      <th className="py-3 px-4">Categoría (Frascos/mes)</th>
                       <th className="py-3 px-4 text-right">Saldo de Puntos</th>
                       <th className="py-3 px-4 text-right font-mono">Histórico</th>
                       <th className="py-3 px-4 text-center">Estado de Cuenta</th>
@@ -953,7 +950,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                   <tbody className="divide-y divide-slate-800 text-xs text-slate-300">
                     {allContacts.filter(c => c.categoria && c.categoria !== 'Sin categoría' && c.categoria !== 'Sin categoria').length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-slate-500">Inscriba socios en el "Perfil del Cliente" para ver registros administrativos de auditoría.</td>
+                        <td colSpan={8} className="py-8 text-center text-slate-500">Inscriba socios en el "Perfil del Cliente" para ver registros administrativos de auditoría.</td>
                       </tr>
                     ) : (
                       allContacts.filter(c => c.categoria && c.categoria !== 'Sin categoría' && c.categoria !== 'Sin categoria').map((m: any) => (
@@ -964,6 +961,10 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                           </td>
                           <td className="py-4 px-4 font-mono text-slate-400">{m.email || 'Sin correo'}</td>
                           <td className="py-4 px-4 text-slate-400">{m.fechaIngreso || 'Sin fecha'}</td>
+                          <td className="py-4 px-4">
+                            <span className="font-bold text-indigo-400">{m.categoria || 'Sin compra'}</span>
+                            <span className="text-[10px] text-slate-500 block">{Number((((m.compraAnual || 0) / 12) / 10000).toFixed(1))} frascos/mes</span>
+                          </td>
                           <td className="py-4 px-4 text-right font-black font-mono text-yellow-400">
                             {Math.floor((Number(m.compraAnual) || 0) / 10000)} pts
                           </td>
@@ -1029,7 +1030,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                             <span className="text-xs">{t.name}</span>
                           </div>
                           <span className="text-[10px] font-mono text-slate-500">
-                            &gt;= {formatCLP(t.minMonthlyAverage)}/mes
+                            &gt;= {t.minMonthlyAverage} frascos/mes
                           </span>
                         </button>
                       );
@@ -1039,8 +1040,8 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                       <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block mb-2">Parámetros del Ciclo</span>
                       <div className="space-y-2 text-[11px] text-slate-400 leading-relaxed">
                         <p><strong>Tipo:</strong> Anual (1 de Julio - 30 de Junio)</p>
-                        <p><strong>Criterio Oficial:</strong> Promedio Mensual de Ventas en Pesos (ventas del ciclo / 12 meses).</p>
-                        <p><strong>Primer Ciclo:</strong> Evaluado conforme a ventas del año base 2024.</p>
+                        <p><strong>Criterio Oficial:</strong> Promedio Mensual de Consumo de Frascos (monto traducido a botellas de $10.000 CLP).</p>
+                        <p><strong>Primer Ciclo:</strong> Evaluado conforme a consumo del año base 2024.</p>
                       </div>
                     </div>
                   </div>
@@ -1116,21 +1117,21 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Mínimas ($ CLP/mes)</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Mínimas (Frascos/mes)</label>
                               <input
                                 type="number"
                                 className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
                                 value={tier.minMonthlyAverage ?? 0}
-                                onChange={(e) => updateField('minMonthlyAverage', parseInt(e.target.value) || 0)}
+                                onChange={(e) => updateField('minMonthlyAverage', parseFloat(e.target.value) || 0)}
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Máximas ($ CLP/mes)</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Máximas (Frascos/mes)</label>
                               <input
                                 type="number"
                                 className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
                                 value={tier.maxMonthlyAverage ?? 0}
-                                onChange={(e) => updateField('maxMonthlyAverage', parseInt(e.target.value) || 0)}
+                                onChange={(e) => updateField('maxMonthlyAverage', parseFloat(e.target.value) || 0)}
                               />
                             </div>
                           </div>
@@ -1291,18 +1292,12 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                         <span className="text-slate-300 font-bold">{redemptionResult.id}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Premio:</span>
+                        <span className="text-slate-500">Beneficio:</span>
                         <span className="text-sky-400 font-bold">{selectedReward.name}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Puntos Debítados:</span>
-                        <span className="text-rose-400 font-bold">-{redemptionResult.pointsSpent} pts</span>
-                      </div>
-                      <div className="flex justify-between border-t border-slate-800 pt-2.5">
-                        <span className="text-slate-400 font-bold">Saldo Restante:</span>
-                        <span className="text-yellow-400 font-black">
-                          {((memberDetails?.pointsSummary?.balance || 0) - selectedReward.pointsCost)} pts
-                        </span>
+                        <span className="text-slate-500">Estado:</span>
+                        <span className="text-emerald-400 font-bold">Activado Exitosamente</span>
                       </div>
                     </div>
                   </div>
@@ -1315,21 +1310,17 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
 
                     <div className="bg-[#050914] border border-slate-850 rounded-2xl p-4 space-y-3 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Recompensa:</span>
+                        <span className="text-slate-500">Beneficio Solicitado:</span>
                         <span className="text-white font-bold">{selectedReward.name}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Costo del Premio:</span>
-                        <span className="text-yellow-400 font-black font-mono">{selectedReward.pointsCost} pts</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Puntos Disponibles del Socio:</span>
-                        <span className="text-slate-300 font-bold font-mono">{memberDetails?.pointsSummary?.balance || 0} pts</span>
+                        <span className="text-slate-500">Categoría del Socio:</span>
+                        <span className="text-slate-300 font-bold font-mono">{memberDetails?.tier || 'Plata'}</span>
                       </div>
                       <div className="flex justify-between border-t border-slate-800 pt-3">
-                        <span className="text-slate-400 font-bold">Saldo de Puntos Restante:</span>
+                        <span className="text-slate-400 font-bold">Validación:</span>
                         <span className="text-emerald-400 font-black font-mono">
-                          {((memberDetails?.pointsSummary?.balance || 0) - selectedReward.pointsCost)} pts
+                          Nivel Autorizado
                         </span>
                       </div>
                     </div>

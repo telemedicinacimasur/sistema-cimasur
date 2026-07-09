@@ -42,6 +42,7 @@ import { OpportunityEngineView } from '../components/crm/OpportunityEngineView';
 import { Client360View } from '../components/crm/Client360View';
 import { ClientForm } from '../components/crm/ClientForm';
 import { ClientService } from '../services/crm/ClientService';
+import { SegmentationService } from '../services/crm/SegmentationService';
 import { CrecimientoView } from '../components/crm/CrecimientoView';
 import { AutomationDashboardView } from '../components/automation/AutomationDashboardView';
 
@@ -226,11 +227,22 @@ export default function CRMView() {
       }
     };
     loadEngineData();
+
+    const handlePreload = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setPreloadedTemplate(detail);
+        setActiveTab('campanas');
+      }
+    };
+
     window.addEventListener('campaign-executed', loadEngineData);
     window.addEventListener('db-change', loadEngineData);
+    window.addEventListener('preload-campaign', handlePreload);
     return () => {
       window.removeEventListener('campaign-executed', loadEngineData);
       window.removeEventListener('db-change', loadEngineData);
+      window.removeEventListener('preload-campaign', handlePreload);
     };
   }, []);
 
@@ -251,6 +263,20 @@ export default function CRMView() {
   useEffect(() => {
     const loadData = async () => {
       const data = await localDB.getCollection('contacts');
+      const sales = await localDB.getCollection('sales');
+      const segmentation = new SegmentationService();
+      
+      const processedData = await Promise.all(data.map(async (c: any) => {
+        const clientSales = sales.filter((s: any) => s.contactId === c.id);
+        const categoria = segmentation.categorizeFromSales(clientSales);
+        
+        if (c.categoria !== categoria) {
+          await localDB.updateInCollection('contacts', c.id, { categoria });
+          return { ...c, categoria };
+        }
+        return { ...c, categoria };
+      }));
+      setRecords(processedData);
       const intranetData = await localDB.getCollection('intranet_clients');
       const importData = await localDB.getCollection('intranet_imports');
 
@@ -509,7 +535,7 @@ export default function CRMView() {
               onViewClient={(id) => setSelectedClientId(id)} 
               onDesignInEditor={(client, reason) => {
                 setPreloadedTemplate(`Asunto: Campaña para ${client.customerName}\n\nEstimado/a ${client.customerName},\n\nMotivo: ${reason}\n\n[Personalice su mensaje aquí]`);
-                setActiveTab('marketing_visual');
+                setActiveTab('campanas');
               }}
             />
           )}

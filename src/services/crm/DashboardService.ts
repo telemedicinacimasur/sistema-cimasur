@@ -32,6 +32,7 @@ export class DashboardService {
     const journeyCounts: Record<string, number> = {
       'Prospecto': 0,
       'Primera Compra': 0,
+      'Sin Compra': 0,
       'Sin categoría': 0,
       'Sin Categoría': 0,
       'Bronce': 0,

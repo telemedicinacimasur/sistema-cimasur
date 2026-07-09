@@ -24,8 +24,8 @@ interface ConfigurationCenterViewProps {
 interface Tier {
   id: string;
   name: string;
-  minMonthlyAverage: number;
-  maxMonthlyAverage: number;
+  minAnnualSales: number;
+  maxAnnualSales: number;
   benefits: string[];
   discountPercent: number;
   condition: string;
@@ -297,7 +297,7 @@ export const ConfigurationCenterView: React.FC<ConfigurationCenterViewProps> = (
                       <div>
                         <div className="font-extrabold text-sm">{t.name}</div>
                         <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                          Promedio: ${t.minMonthlyAverage.toLocaleString('es-CL')} - {t.maxMonthlyAverage > 50000000 ? 'Sin límite' : `$${t.maxMonthlyAverage.toLocaleString('es-CL')}`}
+                          {t.condition}
                         </div>
                       </div>
                       <span className="text-xs font-black px-2.5 py-1 bg-slate-900 border border-slate-800 text-indigo-400 rounded-lg">
@@ -352,24 +352,36 @@ export const ConfigurationCenterView: React.FC<ConfigurationCenterViewProps> = (
 
                         <div>
                           <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
-                            Promedio Mensual Mínimo ($)
+                            VENTAS ANUALES MÍNIMAS (CLP/AÑO)
                           </label>
                           <input
                             type="number"
-                            value={activeTier.minMonthlyAverage}
-                            onChange={(e) => updateTierField(activeTier.id, 'minMonthlyAverage', parseInt(e.target.value) || 0)}
+                            value={activeTier.minAnnualSales}
+                            onChange={(e) => updateTierField(activeTier.id, 'minAnnualSales', parseInt(e.target.value) || 0)}
                             className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono text-xs"
                           />
                         </div>
 
                         <div>
                           <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
-                            Promedio Mensual Máximo ($)
+                            VENTAS ANUALES MÁXIMAS (CLP/AÑO)
                           </label>
                           <input
                             type="number"
-                            value={activeTier.maxMonthlyAverage}
-                            onChange={(e) => updateTierField(activeTier.id, 'maxMonthlyAverage', parseInt(e.target.value) || 0)}
+                            value={activeTier.maxAnnualSales}
+                            onChange={(e) => updateTierField(activeTier.id, 'maxAnnualSales', parseInt(e.target.value) || 0)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
+                            CONDICIÓN COMERCIAL DE ACCESO (MANUAL)
+                          </label>
+                          <input
+                            type="text"
+                            value={activeTier.condition}
+                            onChange={(e) => updateTierField(activeTier.id, 'condition', e.target.value)}
                             className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono text-xs"
                           />
                         </div>

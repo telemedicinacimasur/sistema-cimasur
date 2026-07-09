@@ -18,7 +18,7 @@ export const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
 
   // Derived Alerts
   const alerts = {
-    leadsIntranet: metrics?.journeyCounts?.['Prospecto'] || 0,
+    leadsIntranet: metrics?.journeyCounts?.['Sin Compra'] || 0,
     upgradeCandidates: (metrics?.nearUpgradeCounts?.bronce || 0) + 
                       (metrics?.nearUpgradeCounts?.plata || 0) + 
                       (metrics?.nearUpgradeCounts?.oro || 0),
@@ -30,10 +30,13 @@ export const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
       {/* Management Alerts Block */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <AlertCard 
-          title="Leads de Intranet sin Compra" 
+          title="Clientes Sin Compra" 
           value={alerts.leadsIntranet} 
           icon={<Users size={20} className="text-sky-400" />} 
           color="sky"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('preload-campaign', { detail: 'Primera Compra' }));
+          }}
         />
         <AlertCard 
           title="Próximos a Subir de Nivel" 
@@ -76,8 +79,15 @@ export const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
   );
 };
 
-const AlertCard: React.FC<{ title: string, value: number, icon: React.ReactNode, color: string }> = ({ title, value, icon, color }) => (
-  <div className={cn("p-5 rounded-2xl border bg-[#0D1527]", color === 'sky' ? 'border-sky-900/50' : color === 'amber' ? 'border-amber-900/50' : 'border-rose-900/50')}>
+const AlertCard: React.FC<{ title: string, value: number, icon: React.ReactNode, color: string, onClick?: () => void }> = ({ title, value, icon, color, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={cn(
+      "p-5 rounded-2xl border bg-[#0D1527] transition-all", 
+      color === 'sky' ? 'border-sky-900/50 hover:border-sky-500/50' : color === 'amber' ? 'border-amber-900/50 hover:border-amber-500/50' : 'border-rose-900/50 hover:border-rose-500/50',
+      onClick ? 'cursor-pointer hover:shadow-lg' : ''
+    )}
+  >
     <div className="flex items-center justify-between mb-3">
       <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">{title}</div>
       {icon}
@@ -105,7 +115,7 @@ const ActionCard: React.FC<{ opp: any, onViewClient?: (id: string) => void, onDe
     <div className="flex gap-2">
       {onViewClient && (
         <button 
-          onClick={() => onViewClient(opp.customerName)}
+          onClick={() => onViewClient(opp.customerId)}
           className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
         >
           <Eye size={14} /> Ver

@@ -87,10 +87,7 @@ export class RedemptionService {
       }
 
       // 4. Validate contact balance
-      const { balance } = await this.pointsEngine.getContactBalance(contactId);
-      if (balance < reward.pointsCost) {
-        throw new Error(`Saldo de puntos insuficiente. Requerido: ${reward.pointsCost}, Disponible: ${balance}`);
-      }
+      // Points logic removed. We now assume UI validated the user's tier.
 
       // 5. Decrement Reward Stock
       const stockSuccess = await this.catalogService.updateStock(rewardId, 1);
@@ -99,16 +96,8 @@ export class RedemptionService {
       }
       stockUpdated = true;
 
-      // 6. Deduct Points from Contact
-      const deductionTx = await this.pointsEngine.deduct(
-        contactId,
-        reward.pointsCost,
-        `Canje de recompensa: ${reward.name}`,
-        rewardId,
-        `red_deduct_${idempotencyKey}`
-      );
-      deductionTxId = deductionTx.id;
-      pointsDeducted = true;
+      // 6. Record Redemption (Points logic removed)
+      // No point deduction anymore
 
       // 7. Register redemption transaction
       const now = new Date().toISOString();
@@ -116,7 +105,7 @@ export class RedemptionService {
         id: `red_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
         contactId,
         rewardId,
-        pointsSpent: reward.pointsCost,
+        pointsSpent: 0, // No longer used
         status: 'completed',
         idempotencyKey,
         createdAt: now,
@@ -127,7 +116,7 @@ export class RedemptionService {
       await this.writeRecords('redemptions', allRedemptions);
 
       // Trigger automatic automation/history tracking for completed redemption
-      await this.logActivity(contactId, `Canjeado: ${reward.name} por ${reward.pointsCost} puntos`);
+      await this.logActivity(contactId, `Canjeado beneficio: ${reward.name}`);
 
       return redemption;
 
@@ -137,14 +126,6 @@ export class RedemptionService {
       // Rollback logic
       if (stockUpdated) {
         await this.catalogService.rollbackStock(rewardId, 1);
-      }
-
-      if (pointsDeducted && deductionTxId) {
-        try {
-          await this.pointsEngine.rollback(contactId, deductionTxId, `red_rollback_${idempotencyKey}`);
-        } catch (rollErr) {
-          console.error('[RedemptionService] Points rollback failed, manual intervention needed:', rollErr);
-        }
       }
 
       throw error;

@@ -94,25 +94,25 @@ export class IntegrationService {
       const promedioMensual = Math.max(totalSales / 12, evaluationTotal / 12);
 
       // Categoría dinámica según promedio mensual
-      const category = segmentation.categorizeByMonthlyAverage(promedioMensual);
+      let category = segmentation.categorizeByMonthlyAverage(promedioMensual);
 
       let journeyState = category;
-      if (sales.length === 0) {
-        journeyState = 'Prospecto';
+      const isSinCompra = sales.length === 0 || estadoComercial === 'Inactivo' || totalSales === 0 || vet.categoria === 'Sin compra' || vet.categoria === 'Sin Compra';
+      if (isSinCompra) {
+        category = 'Sin Compra';
+        journeyState = 'Sin Compra';
       } else if (lastPurchaseDate) {
         const diffDays = (new Date().getTime() - new Date(lastPurchaseDate).getTime()) / (24 * 60 * 60 * 1000);
         if (diffDays > 365) journeyState = 'Dormido (365d)';
         else if (diffDays > 180) journeyState = 'Dormido (180d)';
         else if (diffDays > 90) journeyState = 'Dormido (90d)';
         else if (frecuencia === 1) journeyState = 'Primera Compra';
-      } else if (totalSales === 0 && historicalSalesVal === 0) {
-        journeyState = 'Prospecto';
       }
 
       integratedMap.set(rut, {
         ...vet,
         id: vet.id || vet.rut,
-        isClient: sales.length > 0,
+        isClient: sales.length > 0 && estadoComercial !== 'Inactivo',
         sales,
         cycleSales,
         totalSales,
@@ -153,11 +153,15 @@ export class IntegrationService {
         const productosComprados = sales.flatMap(s => s.productos || s.items || []);
         
         const evaluationTotal = evaluationSales.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
-      const promedioMensual = Math.max(totalSales / 12, evaluationTotal / 12);
-        const category = segmentation.categorizeByMonthlyAverage(promedioMensual);
+        const promedioMensual = Math.max(totalSales / 12, evaluationTotal / 12);
+        let category = segmentation.categorizeByMonthlyAverage(promedioMensual);
 
         let journeyState = category;
-        if (lastPurchaseDate) {
+        const isSinCompra = sales.length === 0 || totalSales === 0;
+        if (isSinCompra) {
+          category = 'Sin Compra';
+          journeyState = 'Sin Compra';
+        } else if (lastPurchaseDate) {
           const diffDays = (new Date().getTime() - new Date(lastPurchaseDate).getTime()) / (24 * 60 * 60 * 1000);
           if (diffDays > 365) journeyState = 'Dormido (365d)';
           else if (diffDays > 180) journeyState = 'Dormido (180d)';
@@ -170,7 +174,7 @@ export class IntegrationService {
           id: rut,
           name: salesInfo.name,
           email: salesInfo.email,
-          isClient: true,
+          isClient: sales.length > 0,
           sales,
           cycleSales,
           totalSales,
@@ -183,7 +187,7 @@ export class IntegrationService {
           productosComprados,
           montoAcumulado: totalSales + historicalSalesVal,
           ejecutivoComercial: 'Sin Asignar',
-          estadoComercial: 'Activo',
+          estadoComercial: sales.length > 0 ? 'Activo' : 'Inactivo',
           categoria: category,
           journeyState
         });

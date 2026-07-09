@@ -13,7 +13,12 @@ export class ClientService {
 
   async getClientById(id: string): Promise<Client | undefined> {
     const clients = await this.getAllClients();
-    return clients.find(c => c.id === id);
+    let client = clients.find(c => c.id === id || c.rut === id);
+    if (!client) {
+      const intranetClients = await this.getCollection('intranet_clients');
+      client = intranetClients.find((c: any) => c.id === id || c.rut === id);
+    }
+    return client;
   }
 
   async getFullClientData(id: string): Promise<Client | undefined> {

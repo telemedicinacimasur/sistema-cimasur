@@ -1,26 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-
 export class SegmentationService {
   private config: any;
 
   constructor() {
-    this.loadConfig();
-  }
-
-  private loadConfig() {
-    try {
-      const configPath = path.join(process.cwd(), 'data', 'club_config.json');
-      if (fs.existsSync(configPath)) {
-        const raw = fs.readFileSync(configPath, 'utf-8');
-        this.config = JSON.parse(raw);
-      } else {
-        this.config = this.getDefaultConfig();
-      }
-    } catch (e) {
-      console.error('Error loading club config in SegmentationService:', e);
-      this.config = this.getDefaultConfig();
-    }
+    this.config = this.getDefaultConfig();
   }
 
   private getDefaultConfig() {
@@ -116,18 +98,25 @@ export class SegmentationService {
   }
 
   public getConfig() {
-    this.loadConfig(); // Ensure fresh load
     return this.config;
   }
 
   /**
-   * Categorizes customers based on average monthly sales in pesos within a cycle.
+   * Categorizes customers based on average monthly sales in frascos (2025 historical data).
+   * 1 Frasco = 10,000 CLP.
    */
-  public categorize(annualSales: number): string {
-    const monthlyAverage = annualSales / 12;
+  public categorize(annualSales2025: number): string {
+    if (annualSales2025 <= 0) return 'Sin Compra';
+    
+    const monthlyAverageCLP = annualSales2025 / 12;
+    const monthlyAverageFrascos = monthlyAverageCLP / 7000;
+    
     const tiers = this.config.tiers || this.getDefaultConfig().tiers;
-    for (const t of tiers) {
-      if (monthlyAverage >= t.minMonthlyAverage && monthlyAverage <= t.maxMonthlyAverage) {
+    // Sort tiers by minMonthlyAverage to ensure correct order
+    const sortedTiers = [...tiers].sort((a, b) => a.minMonthlyAverage - b.minMonthlyAverage);
+    
+    for (const t of sortedTiers) {
+      if (monthlyAverageFrascos >= t.minMonthlyAverage && monthlyAverageFrascos <= t.maxMonthlyAverage) {
         return t.name;
       }
     }
@@ -135,25 +124,37 @@ export class SegmentationService {
   }
 
   /**
-   * Helper specifically for sorting or directly classifying based on monthly average.
+   * Helper to compute 2025 annual sales from a sales array and then categorize.
    */
-  public categorizeByMonthlyAverage(monthlyAverage: number): string {
+  public categorizeFromSales(sales: any[]): string {
+    const total2025 = sales
+      .filter(s => new Date(s.fecha).getFullYear() === 2025)
+      .reduce((acc, s) => acc + (s.total || 0), 0);
+    return this.categorize(total2025);
+  }
+
+  /**
+   * Helper specifically for sorting or directly classifying based on monthly average frascos.
+   */
+  public categorizeByMonthlyAverage(monthlyAverageFrascos: number): string {
     const tiers = this.config.tiers || this.getDefaultConfig().tiers;
-    for (const t of tiers) {
-      if (monthlyAverage >= t.minMonthlyAverage && monthlyAverage <= t.maxMonthlyAverage) {
+    // Sort tiers by minMonthlyAverage to ensure correct order
+    const sortedTiers = [...tiers].sort((a, b) => a.minMonthlyAverage - b.minMonthlyAverage);
+    
+    for (const t of sortedTiers) {
+      if (monthlyAverageFrascos >= t.minMonthlyAverage && monthlyAverageFrascos <= t.maxMonthlyAverage) {
         return t.name;
       }
     }
     return 'Sin categoría';
   }
 
-  public getBenefitsAndGoals(annualSales: number, currentState: string, averageMonthly: number = 0) {
-    this.loadConfig(); // Refresh active configuration from disk
+  public getBenefitsAndGoals(annualSales: number, currentState: string, averageMonthlyFrascos: number = 0) {
     
-    // Si pasamos un promedio mensual explícito, usamos ese.
-    // De lo contrario, calculamos usando annualSales / 12 (comportamiento legacy fallback).
-    const monthlyAverage = averageMonthly > 0 ? averageMonthly : (annualSales / 12);
-    const category = averageMonthly > 0 ? this.categorizeByMonthlyAverage(monthlyAverage) : this.categorize(annualSales);
+    // Si pasamos un promedio mensual explícito en frascos, usamos ese.
+    // De lo contrario, calculamos usando annualSales / 12 / 7000.
+    const monthlyAverageFrascos = averageMonthlyFrascos > 0 ? averageMonthlyFrascos : (annualSales / 12 / 7000);
+    const category = this.categorizeByMonthlyAverage(monthlyAverageFrascos);
     
     const tiers = this.config.tiers || this.getDefaultConfig().tiers;
     const currentTierData = tiers.find((t: any) => t.name.toLowerCase() === category.toLowerCase()) || tiers[0];
@@ -164,17 +165,17 @@ export class SegmentationService {
     const currentBenefits = currentTierData.benefits || [];
     const nextBenefit = nextTierData ? (nextTierData.benefits ? nextTierData.benefits[0] : 'N/A') : 'N/A';
     
-    // Target is defined as monthly average in the tier, so annual target is monthly average * 12
-    const targetMonthlyAverage = nextTierData ? nextTierData.minMonthlyAverage : currentTierData.minMonthlyAverage;
-    const targetAnnualSales = targetMonthlyAverage * 12;
+    // Target is defined as monthly average in frascos
+    const targetMonthlyAverageFrascos = nextTierData ? nextTierData.minMonthlyAverage : currentTierData.minMonthlyAverage;
+    const targetAnnualSales = targetMonthlyAverageFrascos * 7000 * 12;
     const missingAmountToUpgrade = Math.max(0, targetAnnualSales - annualSales);
 
     return {
       category: currentTierData.name,
       currentBenefits,
       nextLevel: nextTierName,
-      targetAmount: targetAnnualSales, // Target annual sales
-      targetMonthlyAverage,            // Target monthly average
+      targetAmount: targetAnnualSales, // Target annual sales in CLP
+      targetMonthlyAverageFrascos,            // Target monthly average in Frascos
       missingAmountToUpgrade,          // CLP missing to upgrade (annualized)
       nextBenefit,
       discountPercent: currentTierData.discountPercent,

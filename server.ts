@@ -271,7 +271,7 @@ const crmTools: FunctionDeclaration[] = [
       }));
       contents.push({
         role: 'user',
-        parts: [{ text: `Datos de contexto estructurado del CRM (Growth Engine):\n${JSON.stringify(context)}\n\nMensaje del usuario: ${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client" | "navigate", payload: "some_data" }] }.\n\nSi el usuario te pide modificar, reescribir, resumir, redactar, cambiar el saludo, hacer más formal/cercano o generar una plantilla/mensaje de campaña, genera el texto solicitado y añade SIEMPRE una acción en la lista de actions con el tipo "navigate" para que el usuario pueda cargarlo directamente en el editor de campañas, por ejemplo:\n{ "label": "🎨 Diseñar en Editor de Campañas", "type": "navigate", "payload": { "text": "<aquí el texto modificado o redactado completo>" } }` }]
+        parts: [{ text: `Datos de contexto estructurado del CRM (Growth Engine):\n${JSON.stringify(context)}\n\nMensaje del usuario: ${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client" | "navigate", payload: "some_data" }] }.\n\nEL SISTEMA COMERCIAL CIMASUR NO USA PUNTOS. Es un sistema de estatus anual basado en compras anuales promedio mensual. El catálogo ofrece beneficios según el Nivel de Fidelización (Bronce, Plata, Oro, Platinum) del socio.\n\nSi el usuario te pide modificar, reescribir, resumir, redactar, cambiar el saludo, hacer más formal/cercano o generar una plantilla/mensaje de campaña, genera el texto solicitado basándote en los niveles de fidelización y añade SIEMPRE una acción en la lista de actions con el tipo "navigate" para que el usuario pueda cargarlo directamente en el editor de campañas, por ejemplo:\n{ "label": "🎨 Diseñar en Editor de Campañas", "type": "navigate", "payload": { "text": "<aquí el texto modificado o redactado completo>" } }` }]
       });
 
       // Helper to execute tools
@@ -541,13 +541,34 @@ const crmTools: FunctionDeclaration[] = [
   app.get('/api/crm/intelligence', async (req, res) => {
     console.log('API call: GET /api/crm/intelligence (Server-Side Growth Engine)');
     try {
-      const salesData = await readRecords('sales');
-      const intranetData = await readRecords('contacts');
+      const salesData = await readRecords('sales') || [];
+      const crmContacts = await readRecords('contacts') || [];
+      const intranetClients = await readRecords('intranet_clients') || [];
+      
+      const unified = [
+        ...crmContacts.map((c: any) => ({ ...c, isCRM: true, isIntranet: c.intranet === 'Si' })),
+        ...intranetClients.map((c: any) => ({ ...c, isCRM: false, isIntranet: true }))
+      ];
+
+      // Deduplicate based on rut, id, or email
+      const uniqueClients = new Map();
+      unified.forEach((c: any) => {
+        const key = c.rut || c.id || c.email;
+        if (key) {
+          if (!uniqueClients.has(key)) {
+            uniqueClients.set(key, c);
+          } else if (c.isCRM) {
+            uniqueClients.set(key, { ...uniqueClients.get(key), isCRM: true, ...c });
+          }
+        }
+      });
+
+      const integratedContacts = Array.from(uniqueClients.values());
       
       const integration = new IntegrationService();
       const engine = new GrowthEngine();
       
-      const integratedData = integration.integrate(intranetData, salesData);
+      const integratedData = integration.integrate(integratedContacts, salesData);
       const result = engine.process(integratedData);
       
       res.json(result);

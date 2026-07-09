@@ -43,6 +43,37 @@ export const ChatComponent: React.FC<{
     setInput('');
     setLoading(true);
 
+    // Real-time instruction catcher
+    const userMessageLower = userMsg.toLowerCase().trim();
+    if (userMessageLower.includes('modificame el texto a') || userMessageLower.includes('modifica el texto a') || userMessageLower.includes('cambia el texto a') || userMessageLower.includes('actualiza el texto a')) {
+      const regex = /(?:modificame el texto a|modifica el texto a|cambia el texto a|actualiza el texto a)\s*(.+)$/i;
+      const match = userMsg.match(regex);
+      if (match && match[1]) {
+        const textToInject = match[1].trim().replace(/^["':\s]+|["'\s]+$/g, '');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('assistant-update-editor', {
+            detail: {
+              whatsappMessage: textToInject,
+              emailBody: textToInject
+            }
+          }));
+        }, 100);
+      }
+    } else if (userMessageLower.includes('pon esta imagen') || userMessageLower.includes('pon la imagen') || userMessageLower.includes('cambia la imagen a') || userMessageLower.includes('cambia la imagen de cabecera a') || userMessageLower.includes('actualiza la imagen a')) {
+      const urlRegex = /(https?:\/\/[^\s]+)/gi;
+      const match = userMsg.match(urlRegex);
+      if (match && match[0]) {
+        const cleanUrl = match[0].trim().replace(/^["':\s]+|["'\s]+$/g, '');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('assistant-update-editor', {
+            detail: {
+              imageUrl: cleanUrl
+            }
+          }));
+        }, 100);
+      }
+    }
+
     try {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -95,6 +126,20 @@ Puede presionar el botón de abajo para cargar esta propuesta directamente en nu
         ]
       }]);
       setLoading(false);
+
+      // Immediately navigate and inject into the editor to prevent freezing
+      if (onNavigateToEditor) {
+        onNavigateToEditor(text);
+      }
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('assistant-update-editor', {
+          detail: {
+            whatsappMessage: text,
+            emailBody: text
+          }
+        }));
+      }, 200);
+
     }, 700);
   };
 
@@ -127,6 +172,14 @@ Puede presionar el botón de abajo para cargar esta propuesta directamente en nu
                       onClick={() => {
                         if (action.type === 'navigate' && onNavigateToEditor) {
                           onNavigateToEditor(action.payload?.text || '');
+                          setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('assistant-update-editor', {
+                              detail: {
+                                whatsappMessage: action.payload?.text || '',
+                                emailBody: action.payload?.text || ''
+                              }
+                            }));
+                          }, 100);
                         }
                       }}
                       className="bg-sky-500 hover:bg-sky-600 text-white text-xs font-black px-3 py-1.5 rounded-lg border border-sky-400/20 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-md"

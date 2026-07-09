@@ -201,6 +201,59 @@ export default function MarketingBuilder({
       clearPreloadedTemplate?.();
     }
   }, [preloadedTemplate]);
+
+  useEffect(() => {
+    const handleAssistantUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        whatsappMessage?: string;
+        emailBody?: string;
+        imageUrl?: string;
+      }>;
+      const { whatsappMessage, emailBody, imageUrl } = customEvent.detail || {};
+
+      if (whatsappMessage) {
+        setWhatsappBody(whatsappMessage);
+      }
+      
+      if (emailBody) {
+        let bodyText = emailBody;
+        const subjectMatch = emailBody.match(/^asunto:\s*(.+)$/im);
+        if (subjectMatch) {
+          setEmailSubject(subjectMatch[1]);
+          bodyText = emailBody.replace(/^asunto:\s*(.+)$/im, '').trim();
+        }
+        
+        setEmailBlocks([
+          {
+            id: `block-${Date.now()}`,
+            type: 'text',
+            content: bodyText,
+            title: 'Propuesta Modificada por Asistente IA 🌟',
+            alignment: 'left',
+            fontSize: 'md',
+            padding: 'md'
+          }
+        ]);
+      }
+
+      if (imageUrl) {
+        setWhatsappHeaderUrl(imageUrl);
+      }
+
+      // Switch tab based on what was modified
+      if (whatsappMessage && !emailBody) {
+        setActiveTab('whatsapp');
+      } else if (emailBody && !whatsappMessage) {
+        setActiveTab('email');
+      }
+    };
+
+    window.addEventListener('assistant-update-editor', handleAssistantUpdate);
+    return () => {
+      window.removeEventListener('assistant-update-editor', handleAssistantUpdate);
+    };
+  }, []);
+
   const [whatsappHeaderUrl, setWhatsappHeaderUrl] = useState('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800');
   const [whatsappSendType, setWhatsappSendType] = useState<'individual' | 'masivo'>('masivo');
 

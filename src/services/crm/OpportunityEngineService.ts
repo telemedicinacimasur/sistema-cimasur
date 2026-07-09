@@ -32,7 +32,7 @@ export class OpportunityEngineService {
             opportunities.push({
               id: `dormant_${diffDays}_${customer.rut}`,
               type: 'dormant',
-              customerId: customer.rut,
+              customerId: customer.id,
               customerName: name,
               potential: totalSales * 0.3,
               description: `Cliente ${name} inactivo hace ${Math.floor(diffDays)} días.`
@@ -45,7 +45,7 @@ export class OpportunityEngineService {
         opportunities.push({
           id: `first_purchase_${customer.rut}`,
           type: 'first_purchase',
-          customerId: customer.rut,
+          customerId: customer.id,
           customerName: name,
           potential: 100000,
           description: `Veterinario ${name} registrado sin primera compra.`
@@ -69,7 +69,7 @@ export class OpportunityEngineService {
           opportunities.push({
             id: `upgrade_${customer.rut}`,
             type: 'upgrade',
-            customerId: customer.rut,
+            customerId: customer.id,
             customerName: name,
             potential: missingAnnual,
             description: `Cliente ${name} está a $${Math.round(missingMonthly).toLocaleString('es-CL')} de promedio mensual para subir a categoría ${nextTier.name}.`

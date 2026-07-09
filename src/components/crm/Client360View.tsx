@@ -77,16 +77,35 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     );
   }
 
+  const getComputedCategory = (compAnual: number, state: string, compCount: number) => {
+    if (state === 'Inactivo' || compCount === 0) {
+      return 'Sin Compra';
+    }
+    const monthlyAverageFrascos = (compAnual / 12) / 7000;
+    if (monthlyAverageFrascos <= 5.6) {
+      return 'Sin categoría';
+    } else if (monthlyAverageFrascos >= 5.7 && monthlyAverageFrascos <= 22.9) {
+      return 'Bronce';
+    } else if (monthlyAverageFrascos >= 23.0 && monthlyAverageFrascos <= 54.9) {
+      return 'Plata';
+    } else if (monthlyAverageFrascos >= 55.0 && monthlyAverageFrascos <= 99.9) {
+      return 'Oro';
+    } else {
+      return 'Platinum';
+    }
+  };
+
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const finalCategory = editForm.categoria || 'Sin categoría';
       const parsedCompraAnual = Number(editForm.compraAnual || 0);
       const parsedCompras = Number(editForm.compras !== undefined ? editForm.compras : (editForm.frascos !== undefined ? editForm.frascos : 0));
+      const finalCategory = getComputedCategory(parsedCompraAnual, editForm.estado || 'Activo', parsedCompras);
 
       const contactUpdates = {
         ...editForm,
         categoria: finalCategory,
+        journeyState: finalCategory,
         compraAnual: parsedCompraAnual,
         compras: parsedCompras,
         frascos: parsedCompras,
@@ -384,32 +403,29 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                         <option value="Activo">Activo</option>
                         <option value="Inactivo">Inactivo</option>
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Categoría del Club</label>
-                      <select 
-                        value={editForm.categoria || 'Sin categoría'} 
-                        onChange={e => setEditForm({...editForm, categoria: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white"
-                      >
-                        <option value="Sin compra">Sin compra</option>
-                        <option value="Sin categoría">Sin categoría</option>
-                        <option value="Bronce">Bronce</option>
-                        <option value="Plata">Plata</option>
-                        <option value="Oro">Oro</option>
-                        <option value="Platinum">Platinum</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Monto Compra Anual ($)</label>
+                                   <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Categoría del Club (Auto-calculada)</label>
                       <input 
-                        type="number" 
-                        value={editForm.compraAnual !== undefined ? editForm.compraAnual : ''} 
-                        onChange={e => setEditForm({...editForm, compraAnual: e.target.value ? Number(e.target.value) : 0})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                        placeholder="Ej: 1500000"
+                        type="text" 
+                        disabled 
+                        value={getComputedCategory(Number(editForm.compraAnual || 0), editForm.estado || 'Activo', Number(editForm.compras !== undefined ? editForm.compras : (editForm.frascos !== undefined ? editForm.frascos : 0)))}
+                        className="w-full bg-slate-900/50 border border-slate-800 p-3 rounded-xl text-xs text-indigo-400 font-bold cursor-not-allowed" 
                       />
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Promedio de Frascos Mensual Equivalente</label>
+                      <input 
+                        type="number" 
+                        step="0.1"
+                        value={editForm.compraAnual !== undefined ? Number((((editForm.compraAnual || 0) / 12) / 10000).toFixed(1)) : ''} 
+                        onChange={e => setEditForm({...editForm, compraAnual: e.target.value ? Number(e.target.value) * 10000 * 12 : 0})}
+                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
+                        placeholder="Ej: 5.7"
+                      />
+                      <span className="text-[10px] text-amber-400 block mt-1 font-mono">
+                        Traducido internamente para categorización comercial según consumo de frascos.
+                      </span>
+                    </div>           </div>
                     <div>
                       <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Consumo de Frascos</label>
                       <input 
@@ -459,8 +475,8 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   <DetailField label="Ejecutivo Comercial" value={client.ejecutivoComercial || 'Sin asignar'} icon={<User className="text-orange-400" />} />
                   <DetailField label="Responsable Intranet" value={client.responsable || 'Sistema'} icon={<Layers className="text-sky-400" />} />
                   <DetailField label="Categoría Club" value={client.categoria || 'Sin categoría'} icon={<Award className="text-yellow-500" />} />
-                  <DetailField label="Compra Anual" value={client.compraAnual !== undefined ? `$${client.compraAnual.toLocaleString('es-CL')}` : '$0'} icon={<DollarSign className="text-emerald-500" />} />
-                  <DetailField label="Consumo de Frascos" value={`${client.compras !== undefined ? client.compras : (client.frascos !== undefined ? client.frascos : 0)} frascos`} icon={<Activity className="text-orange-500" />} />
+                  <DetailField label="Promedio Frascos Mensual" value={`${Number((((client.compraAnual || 0) / 12) / 10000).toFixed(1))} frascos/mes`} icon={<Activity className="text-emerald-400" />} />
+                  <DetailField label="Consumo de Frascos (Total)" value={`${client.compras !== undefined ? client.compras : (client.frascos !== undefined ? client.frascos : 0)} frascos`} icon={<Activity className="text-orange-500" />} />
                   
                   <div className="md:col-span-2 lg:col-span-3 bg-slate-900/30 p-5 rounded-2xl border border-slate-850">
                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Observaciones Internas</span>
@@ -675,7 +691,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-xs text-slate-500">Inscríbalo al Club Comercial para desbloquear descuentos y beneficios exclusivos para veterinarios.</p>
+                    <p className="text-xs text-slate-500">No hay beneficios activos para esta categoría.</p>
                   )}
                 </div>
 
