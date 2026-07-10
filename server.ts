@@ -233,6 +233,11 @@ async function startServer() {
 // Tool Definitions
 const crmTools: FunctionDeclaration[] = [
   {
+    name: "get_all_contacts",
+    description: "Gets the full list of contacts with their sales data and categories for analysis.",
+    parameters: { type: Type.OBJECT, properties: {} },
+  },
+  {
     name: "get_inactive_clients",
     description: "Gets a list of clients who have not purchased in the last 90 days.",
     parameters: { type: Type.OBJECT, properties: {} },
@@ -260,10 +265,7 @@ const crmTools: FunctionDeclaration[] = [
         return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
       }
 
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-      });
+      const ai = new GoogleGenAI({ apiKey });
 
       const contents = history.map((h: any) => ({
         role: h.sender === 'user' ? 'user' : 'model',
@@ -271,18 +273,29 @@ const crmTools: FunctionDeclaration[] = [
       }));
       contents.push({
         role: 'user',
-        parts: [{ text: `Datos de contexto estructurado del CRM (Growth Engine):\n${JSON.stringify(context)}\n\nMensaje del usuario: ${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client" | "navigate", payload: "some_data" }] }.\n\nEL SISTEMA COMERCIAL CIMASUR NO USA PUNTOS. Es un sistema de estatus anual basado en compras anuales promedio mensual. El catálogo ofrece beneficios según el Nivel de Fidelización (Bronce, Plata, Oro, Platinum) del socio.\n\nSi el usuario te pide modificar, reescribir, resumir, redactar, cambiar el saludo, hacer más formal/cercano o generar una plantilla/mensaje de campaña, genera el texto solicitado basándote en los niveles de fidelización y añade SIEMPRE una acción en la lista de actions con el tipo "navigate" para que el usuario pueda cargarlo directamente en el editor de campañas, por ejemplo:\n{ "label": "🎨 Diseñar en Editor de Campañas", "type": "navigate", "payload": { "text": "<aquí el texto modificado o redactado completo>" } }` }]
+        parts: [{ text: `Datos de contexto estructurado del CRM (Growth Engine):\n${JSON.stringify(context)}\n\nMensaje del usuario: ${message}\n\nIMPORTANT: Respond with JSON format: { text: "your conversational response", actions: [{ label: "Button Label", type: "whatsapp" | "email" | "campaign" | "view_client" | "navigate", payload: "some_data" }] }.\n\nEL SISTEMA COMERCIAL CIMASUR NO USA PUNTOS. Es un sistema de estatus anual basado en compras anuales promedio mensual. El catálogo ofrece beneficios según el Nivel de Fidelización (Bronce, Plata, Oro, Platinum) del socio.\n\nSi el usuario hace preguntas de análisis (ej: quién está por subir de nivel, cuántos clientes hay por categoría), utiliza la herramienta 'get_all_contacts' para obtener los datos necesarios y realiza el análisis tú mismo.\n\nSi el usuario te pide modificar, reescribir, resumir, redactar, cambiar el saludo, hacer más formal/cercano o generar una plantilla/mensaje de campaña, genera el texto solicitado basándote en los niveles de fidelización y añade SIEMPRE una acción en la lista de actions con el tipo "navigate" para que el usuario pueda cargarlo directamente en el editor de campañas.` }]
       });
 
       // Helper to execute tools
       const executeTool = async (name: string, args: any) => {
         console.log(`Executing tool: ${name} with`, args);
         try {
+          if (name === 'get_all_contacts') {
+            const contacts = await readRecords('contacts');
+            // Retornamos un resumen para no exceder límites si hay demasiados, pero lo suficiente para análisis
+            return { result: JSON.stringify(contacts.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              rut: c.rut,
+              categoria: c.categoria,
+              ventas: c.clubVentasDetail ? (typeof c.clubVentasDetail === 'string' ? JSON.parse(c.clubVentasDetail) : c.clubVentasDetail) : {}
+            }))) };
+          }
           if (name === 'get_inactive_clients') {
-            const clients = await readRecords('clients');
+            const clients = await readRecords('contacts');
             const now = new Date();
             const inactive = clients.filter((c: any) => {
-              if (!c.lastPurchaseDate) return true; // Assume new or never purchased
+              if (!c.lastPurchaseDate) return true;
               const lastDate = new Date(c.lastPurchaseDate);
               const diffTime = Math.abs(now.getTime() - lastDate.getTime());
               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -309,36 +322,37 @@ const crmTools: FunctionDeclaration[] = [
         }
       };
 
-      let response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+      let result = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
         contents: contents,
         config: {
           tools: [{ functionDeclarations: crmTools }]
         }
       });
-
+      
       // Handle tool calls
-      if (response.functionCalls) {
-        const toolCalls = response.functionCalls;
+      if (result.functionCalls) {
+        const toolCalls = result.functionCalls;
         const toolResults = [];
         
         for (const call of toolCalls) {
-          const result = await executeTool(call.name, call.args);
+          const resTool = await executeTool(call.name, call.args);
           toolResults.push({
             role: 'tool',
-            parts: [{ functionResponse: { name: call.name, response: result } }]
+            parts: [{ functionResponse: { name: call.name, response: resTool } }]
           });
         }
         
         // Send tool results back to model
-        response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [...contents, response.candidates![0].content, ...toolResults]
+        result = await ai.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: [...contents, result.candidates![0].content, ...toolResults]
         });
       }
 
-      res.json({ reply: response.text });
+      res.json({ reply: result.text });
     } catch (e: any) {
+      console.error("Error in AI Chat:", e);
       res.status(500).json({ error: e.message || 'Error en chat IA' });
     }
   });
@@ -908,16 +922,30 @@ const crmTools: FunctionDeclaration[] = [
     }
   });
 
+  app.get('/api/crm/config/categories/:year', async (req, res) => {
+    try {
+      const { year } = req.params;
+      const configs = await readRecords('crm_config_categories_' + year);
+      if (configs && configs.length > 0) {
+        res.json(configs[0]);
+      } else {
+        res.json({ ranges: null, benefits: null });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.put('/api/crm/clients/category', async (req, res) => {
     try {
-      const { id, category, year, rut, categoria, clubVentasDetail } = req.body;
+      const { id, category, year, rut, categoria, clubVentasDetail, bitacora } = req.body;
       const contacts = await readRecords('contacts');
       
       const targetId = id;
       const targetRut = rut;
       const targetCategory = category || categoria;
 
-      if (!targetCategory && !clubVentasDetail) {
+      if (!targetCategory && !clubVentasDetail && !bitacora) {
         return res.json({ success: true });
       }
 
@@ -934,6 +962,9 @@ const crmTools: FunctionDeclaration[] = [
         }
         if (clubVentasDetail) {
           contacts[idx].clubVentasDetail = clubVentasDetail;
+        }
+        if (bitacora) {
+          contacts[idx].bitacora = bitacora;
         }
         await writeRecords('contacts', contacts);
       }

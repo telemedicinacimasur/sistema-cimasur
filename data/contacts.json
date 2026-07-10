@@ -6,7 +6,7 @@
     "email": "marco@veterinaria.cl",
     "accesoAprobado": "Si",
     "ventasHistoricas": 1500000,
-    "categoria": "Sin categoría",
+    "categoria": "Plata",
     "clubVentasDetail": "{\"v2026\":0}"
   },
   {
@@ -16,7 +16,7 @@
     "email": "ana@clinicasur.cl",
     "accesoAprobado": "Si",
     "ventasHistoricas": 500000,
-    "categoria": "Sin categoría",
+    "categoria": "Plata",
     "clubVentasDetail": "{\"v2026\":0}"
   },
   {
@@ -26,7 +26,8 @@
     "email": "juan@vetperez.cl",
     "accesoAprobado": "No",
     "ventasHistoricas": 0,
-    "categoria": "Sin Compra"
+    "categoria": "Plata",
+    "clubVentasDetail": "{\"v2026\":0}"
   },
   {
     "id": "c4",
@@ -35,7 +36,8 @@
     "email": "laura@vetgomez.cl",
     "accesoAprobado": "Si",
     "ventasHistoricas": 0,
-    "categoria": "Sin categoría"
+    "categoria": "Platinum",
+    "clubVentasDetail": "{\"v2026\":0}"
   },
   {
     "id": "c5",
@@ -44,6 +46,7 @@
     "email": "pedro@rojasvet.cl",
     "accesoAprobado": "Si",
     "ventasHistoricas": 100000,
-    "categoria": "Sin categoría"
+    "categoria": "Platinum",
+    "clubVentasDetail": "{\"v2026\":0}"
   }
 ]

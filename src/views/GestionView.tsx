@@ -29,6 +29,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
+import { addNotification } from '../lib/notifications';
 
 const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -37,8 +38,6 @@ const exportTableToExcel = (title: string, headers: string[], data: any[][], fil
   XLSX.utils.book_append_sheet(wb, ws, safeTitle);
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 };
-
-import { addNotification } from '../lib/notifications';
 
 function parseExcelDate(serial: any) {
   if (!serial) return null;

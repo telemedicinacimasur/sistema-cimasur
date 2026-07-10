@@ -81,12 +81,14 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const contactUpdates = {
-        ...editForm,
-        // Manual updates for clubComercial already handled in editForm
-      };
+      const { ventas, clubComercial, ...contactUpdates } = editForm;
 
       await clientService.updateClient(client.id, contactUpdates);
+
+      if (clubComercial) {
+        const loyaltyId = clubComercial.id || client.id;
+        await localDB.updateInCollection('loyalty_accounts', loyaltyId, clubComercial);
+      }
 
       await loadData();
       setIsEditing(false);

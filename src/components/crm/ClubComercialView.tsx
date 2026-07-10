@@ -53,9 +53,10 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
   const [selectedReward, setSelectedReward] = useState<any | null>(null);
   const [selectedClientForReward, setSelectedClientForReward] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedYear, setSelectedYear] = useState('2026');
   
   // Estado para los beneficios dinámicos
-  const [benefitsByCategory, setBenefitsByCategory] = useState<Record<string, string[]>>(DEFAULT_BENEFITS);
+  const [beneficiosPorCategoria, setBeneficiosPorCategoria] = useState<Record<string, string[]>>(DEFAULT_BENEFITS);
   
   // Config Modal State
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -70,10 +71,33 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
   
   useEffect(() => {
     loadContacts();
-    const handleDbChange = () => loadContacts();
+    loadConfig(selectedYear);
+    const handleDbChange = () => {
+      loadContacts();
+      loadConfig(selectedYear);
+    };
     window.addEventListener('db-change', handleDbChange);
     return () => window.removeEventListener('db-change', handleDbChange);
-  }, []);
+  }, [selectedYear]);
+
+  const loadConfig = async (year: string) => {
+    try {
+      const response = await fetch(`/api/crm/config/categories/${year}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.ranges) setConfigRanges(data.ranges);
+        if (data.benefits) {
+          setBeneficiosPorCategoria(data.benefits);
+          setConfigBenefits(data.benefits);
+        } else {
+          setBeneficiosPorCategoria(DEFAULT_BENEFITS);
+          setConfigBenefits(DEFAULT_BENEFITS);
+        }
+      }
+    } catch (e) {
+      console.error("Error loading config", e);
+    }
+  };
 
   const loadContacts = async () => {
     const data = await localDB.getCollection('contacts');
@@ -82,14 +106,32 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
 
   const activeContacts = contacts.filter(c => c.estado === 'Activo' || c.estado === 'Solo CRM Comercial' || c.estado === 'Solo Intranet' || c.estado === 'Ambos (Sincronizado)');
   
-  const categoryData = useMemo(() => {
-    const counts: Record<string, number> = {};
+  const stats = useMemo(() => {
+    const counts: Record<string, number> = { 'Platinum': 0, 'Oro': 0, 'Plata': 0, 'Bronce': 0 };
+    let totalConsolidado = 0;
+
     activeContacts.forEach(c => {
-      const cat = c.categoria || 'Sin categoría';
-      counts[cat] = (counts[cat] || 0) + 1;
+      const details = c.clubVentasDetail ? (typeof c.clubVentasDetail === 'string' ? JSON.parse(c.clubVentasDetail) : c.clubVentasDetail) : {};
+      
+      // Get category for selected year or current category if it matches
+      const catKey = `cat${selectedYear}`;
+      const salesKey = `v${selectedYear}`;
+      
+      const cat = details[catKey] || (selectedYear === '2026' ? c.categoria : null) || 'Sin categoría';
+      const sales = Number(details[salesKey] || 0);
+
+      if (counts[cat] !== undefined) {
+        counts[cat]++;
+      }
+      totalConsolidado += sales;
     });
-    return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
-  }, [activeContacts]);
+
+    return {
+      counts,
+      totalConsolidado,
+      pieData: Object.keys(counts).map(key => ({ name: key, value: counts[key] }))
+    };
+  }, [activeContacts, selectedYear]);
 
   const handleRegisterBenefitUse = async () => {
     if (!selectedClientForReward || !selectedReward) return;
@@ -127,7 +169,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
       });
       if (response.ok) {
         alert('Configuración guardada y cascada aplicada exitosamente.');
-        setBenefitsByCategory(configBenefits);
+        setBeneficiosPorCategoria(configBenefits);
         setIsConfigOpen(false);
         loadContacts();
         window.dispatchEvent(new Event('db-change'));
@@ -148,9 +190,20 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
             <Award className="text-amber-400" size={28} />
             Club Comercial CIMASUR®
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Gestión de categorías y beneficios de clientes fidelizados.
-          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-slate-400">
+              Gestión de categorías y beneficios de clientes fidelizados.
+            </p>
+            <select 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-[#0D1527] border border-slate-800 text-[10px] font-bold text-sky-400 px-2 py-1 rounded-lg outline-none focus:border-sky-500 cursor-pointer"
+            >
+              <option value="2024">Ciclo 2024</option>
+              <option value="2025">Ciclo 2025</option>
+              <option value="2026">Ciclo 2026</option>
+            </select>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -167,52 +220,96 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
       </div>
 
       {activeSubTab === 'dashboard' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-2xl flex items-center justify-between shadow-md">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Socios Activos</span>
-                <div className="text-3xl font-black text-white font-mono mt-1">{activeContacts.length}</div>
+        <div className="space-y-6">
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <KPICard 
+              label="Platinum" 
+              value={stats.counts.Platinum} 
+              color={TIER_COLORS.Platinum} 
+              icon={<Award size={20} />} 
+            />
+            <KPICard 
+              label="Oro" 
+              value={stats.counts.Oro} 
+              color={TIER_COLORS.Oro} 
+              icon={<Award size={20} />} 
+            />
+            <KPICard 
+              label="Plata" 
+              value={stats.counts.Plata} 
+              color={TIER_COLORS.Plata} 
+              icon={<Award size={20} />} 
+            />
+            <KPICard 
+              label="Bronce" 
+              value={stats.counts.Bronce} 
+              color={TIER_COLORS.Bronce} 
+              icon={<Award size={20} />} 
+            />
+            <div className="bg-[#0D1527] border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-md relative overflow-hidden group transition-all hover:bg-[#152035]">
+              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Activity size={48} className="text-sky-400" />
               </div>
-              <div className="p-3 bg-sky-950/30 text-sky-400 rounded-2xl border border-sky-900/50">
-                <Users size={24} />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Monto Consolidado</span>
+              <div className="mt-2">
+                <div className="text-xl font-black text-white font-mono leading-tight">
+                  ${stats.totalConsolidado.toLocaleString('es-CL')}
+                </div>
+                <p className="text-[9px] text-slate-500 mt-1 uppercase">Facturación histórica Ciclo {selectedYear}</p>
               </div>
             </div>
           </div>
-          
-          <div className="lg:col-span-2 bg-[#0D1527] border border-slate-800 rounded-2xl p-6">
-            <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2">
-              <Users size={16} className="text-slate-400" /> Distribución por Categoría
-            </h3>
-            <div className="h-64">
-              {categoryData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={TIER_COLORS[entry.name] || TIER_COLORS['Sin categoría']} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', borderRadius: '12px' }}
-                      itemStyle={{ color: '#F8FAFC' }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                  No hay datos suficientes
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-2xl flex items-center justify-between shadow-md">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Socios Ciclo {selectedYear}</span>
+                  <div className="text-3xl font-black text-white font-mono mt-1">
+                    {(Object.values(stats.counts) as number[]).reduce((a, b) => a + b, 0)}
+                  </div>
                 </div>
-              )}
+                <div className="p-3 bg-sky-950/30 text-sky-400 rounded-2xl border border-sky-900/50">
+                  <Users size={24} />
+                </div>
+              </div>
+            </div>
+            
+            <div className="lg:col-span-2 bg-[#0D1527] border border-slate-800 rounded-2xl p-6">
+              <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2">
+                <Users size={16} className="text-slate-400" /> Distribución por Categoría (Ciclo {selectedYear})
+              </h3>
+              <div className="h-64">
+                {stats.pieData.some(d => d.value > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {stats.pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={TIER_COLORS[entry.name] || TIER_COLORS['Sin categoría']} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', borderRadius: '12px' }}
+                        itemStyle={{ color: '#F8FAFC' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+                    No hay datos registrados para el Ciclo {selectedYear}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -220,7 +317,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
 
       {activeSubTab === 'rewards' && (
         <div className="space-y-8">
-          {Object.entries(benefitsByCategory).map(([category, benefits]: [string, string[]]) => (
+          {Object.entries(beneficiosPorCategoria).map(([category, benefits]: [string, string[]]) => (
             <div key={category} className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6">
               <h3 className="text-lg font-black text-white mb-4 flex items-center gap-2" style={{ color: TIER_COLORS[category] }}>
                 <ShieldCheck size={20} /> Categoría {category}
@@ -478,5 +575,22 @@ function SubTabButton({ active, onClick, icon, label }: { active: boolean; onCli
       {icon}
       {label}
     </button>
+  );
+}
+
+function KPICard({ label, value, color, icon }: { label: string; value: number; color: string; icon: React.ReactNode }) {
+  return (
+    <div className="bg-[#0D1527] border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-md group transition-all hover:bg-[#152035]">
+      <div className="flex justify-between items-start mb-2">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+        <div className="p-1.5 rounded-lg opacity-80" style={{ backgroundColor: `${color}20`, color: color }}>
+          {icon}
+        </div>
+      </div>
+      <div className="mt-auto">
+        <div className="text-3xl font-black text-white font-mono leading-none">{value}</div>
+        <div className="text-[9px] text-slate-500 mt-2 font-bold uppercase">Socios registrados</div>
+      </div>
+    </div>
   );
 }

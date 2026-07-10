@@ -21,7 +21,8 @@ import {
   Download,
   Upload,
   FileSpreadsheet,
-  X
+  X,
+  Check
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
 import { CommentDialog } from '../components/CommentDialog';
@@ -1088,8 +1089,119 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
   
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importCycleYear, setImportCycleYear] = useState('2026');
+  const [pastedData, setPastedData] = useState('');
 
   const segmentationService = useMemo(() => new SegmentationService(), []);
+
+  const getPastedCount = (text: string) => {
+    if (!text) return 0;
+    return text.split('\n').filter(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return false;
+      let parts = trimmed.split('\t');
+      if (parts.length < 2) parts = trimmed.split(/[;|,]/);
+      if (parts.length < 2) parts = trimmed.split(/\s+/);
+      return parts.length >= 2 && cleanRutString(parts[0]);
+    }).length;
+  };
+
+  const processPastedImport = async () => {
+    if (!pastedData.trim()) {
+      alert("Por favor pega datos en el campo de texto.");
+      return;
+    }
+
+    const lines = pastedData.split('\n');
+    const prevYear = Number(importCycleYear) - 1;
+    let processedCount = 0;
+    let notFoundRuts: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      let parts = trimmed.split('\t');
+      if (parts.length < 2) parts = trimmed.split(/[;|,]/);
+      if (parts.length < 2) parts = trimmed.split(/\s+/);
+
+      if (parts.length >= 2) {
+        const rutRaw = parts[0].trim();
+        const amountRaw = parts[1].trim();
+
+        const cleanRutRaw = cleanRutString(rutRaw);
+        if (!cleanRutRaw) continue;
+
+        const client = records.find(c => cleanRutString(c.rut) === cleanRutRaw);
+        if (!client) {
+          notFoundRuts.push(rutRaw);
+          continue;
+        }
+
+        const cleanAmountStr = amountRaw.replace(/[^0-9]/g, '');
+        const ventasTotalesAnteriores = Number(cleanAmountStr) || 0;
+
+        const calculatedTier = getTierForSales(ventasTotalesAnteriores);
+
+        let existingDetails: any = {};
+        if (client.clubVentasDetail) {
+          try {
+            existingDetails = typeof client.clubVentasDetail === 'string' 
+              ? JSON.parse(client.clubVentasDetail) 
+              : client.clubVentasDetail;
+          } catch (e) {
+            console.error("Error parsing clubVentasDetail", e);
+          }
+        }
+        existingDetails[`v${importCycleYear}`] = ventasTotalesAnteriores;
+        existingDetails[`cat${importCycleYear}`] = calculatedTier.name;
+
+        // Inyectar a Bitácora
+        const currentBitacora = client.bitacora ? (typeof client.bitacora === 'string' ? JSON.parse(client.bitacora) : client.bitacora) : [];
+        const bitacoraEntry = {
+          id: Date.now().toString() + Math.random(),
+          fecha: new Date().toISOString(),
+          comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
+          creador: user?.displayName || user?.email || 'Sistema'
+        };
+        const newBitacora = [bitacoraEntry, ...currentBitacora];
+
+        // Update local DB
+        await localDB.updateInCollection('contacts', client.id, { 
+            categoria: calculatedTier.name,
+            clubVentasDetail: JSON.stringify(existingDetails),
+            bitacora: JSON.stringify(newBitacora)
+        });
+
+        // Call API to update backend JSON file (Cascade)
+        try {
+            await fetch('/api/crm/clients/category', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    id: client.id, 
+                    category: calculatedTier.name, 
+                    year: importCycleYear,
+                    clubVentasDetail: JSON.stringify(existingDetails),
+                    bitacora: JSON.stringify(newBitacora)
+                })
+            });
+        } catch (error) {
+            console.error("Failed to update SQL database for", client.name, error);
+        }
+        processedCount++;
+      }
+    }
+
+    let reportMsg = `Se procesaron y actualizaron exitosamente ${processedCount} registros para el ciclo ${importCycleYear} (evaluando ventas de ${prevYear}).`;
+    if (notFoundRuts.length > 0) {
+      reportMsg += `\n\nNo se encontraron clientes para los siguientes ${notFoundRuts.length} RUTs:\n${notFoundRuts.slice(0, 10).join(', ')}${notFoundRuts.length > 10 ? '...' : ''}`;
+    }
+    alert(reportMsg);
+
+    setPastedData('');
+    setIsImportModalOpen(false);
+    window.dispatchEvent(new Event('db-change'));
+  };
 
   const handleImportClick = () => {
     setIsImportModalOpen(true);
@@ -1151,10 +1263,22 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
             // Update local DB
             const existingDetails = JSON.parse(client.clubVentasDetail || '{}');
             existingDetails[`v${importCycleYear}`] = ventasTotalesAnteriores;
+            existingDetails[`cat${importCycleYear}`] = calculatedTier.name;
             
+            // Inyectar a Bitácora
+            const currentBitacora = client.bitacora ? (typeof client.bitacora === 'string' ? JSON.parse(client.bitacora) : client.bitacora) : [];
+            const bitacoraEntry = {
+              id: Date.now().toString() + Math.random(),
+              fecha: new Date().toISOString(),
+              comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
+              creador: user?.displayName || user?.email || 'Sistema'
+            };
+            const newBitacora = [bitacoraEntry, ...currentBitacora];
+
             await localDB.updateInCollection('contacts', client.id, { 
                 categoria: calculatedTier.name,
-                clubVentasDetail: JSON.stringify(existingDetails)
+                clubVentasDetail: JSON.stringify(existingDetails),
+                bitacora: JSON.stringify(newBitacora)
             });
             
             // Call Render API to update SQL database in cascade
@@ -1166,7 +1290,8 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                         id: client.id, 
                         category: calculatedTier.name, 
                         year: importCycleYear,
-                        clubVentasDetail: JSON.stringify(existingDetails)
+                        clubVentasDetail: JSON.stringify(existingDetails),
+                        bitacora: JSON.stringify(newBitacora)
                     })
                 });
             } catch (error) {
@@ -2223,18 +2348,18 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#0D1527] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+              className="bg-[#0D1527] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl"
             >
               <div className="bg-[#152035] border-b border-slate-800 px-6 py-4 flex justify-between items-center">
                 <h3 className="text-md font-black text-white flex items-center gap-2">
-                  <Upload size={18} className="text-emerald-400" /> Importar Histórico de Ventas
+                  <Upload size={18} className="text-emerald-400" /> Importar Histórico de Ventas (Paso Rápido)
                 </h3>
-                <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                <button onClick={() => { setIsImportModalOpen(false); setPastedData(''); }} className="text-slate-400 hover:text-white transition-colors">
                   <X size={18} />
                 </button>
               </div>
               
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-4">
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Ciclo Comercial a Configurar (Año en Curso)</label>
                   <select 
@@ -2246,20 +2371,53 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                     <option value="2025">2025</option>
                     <option value="2026">2026</option>
                   </select>
-                  <p className="mt-3 text-xs text-slate-500 leading-relaxed">
-                    <strong>Regla de congelamiento:</strong> Si selecciona el ciclo <strong className="text-slate-300">{importCycleYear}</strong>, el sistema evaluará la columna de ventas correspondientes al <strong className="text-sky-400">año comercial {Number(importCycleYear) - 1}</strong> en su archivo Excel.
+                  <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                    <strong>Regla de congelamiento:</strong> Se evaluarán las ventas del <strong className="text-sky-400">año comercial {Number(importCycleYear) - 1}</strong> y se actualizará la categoría y la bitácora de los clientes en la ficha de 360 de inmediato.
                   </p>
+                </div>
+
+                <div className="border-t border-slate-800 pt-4">
+                  <label className="block text-[10px] font-black uppercase text-emerald-400 tracking-wider mb-2 flex justify-between items-center">
+                    <span>Pegar Datos desde Excel (RUT y Monto Anual)</span>
+                    {getPastedCount(pastedData) > 0 && (
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full font-bold">
+                        ✓ {getPastedCount(pastedData)} registros detectados
+                      </span>
+                    )}
+                  </label>
+                  <textarea
+                    value={pastedData}
+                    onChange={(e) => setPastedData(e.target.value)}
+                    placeholder="Pegue aquí 2 columnas de Excel (RUT [tab o espacio] Monto)&#10;Ejemplo:&#10;11.111.111-1    4500000&#10;12.345.678-9    1200000"
+                    className="w-full bg-[#050914] border border-slate-800 p-3 rounded-lg text-xs font-mono text-white placeholder-slate-600 outline-none focus:border-emerald-500 h-40 resize-none leading-relaxed"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    * Ideal para copiar directamente dos columnas adyacentes desde Excel sin necesidad de usar plantillas ni descargar archivos intermedios.
+                  </span>
                 </div>
               </div>
               
-              <div className="bg-[#152035] border-t border-slate-800 px-6 py-4 flex justify-end gap-3">
-                <button onClick={() => setIsImportModalOpen(false)} className="text-xs font-bold text-slate-400 hover:text-white">Cancelar</button>
+              <div className="bg-[#152035] border-t border-slate-800 px-6 py-4 flex justify-between items-center gap-3">
                 <button 
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase px-6 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
+                  className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800/50 hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors"
+                  title="O usar el método tradicional de archivo Excel"
                 >
-                  <FileSpreadsheet size={16} /> Seleccionar Archivo
+                  <FileSpreadsheet size={14} /> Subir Excel
                 </button>
+
+                <div className="flex gap-2">
+                  <button onClick={() => { setIsImportModalOpen(false); setPastedData(''); }} className="text-xs font-bold text-slate-400 hover:text-white px-3 py-2">
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={processPastedImport}
+                    disabled={!pastedData.trim() || getPastedCount(pastedData) === 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs uppercase px-5 py-2 rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                  >
+                    <Check size={16} /> Procesar e Importar Datos
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
