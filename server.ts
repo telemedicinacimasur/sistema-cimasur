@@ -910,14 +910,14 @@ const crmTools: FunctionDeclaration[] = [
 
   app.put('/api/crm/clients/category', async (req, res) => {
     try {
-      const { id, category, year, rut, categoria } = req.body;
+      const { id, category, year, rut, categoria, clubVentasDetail } = req.body;
       const contacts = await readRecords('contacts');
       
       const targetId = id;
       const targetRut = rut;
       const targetCategory = category || categoria;
 
-      if (!targetCategory) {
+      if (!targetCategory && !clubVentasDetail) {
         return res.json({ success: true });
       }
 
@@ -929,7 +929,12 @@ const crmTools: FunctionDeclaration[] = [
       }
 
       if (idx !== -1) {
-        contacts[idx].categoria = targetCategory;
+        if (targetCategory) {
+          contacts[idx].categoria = targetCategory;
+        }
+        if (clubVentasDetail) {
+          contacts[idx].clubVentasDetail = clubVentasDetail;
+        }
         await writeRecords('contacts', contacts);
       }
       res.json({ success: true });

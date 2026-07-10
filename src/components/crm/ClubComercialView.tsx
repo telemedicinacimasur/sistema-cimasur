@@ -13,6 +13,21 @@ const TIER_COLORS: Record<string, string> = {
   'Sin Compra': '#475569'
 };
 
+const parseBitacora = (bitacoraField: any): any[] => {
+  if (!bitacoraField) return [];
+  if (Array.isArray(bitacoraField)) return bitacoraField;
+  if (typeof bitacoraField === 'string') {
+    try {
+      const parsed = JSON.parse(bitacoraField);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Error parsing bitacora JSON string", e);
+      return [];
+    }
+  }
+  return [];
+};
+
 // Definimos los valores por defecto
 const DEFAULT_BENEFITS: Record<string, string[]> = {
   'Platinum': [
@@ -90,7 +105,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
       tipo: 'beneficio'
     };
     
-    const currentBitacora = client.bitacora ? JSON.parse(client.bitacora) : [];
+    const currentBitacora = parseBitacora(client.bitacora);
     const newBitacora = [bitacoraEntry, ...currentBitacora];
     
     await localDB.updateInCollection('contacts', client.id, {
@@ -215,8 +230,17 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                   // Sumarize uses
                   const uses = contacts.reduce((acc, client) => {
                     if (client.bitacora) {
-                      const logs = JSON.parse(client.bitacora);
-                      const benefitLogs = logs.filter((l: any) => l.descripcion === `Uso de Beneficio: ${benefit}`);
+                      const logs = parseBitacora(client.bitacora);
+                      const benefitText = `Uso de Beneficio: ${benefit}`;
+                      const benefitLogs = logs.filter((l: any) => 
+                        l && (
+                          l.descripcion === benefitText || 
+                          l.comentario === benefitText || 
+                          l.detalle === benefitText ||
+                          (l.comentario && String(l.comentario).includes(benefitText)) ||
+                          (l.detalle && String(l.detalle).includes(benefitText))
+                        )
+                      );
                       if (benefitLogs.length > 0) {
                         acc.push({ client, count: benefitLogs.length });
                       }

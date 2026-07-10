@@ -697,6 +697,42 @@ const getTiersList = () => {
   ];
 };
 
+const parseNumericValue = (value: any): number => {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number') return value;
+  
+  const str = String(value).trim();
+  if (!str) return 0;
+  
+  let cleaned = str.replace(/[$\s]/g, '');
+  
+  if (cleaned.includes('.') && cleaned.includes(',')) {
+    cleaned = cleaned.replace(/\./g, '').replace(/,/g, '.');
+  } else if (cleaned.includes('.')) {
+    const dotCount = (cleaned.match(/\./g) || []).length;
+    if (dotCount > 1) {
+      cleaned = cleaned.replace(/\./g, '');
+    } else {
+      const parts = cleaned.split('.');
+      if (parts[1] && parts[1].length === 3) {
+        cleaned = cleaned.replace(/\./g, '');
+      }
+    }
+  } else if (cleaned.includes(',')) {
+    cleaned = cleaned.replace(/,/g, '.');
+  }
+  
+  const parsed = Number(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+const cleanRutString = (r: any): string => {
+  if (!r) return '';
+  const cleanStr = String(r).toUpperCase().replace(/[^0-9K]/g, '').trim();
+  if (cleanStr === '' || cleanStr.includes('SINRUT') || cleanStr === 'NO' || cleanStr === 'SIN') return '';
+  return cleanStr;
+};
+
 const getTierForSales = (sales: number) => {
   const list = getTiersList();
   for (const t of list) {
@@ -872,13 +908,14 @@ function CRMRegister() {
 
           let name = safe(row["Nombre / Razón Social"]) || "Contacto Sin Nombre";
           const estado = safe(row["Estado (Activo/Inactivo)"]) || safe(row["Estado"]) || "Activo";
-          const ventasAnuales = Number(safe(row["Ventas Anuales 2025 (CLP)"]) || safe(row["Ventas Anuales"])) || 0;
+          
+          const rawVentas = row["Ventas Anuales 2025 (CLP)"] || row["Ventas Anuales"] || row["Ventas"] || row["ventas"];
+          const ventasAnuales = parseNumericValue(rawVentas);
           
           const promedioMensual = ventasAnuales / 12;
           const precioPromedioFrasco = 12000; // Assumed fixed price for calculating frascos if needed, though getTierForSales uses Sales directly usually?
           
           // Let's use getTierForSales which usually takes annual sales, or is it monthly?
-          // If the rule is based on monthly:
           const calculatedCategory = getTierForSales(ventasAnuales).name;
 
           const newContact = {
@@ -1076,17 +1113,39 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
         const prevYear = Number(importCycleYear) - 1;
         let processed = 0;
         
+        // Dynamic search for sales value function
+        const getSalesFromRow = (row: any, targetYear: number): number => {
+          const keys = Object.keys(row);
+          // Try exact matches first (case insensitive, space/underscore removed)
+          for (const k of keys) {
+            const kLower = k.toLowerCase().replace(/[\s_]/g, '');
+            if (kLower === `ventas${targetYear}` || kLower === `venta${targetYear}` || kLower === `v${targetYear}`) {
+              return parseNumericValue(row[k]);
+            }
+          }
+          // Try generic sales indicators
+          for (const k of keys) {
+            const kLower = k.toLowerCase().replace(/[\s_]/g, '');
+            if (kLower === 'ventas' || kLower === 'venta' || kLower === 'ventasanuales' || kLower === 'total') {
+              return parseNumericValue(row[k]);
+            }
+          }
+          return 0;
+        };
+
         for (const item of data) {
             const rutRaw = item.RUT || item.rut || item.Rut || item['RUT (llave primaria)'] || item['RUT / ID'];
             if (!rutRaw) continue;
             
-            const client = records.find(c => c.rut === rutRaw);
+            const cleanRutRaw = cleanRutString(rutRaw);
+            if (!cleanRutRaw) continue;
+
+            const client = records.find(c => cleanRutString(c.rut) === cleanRutRaw);
             if (!client) continue;
 
-            const ventasTotalesAnteriores = Number(item.Ventas || item.ventas || item['Ventas Anuales'] || item[`Ventas${prevYear}`] || item[`Ventas ${prevYear}`] || item['Total']) || 0;
+            const ventasTotalesAnteriores = getSalesFromRow(item, prevYear);
             
             // Calculamos promedio mensual anualizado que en el fondo son las ventasTotalesAnteriores contrastadas contra los rangos (que asumen venta anual).
-            // Get category based on previous year total sales
             const calculatedTier = getTierForSales(ventasTotalesAnteriores);
             
             // Update local DB
@@ -1103,7 +1162,12 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                 await fetch('/api/crm/clients/category', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: client.id, category: calculatedTier.name, year: importCycleYear })
+                    body: JSON.stringify({ 
+                        id: client.id, 
+                        category: calculatedTier.name, 
+                        year: importCycleYear,
+                        clubVentasDetail: JSON.stringify(existingDetails)
+                    })
                 });
             } catch (error) {
                 console.error("Failed to update SQL database", error);
@@ -1119,12 +1183,24 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
   };
 
   const handleExport = () => {
-    const data = records.map(c => ({
+    const data = records.map(c => {
+      let salesObj: any = {};
+      if (c.clubVentasDetail) {
+        try {
+          salesObj = typeof c.clubVentasDetail === 'string' ? JSON.parse(c.clubVentasDetail) : c.clubVentasDetail;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      return {
         RUT: c.rut,
         Clinica: c.name,
-        Ventas2026: JSON.parse(c.clubVentasDetail || '{}').v2026 || 0,
+        Ventas2023: salesObj.v2024 || 0,
+        Ventas2024: salesObj.v2025 || 0,
+        Ventas2025: salesObj.v2026 || 0,
         Categoría: c.categoria || 'Sin categoría'
-    }));
+      };
+    });
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
