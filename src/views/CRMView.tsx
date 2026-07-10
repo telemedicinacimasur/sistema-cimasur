@@ -1074,22 +1074,31 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json<{RUT: string, Ventas2026: number}>(ws);
         
-        console.log("Importing data:", data);
+        const intranetClients = await localDB.getCollection('intranet_clients');
+        
+        console.log("Importing data and syncing with Intranet:", data);
         
         for (const item of data) {
             const client = records.find(c => c.rut === item.RUT);
             if (client) {
-                const ventas2026 = item.Ventas2026;
-                const monthlyAverageFrascos = ventas2026 / 12 / 7000;
-                const newCategoria = segmentationService.categorizeByMonthlyAverage(monthlyAverageFrascos);
+                const intranetClient = intranetClients.find((ic: any) => ic.rut === item.RUT);
+                
+                let newCategoria = 'Sin Compra';
+                
+                if (intranetClient && intranetClient.ventas2025 > 0) {
+                    const monthlyAverageFrascos = intranetClient.ventas2025 / 12 / 7000;
+                    newCategoria = segmentationService.categorizeByMonthlyAverage(monthlyAverageFrascos);
+                } else {
+                    newCategoria = 'Sin Compra';
+                }
 
                 await localDB.updateInCollection('contacts', client.id, { 
                     categoria: newCategoria,
-                    clubVentasDetail: JSON.stringify({ ...JSON.parse(client.clubVentasDetail || '{}'), v2026: ventas2026 })
+                    clubVentasDetail: JSON.stringify({ ...JSON.parse(client.clubVentasDetail || '{}'), v2026: item.Ventas2026 })
                 });
             }
         }
-        alert(`Procesadas ${data.length} filas y categorías actualizadas.`);
+        alert(`Procesadas ${data.length} filas y categorías actualizadas según ventas 2025.`);
         window.dispatchEvent(new Event('db-change'));
     };
     reader.readAsBinaryString(file);
