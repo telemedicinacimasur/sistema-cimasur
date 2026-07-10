@@ -326,6 +326,33 @@ export const localDB = {
       }
     }
   },
+  updateBulkCategory: async (ids: string[], category: string) => {
+    invalidateCollectionCache('contacts');
+    if (isFirebaseReady && db) {
+      try {
+        await Promise.all(ids.map(id => 
+          setDoc(doc(db, 'contacts', id), {
+            categoria: category,
+            updatedAt: new Date().toISOString()
+          }, { merge: true })
+        ));
+      } catch (error) {
+        console.error(`Firebase bulk category update error:`, error);
+        throw error;
+      }
+    } else {
+      const response = await fetch('/api/crm/clients/bulk-category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, categoria: category })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API bulk category update error:`, response.status, errorText);
+        throw new Error(`Failed bulk category update: Status ${response.status} - ${errorText}`);
+      }
+    }
+  },
   deleteFromCollection: async (name: string, id: string) => {
     if (name === 'trash_bin') {
       invalidateCollectionCache(name);

@@ -3,7 +3,7 @@ import { Send, Bot, User, Trash2 } from 'lucide-react';
 
 export const ChatComponent: React.FC<{ 
   contextData?: any; 
-  onNavigateToEditor?: (text: string) => void;
+  onNavigateToEditor?: (text: string, clientIds?: string[]) => void;
 }> = ({ contextData, onNavigateToEditor }) => {
   const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string; actions?: { label: string; type: string; payload: any }[] }[]>(() => {
     try {
@@ -72,6 +72,57 @@ export const ChatComponent: React.FC<{
           }));
         }, 100);
       }
+    } else if (userMessageLower.includes('inactivos para trabajar')) {
+      setTimeout(async () => {
+        const text = `He analizado nuestra base de datos. Encontré clientes marcados como Inactivos. Los he seleccionado por ti y preparé esta plantilla:
+
+¡Hola {{nombre}}! Notamos que hace un tiempo no adquieres nuestros frascos homeopáticos. Te recordamos que perteneces a la categoría {{categoria_club}} y tienes beneficios esperando por ti.
+
+¿Te gustaría retomar tu tratamiento?
+
+Te enviaré al Editor de Campañas ahora...`;
+        
+        // Find inactive clients
+        let inactiveIds: string[] = [];
+        try {
+          // Import at top ideally, but accessing window is a hack or use localDB if available. Wait, ChatComponent doesn't have localDB imported. I'll import it.
+          // Wait, localDB isn't in this file. But localDB is exported from lib/auth. Let's assume it's imported or I will just dispatch an event.
+          // Actually, I can use fetch to API if it exists or since localDB is indexedDB, I might not have access if it's not imported.
+          // Let's just dispatch the text and some dummy IDs? No, we need real inactive clients. 
+          // `contextData` has `clients`. I can use that!
+          const clients = contextData?.clients || [];
+          inactiveIds = clients.filter((c: any) => c.estado === 'Inactivo' || c.estado === 'inactivo' || c.estado === 'Solo Intranet').map((c: any) => c.id);
+        } catch(e) {}
+
+        setMessages(prev => [...prev, { 
+          sender: 'ai', 
+          text, 
+          actions: [
+            {
+              label: 'Ir a Campañas',
+              type: 'navigate',
+              payload: { text, ids: inactiveIds }
+            }
+          ]
+        }]);
+
+        if (onNavigateToEditor) {
+          onNavigateToEditor(text, inactiveIds);
+        }
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('assistant-update-editor', {
+            detail: {
+              whatsappMessage: text,
+              emailBody: text,
+              selectedIds: inactiveIds
+            }
+          }));
+        }, 300);
+
+        setLoading(false);
+      }, 1000);
+      return;
     }
 
     try {
@@ -82,10 +133,16 @@ export const ChatComponent: React.FC<{
       });
       const data = await response.json();
       try {
-        const parsedReply = JSON.parse(data.reply);
-        setMessages(prev => [...prev, { sender: 'ai', text: parsedReply.text, actions: parsedReply.actions }]);
+        // Sanitize and clean markdown or broken JSON from the payload
+        const cleanedStr = data.reply.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsedReply = JSON.parse(cleanedStr);
+        // Force a single action button if there are any actions
+        const singleAction = parsedReply.actions && parsedReply.actions.length > 0 ? [parsedReply.actions[0]] : [];
+        setMessages(prev => [...prev, { sender: 'ai', text: parsedReply.text, actions: singleAction }]);
       } catch (e) {
-        setMessages(prev => [...prev, { sender: 'ai', text: data.reply }]);
+        // If not JSON, it's just plain text, still clean basic markdown noise if any
+        const plainText = typeof data.reply === 'string' ? data.reply.replace(/```/g, '').trim() : '';
+        setMessages(prev => [...prev, { sender: 'ai', text: plainText || 'Respuesta recibida.' }]);
       }
     } catch (e) {
       console.error(e);
@@ -171,7 +228,7 @@ Puede presionar el botón de abajo para cargar esta propuesta directamente en nu
                       key={ai} 
                       onClick={() => {
                         if (action.type === 'navigate' && onNavigateToEditor) {
-                          onNavigateToEditor(action.payload?.text || '');
+                          onNavigateToEditor(action.payload?.text || '', action.payload?.ids || []);
                           setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('assistant-update-editor', {
                               detail: {

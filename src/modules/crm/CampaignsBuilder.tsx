@@ -10,11 +10,13 @@ export default function CampaignsBuilder({
   dashboardData, 
   onViewClient,
   preloadedTemplate,
+  preloadedClientIds,
   clearPreloadedTemplate
 }: { 
   dashboardData: any; 
   onViewClient: (id: string) => void;
   preloadedTemplate?: string | null;
+  preloadedClientIds?: string[];
   clearPreloadedTemplate?: () => void;
 }) {
   const [selectedCampaign, setSelectedCampaign] = useState<SuggestedCampaign | null>(null);
@@ -23,6 +25,13 @@ export default function CampaignsBuilder({
   const [channel, setChannel] = useState<'email' | 'whatsapp'>('email');
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
+
+  // Effect to preload client ids if provided
+  useEffect(() => {
+    if (preloadedClientIds && preloadedClientIds.length > 0) {
+      setSelectedClientIds(new Set(preloadedClientIds));
+    }
+  }, [preloadedClientIds]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
 
   const [activeHelperClient, setActiveHelperClient] = useState<any | null>(null);
@@ -260,7 +269,23 @@ export default function CampaignsBuilder({
     setSelectedClientIds(next);
   };
 
-  const handleSendEmail = () => {
+  const registerCampaignLog = async (client: any, tipoCampana: string) => {
+    try {
+      const currentBitacora = client.bitacora ? (typeof client.bitacora === 'string' ? JSON.parse(client.bitacora) : client.bitacora) : [];
+      const newEntry = {
+        id: Date.now().toString(),
+        fecha: new Date().toISOString(),
+        comentario: `Envío de campaña ${tipoCampana}: ${selectedCampaign?.name || 'Manual'}`,
+        creador: 'Usuario CRM'
+      };
+      const updated = [newEntry, ...currentBitacora];
+      await localDB.updateInCollection('contacts', client.id, { bitacora: JSON.stringify(updated) });
+    } catch (e) {
+      console.error("Error logging campaign", e);
+    }
+  };
+
+  const handleSendEmail = async () => {
     const bcc = selectedClients.map(c => c.email).filter(e => !!e).join(',');
     const subject = (document.getElementById('email-subject-input') as HTMLInputElement)?.value || `Campaña: ${selectedCampaign?.name || 'Información Importante'}`;
     const htmlContent = document.getElementById('email-preview-content')?.innerHTML || 'No content generated.';
@@ -283,6 +308,12 @@ ${htmlContent}`;
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    // Register log for each selected client
+    for (const c of selectedClients) {
+      await registerCampaignLog(c, 'Email');
+    }
+    alert('Campaña por Email generada y registrada en bitácoras.');
   };
 
   const getClientVariableValue = (client: any, tag: string): string => {
@@ -323,13 +354,15 @@ ${htmlContent}`;
     return textToSend;
   };
 
-  const handleQuickSendWhatsApp = (client: any) => {
+  const handleQuickSendWhatsApp = async (client: any) => {
     const textToSend = getProcessedTextForClient(client);
     const encodedText = encodeURIComponent(textToSend).replace(/%2A/g, '*');
     const cleanPhoneVal = client.phone || client.telefono || "";
     const cleanPhone = cleanPhoneVal ? String(cleanPhoneVal).replace(/\s+/g, '') : "";
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
     window.open(whatsappUrl, '_blank');
+    
+    await registerCampaignLog(client, 'WhatsApp');
   };
 
   const handleCopyImageToClipboard = async (imageUrl: string) => {

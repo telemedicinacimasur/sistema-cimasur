@@ -8,7 +8,7 @@ import { Client } from '../../services/crm/types';
 interface IAComercialViewProps {
   dashboardData: any;
   onViewClient?: (id: string) => void;
-  onNavigateToEditor?: (text: string) => void;
+  onNavigateToEditor?: (text: string, clientIds?: string[]) => void;
 }
 
 export const IAComercialView: React.FC<IAComercialViewProps> = ({ dashboardData, onViewClient, onNavigateToEditor }) => {

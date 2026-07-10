@@ -88,31 +88,6 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
 
       await clientService.updateClient(client.id, contactUpdates);
 
-      // Sincronizar con loyalty_accounts
-      try {
-        const loyaltyCollection = await localDB.getCollection('loyalty_accounts') || [];
-        const existingLoyaltyIndex = loyaltyCollection.findIndex((l: any) => l.contactId === client.id);
-        if (existingLoyaltyIndex !== -1) {
-          const updatedLoyalty = {
-            ...loyaltyCollection[existingLoyaltyIndex],
-            categoria: editForm.clubComercial?.categoria || 'Sin categoría',
-            puntos: Number(editForm.puntos || loyaltyCollection[existingLoyaltyIndex].puntos || 0)
-          };
-          await localDB.updateInCollection('loyalty_accounts', loyaltyCollection[existingLoyaltyIndex].id, updatedLoyalty);
-        } else {
-          await localDB.saveToCollection('loyalty_accounts', {
-            id: `loy-${Date.now()}`,
-            contactId: client.id,
-            categoria: editForm.clubComercial?.categoria || 'Sin categoría',
-            puntos: Number(editForm.puntos || 0),
-            estado: 'Inscrito',
-            beneficios: []
-          });
-        }
-      } catch (lErr) {
-        console.error('Error al sincronizar loyalty_accounts:', lErr);
-      }
-
       await loadData();
       setIsEditing(false);
       if (onSave) onSave();
@@ -166,9 +141,9 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     if (!newBitacoraEntry.trim()) return;
     const newEntry = {
       id: Date.now().toString(),
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: new Date().toISOString(),
       comentario: newBitacoraEntry,
-      creador: 'Sistema / CRM'
+      creador: 'Usuario CRM'
     };
     const updated = [newEntry, ...bitacora];
     await clientService.updateClient(client.id, { bitacora: updated });
@@ -662,40 +637,53 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   <div className="flex items-center gap-3">
                     <Award className="text-yellow-500 w-8 h-8" />
                     <div>
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Estatus de Fidelidad</h4>
-                      <div className="text-2xl font-black text-white mt-1">{client.clubComercial?.categoria || 'Sin categoría'}</div>
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Categoría Actual (2026)</h4>
+                      <div className="text-2xl font-black text-white mt-1">{client.categoria || 'Sin categoría'}</div>
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-850/50 pt-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase">Saldo Puntos</span>
-                      <span className="text-xl font-black text-yellow-400 font-mono">{client.clubComercial?.puntos || 0} pts</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase">Inscripción</span>
-                      <span className="text-sm font-bold text-white">{client.clubComercial?.estado || 'No inscrito'}</span>
-                    </div>
+                  <div className="border-t border-slate-850/50 pt-4">
+                     <span className="text-[10px] text-slate-500 font-bold block uppercase mb-2">Histórico de Categorías</span>
+                     <table className="w-full text-xs text-left">
+                       <thead>
+                         <tr className="border-b border-slate-800 text-slate-500">
+                           <th className="pb-2 font-bold">Año Comercial</th>
+                           <th className="pb-2 font-bold">Categoría</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-800">
+                         <tr>
+                           <td className="py-2 text-white">2026</td>
+                           <td className="py-2 text-yellow-400 font-bold">{client.categoria || 'Sin categoría'}</td>
+                         </tr>
+                         <tr>
+                           <td className="py-2 text-slate-400">2025</td>
+                           <td className="py-2 text-slate-300">{(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).cat2025 : null) || 'Sin categoría'}</td>
+                         </tr>
+                         <tr>
+                           <td className="py-2 text-slate-400">2024</td>
+                           <td className="py-2 text-slate-300">{(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).cat2024 : null) || 'Sin categoría'}</td>
+                         </tr>
+                       </tbody>
+                     </table>
                   </div>
                 </div>
 
                 <div className="bg-[#050914] border border-slate-850 p-6 rounded-2xl space-y-4">
                   <h4 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
                     <Gift size={16} />
-                    Beneficios Activos por Categoría
+                    Detalles de Venta
                   </h4>
-                  {client.clubComercial?.beneficios?.length ? (
-                    <ul className="space-y-2 text-xs text-slate-300">
-                      {client.clubComercial.beneficios.map((b: any, i: number) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <Check size={14} className="text-emerald-400 mt-0.5" />
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-slate-500">No hay beneficios activos para esta categoría.</p>
-                  )}
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block uppercase">Ventas Anuales (2025)</span>
+                      <span className="text-sm font-bold text-white">${(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0)?.toLocaleString('es-CL')}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block uppercase">Promedio Mensual Estimado</span>
+                      <span className="text-sm font-bold text-white">${((client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0) / 12)?.toLocaleString('es-CL')}</span>
+                    </div>
+                  </div>
                 </div>
 
               </div>
@@ -813,7 +801,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                     <div key={idx} className="bg-slate-900/30 border border-slate-850 p-5 rounded-2xl space-y-2">
                       <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                         <span>Registrado por {entry.creador || 'Sistema'}</span>
-                        <span className="font-mono">{entry.fecha}</span>
+                        <span className="font-mono">{new Date(entry.fecha).toLocaleString()}</span>
                       </div>
                       <p className="text-xs text-slate-200 leading-relaxed">{entry.comentario}</p>
                     </div>

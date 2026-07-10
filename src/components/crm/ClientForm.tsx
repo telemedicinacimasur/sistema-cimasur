@@ -24,7 +24,8 @@ export const ClientForm: React.FC<ClientFormProps> = ({ client, onSave, onCancel
     region: 'Metropolitana',
     sitioWeb: '',
     ejecutivoComercial: '',
-    estado: 'Activo',
+    estado: 'Solo CRM Comercial',
+    registroPosteriorCompra: false,
     observaciones: '',
     fechaIngreso: new Date().toISOString().split('T')[0],
     accesoAprobado: 'No',
@@ -249,12 +250,23 @@ export const ClientForm: React.FC<ClientFormProps> = ({ client, onSave, onCancel
             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Estado</label>
             <select 
               value={formData.estado} 
-              onChange={e => setFormData({...formData, estado: e.target.value as 'Activo' | 'Inactivo'})}
+              onChange={e => setFormData({...formData, estado: e.target.value})}
               className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white outline-none focus:border-sky-500 transition-all"
             >
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
+              <option value="Solo CRM Comercial">Solo CRM Comercial</option>
+              <option value="Solo Intranet">Solo Intranet</option>
+              <option value="Ambos (Sincronizado)">Ambos (Sincronizado)</option>
             </select>
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <input 
+              type="checkbox"
+              id="registroPosteriorCompra"
+              checked={formData.registroPosteriorCompra || false}
+              onChange={e => setFormData({...formData, registroPosteriorCompra: e.target.checked})}
+              className="w-4 h-4 rounded border-slate-700 bg-[#050914] text-emerald-500 focus:ring-emerald-500"
+            />
+            <label htmlFor="registroPosteriorCompra" className="text-xs text-slate-300">Registro en Intranet posterior a la compra (Cliente con Compra Previa)</label>
           </div>
         </div>
 

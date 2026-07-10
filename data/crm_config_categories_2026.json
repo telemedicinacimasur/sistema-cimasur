@@ -1,0 +1,38 @@
+{
+  "ranges": {
+    "Bronce": {
+      "min": 0,
+      "max": 999999
+    },
+    "Plata": {
+      "min": 1000000,
+      "max": 2999999
+    },
+    "Oro": {
+      "min": 3000000,
+      "max": 4999999
+    },
+    "Platinum": {
+      "min": 5000000,
+      "max": 99999999
+    }
+  },
+  "benefits": {
+    "Platinum": [
+      "Despacho Gratis Ilimitado: Envíos a todo Chile sin costo.",
+      "Soporte Prioritario: Atención 24/7 con línea directa.",
+      "Regalo Aniversario: Set de productos premium una vez al año."
+    ],
+    "Oro": [
+      "Despacho Gratis (5/mes): Hasta 5 envíos gratis por mes.",
+      "Soporte Preferencial: Atención en menos de 2 horas."
+    ],
+    "Plata": [
+      "Despacho Gratis (1/mes): 1 envío gratis al mes."
+    ],
+    "Bronce": [
+      "Boletín Exclusivo: Acceso a noticias y ofertas antes que todos.",
+      "Regalo Aniversario: Set de productos premium una vez al año."
+    ]
+  }
+}

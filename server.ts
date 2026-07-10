@@ -898,6 +898,68 @@ const crmTools: FunctionDeclaration[] = [
     res.json({ success: true });
   });
 
+  app.put('/api/crm/config/categories', async (req, res) => {
+    try {
+      const { year, ranges, benefits } = req.body;
+      await writeRecords('crm_config_categories_' + year, [{ id: 'config', ranges, benefits }]);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put('/api/crm/clients/category', async (req, res) => {
+    try {
+      const { id, category, year, rut, categoria } = req.body;
+      const contacts = await readRecords('contacts');
+      
+      const targetId = id;
+      const targetRut = rut;
+      const targetCategory = category || categoria;
+
+      if (!targetCategory) {
+        return res.json({ success: true });
+      }
+
+      let idx = -1;
+      if (targetId) {
+        idx = contacts.findIndex((c: any) => c.id === targetId);
+      } else if (targetRut) {
+        idx = contacts.findIndex((c: any) => c.rut === targetRut);
+      }
+
+      if (idx !== -1) {
+        contacts[idx].categoria = targetCategory;
+        await writeRecords('contacts', contacts);
+      }
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/crm/clients/bulk-category', async (req, res) => {
+    try {
+      const { ids, categoria } = req.body;
+      if (!ids || !Array.isArray(ids) || !categoria) {
+        return res.status(400).json({ error: 'Faltan campos ids o categoria' });
+      }
+      const contacts = await readRecords('contacts');
+      let count = 0;
+      for (const id of ids) {
+        const idx = contacts.findIndex((c: any) => c.id === id);
+        if (idx !== -1) {
+          contacts[idx].categoria = categoria;
+          count++;
+        }
+      }
+      await writeRecords('contacts', contacts);
+      res.json({ success: true, count });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.delete('/api/records/:collection/:id', async (req, res) => {
     console.log('API call: DELETE /api/records/:collection/:id');
     const { collection, id } = req.params;

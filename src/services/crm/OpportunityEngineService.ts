@@ -18,6 +18,9 @@ export class OpportunityEngineService {
     const now = new Date();
     
     customers.forEach(customer => {
+      // Filter out demo/mock clients
+      if (!customer.rut || customer.rut.toLowerCase().includes('sin rut')) return;
+
       // Use the pre-calculated totalSales for the current cycle
       const totalSales = customer.totalSales || 0;
       const category = customer.categoria || 'Sin categoría';

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDate, parseExcelDate, safe, formatDateForExcel } from '../lib/utils';
@@ -19,7 +20,8 @@ import {
   Trash2,
   Download,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  X
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
 import { CommentDialog } from '../components/CommentDialog';
@@ -251,6 +253,7 @@ export default function CRMView() {
   const [imports, setImports] = useState<any[]>([]);
   const [clientesSubTab, setClientesSubTab] = useState<'cartera' | 'intranet'>('cartera');
   const [preloadedTemplate, setPreloadedTemplate] = useState<string | null>(null);
+  const [preloadedClientIds, setPreloadedClientIds] = useState<string[]>([]);
   const [commentTarget, setCommentTarget] = useState<any | null>(null);
   const [filters, setFilters] = useState({
     search: '',
@@ -263,26 +266,16 @@ export default function CRMView() {
   useEffect(() => {
     const loadData = async () => {
       const data = await localDB.getCollection('contacts');
-      const sales = await localDB.getCollection('sales');
-      const segmentation = new SegmentationService();
-      
-      const processedData = await Promise.all(data.map(async (c: any) => {
-        const clientSales = sales.filter((s: any) => s.contactId === c.id);
-        const categoria = segmentation.categorizeFromSales(clientSales);
-        
-        if (c.categoria !== categoria) {
-          await localDB.updateInCollection('contacts', c.id, { categoria });
-          return { ...c, categoria };
-        }
-        return { ...c, categoria };
-      }));
-      setRecords(processedData);
       const intranetData = await localDB.getCollection('intranet_clients');
       const importData = await localDB.getCollection('intranet_imports');
 
       // Proactive cleanup of existing duplicates in contacts list (e.g. Marco Antonio Vilches)
       let cleanedSomeDuplicates = false;
-      const cleanContactsList = [...data];
+      const cleanContactsList = data.map((c: any) => ({
+        ...c,
+        categoria: c.categoria || 'Sin categoría'
+      }));
+
       for (let i = 0; i < cleanContactsList.length; i++) {
         for (let j = i + 1; j < cleanContactsList.length; j++) {
           const c1 = cleanContactsList[i];
@@ -345,7 +338,11 @@ export default function CRMView() {
 
       if (didSync || cleanedSomeDuplicates) {
         const uContacts = await localDB.getCollection('contacts');
-        setRecords(uContacts);
+        const processedUContacts = uContacts.map((c: any) => ({
+          ...c,
+          categoria: c.categoria || 'Sin categoría'
+        }));
+        setRecords(processedUContacts);
       } else {
         setRecords(cleanContactsList);
       }
@@ -593,16 +590,20 @@ export default function CRMView() {
               dashboardData={dashboardData} 
               onViewClient={(id) => setSelectedClientId(id)} 
               preloadedTemplate={preloadedTemplate}
-              clearPreloadedTemplate={() => setPreloadedTemplate(null)}
+              preloadedClientIds={preloadedClientIds}
+              clearPreloadedTemplate={() => {
+                setPreloadedTemplate(null);
+                setPreloadedClientIds([]);
+              }}
             />
           )}
           {activeTab === 'ia' && (
             <IAComercialView 
               dashboardData={dashboardData} 
               onViewClient={(id) => setSelectedClientId(id)} 
-              onNavigateToEditor={(text) => {
-                // Preloading logic should be handled by CampaignsBuilder or passed down
+              onNavigateToEditor={(text, clientIds = []) => {
                 setPreloadedTemplate(text);
+                setPreloadedClientIds(clientIds);
                 setActiveTab('campanas');
               }}
             />
@@ -842,7 +843,7 @@ function CRMRegister() {
 
   const downloadExcelTemplate = () => {
     const headers = [
-      ["Fecha Ingreso", "Nombre / Razón Social", "RUT / ID", "Teléfono", "Email", "Comuna", "Tipo de Cliente", "Categoría de Cliente", "Inscrito en Intranet", "Como Llego", "Compra Anual"]
+      ["RUT (llave primaria)", "Nombre / Razón Social", "Estado (Activo/Inactivo)", "Ventas Anuales 2025 (CLP)"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(headers);
     ws['!cols'] = headers[0].map(() => ({ wch: 25 }));
@@ -866,48 +867,35 @@ function CRMRegister() {
 
         let importedCount = 0;
         for (const row of data) {
-          const fechaIngreso = parseExcelDate(row["Fecha Ingreso"]);
-          const phone = safe(row["Teléfono"]);
-          let name = safe(row["Nombre / Razón Social"]);
-          const rut = safe(row["RUT / ID"]);
+          const rut = safe(row["RUT (llave primaria)"]) || safe(row["RUT"]) || safe(row["RUT / ID"]);
+          if (!rut || rut.trim() === '') continue; // RUT is primary key and required
 
-          if (!name && phone) {
-            name = `Contacto Fono ${phone}`;
-          } else if (!name) {
-            name = "Contacto Sin Nombre";
-          }
-
-          const resolvedRut = rut || "Sin RUT";
-          const parsedCompra = Number(safe(row["Compra Anual"]) || safe(row["Compra Anual 2026"]) || safe(row["Ventas Anuales"]) || safe(row["Monto de Compra"])) || 0;
-          const calculatedCategory = getTierForSales(parsedCompra).name;
-          const categoryFromFile = safe(row["Categoría de Cliente"]);
-          const finalCategory = categoryFromFile && CATEGORIAS.includes(categoryFromFile) ? categoryFromFile : calculatedCategory;
+          let name = safe(row["Nombre / Razón Social"]) || "Contacto Sin Nombre";
+          const estado = safe(row["Estado (Activo/Inactivo)"]) || safe(row["Estado"]) || "Activo";
+          const ventasAnuales = Number(safe(row["Ventas Anuales 2025 (CLP)"]) || safe(row["Ventas Anuales"])) || 0;
+          
+          const promedioMensual = ventasAnuales / 12;
+          const precioPromedioFrasco = 12000; // Assumed fixed price for calculating frascos if needed, though getTierForSales uses Sales directly usually?
+          
+          // Let's use getTierForSales which usually takes annual sales, or is it monthly?
+          // If the rule is based on monthly:
+          const calculatedCategory = getTierForSales(ventasAnuales).name;
 
           const newContact = {
-            fechaIngreso: fechaIngreso,
+            fechaIngreso: new Date().toISOString().split('T')[0],
             name: name,
-            rut: resolvedRut,
-            phone: phone,
-            email: safe(row["Email"]),
-            region: safe(row["Comuna"]) || 'Metropolitana',
-            type: safe(row["Tipo de Cliente"]) || 'Farmacia',
-            categoria: finalCategory,
-            intranet: safe(row["Inscrito en Intranet"]) || 'No',
-            comoLlego: safe(row["Como Llego"]) || safe(row["Canal de Entrada"]) || safe(row["Origen"]) || 'Campañas / Ads',
-            compraAnual: parsedCompra,
-            clubVentasDetail: JSON.stringify({ v2024: 0, v2025: 0, v2026: parsedCompra }),
-            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')}` + 
-              (row["Como Llego"] || row["Canal de Entrada"] || row["Origen"] ? ` (Origen: ${row["Como Llego"] || row["Canal de Entrada"] || row["Origen"]})` : '') +
-              ` (Compra Anual: $${parsedCompra.toLocaleString('es-CL')}, Categoría: ${finalCategory})`,
+            rut: rut,
+            estado: estado,
+            categoria: calculatedCategory,
+            clubVentasDetail: JSON.stringify({ v2024: 0, v2025: ventasAnuales, v2026: 0, pMensual: promedioMensual }),
+            promedioMensual: promedioMensual,
+            frascosMensualesEstimados: Math.round(promedioMensual / precioPromedioFrasco),
+            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')} (Ventas 2025: $${ventasAnuales.toLocaleString('es-CL')}, Categoría: ${calculatedCategory})`,
             responsable: user.displayName || user.email || 'Sistema'
           };
 
-          // Allow saving as long as there is any identifier (phone, name or rut)
-          if (phone || newContact.name !== "Contacto Sin Nombre" || rut) {
-            await localDB.saveToCollection('contacts', newContact);
-            await syncToIntranetClientsIfNeeded(newContact, user);
-            importedCount++;
-          }
+          await localDB.saveToCollection('contacts', newContact);
+          importedCount++;
         }
 
         await addAuditLog(user, `Importó ${importedCount} clientes desde Excel`, 'CRM');
@@ -1044,6 +1032,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
   const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkCategory, setBulkCategory] = useState<string>('');
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [newHistory, setNewHistory] = useState('');
   const [newName, setNewName] = useState('');
@@ -1059,12 +1048,21 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
   const [crmCampaignTargetTier, setCrmCampaignTargetTier] = useState<string | null>(null);
   const [crmCopiedMessageId, setCrmCopiedMessageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importCycleYear, setImportCycleYear] = useState('2026');
 
   const segmentationService = useMemo(() => new SegmentationService(), []);
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportClick = () => {
+    setIsImportModalOpen(true);
+  };
+
+  const processImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    setIsImportModalOpen(false);
     
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -1072,34 +1070,50 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json<{RUT: string, Ventas2026: number}>(ws);
+        const data = XLSX.utils.sheet_to_json<any>(ws);
         
-        const intranetClients = await localDB.getCollection('intranet_clients');
-        
-        console.log("Importing data and syncing with Intranet:", data);
+        console.log(`Importing data for Cycle ${importCycleYear}...`, data);
+        const prevYear = Number(importCycleYear) - 1;
+        let processed = 0;
         
         for (const item of data) {
-            const client = records.find(c => c.rut === item.RUT);
-            if (client) {
-                const intranetClient = intranetClients.find((ic: any) => ic.rut === item.RUT);
-                
-                let newCategoria = 'Sin Compra';
-                
-                if (intranetClient && intranetClient.ventas2025 > 0) {
-                    const monthlyAverageFrascos = intranetClient.ventas2025 / 12 / 7000;
-                    newCategoria = segmentationService.categorizeByMonthlyAverage(monthlyAverageFrascos);
-                } else {
-                    newCategoria = 'Sin Compra';
-                }
+            const rutRaw = item.RUT || item.rut || item.Rut || item['RUT (llave primaria)'] || item['RUT / ID'];
+            if (!rutRaw) continue;
+            
+            const client = records.find(c => c.rut === rutRaw);
+            if (!client) continue;
 
-                await localDB.updateInCollection('contacts', client.id, { 
-                    categoria: newCategoria,
-                    clubVentasDetail: JSON.stringify({ ...JSON.parse(client.clubVentasDetail || '{}'), v2026: item.Ventas2026 })
+            const ventasTotalesAnteriores = Number(item.Ventas || item.ventas || item['Ventas Anuales'] || item[`Ventas${prevYear}`] || item[`Ventas ${prevYear}`] || item['Total']) || 0;
+            
+            // Calculamos promedio mensual anualizado que en el fondo son las ventasTotalesAnteriores contrastadas contra los rangos (que asumen venta anual).
+            // Get category based on previous year total sales
+            const calculatedTier = getTierForSales(ventasTotalesAnteriores);
+            
+            // Update local DB
+            const existingDetails = JSON.parse(client.clubVentasDetail || '{}');
+            existingDetails[`v${importCycleYear}`] = ventasTotalesAnteriores;
+            
+            await localDB.updateInCollection('contacts', client.id, { 
+                categoria: calculatedTier.name,
+                clubVentasDetail: JSON.stringify(existingDetails)
+            });
+            
+            // Call Render API to update SQL database in cascade
+            try {
+                await fetch('/api/crm/clients/category', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: client.id, category: calculatedTier.name, year: importCycleYear })
                 });
+            } catch (error) {
+                console.error("Failed to update SQL database", error);
             }
+            processed++;
         }
-        alert(`Procesadas ${data.length} filas y categorías actualizadas según ventas 2025.`);
+        
+        alert(`Se procesaron ${processed} registros. Las categorías fueron actualizadas evaluando las ventas de ${prevYear} para el ciclo comercial ${importCycleYear}.`);
         window.dispatchEvent(new Event('db-change'));
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsBinaryString(file);
   };
@@ -1149,7 +1163,11 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
       const matchesIntranet = filters.intranet === 'Todos' || safe(r.intranet) === filters.intranet;
       return matchesSearch && matchesRegion && matchesType && matchesCategoria && matchesIntranet;
     })
-    .sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+    .sort((a, b) => {
+      const dateCmp = (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '');
+      if (dateCmp !== 0) return dateCmp;
+      return (a.id || '').localeCompare(b.id || '');
+    });
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -1805,24 +1823,8 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
               <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Nueva Categoría:</span>
               <select
                 disabled={!canEdit}
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  if (!val) return;
-                  if (window.confirm(`¿Está seguro que desea cambiar a "${val}" la categoría de los ${selectedIds.length} clientes seleccionados?`)) {
-                    try {
-                      for (const id of selectedIds) {
-                        await localDB.updateInCollection('contacts', id, { categoria: val });
-                      }
-                      setSelectedIds([]);
-                      window.dispatchEvent(new Event('db-change'));
-                      alert(`Se actualizó la categoría a "${val}" para los clientes seleccionados.`);
-                    } catch (err) {
-                      console.error(err);
-                      alert('Hubo un error al actualizar las categorías.');
-                    }
-                  }
-                  e.target.value = '';
-                }}
+                value={bulkCategory}
+                onChange={(e) => setBulkCategory(e.target.value)}
                 className="bg-transparent text-white text-xs border-none outline-none cursor-pointer font-bold focus:ring-0 focus:outline-none"
               >
                 <option value="" className="bg-[#152035] text-slate-400">Seleccionar...</option>
@@ -1831,6 +1833,28 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                 ))}
               </select>
             </div>
+
+            <button
+              disabled={!canEdit || !bulkCategory}
+              onClick={async () => {
+                if (window.confirm(`¿Está seguro que desea cambiar a "${bulkCategory}" la categoría de los ${selectedIds.length} clientes seleccionados?`)) {
+                  try {
+                    await localDB.updateBulkCategory(selectedIds, bulkCategory);
+                    setSelectedIds([]);
+                    setBulkCategory('');
+                    window.dispatchEvent(new Event('db-change'));
+                    alert(`Se actualizó la categoría a "${bulkCategory}" para los clientes seleccionados.`);
+                  } catch (err) {
+                    console.error(err);
+                    alert('Hubo un error al actualizar las categorías.');
+                  }
+                }
+              }}
+              className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369a1] text-white rounded-xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-lg active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Save className="w-4 h-4" />
+              <span>Guardar</span>
+            </button>
 
             {/* Traspasar masivo a Gestión */}
             <button
@@ -1889,7 +1913,10 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
 
             {/* Cancelar Selección */}
             <button
-              onClick={() => setSelectedIds([])}
+              onClick={() => {
+                setSelectedIds([]);
+                setBulkCategory('');
+              }}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-705 text-slate-300 rounded-xl transition-all font-bold text-xs border border-slate-700 active:scale-95 cursor-pointer"
             >
               Cancelar
@@ -1901,8 +1928,8 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="p-4 flex justify-end gap-2">
             <button onClick={handleExport} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Download size={14}/>Exportar Plantilla</button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Upload size={14}/>Importar Ventas Masivas</button>
-            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx, .xls" />
+            <button onClick={handleImportClick} className="bg-emerald-600 hover:bg-emerald-700 transition-colors text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Upload size={14}/>Importar Ventas Masivas</button>
+            <input type="file" ref={fileInputRef} onChange={processImport} className="hidden" accept=".xlsx, .xls" />
         </div>
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
@@ -1970,7 +1997,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                                window.dispatchEvent(new Event('db-change'));
                              } catch (err) {
                                console.error(err);
-                               alert('Error al actualizar la categoría.');
+                               alert('Error al actualizar la categoría. Revisa la consola.');
                              }
                            }}
                            className={cn(
@@ -2111,6 +2138,58 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
             </table>
          </div>
        </div>
+
+      {/* Modal para seleccionar Ciclo Comercial de Importación */}
+      <AnimatePresence>
+        {isImportModalOpen && (
+          <div className="fixed inset-0 bg-[#050914]/85 backdrop-blur-md flex items-center justify-center p-4 z-[60]">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#0D1527] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+            >
+              <div className="bg-[#152035] border-b border-slate-800 px-6 py-4 flex justify-between items-center">
+                <h3 className="text-md font-black text-white flex items-center gap-2">
+                  <Upload size={18} className="text-emerald-400" /> Importar Histórico de Ventas
+                </h3>
+                <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Ciclo Comercial a Configurar (Año en Curso)</label>
+                  <select 
+                    value={importCycleYear}
+                    onChange={(e) => setImportCycleYear(e.target.value)}
+                    className="w-full bg-[#050914] border border-slate-800 p-3 rounded-lg text-sm font-bold text-white outline-none focus:border-sky-500"
+                  >
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                  </select>
+                  <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                    <strong>Regla de congelamiento:</strong> Si selecciona el ciclo <strong className="text-slate-300">{importCycleYear}</strong>, el sistema evaluará la columna de ventas correspondientes al <strong className="text-sky-400">año comercial {Number(importCycleYear) - 1}</strong> en su archivo Excel.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-[#152035] border-t border-slate-800 px-6 py-4 flex justify-end gap-3">
+                <button onClick={() => setIsImportModalOpen(false)} className="text-xs font-bold text-slate-400 hover:text-white">Cancelar</button>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase px-6 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
+                >
+                  <FileSpreadsheet size={16} /> Seleccionar Archivo
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
@@ -2603,8 +2682,20 @@ function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }
         for (const contact of targetedContacts) {
           const logHeader = `\n\n--- Automatización: ${form.campania} ---`;
           const updatedHistory = (contact.historialUnificado || '') + logHeader + `\n[${form.tipo}] - ${form.observaciones}`;
+          
+          // Inyectar a Bitácora
+          const currentBitacora = contact.bitacora ? (typeof contact.bitacora === 'string' ? JSON.parse(contact.bitacora) : contact.bitacora) : [];
+          const bitacoraEntry = {
+            id: Date.now().toString() + Math.random(),
+            fecha: new Date().toISOString(),
+            comentario: `Campaña Interna: ${form.campania} - ${form.observaciones}`,
+            creador: user.displayName || user.email || 'Sistema'
+          };
+          const newBitacora = [bitacoraEntry, ...currentBitacora];
+
           await localDB.updateInCollection('contacts', contact.id, {
-            historialUnificado: updatedHistory
+            historialUnificado: updatedHistory,
+            bitacora: JSON.stringify(newBitacora)
           });
         }
 
