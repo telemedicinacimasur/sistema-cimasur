@@ -43,9 +43,23 @@ export interface Client {
   ventas?: any[];
   clubComercial?: {
     categoria: string;
-    beneficios: any[];
+    beneficios: {
+      bronce: any[];
+      plata: any[];
+      oro: any[];
+      platinum: any[];
+    };
     puntos: number;
     estado: 'Inscrito' | 'Sin categoría';
+    
+    // New fields
+    manualMonthlyFrascos?: number;
+    yearlyData?: { 
+      year: number; 
+      annualAmount: number; 
+      monthlyAmount: number; 
+      monthlyFrascos: number; 
+    }[];
   };
   oportunidades?: any[];
   campanas?: any[];

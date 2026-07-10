@@ -1030,7 +1030,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                             <span className="text-xs">{t.name}</span>
                           </div>
                           <span className="text-[10px] font-mono text-slate-500">
-                            &gt;= {t.minMonthlyAverage} frascos/mes
+                            &gt;= {t.visualEquivalentFrascos || '0'} frascos/mes
                           </span>
                         </button>
                       );
@@ -1117,21 +1117,21 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Mínimas (Frascos/mes)</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">VENTAS ANUALES DE CONTROL (CLP/AÑO)</label>
                               <input
-                                type="number"
+                                type="text"
                                 className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
-                                value={tier.minMonthlyAverage ?? 0}
-                                onChange={(e) => updateField('minMonthlyAverage', parseFloat(e.target.value) || 0)}
+                                value={tier.annualSalesControl ?? ''}
+                                onChange={(e) => updateField('annualSalesControl', e.target.value)}
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ventas Promedio Máximas (Frascos/mes)</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">EQUIVALENCIA VISUAL EN FRASCOS (FRASCOS/MES)</label>
                               <input
-                                type="number"
+                                type="text"
                                 className="w-full bg-[#0D1527] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-indigo-500 outline-none font-mono"
-                                value={tier.maxMonthlyAverage ?? 0}
-                                onChange={(e) => updateField('maxMonthlyAverage', parseFloat(e.target.value) || 0)}
+                                value={tier.visualEquivalentFrascos ?? ''}
+                                onChange={(e) => updateField('visualEquivalentFrascos', e.target.value)}
                               />
                             </div>
                           </div>
@@ -1305,10 +1305,14 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                   // Confimation State
                   <div className="space-y-4">
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      ¿Está seguro que desea realizar el canje de este premio para el cliente <strong>{memberDetails?.account?.name}</strong>? Esta acción no se puede revertir.
+                      ¿Está seguro que desea realizar el canje de este premio para el cliente <strong>{memberDetails?.account?.name || memberDetails?.name || 'Cliente'}</strong>? Esta acción no se puede revertir.
                     </p>
 
                     <div className="bg-[#050914] border border-slate-850 rounded-2xl p-4 space-y-3 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Cliente:</span>
+                        <span className="text-white font-bold">{memberDetails?.account?.name || memberDetails?.name || 'Desconocido'}</span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500">Beneficio Solicitado:</span>
                         <span className="text-white font-bold">{selectedReward.name}</span>

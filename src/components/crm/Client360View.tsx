@@ -77,39 +77,13 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     );
   }
 
-  const getComputedCategory = (compAnual: number, state: string, compCount: number) => {
-    if (state === 'Inactivo' || compCount === 0) {
-      return 'Sin Compra';
-    }
-    const monthlyAverageFrascos = (compAnual / 12) / 7000;
-    if (monthlyAverageFrascos <= 5.6) {
-      return 'Sin categoría';
-    } else if (monthlyAverageFrascos >= 5.7 && monthlyAverageFrascos <= 22.9) {
-      return 'Bronce';
-    } else if (monthlyAverageFrascos >= 23.0 && monthlyAverageFrascos <= 54.9) {
-      return 'Plata';
-    } else if (monthlyAverageFrascos >= 55.0 && monthlyAverageFrascos <= 99.9) {
-      return 'Oro';
-    } else {
-      return 'Platinum';
-    }
-  };
 
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const parsedCompraAnual = Number(editForm.compraAnual || 0);
-      const parsedCompras = Number(editForm.compras !== undefined ? editForm.compras : (editForm.frascos !== undefined ? editForm.frascos : 0));
-      const finalCategory = getComputedCategory(parsedCompraAnual, editForm.estado || 'Activo', parsedCompras);
-
       const contactUpdates = {
         ...editForm,
-        categoria: finalCategory,
-        journeyState: finalCategory,
-        compraAnual: parsedCompraAnual,
-        compras: parsedCompras,
-        frascos: parsedCompras,
-        frascosComprados: parsedCompras,
+        // Manual updates for clubComercial already handled in editForm
       };
 
       await clientService.updateClient(client.id, contactUpdates);
@@ -121,7 +95,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
         if (existingLoyaltyIndex !== -1) {
           const updatedLoyalty = {
             ...loyaltyCollection[existingLoyaltyIndex],
-            categoria: finalCategory,
+            categoria: editForm.clubComercial?.categoria || 'Sin categoría',
             puntos: Number(editForm.puntos || loyaltyCollection[existingLoyaltyIndex].puntos || 0)
           };
           await localDB.updateInCollection('loyalty_accounts', loyaltyCollection[existingLoyaltyIndex].id, updatedLoyalty);
@@ -129,7 +103,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
           await localDB.saveToCollection('loyalty_accounts', {
             id: `loy-${Date.now()}`,
             contactId: client.id,
-            categoria: finalCategory,
+            categoria: editForm.clubComercial?.categoria || 'Sin categoría',
             puntos: Number(editForm.puntos || 0),
             estado: 'Inscrito',
             beneficios: []
@@ -403,29 +377,57 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                         <option value="Activo">Activo</option>
                         <option value="Inactivo">Inactivo</option>
                       </select>
-                                   <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Categoría del Club (Auto-calculada)</label>
+                      <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">VENTAS ANUALES (CLP)</label>
                       <input 
-                        type="text" 
-                        disabled 
-                        value={getComputedCategory(Number(editForm.compraAnual || 0), editForm.estado || 'Activo', Number(editForm.compras !== undefined ? editForm.compras : (editForm.frascos !== undefined ? editForm.frascos : 0)))}
-                        className="w-full bg-slate-900/50 border border-slate-800 p-3 rounded-xl text-xs text-indigo-400 font-bold cursor-not-allowed" 
+                        type="number" 
+                        value={editForm.clubComercial?.yearlyData?.[0]?.annualAmount || ''} 
+                        onChange={e => {
+                          const val = Number(e.target.value);
+                          const newYearlyData = [...(editForm.clubComercial?.yearlyData || [{year: new Date().getFullYear(), annualAmount: 0, monthlyAmount: 0, monthlyFrascos: 0}])];
+                          newYearlyData[0].annualAmount = val;
+                          newYearlyData[0].monthlyAmount = val / 12;
+                          setEditForm({...editForm, clubComercial: {...editForm.clubComercial, yearlyData: newYearlyData} as any});
+                        }}
+                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
+                        placeholder="Ej: 12000000"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Promedio de Frascos Mensual Equivalente</label>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">PROMEDIO MENSUAL (CLP)</label>
                       <input 
                         type="number" 
-                        step="0.1"
-                        value={editForm.compraAnual !== undefined ? Number((((editForm.compraAnual || 0) / 12) / 10000).toFixed(1)) : ''} 
-                        onChange={e => setEditForm({...editForm, compraAnual: e.target.value ? Number(e.target.value) * 10000 * 12 : 0})}
+                        value={editForm.clubComercial?.yearlyData?.[0]?.monthlyAmount || ''} 
+                        onChange={e => {
+                          const val = Number(e.target.value);
+                          const newYearlyData = [...(editForm.clubComercial?.yearlyData || [{year: new Date().getFullYear(), annualAmount: 0, monthlyAmount: 0, monthlyFrascos: 0}])];
+                          newYearlyData[0].monthlyAmount = val;
+                          setEditForm({...editForm, clubComercial: {...editForm.clubComercial, yearlyData: newYearlyData} as any});
+                        }}
+                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">PROMEDIO MENSUAL (FRASCOS)</label>
+                      <input 
+                        type="number" 
+                        value={editForm.clubComercial?.manualMonthlyFrascos || ''} 
+                        onChange={e => setEditForm({...editForm, clubComercial: {...editForm.clubComercial, manualMonthlyFrascos: Number(e.target.value)} as any})}
                         className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
                         placeholder="Ej: 5.7"
                       />
-                      <span className="text-[10px] text-amber-400 block mt-1 font-mono">
-                        Traducido internamente para categorización comercial según consumo de frascos.
-                      </span>
-                    </div>           </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Categoría Actual (Manual)</label>
+                      <input 
+                        type="text" 
+                        value={editForm.clubComercial?.categoria || ''} 
+                        onChange={e => setEditForm({...editForm, clubComercial: {...editForm.clubComercial, categoria: e.target.value} as any})}
+                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
+                        placeholder="Ej: Bronce"
+                      />
+                    </div>
+          </div>
                     <div>
                       <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Consumo de Frascos</label>
                       <input 
@@ -442,6 +444,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                       />
                     </div>
                   </div>
+                  
                   <div>
                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Observaciones Internas</label>
                     <textarea 

@@ -12,7 +12,7 @@ import { GoogleGenAI, Type, FunctionDeclaration, GenerateContentResponse } from 
 import dns from 'dns';
 
 // CRM Backend Imports
-import { IntegrationService } from './src/services/crm/IntegrationService';
+import { IntegrationService } from './src/services/crm/IntegrationService.ts';
 import { GrowthEngine } from './src/services/crm/GrowthEngine';
 
 const CommercialEngine = {
