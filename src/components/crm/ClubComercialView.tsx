@@ -57,8 +57,17 @@ const TIER_GRADIENTS: Record<string, string> = {
 export default function ClubComercialView({ onViewClient }: { onViewClient?: (id: string) => void }) {
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'perfil' | 'rewards' | 'admin'>('dashboard');
   
-  // Search & Selector state for Perfil View
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('Todos');
+  const [selectedRedeemerId, setSelectedRedeemerId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  
   const [allContacts, setAllContacts] = useState<any[]>([]);
+
+  const filteredContacts = allContacts.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.rut.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [searchContactQuery, setSearchContactQuery] = useState<string>('');
   
@@ -283,6 +292,35 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
         await loadMemberDetails(selectedContactId);
         await loadDashboardMetrics();
         await loadRewardsCatalog();
+        
+        // Log redemption to client bitacora and clubComercial benefits
+        const updatedBitacora = [...(memberDetails.account.bitacora || []), {
+            title: 'Canje de Premio',
+            description: `Se ha canjeado el beneficio: ${selectedReward.name}`,
+            date: new Date().toISOString(),
+            type: 'Canje'
+        }];
+
+        const clientCategory = memberDetails.tier.toLowerCase() as 'bronce' | 'plata' | 'oro' | 'platinum';
+        const updatedBeneficios = {
+            ...memberDetails.clubComercial.beneficios,
+            [clientCategory]: [
+                ...(memberDetails.clubComercial.beneficios[clientCategory] || []),
+                { name: selectedReward.name, date: new Date().toISOString() }
+            ]
+        };
+
+        await fetch(`/api/records/contacts/${selectedContactId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bitacora: updatedBitacora,
+            clubComercial: {
+                ...memberDetails.clubComercial,
+                beneficios: updatedBeneficios
+            }
+          })
+        }).catch(console.error);
       } else {
         setRedemptionError(data.error || 'Hubo un error al procesar el canje de la recompensa.');
       }
@@ -783,49 +821,91 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
           <div className="space-y-8 animate-in fade-in duration-300">
             
             {/* Header / Selector information */}
-            <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="space-y-1">
-                <h3 className="text-lg font-black text-white">Catálogo de Beneficios de CIMASUR®</h3>
-                <p className="text-xs text-slate-400">Accede a convenios de descuento, despachos preferenciales y herramientas exclusivas según tu categoría de socio.</p>
+            <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-2xl flex flex-col gap-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-black text-white">Catálogo de Beneficios de CIMASUR®</h3>
+                  <p className="text-xs text-slate-400">Selecciona un cliente para canjear y filtra los beneficios disponibles por categoría.</p>
+                </div>
               </div>
 
-              {selectedContactId && memberDetails?.enrolled && (
-                <div className="bg-[#050914] border border-slate-850 px-5 py-3 rounded-2xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Categoría Actual del Socio</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-slate-400 truncate max-w-[150px] font-bold block">{memberDetails.account?.name}:</span>
-                    <span className="text-sm font-black text-white font-mono">{memberDetails.tier || 'Plata'}</span>
+              <div className="flex flex-wrap gap-4">
+                  {/* Category Filter */}
+                  <div className="flex bg-[#050914] p-1 rounded-xl border border-slate-850">
+                    {['Todos', 'Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
+                        <button key={cat} onClick={() => setSelectedCategoryFilter(cat)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${selectedCategoryFilter === cat ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-white'}`}>
+                            {cat}
+                        </button>
+                    ))}
                   </div>
-                </div>
-              )}
+
+                  {/* Client Selector */}
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      className="bg-[#050914] border border-slate-850 rounded-xl px-4 py-2 text-xs text-white w-64"
+                      placeholder="Buscar cliente por nombre o RUT..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setShowSuggestions(true);
+                      }}
+                      onFocus={() => setShowSuggestions(true)}
+                    />
+                    {showSuggestions && searchQuery && (
+                      <div className="absolute top-full left-0 mt-1 bg-[#050914] border border-slate-850 rounded-xl w-64 max-h-60 overflow-y-auto z-50">
+                        {filteredContacts.map(c => (
+                          <button 
+                            key={c.id} 
+                            onClick={() => {
+                              setSelectedRedeemerId(c.id);
+                              setSearchQuery(`${c.name} (${c.rut})`);
+                              setShowSuggestions(false);
+                            }}
+                            className="block w-full text-left px-4 py-2 text-xs text-white hover:bg-slate-800"
+                          >
+                            {c.name} ({c.rut})
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+              </div>
             </div>
 
             {loadingRewards ? renderSkeleton() : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {rewardsCatalog.map(reward => {
-                  const hasStock = reward.stock > 0;
-                  const isEnrolled = true; // Always allow redemption for existing CRM clients
-                  
-                  // Business rule: Check required tier
-                  let meetsTier = true;
-                  const clientTier = memberDetails?.tier || 'Sin categoría';
-                  
-                  if (reward.id === 'r_desc_20' && (clientTier === 'Sin categoría' || clientTier === 'Bronce')) {
-                    meetsTier = false; // requires Plata or up
-                  }
-                  if (reward.id === 'r_prod_base' && (clientTier === 'Sin categoría' || clientTier === 'Bronce' || clientTier === 'Plata')) {
-                    meetsTier = false; // requires Oro or up
-                  }
-                  if (reward.id === 'r_vademecum_impreso' && (clientTier === 'Sin categoría' || clientTier === 'Bronce')) {
-                    meetsTier = false; // requires Plata or up
-                  }
-
-                  const canRedeem = hasStock && meetsTier;
-
-                  let requiredTierLabel = 'Bronce';
-                  if (reward.id === 'r_desc_20') requiredTierLabel = 'Plata';
-                  if (reward.id === 'r_prod_base') requiredTierLabel = 'Oro';
-                  if (reward.id === 'r_vademecum_impreso') requiredTierLabel = 'Plata';
+                {rewardsCatalog
+                  .filter(reward => {
+                    let requiredTierLabel = 'Bronce';
+                    if (reward.id === 'r_desc_20') requiredTierLabel = 'Plata';
+                    if (reward.id === 'r_prod_base') requiredTierLabel = 'Oro';
+                    if (reward.id === 'r_vademecum_impreso') requiredTierLabel = 'Plata';
+                    return selectedCategoryFilter === 'Todos' || requiredTierLabel === selectedCategoryFilter;
+                  })
+                  .map(reward => {
+                    const hasStock = reward.stock > 0;
+                    
+                    // Logic to determine required tier label for UI
+                    let requiredTierLabel = 'Bronce';
+                    if (reward.id === 'r_desc_20') requiredTierLabel = 'Plata';
+                    if (reward.id === 'r_prod_base') requiredTierLabel = 'Oro';
+                    if (reward.id === 'r_vademecum_impreso') requiredTierLabel = 'Plata';
+                    
+                    const isEnrolled = !!selectedRedeemerId; // Check if a client is selected
+                    
+                    // Business rule: Check required tier
+                    let meetsTier = true;
+                    // Need to find the selected client tier if possible
+                    const selectedClient = allContacts.find(c => c.id === selectedRedeemerId);
+                    const clientTier = selectedClient?.clubComercial?.categoria || 'Sin categoría';
+                    
+                    // Simple logic for tier check based on requiredTierLabel
+                    // ... (keep original logic)
+                    if (requiredTierLabel === 'Plata' && (clientTier === 'Sin categoría' || clientTier === 'Bronce')) meetsTier = false;
+                    if (requiredTierLabel === 'Oro' && (clientTier === 'Sin categoría' || clientTier === 'Bronce' || clientTier === 'Plata')) meetsTier = false;
+                    
+                    const canRedeem = hasStock && meetsTier && isEnrolled;
 
                   return (
                     <div 
@@ -834,7 +914,6 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                     >
                       <div className="space-y-4">
                         <div className="h-44 bg-[#050914] border border-slate-850 rounded-xl overflow-hidden relative flex items-center justify-center">
-                          {/* Image generator placeholder or nice vector icon */}
                           <div className="absolute inset-0 bg-gradient-to-tr from-[#0D1527] to-[#1E293B]/40 opacity-50 z-10" />
                           <div className="z-20 text-center space-y-2">
                             <span className="inline-block p-4 bg-slate-900/80 rounded-full border border-slate-800 text-sky-400">
@@ -872,7 +951,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                           }}
                           className={`w-full font-black text-xs uppercase py-3 rounded-xl transition-all shadow-md ${canRedeem ? 'bg-sky-500 hover:bg-sky-600 text-slate-950' : 'bg-[#050914] text-slate-500 border border-slate-850 cursor-not-allowed'}`}
                         >
-                          {!isEnrolled ? 'Inscriba al Socio Primero' : !hasStock ? 'Sin stock' : !meetsTier ? 'Requiere mayor nivel' : 'Solicitar Beneficio'}
+                          {!isEnrolled ? 'Seleccione un Socio' : !hasStock ? 'Sin stock' : !meetsTier ? 'Requiere mayor nivel' : 'Solicitar Beneficio'}
                         </button>
                       </div>
                     </div>
