@@ -1,26 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ClubClient, classifyClients } from '../../lib/crmLogic';
-import { Mail, Phone, Users, Laptop } from 'lucide-react';
+import { Mail, Phone, Users, Laptop, Download, Upload } from 'lucide-react';
 import { useBenefits } from '../../context/BenefitsContext';
+import * as XLSX from 'xlsx';
 
 export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => {
   const [activeTab, setActiveTab] = useState<'club' | 'intranet'>('club');
   const { clientesARecuperar, veterinariosIntranet, subitDeCategoria, zonaVIP } = classifyClients(clients);
   const { benefits } = useBenefits();
-  const [showImport, setShowImport] = useState(false);
-  const [bulkImportData, setBulkImportData] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatCLP = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(val);
 
-  const handleImport = () => {
-    const lines = bulkImportData.split('\n');
-    lines.forEach(line => {
-      if (!line.trim()) return;
-      const [rut, year, amount] = line.split(',').map(s => s.trim());
-    });
-    alert(`Procesadas ${lines.length} líneas de datos.`);
-    setBulkImportData('');
-    setShowImport(false);
+  const handleExport = () => {
+    const data = clients.map(c => ({
+        RUT: c.rut,
+        Clinica: c.clinica,
+        Nombre: c.name,
+        Ventas2026: c.ventas?.v2026 || 0,
+        Ventas2025: c.ventas?.v2025 || 0
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
+    XLSX.writeFile(workbook, "CarteraClientes.xlsx");
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json<{RUT: string, Ventas2026: number}>(ws);
+        
+        console.log("Importing data:", data);
+        
+        for (const item of data) {
+            const client = clients.find(c => c.rut === item.RUT);
+            if (client) {
+                await fetch(`/api/records/contacts/${client.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        ventas: { ...client.ventas, v2026: item.Ventas2026 } 
+                    })
+                });
+            }
+        }
+        alert(`Procesadas ${data.length} filas.`);
+        window.location.reload();
+    };
+    reader.readAsBinaryString(file);
   };
 
   const getMessage = (client: ClubClient, pillar: string) => {
@@ -72,25 +107,12 @@ export const CimasurCRM: React.FC<{ clients: ClubClient[] }> = ({ clients }) => 
           <button onClick={() => setActiveTab('club')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase ${activeTab === 'club' ? 'bg-sky-500 text-slate-950' : 'bg-[#0d162d] text-slate-400 border border-slate-800'}`}><Users size={16}/>Club Comercial</button>
           <button onClick={() => setActiveTab('intranet')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase ${activeTab === 'intranet' ? 'bg-sky-500 text-slate-950' : 'bg-[#0d162d] text-slate-400 border border-slate-800'}`}><Laptop size={16}/>Intranet Prospectos</button>
         </div>
-        <button onClick={() => setShowImport(true)} className="bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-xs">Importar Ventas</button>
-      </div>
-
-      {showImport && (
-        <div className="bg-[#0D1527] p-6 rounded-2xl border border-[#1E293B] mb-8">
-          <h3 className="text-white font-bold mb-4">Importar Ventas Masivas (Formato: RUT, Año, MontoMensual)</h3>
-          <textarea 
-            placeholder="Ejemplo: 12345678-9, 2026, 150000&#10;98765432-1, 2026, 200000"
-            value={bulkImportData}
-            onChange={e => setBulkImportData(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm mb-4"
-            rows={5}
-          />
-          <div className="flex gap-4">
-            <button onClick={handleImport} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Guardar</button>
-            <button onClick={() => setShowImport(false)} className="bg-slate-700 text-white px-4 py-2 rounded-lg font-bold text-sm">Cancelar</button>
-          </div>
+        <div className="flex gap-2">
+          <button onClick={handleExport} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Download size={14}/>Exportar Plantilla</button>
+          <button onClick={() => fileInputRef.current?.click()} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Upload size={14}/>Importar Ventas Masivas</button>
+          <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx, .xls" />
         </div>
-      )}
+      </div>
 
       <div className="bg-[#0d162d] border border-slate-850 rounded-2xl p-2">
         <table className="w-full">

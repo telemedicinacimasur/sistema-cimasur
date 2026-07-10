@@ -1058,6 +1058,55 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
   
   const [crmCampaignTargetTier, setCrmCampaignTargetTier] = useState<string | null>(null);
   const [crmCopiedMessageId, setCrmCopiedMessageId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const segmentationService = useMemo(() => new SegmentationService(), []);
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json<{RUT: string, Ventas2026: number}>(ws);
+        
+        console.log("Importing data:", data);
+        
+        for (const item of data) {
+            const client = records.find(c => c.rut === item.RUT);
+            if (client) {
+                const ventas2026 = item.Ventas2026;
+                const monthlyAverageFrascos = ventas2026 / 12 / 7000;
+                const newCategoria = segmentationService.categorizeByMonthlyAverage(monthlyAverageFrascos);
+
+                await localDB.updateInCollection('contacts', client.id, { 
+                    categoria: newCategoria,
+                    clubVentasDetail: JSON.stringify({ ...JSON.parse(client.clubVentasDetail || '{}'), v2026: ventas2026 })
+                });
+            }
+        }
+        alert(`Procesadas ${data.length} filas y categorías actualizadas.`);
+        window.dispatchEvent(new Event('db-change'));
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleExport = () => {
+    const data = records.map(c => ({
+        RUT: c.rut,
+        Clinica: c.name,
+        Ventas2026: JSON.parse(c.clubVentasDetail || '{}').v2026 || 0,
+        Categoría: c.categoria || 'Sin categoría'
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
+    XLSX.writeFile(workbook, "CarteraClientes.xlsx");
+  };
 
   useEffect(() => {
     if (selectedClient) {
@@ -1841,6 +1890,11 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
       )}
 
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="p-4 flex justify-end gap-2">
+            <button onClick={handleExport} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Download size={14}/>Exportar Plantilla</button>
+            <button onClick={() => fileInputRef.current?.click()} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Upload size={14}/>Importar Ventas Masivas</button>
+            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx, .xls" />
+        </div>
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
               <thead>
