@@ -27,6 +27,13 @@ import {
 import { RecordActions } from '../components/RecordActions';
 import { CommentDialog } from '../components/CommentDialog';
 
+const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, title);
+  XLSX.writeFile(wb, `${fileName}.xlsx`);
+};
+
 import { addNotification } from '../lib/notifications';
 
 import { CimasurCRM } from '../components/crm/CimasurCRM';
@@ -1105,6 +1112,25 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
     }).length;
   };
 
+  const exportCategoryProgress = () => {
+    const headers = ["RUT", "Razón Social", "Email", "Categoría 2024", "Categoría 2025", "Categoría 2026 (Actual)", "Ventas 2025 (Base 2026)", "Promedio Mensual 2025"];
+    const data = filtered.map(r => {
+      const details = r.clubVentasDetail ? (typeof r.clubVentasDetail === 'string' ? JSON.parse(r.clubVentasDetail) : r.clubVentasDetail) : {};
+      const v2025 = Number(details.v2026 || 0);
+      return [
+        r.rut || '---',
+        r.name || '---',
+        r.email || '---',
+        details.cat2024 || '---',
+        details.cat2025 || '---',
+        r.categoria || 'Sin categoría',
+        v2025,
+        (v2025 / 12).toFixed(0)
+      ];
+    });
+    exportTableToExcel("Reporte Avance de Categorías", headers, data, "avance_categorias_cimasur");
+  };
+
   const processPastedImport = async () => {
     if (!pastedData.trim()) {
       alert("Por favor pega datos en el campo de texto.");
@@ -2131,6 +2157,14 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
 
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="p-4 flex justify-end gap-2">
+            <button 
+              onClick={exportCategoryProgress}
+              className="bg-sky-700 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-lg transition-colors"
+              title="Descarga el historial de avance de categorías de los clientes"
+            >
+              <TrendingUp size={14}/>
+              Exportar Avance de Categorías
+            </button>
             <button onClick={handleExport} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Download size={14}/>Exportar Plantilla</button>
             <button onClick={handleImportClick} className="bg-emerald-600 hover:bg-emerald-700 transition-colors text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Upload size={14}/>Importar Ventas Masivas</button>
             <input type="file" ref={fileInputRef} onChange={processImport} className="hidden" accept=".xlsx, .xls" />
@@ -2151,7 +2185,8 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Comuna</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Email</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Ingreso</th>
-                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Categoría</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cat. Anterior (2025)</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cat. Actual (2026)</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Tipo</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Intranet</th>
                     <th className="p-5 text-right px-8 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
@@ -2190,6 +2225,25 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                        <td className="p-5 text-slate-400 italic">{r.region}</td>
                        <td className="p-5 text-slate-300">{r.email || "---"}</td>
                        <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || "---"}</td>
+                       <td className="p-5">
+                          <div className="flex flex-col gap-1">
+                             {(() => {
+                               const details = r.clubVentasDetail ? (typeof r.clubVentasDetail === 'string' ? JSON.parse(r.clubVentasDetail) : r.clubVentasDetail) : {};
+                               const catPrev = details.cat2025 || '---';
+                               return (
+                                 <span className={cn(
+                                   "text-[9px] font-bold px-1.5 py-0.5 rounded border self-start",
+                                   catPrev === 'Platinum' ? "bg-purple-950/30 text-purple-400 border-purple-900/50" :
+                                   catPrev === 'Oro' ? "bg-amber-950/30 text-amber-400 border-amber-900/50" :
+                                   catPrev === 'Plata' ? "bg-slate-800/30 text-slate-400 border-slate-700/50" :
+                                   "bg-slate-900/30 text-slate-500 border-slate-800/50"
+                                 )}>
+                                   {catPrev}
+                                 </span>
+                               );
+                             })()}
+                          </div>
+                       </td>
                        <td className="p-5">
                          <select
                            value={CATEGORIAS.includes(r.categoria) ? r.categoria : 'Sin categoría'}

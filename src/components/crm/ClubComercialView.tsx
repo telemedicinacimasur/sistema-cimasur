@@ -104,7 +104,14 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
     setContacts(data || []);
   };
 
-  const activeContacts = contacts.filter(c => c.estado === 'Activo' || c.estado === 'Solo CRM Comercial' || c.estado === 'Solo Intranet' || c.estado === 'Ambos (Sincronizado)');
+  const activeContacts = contacts.filter(c => 
+    !c.estado || // Handle cases where estado is not defined
+    c.estado === 'Activo' || 
+    c.estado === 'Solo CRM Comercial' || 
+    c.estado === 'Solo Intranet' || 
+    c.estado === 'Ambos (Sincronizado)' ||
+    c.categoria !== 'Sin categoría' // If it has a category, it's a club member
+  );
   
   const stats = useMemo(() => {
     const counts: Record<string, number> = { 'Platinum': 0, 'Oro': 0, 'Plata': 0, 'Bronce': 0 };
@@ -117,7 +124,15 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
       const catKey = `cat${selectedYear}`;
       const salesKey = `v${selectedYear}`;
       
-      const cat = details[catKey] || (selectedYear === '2026' ? c.categoria : null) || 'Sin categoría';
+      // Normalize category comparison (handle potential case differences)
+      let cat = details[catKey] || (selectedYear === '2026' ? c.categoria : null) || 'Sin categoría';
+      
+      // Basic normalization to match keys
+      if (cat.toLowerCase() === 'platinum') cat = 'Platinum';
+      if (cat.toLowerCase() === 'oro') cat = 'Oro';
+      if (cat.toLowerCase() === 'plata') cat = 'Plata';
+      if (cat.toLowerCase() === 'bronce') cat = 'Bronce';
+
       const sales = Number(details[salesKey] || 0);
 
       if (counts[cat] !== undefined) {
@@ -160,15 +175,27 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
     loadContacts(); // Refresh
   };
 
-  const handleSaveConfig = async () => {
+  useEffect(() => {
+    if (isConfigOpen) {
+      loadConfig(configYear);
+    }
+  }, [configYear, isConfigOpen]);
+
+  const handleSaveConfig = async (applyToAll = false) => {
     try {
-      const response = await fetch('/api/crm/config/categories', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year: configYear, ranges: configRanges, benefits: configBenefits })
-      });
-      if (response.ok) {
-        alert('Configuración guardada y cascada aplicada exitosamente.');
+      const yearsToSave = applyToAll ? ['2024', '2025', '2026'] : [configYear];
+      
+      const promises = yearsToSave.map(year => 
+        fetch('/api/crm/config/categories', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ year, ranges: configRanges, benefits: configBenefits })
+        })
+      );
+
+      const results = await Promise.all(promises);
+      if (results.every(r => r.ok)) {
+        alert(applyToAll ? 'Configuración aplicada a TODOS los años exitosamente.' : 'Configuración guardada para el año seleccionado exitosamente.');
         setBeneficiosPorCategoria(configBenefits);
         setIsConfigOpen(false);
         loadContacts();
@@ -178,7 +205,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
       }
     } catch (e) {
       console.error(e);
-      alert('Error al guardar la configuración de rangos mediante API. Revisa la consola.');
+      alert('Error al guardar la configuración. Revisa la consola.');
     }
   };
 
@@ -548,14 +575,26 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                 </div>
               </div>
               
-              <div className="bg-[#152035] border-t border-slate-800 px-6 py-4 flex justify-end gap-3">
-                <button onClick={() => setIsConfigOpen(false)} className="text-xs font-bold text-slate-400 hover:text-white">Cancelar</button>
-                <button 
-                  onClick={handleSaveConfig}
-                  className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-xs uppercase px-6 py-2.5 rounded-xl transition-all shadow-md"
-                >
-                  Guardar y Aplicar en Cascada
-                </button>
+              <div className="bg-[#152035] border-t border-slate-800 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold italic">
+                   * Guardar aplicará cambios únicamente al año seleccionado arriba.
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setIsConfigOpen(false)} className="text-xs font-bold text-slate-400 hover:text-white">Cancelar</button>
+                  <button 
+                    onClick={() => handleSaveConfig(true)}
+                    className="bg-slate-700 hover:bg-slate-600 text-white font-black text-xs uppercase px-4 py-2.5 rounded-xl transition-all shadow-md"
+                    title="Copia estos rangos y beneficios a todos los ciclos (2024, 2025, 2026)"
+                  >
+                    Aplicar a Todos los Años
+                  </button>
+                  <button 
+                    onClick={() => handleSaveConfig(false)}
+                    className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-xs uppercase px-6 py-2.5 rounded-xl transition-all shadow-md"
+                  >
+                    Guardar Año {configYear}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
