@@ -2246,7 +2246,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                        </td>
                        <td className="p-5">
                          <select
-                           value={CATEGORIAS.includes(r.categoria) ? r.categoria : 'Sin categoría'}
+                           value={(() => { const current = r.categoria || 'Sin categoría'; return CATEGORIAS.find(c => c.toLowerCase() === current.toLowerCase()) || 'Sin categoría'; })()}
                            disabled={!canEdit}
                            onChange={async (e) => {
                              const newVal = e.target.value;

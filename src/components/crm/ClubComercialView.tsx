@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Award, Users, Gift, Activity, Search, Check, X, ShieldCheck, Clock, Settings } from 'lucide-react';
+import { Award, Users, Gift, Activity, Search, Check, X, ShieldCheck, Clock, Settings, Trash2, Plus } from 'lucide-react';
 import { PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip } from 'recharts';
 import { localDB } from '../../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -105,12 +105,8 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
   };
 
   const activeContacts = contacts.filter(c => 
-    !c.estado || // Handle cases where estado is not defined
-    c.estado === 'Activo' || 
-    c.estado === 'Solo CRM Comercial' || 
-    c.estado === 'Solo Intranet' || 
-    c.estado === 'Ambos (Sincronizado)' ||
-    c.categoria !== 'Sin categoría' // If it has a category, it's a club member
+    c.estado !== 'Eliminado' && 
+    (c.categoria !== 'Sin categoría' || c.categoria !== 'Sin compra' || c.intranet === 'si' || c.estado === 'Activo')
   );
   
   const stats = useMemo(() => {
@@ -124,14 +120,14 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
       const catKey = `cat${selectedYear}`;
       const salesKey = `v${selectedYear}`;
       
-      // Normalize category comparison (handle potential case differences)
-      let cat = details[catKey] || (selectedYear === '2026' ? c.categoria : null) || 'Sin categoría';
+      // Normalize category comparison (handle potential case differences and spaces)
+      const rawCat = (details[catKey] || (selectedYear === '2026' ? c.categoria : null) || 'Sin categoría').toString().trim();
+      let cat = 'Sin categoría';
       
-      // Basic normalization to match keys
-      if (cat.toLowerCase() === 'platinum') cat = 'Platinum';
-      if (cat.toLowerCase() === 'oro') cat = 'Oro';
-      if (cat.toLowerCase() === 'plata') cat = 'Plata';
-      if (cat.toLowerCase() === 'bronce') cat = 'Bronce';
+      if (/platinum/i.test(rawCat)) cat = 'Platinum';
+      else if (/oro/i.test(rawCat)) cat = 'Oro';
+      else if (/plata/i.test(rawCat)) cat = 'Plata';
+      else if (/bronce/i.test(rawCat)) cat = 'Bronce';
 
       const sales = Number(details[salesKey] || 0);
 
@@ -539,35 +535,46 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                       {configBenefits[cat] && (
                         <div className="pt-4 border-t border-slate-800/50 space-y-3">
                           <label className="block text-[10px] font-bold uppercase text-slate-400">Beneficios ({cat})</label>
-                          {[...configBenefits[cat], ""].map((benefitStr, bIndex) => (
-                            <div key={bIndex} className="bg-[#0D1527] p-2 rounded-lg border border-slate-800/80 flex items-center gap-2">
+                          {configBenefits[cat] && configBenefits[cat].map((benefit, bIdx) => (
+                            <div key={bIdx} className="bg-[#0D1527] p-2 rounded-lg border border-slate-800/80 flex items-center gap-2 group">
                               <input 
                                 type="text"
-                                placeholder={bIndex === configBenefits[cat].length ? "Añadir nuevo beneficio..." : "Descripción del beneficio"}
-                                value={benefitStr}
+                                value={benefit}
                                 onChange={(e) => {
                                   const newBenefits = { ...configBenefits };
-                                  if (bIndex === newBenefits[cat].length) {
-                                    // adding a new one
-                                    if (e.target.value.trim() !== "") {
-                                      newBenefits[cat] = [...newBenefits[cat], e.target.value];
-                                    }
-                                  } else {
-                                    // updating existing
-                                    newBenefits[cat][bIndex] = e.target.value;
-                                  }
-                                  setConfigBenefits(newBenefits);
-                                }}
-                                onBlur={() => {
-                                  // Clean up empty lines when leaving focus
-                                  const newBenefits = { ...configBenefits };
-                                  newBenefits[cat] = newBenefits[cat].filter(b => b.trim() !== "");
+                                  newBenefits[cat][bIdx] = e.target.value;
                                   setConfigBenefits(newBenefits);
                                 }}
                                 className="w-full bg-[#152035] border border-slate-700 p-2 rounded text-xs text-white outline-none focus:border-sky-500"
                               />
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  const newBenefits = { ...configBenefits };
+                                  newBenefits[cat] = (newBenefits[cat] || []).filter((_, i) => i !== bIdx);
+                                  setConfigBenefits(newBenefits);
+                                }}
+                                className="text-slate-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 size={12} />
+                              </button>
                             </div>
                           ))}
+                          <div className="flex gap-2">
+                            <input 
+                              type="text"
+                              placeholder="Escribe y presiona Enter para añadir beneficio..."
+                              className="flex-1 bg-[#050914] border border-slate-800 border-dashed p-2 rounded text-xs text-slate-400 outline-none focus:border-sky-500"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                                  const val = e.currentTarget.value.trim();
+                                  setConfigBenefits(prev => ({...prev, [cat]: [...(prev[cat] || []), val]}));
+                                  e.currentTarget.value = "";
+                                  e.preventDefault();
+                                }
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
