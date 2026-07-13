@@ -2185,8 +2185,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Comuna</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Email</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Fecha Ingreso</th>
-                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cat. Anterior (2025)</th>
-                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Cat. Actual (2026)</th>
+                    <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Categoría Club</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Tipo</th>
                     <th className="p-5 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Intranet</th>
                     <th className="p-5 text-right px-8 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]">Acciones</th>
@@ -2225,25 +2224,6 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                        <td className="p-5 text-slate-400 italic">{r.region}</td>
                        <td className="p-5 text-slate-300">{r.email || "---"}</td>
                        <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || "---"}</td>
-                       <td className="p-5">
-                          <div className="flex flex-col gap-1">
-                             {(() => {
-                               const details = r.clubVentasDetail ? (typeof r.clubVentasDetail === 'string' ? JSON.parse(r.clubVentasDetail) : r.clubVentasDetail) : {};
-                               const catPrev = details.cat2025 || '---';
-                               return (
-                                 <span className={cn(
-                                   "text-[9px] font-bold px-1.5 py-0.5 rounded border self-start",
-                                   catPrev === 'Platinum' ? "bg-purple-950/30 text-purple-400 border-purple-900/50" :
-                                   catPrev === 'Oro' ? "bg-amber-950/30 text-amber-400 border-amber-900/50" :
-                                   catPrev === 'Plata' ? "bg-slate-800/30 text-slate-400 border-slate-700/50" :
-                                   "bg-slate-900/30 text-slate-500 border-slate-800/50"
-                                 )}>
-                                   {catPrev}
-                                 </span>
-                               );
-                             })()}
-                          </div>
-                       </td>
                        <td className="p-5">
                          <select
                            value={(() => { const current = r.categoria || 'Sin categoría'; return CATEGORIAS.find(c => c.toLowerCase() === current.toLowerCase()) || 'Sin categoría'; })()}
