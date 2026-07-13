@@ -645,45 +645,56 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   </div>
 
                   <div className="border-t border-slate-850/50 pt-4">
-                     <span className="text-[10px] text-slate-500 font-bold block uppercase mb-2">Histórico de Categorías</span>
-                     <table className="w-full text-xs text-left">
-                       <thead>
-                         <tr className="border-b border-slate-800 text-slate-500">
-                           <th className="pb-2 font-bold">Año Comercial</th>
-                           <th className="pb-2 font-bold">Categoría</th>
-                         </tr>
-                       </thead>
-                       <tbody className="divide-y divide-slate-800">
-                         <tr>
-                           <td className="py-2 text-white">2026</td>
-                           <td className="py-2 text-yellow-400 font-bold">{client.categoria || 'Sin categoría'}</td>
-                         </tr>
-                         <tr>
-                           <td className="py-2 text-slate-400">2025</td>
-                           <td className="py-2 text-slate-300">{(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).cat2025 : null) || 'Sin categoría'}</td>
-                         </tr>
-                         <tr>
-                           <td className="py-2 text-slate-400">2024</td>
-                           <td className="py-2 text-slate-300">{(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).cat2024 : null) || 'Sin categoría'}</td>
-                         </tr>
-                       </tbody>
-                     </table>
+                     <span className="text-[10px] text-slate-500 font-bold block uppercase mb-4">Línea de Tiempo Histórica</span>
+                     
+                     <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-800">
+                        {['2026', '2025', '2024'].map((year, idx) => {
+                          const details = client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail) : {};
+                          const cat = details[`cat${year}`] || (year === '2026' ? client.categoria : null) || 'Sin categoría';
+                          const sales = details[`v${year}`] || 0;
+                          
+                          return (
+                            <div key={year} className="relative">
+                              <div className={`absolute -left-[24px] top-1 w-4 h-4 rounded-full border-4 border-[#0D1527] z-10 ${idx === 0 ? 'bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.5)]' : 'bg-slate-700'}`} />
+                              <div className="bg-[#0D1527] border border-slate-850 p-3 rounded-xl">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-[10px] font-black text-slate-500 uppercase">Ciclo {year}</span>
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${cat === 'Platinum' ? 'bg-purple-950 text-purple-300' : cat === 'Oro' ? 'bg-amber-950 text-amber-300' : cat === 'Plata' ? 'bg-slate-800 text-slate-300' : 'bg-orange-950 text-orange-300'}`}>
+                                    {cat}
+                                  </span>
+                                </div>
+                                <div className="text-xs font-bold text-white">${Number(sales).toLocaleString('es-CL')}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                     </div>
                   </div>
                 </div>
 
                 <div className="bg-[#050914] border border-slate-850 p-6 rounded-2xl space-y-4">
                   <h4 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
                     <Gift size={16} />
-                    Detalles de Venta
+                    Detalles de Venta y Promedios
                   </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase">Ventas Anuales (2025)</span>
-                      <span className="text-sm font-bold text-white">${(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0)?.toLocaleString('es-CL')}</span>
+                  <div className="space-y-4">
+                    <div className="bg-sky-500/5 p-4 rounded-xl border border-sky-500/10">
+                      <span className="text-[10px] text-slate-500 font-bold block uppercase mb-1">Ventas Anuales Consolidadas</span>
+                      <span className="text-xl font-black text-white">${(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0)?.toLocaleString('es-CL')}</span>
+                      <div className="mt-2 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-sky-500" style={{ width: '65%' }}></div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase">Promedio Mensual Estimado</span>
-                      <span className="text-sm font-bold text-white">${((client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0) / 12)?.toLocaleString('es-CL')}</span>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="bg-[#0D1527] p-3 rounded-xl border border-slate-850">
+                         <span className="text-[9px] text-slate-500 font-bold block uppercase mb-1">Prom. Mensual</span>
+                         <span className="text-xs font-bold text-white">${((client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0) / 12)?.toLocaleString('es-CL')}</span>
+                       </div>
+                       <div className="bg-[#0D1527] p-3 rounded-xl border border-slate-850">
+                         <span className="text-[9px] text-slate-500 font-bold block uppercase mb-1">Brecha Prox. Cat.</span>
+                         <span className="text-xs font-bold text-emerald-400">$1.240.000</span>
+                       </div>
                     </div>
                   </div>
                 </div>

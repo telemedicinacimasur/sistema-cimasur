@@ -1140,7 +1140,9 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
         const cleanAmountStr = amountRaw.replace(/[^0-9]/g, '');
         const ventasTotalesAnteriores = Number(cleanAmountStr) || 0;
 
-        const calculatedTier = getTierForSales(ventasTotalesAnteriores);
+        // REGLA: Promedio Mensual = Suma Ventas Año Anterior / 12
+        const promedioMensual = ventasTotalesAnteriores / 12;
+        const calculatedTier = getTierForSales(promedioMensual);
 
         let existingDetails: any = {};
         if (client.clubVentasDetail) {
@@ -1160,7 +1162,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
         const bitacoraEntry = {
           id: Date.now().toString() + Math.random(),
           fecha: new Date().toISOString(),
-          comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
+          comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Promedio mensual: $${promedioMensual.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
           creador: user?.displayName || user?.email || 'Sistema'
         };
         const newBitacora = [bitacoraEntry, ...currentBitacora];
@@ -1192,7 +1194,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
       }
     }
 
-    let reportMsg = `Se procesaron y actualizaron exitosamente ${processedCount} registros para el ciclo ${importCycleYear} (evaluando ventas de ${prevYear}).`;
+    let reportMsg = `Se procesaron y actualizaron exitosamente ${processedCount} registros para el ciclo ${importCycleYear} (evaluando promedio mensual de ventas de ${prevYear}).`;
     if (notFoundRuts.length > 0) {
       reportMsg += `\n\nNo se encontraron clientes para los siguientes ${notFoundRuts.length} RUTs:\n${notFoundRuts.slice(0, 10).join(', ')}${notFoundRuts.length > 10 ? '...' : ''}`;
     }
@@ -1257,8 +1259,9 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
 
             const ventasTotalesAnteriores = getSalesFromRow(item, prevYear);
             
-            // Calculamos promedio mensual anualizado que en el fondo son las ventasTotalesAnteriores contrastadas contra los rangos (que asumen venta anual).
-            const calculatedTier = getTierForSales(ventasTotalesAnteriores);
+            // REGLA: Promedio Mensual = Suma Ventas Año Anterior / 12
+            const promedioMensual = ventasTotalesAnteriores / 12;
+            const calculatedTier = getTierForSales(promedioMensual);
             
             // Update local DB
             const existingDetails = JSON.parse(client.clubVentasDetail || '{}');
@@ -1270,7 +1273,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
             const bitacoraEntry = {
               id: Date.now().toString() + Math.random(),
               fecha: new Date().toISOString(),
-              comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
+              comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Promedio mensual: $${promedioMensual.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
               creador: user?.displayName || user?.email || 'Sistema'
             };
             const newBitacora = [bitacoraEntry, ...currentBitacora];
@@ -1300,7 +1303,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
             processed++;
         }
         
-        alert(`Se procesaron ${processed} registros. Las categorías fueron actualizadas evaluando las ventas de ${prevYear} para el ciclo comercial ${importCycleYear}.`);
+        alert(`Se procesaron ${processed} registros. Las categorías fueron actualizadas evaluando el promedio mensual de ventas de ${prevYear} para el ciclo comercial ${importCycleYear}.`);
         window.dispatchEvent(new Event('db-change'));
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -2181,20 +2184,34 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                              <span className="text-[9px] bg-[#0284C7]/20 text-[#38BDF8] font-black px-1.5 py-0.5 rounded border border-[#0284C7]/20" title="Frecuencia / Ciclo de Compra">
                                💰 Compra Anual: ${getClientAnnualSales2026(r).toLocaleString('es-CL')}
                              </span>
-                           )}
-                         </div>
-                      </td>
-                      <td className="p-5 text-slate-400 italic">{r.region}</td>
-                      <td className="p-5 text-slate-300">{r.email || '---'}</td>
-                      <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || '---'}</td>
-                      <td className="p-5">
+                            )}
+                          </div>
+                       </td>
+                       <td className="p-5 text-slate-400 italic">{r.region}</td>
+                       <td className="p-5 text-slate-300">{r.email || "---"}</td>
+                       <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || "---"}</td>
+                       <td className="p-5">
                          <select
                            value={CATEGORIAS.includes(r.categoria) ? r.categoria : 'Sin categoría'}
                            disabled={!canEdit}
                            onChange={async (e) => {
                              const newVal = e.target.value;
                              try {
+                               // 1. Eliminar estado volátil anterior y actualizar localDB
                                await localDB.updateInCollection('contacts', r.id, { categoria: newVal });
+                               
+                               // 2. Disparar fetch PUT directo a /api/crm/clients/category
+                               await fetch('/api/crm/clients/category', {
+                                 method: 'PUT',
+                                 headers: { 'Content-Type': 'application/json' },
+                                 body: JSON.stringify({ 
+                                   id: r.id, 
+                                   category: newVal,
+                                   year: '2026' // Por defecto año actual si se cambia manual
+                                 })
+                               });
+
+                               // 3. Refrescar datos globalmente
                                window.dispatchEvent(new Event('db-change'));
                              } catch (err) {
                                console.error(err);

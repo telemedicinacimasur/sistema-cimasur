@@ -134,11 +134,24 @@ Te enviaré al Editor de Campañas ahora...`;
       const data = await response.json();
       try {
         // Sanitize and clean markdown or broken JSON from the payload
-        const cleanedStr = data.reply.replace(/```json/g, '').replace(/```/g, '').trim();
+        // REGLA: Sanitizar respuesta de IA para asegurar JSON limpio si viene con ruido markdown
+        const cleanedStr = data.reply
+          .replace(/```json\s?/g, '')
+          .replace(/```\s?/g, '')
+          .replace(/^[\s\n]*\{/, '{')
+          .replace(/\}[\s\n]*$/, '}')
+          .trim();
+        
         const parsedReply = JSON.parse(cleanedStr);
-        // Force a single action button if there are any actions
+        
+        // REGLA: Unificar botones masivos a UNO solo para no saturar
         const singleAction = parsedReply.actions && parsedReply.actions.length > 0 ? [parsedReply.actions[0]] : [];
-        setMessages(prev => [...prev, { sender: 'ai', text: parsedReply.text, actions: singleAction }]);
+        
+        setMessages(prev => [...prev, { 
+          sender: 'ai', 
+          text: parsedReply.text || 'Respuesta generada.', 
+          actions: singleAction 
+        }]);
       } catch (e) {
         // If not JSON, it's just plain text, still clean basic markdown noise if any
         const plainText = typeof data.reply === 'string' ? data.reply.replace(/```/g, '').trim() : '';
