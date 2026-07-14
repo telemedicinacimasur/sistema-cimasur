@@ -744,11 +744,25 @@ export default function MarketingBuilder({
       message: `Enviando prueba comercial...`
     });
 
-    setTimeout(() => {
+    setTimeout(async () => {
       setAlertNotification({
         type: 'success',
         message: `✅ ¡Envío de prueba de ${activeTab === 'email' ? 'Email' : 'WhatsApp'} exitoso a ${destination}! El motor aplicó la personalización en tiempo real.`
       });
+
+      // Register in history record for tracking
+      try {
+        const historyEntry = {
+          fecha: new Date().toISOString(),
+          tipo: activeTab === 'email' ? 'Email Marketing' : 'Campaña comercial/wsp',
+          campania: templateName || 'Prueba Manual Builder',
+          observaciones: `Envío de prueba simulado a ${destination}.`,
+          responsable: 'Simulador CRM'
+        };
+        await localDB.saveToCollection('crm_activities', historyEntry);
+      } catch (err) {
+        console.error("Error logging history:", err);
+      }
     }, 1200);
   };
 

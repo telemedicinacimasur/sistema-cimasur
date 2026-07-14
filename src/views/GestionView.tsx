@@ -198,6 +198,20 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
 
       await localDB.saveToCollection('gestion_activities', newActivity);
       
+      // Also register in global CRM activities for unified tracking
+      try {
+        await localDB.saveToCollection('crm_activities', {
+          fecha: new Date().toISOString(),
+          campania: 'Módulo Gestión',
+          tipo: newActivityType,
+          observaciones: newNote || '(Sin detalle adicional)',
+          responsable: user.displayName || user.email || 'Consultora',
+          clientId: client.id
+        });
+      } catch (err) {
+        console.error("Error logging global activity", err);
+      }
+      
       await addNotification({
         title: 'Nueva Actividad en Gestión',
         message: `${user.displayName || user.email} registró: ${newActivityType} para ${client.nombre || client.cliente}`,
@@ -525,20 +539,20 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
       await localDB.saveToCollection('gestion_records', recordToSave);
 
       if (duplicateToCRM) {
-        await localDB.saveToCollection('crm_clients', {
-          date: recordToSave.fechaIngreso,
+        await localDB.saveToCollection('contacts', {
+          fechaIngreso: recordToSave.fechaIngreso,
           name: recordToSave.nombre,
-          company: recordToSave.tipoEmpresa || 'Clínica',
+          type: recordToSave.tipoEmpresa || 'Clínica',
           phone: recordToSave.celular,
           email: recordToSave.email,
-          service: recordToSave.especialidadCliente || 'Gestión Integral',
-          status: 'Prospecto',
-          probability: 50,
-          value: 0,
           rut: recordToSave.rut,
-          category: recordToSave.categoria,
-          nextContact: '',
-          notes: 'Cliente importado desde Módulo de Gestión. ' + (recordToSave.observaciones || '')
+          categoria: recordToSave.categoria === 'Sin categoría' ? 'Sin compra' : recordToSave.categoria,
+          region: recordToSave.comuna || recordToSave.region || 'Metropolitana',
+          comoLlego: recordToSave.medioContacto || 'Módulo Gestión',
+          intranet: 'No',
+          historialUnificado: 'Cliente importado desde Módulo de Gestión. ' + (recordToSave.observaciones || ''),
+          responsable: recordToSave.consultora,
+          isGestionCustomer: true
         });
         await addAuditLog(user, `Duplicó Cliente a CRM Comercial: ${form.nombre}`, 'CRM Comercial');
       }

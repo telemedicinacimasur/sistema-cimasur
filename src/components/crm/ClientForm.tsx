@@ -86,6 +86,21 @@ export const ClientForm: React.FC<ClientFormProps> = ({ client, onSave, onCancel
           }],
           documentos: []
         } as unknown as Client;
+
+        // Register global activity
+        try {
+          await localDB.saveToCollection('crm_activities', {
+            fecha: new Date().toISOString(),
+            campania: 'CRM Core',
+            tipo: 'Alta de Socio',
+            observaciones: 'Cliente ingresado manualmente al CRM.',
+            responsable: 'Sistema',
+            clientId: newClient.id
+          });
+        } catch (err) {
+          console.error("Error logging global activity", err);
+        }
+
         await clientService.saveClient(newClient);
       }
       onSave();

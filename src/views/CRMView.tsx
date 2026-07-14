@@ -3332,7 +3332,7 @@ function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }
                   <td className="p-4 text-right">
                     <RecordActions 
                       module="crm"
-                      onView={() => onViewClient?.(act.id)}
+                      onView={() => setDetailView(act)}
                       onEdit={() => handleEdit(act)}
                       onDelete={async () => {
                          try {

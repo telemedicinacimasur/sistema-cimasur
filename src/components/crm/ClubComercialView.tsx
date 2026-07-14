@@ -153,10 +153,24 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
     const bitacoraEntry = {
       id: crypto.randomUUID(),
       fecha: new Date().toISOString(),
-      usuario: 'Usuario CRM', // Ideally from auth context
+      usuario: 'Usuario CRM',
       comentario: `Uso de Beneficio: ${selectedReward}`,
       tipo: 'beneficio'
     };
+
+    // Register global activity
+    try {
+      await localDB.saveToCollection('crm_activities', {
+        fecha: new Date().toISOString(),
+        campania: 'Club Comercial',
+        tipo: 'Uso de Beneficio',
+        observaciones: `Uso de Beneficio: ${selectedReward}`,
+        responsable: 'Usuario CRM',
+        clientId: client.id
+      });
+    } catch (err) {
+      console.error("Error logging global activity", err);
+    }
     
     const currentBitacora = parseBitacora(client.bitacora);
     const newBitacora = [bitacoraEntry, ...currentBitacora];

@@ -117,9 +117,14 @@ export default function CampaignsBuilder({
   const getFilteredClients = (camp: SuggestedCampaign | null, catFilterOrList: string | string[], clientsList: Client[] = allClients) => {
     let clients = clientsList;
     
-    // If a campaign is specifically selected (though now optional), we use its targets.
-    // Otherwise, we start with all clients to ensure category filters work across the whole DB.
-    if (camp) {
+    // If a campaign is specifically selected AND no specific category filters are applied (other than 'Todos')
+    // we use the campaign's target set.
+    // If the user explicitly selects categories (like 'Bronce'), we should look at ALL clients
+    // to satisfy the user request: "al filtrar por categoría no me filtra por todos los bronce por ejemplo"
+    const filtersArray = Array.isArray(catFilterOrList) ? catFilterOrList : [catFilterOrList];
+    const isExplicitFiltering = !filtersArray.includes('Todos') && filtersArray.length > 0;
+
+    if (camp && !isExplicitFiltering) {
       const targetIds = new Set(camp.opportunities?.map((o: any) => o.customerId) || []);
       const targeted = clientsList.filter(c => {
         return targetIds.has(c.rut) || targetIds.has(c.id);
@@ -147,10 +152,8 @@ export default function CampaignsBuilder({
       }
     }
 
-    const filtersArray = Array.isArray(catFilterOrList) ? catFilterOrList : [catFilterOrList];
-
-    if (!filtersArray.includes('Todos') && filtersArray.length > 0) {
-        clients = clients.filter(c => {
+    if (isExplicitFiltering) {
+        clients = clientsList.filter(c => {
           const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
           const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
           
@@ -269,17 +272,73 @@ export default function CampaignsBuilder({
     setSelectedClientIds(next);
   };
 
-  const registerCampaignLog = async (client: any, tipoCampana: string) => {
+  const registerCampaignLog = async (client: any, tipoCampana: string, skipGlobal: boolean = false) => {
     try {
-      const currentBitacora = client.bitacora ? (typeof client.bitacora === 'string' ? JSON.parse(client.bitacora) : client.bitacora) : [];
+      // Determine correct collection
+      const collection = client.isCRM ? 'contacts' : 'intranet_clients';
+      
+      const parseArray = (val: any) => {
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string') {
+            try {
+              const parsed = JSON.parse(val);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch (e) { return []; }
+          }
+          return [];
+      };
+
+      const currentBitacora = parseArray(client.bitacora);
+      const currentCampanas = parseArray(client.campanas);
+      const campaignName = selectedCampaign?.name || 'Campaña Manual';
+
       const newEntry = {
         id: Date.now().toString(),
         fecha: new Date().toISOString(),
-        comentario: `Envío de campaña ${tipoCampana}: ${selectedCampaign?.name || 'Manual'}`,
+        comentario: `Envío de campaña ${tipoCampana}: ${campaignName}`,
         creador: 'Usuario CRM'
       };
-      const updated = [newEntry, ...currentBitacora];
-      await localDB.updateInCollection('contacts', client.id, { bitacora: JSON.stringify(updated) });
+
+      const newCampanaEntry = {
+        id: Date.now().toString(),
+        nombre: campaignName,
+        fecha: new Date().toISOString(),
+        tipo: tipoCampana,
+        canal: tipoCampana,
+        estado: 'Enviado'
+      };
+
+      const updatedBitacora = [newEntry, ...currentBitacora];
+      const updatedCampanas = [newCampanaEntry, ...currentCampanas];
+
+      await localDB.updateInCollection(collection, client.id, { 
+        bitacora: JSON.stringify(updatedBitacora),
+        campanas: JSON.stringify(updatedCampanas)
+      });
+
+      // Also register in the global CRM activities log for history
+      if (!skipGlobal) {
+        try {
+          const globalActivity = {
+            fecha: new Date().toISOString(),
+            campania: campaignName,
+            tipo: tipoCampana === 'Email' ? 'Email Marketing' : 'Campaña comercial/wsp',
+            observaciones: `Envío a ${client.name} (${client.rut || client.id})`,
+            responsable: 'Envío CRM',
+            clientId: client.id
+          };
+          await localDB.saveToCollection('crm_activities', globalActivity);
+        } catch (err) {
+          console.error("Error saving global activity", err);
+        }
+      }
+
+      // Update local memory to reflect changes without full reload if possible
+      setAllClients(prev => prev.map(c => c.id === client.id ? {
+        ...c,
+        bitacora: updatedBitacora,
+        campanas: updatedCampanas
+      } : c));
     } catch (e) {
       console.error("Error logging campaign", e);
     }
@@ -311,8 +370,22 @@ ${htmlContent}`;
 
     // Register log for each selected client
     for (const c of selectedClients) {
-      await registerCampaignLog(c, 'Email');
+      await registerCampaignLog(c, 'Email', true);
     }
+
+    // Single global activity for the mass send
+    try {
+      await localDB.saveToCollection('crm_activities', {
+        fecha: new Date().toISOString(),
+        campania: selectedCampaign?.name || 'Campaña Manual',
+        tipo: 'Email Marketing',
+        observaciones: `Envío masivo por Email a ${selectedClients.length} destinatarios.`,
+        responsable: 'Envío Masivo CRM'
+      });
+    } catch (err) {
+      console.error("Error logging global activity", err);
+    }
+
     alert('Campaña por Email generada y registrada en bitácoras.');
   };
 
@@ -723,10 +796,11 @@ ${htmlContent}`;
                       Abre el chat de WhatsApp. Presiona <strong>Ctrl + V</strong> (o Pegar). Verás que la imagen se adjunta como un archivo de verdad; luego, pega el texto copiado en el comentario de la imagen. ¡Eso es todo!
                     </p>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const cleanPhoneVal = activeHelperClient.phone || activeHelperClient.telefono || "";
                         const cleanPhone = cleanPhoneVal ? String(cleanPhoneVal).replace(/\s+/g, '') : "";
                         window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}`, '_blank');
+                        await registerCampaignLog(activeHelperClient, 'WhatsApp');
                       }}
                       className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-950/20"
                     >

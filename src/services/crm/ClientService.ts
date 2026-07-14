@@ -41,6 +41,11 @@ export class ClientService {
   }
 
   async updateClient(id: string, updates: Partial<Client>): Promise<void> {
-    await this.updateItem('contacts', id, updates);
+    const clients = await this.getCollection('contacts');
+    if (clients.some(c => c.id === id)) {
+      await this.updateItem('contacts', id, updates);
+    } else {
+      await this.updateItem('intranet_clients', id, updates);
+    }
   }
 }

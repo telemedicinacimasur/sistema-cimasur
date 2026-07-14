@@ -5,8 +5,10 @@ import { localDB } from '../../lib/auth';
 import { 
   X, User, Building2, MapPin, Phone, Mail, Globe, Briefcase, 
   Calendar, Award, TrendingUp, Bot, FileText, Plus, Trash2, 
-  Edit2, Save, Activity, DollarSign, Gift, Layers, Brain, Megaphone, Check
+  Edit3, Save, Activity, DollarSign, Gift, Layers, Brain, Megaphone, Check,
+  Zap, ClipboardList, Stethoscope, Hash, Target, ClipboardCheck, Edit2
 } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface Client360Props {
   clientId: string;
@@ -26,6 +28,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [contacts, setContacts] = useState<any[]>([]);
   const [veterinarios, setVeterinarios] = useState<any[]>([]);
   const [bitacora, setBitacora] = useState<any[]>([]);
+  const [globalActivities, setGlobalActivities] = useState<any[]>([]);
 
   // Add sub-list form states
   const [newContact, setNewContact] = useState({ nombre: '', cargo: '', telefono: '', celular: '', email: '', esPrincipal: false });
@@ -45,9 +48,33 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
       if (c) {
         setClient(c);
         setEditForm(c);
-        setContacts(Array.isArray(c.contactos) ? c.contactos : []);
-        setVeterinarios(Array.isArray(c.veterinarios) ? c.veterinarios : []);
-        setBitacora(Array.isArray(c.bitacora) ? c.bitacora : []);
+        
+        // Handle potentially stringified arrays from DB
+        const parseArray = (val: any) => {
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string') {
+            try {
+              const parsed = JSON.parse(val);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+              return [];
+            }
+          }
+          return [];
+        };
+
+        setContacts(parseArray(c.contactos));
+        setVeterinarios(parseArray(c.veterinarios));
+        setBitacora(parseArray(c.bitacora));
+        
+        // Fetch global activities for this client
+        const allGlobal = await localDB.getCollection('crm_activities');
+        const related = allGlobal.filter((a: any) => a.clientId === clientId || a.clientId === c.rut || a.clientId === c.id);
+        setGlobalActivities(related);
+        
+        // Also ensure client object has parsed campanas for the UI
+        c.campanas = parseArray(c.campanas);
+        c.oportunidades = parseArray(c.oportunidades);
       }
     } catch (error) {
       console.error("Error loading client 360 data:", error);
@@ -60,58 +87,18 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     loadData();
   }, [clientId]);
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl flex flex-col items-center gap-4 shadow-2xl">
-          <Activity className="w-10 h-10 text-sky-400 animate-spin" />
-          <p className="text-white font-bold text-sm">Cargando Ficha Cliente 360°...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!client) {
-    return (
-      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl flex flex-col items-center gap-4 max-w-sm text-center shadow-2xl">
-          <X className="w-10 h-10 text-red-500" />
-          <p className="text-white font-bold text-sm">Cliente no encontrado</p>
-          <button onClick={onClose} className="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-white rounded-lg text-xs font-bold">Cerrar</button>
-        </div>
-      </div>
-    );
-  }
-
-
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const { ventas, clubComercial, ...contactUpdates } = editForm;
-
-      await clientService.updateClient(client.id, contactUpdates);
-
-      if (clubComercial) {
-        const loyaltyId = clubComercial.id || client.id;
-        await localDB.updateInCollection('loyalty_accounts', loyaltyId, clubComercial);
-      }
-
-      await loadData();
-      setIsEditing(false);
-      if (onSave) onSave();
-      window.dispatchEvent(new Event('db-change'));
-      alert('Información general actualizada exitosamente.');
-    } catch (err) {
-      console.error(err);
-      alert('Error al guardar los cambios.');
-    }
+    if (!client) return;
+    await clientService.updateClient(client.id, editForm);
+    setIsEditing(false);
+    await loadData();
+    if (onSave) onSave();
+    window.dispatchEvent(new Event('db-change'));
   };
 
   const handleAddContact = async () => {
-    if (!newContact.nombre || !newContact.email) {
-      alert('Nombre y Email son obligatorios');
-      return;
-    }
+    if (!newContact.nombre) return;
     const updated = [...contacts, newContact];
     await clientService.updateClient(client.id, { contactos: updated });
     setNewContact({ nombre: '', cargo: '', telefono: '', celular: '', email: '', esPrincipal: false });
@@ -155,765 +142,323 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     };
     const updated = [newEntry, ...bitacora];
     await clientService.updateClient(client.id, { bitacora: updated });
+
+    // Also register in global CRM activities for visibility across the platform
+    try {
+      await localDB.saveToCollection('crm_activities', {
+        fecha: newEntry.fecha,
+        campania: 'Gestión Directa',
+        tipo: 'Nota de Seguimiento',
+        observaciones: newBitacoraEntry,
+        responsable: 'Usuario CRM',
+        clientId: client.id
+      });
+    } catch (err) {
+      console.error("Error logging global activity", err);
+    }
+
     setNewBitacoraEntry('');
     await loadData();
     window.dispatchEvent(new Event('db-change'));
   };
 
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl flex flex-col items-center gap-4 shadow-2xl">
+          <Activity className="w-10 h-10 text-sky-400 animate-spin" />
+          <p className="text-white font-bold text-sm">Cargando Ficha Cliente 360°...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl flex flex-col items-center gap-4 max-w-sm text-center shadow-2xl">
+          <X className="w-10 h-10 text-red-500" />
+          <p className="text-white font-bold text-sm">Cliente no encontrado</p>
+          <button onClick={onClose} className="bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold">Cerrar</button>
+        </div>
+      </div>
+    );
+  }
+
   const formatCLP = (val: number) => `$${val.toLocaleString('es-CL')}`;
 
-  const tabs = [
-    { id: 'general', label: 'General', icon: <Building2 size={14} /> },
-    { id: 'contactos', label: 'Contactos & Vets', icon: <User size={14} /> },
-    { id: 'club', label: 'Club Comercial', icon: <Award size={14} /> },
-    { id: 'oportunidades', label: 'Oportunidades', icon: <Megaphone size={14} /> },
-    { id: 'ia', label: 'Inteligencia IA', icon: <Brain size={14} /> },
-    { id: 'bitacora', label: 'Bitácora', icon: <FileText size={14} /> },
-  ];
-
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-[#0D1527] border border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
-        
-        {/* Modal Header */}
-        <div className="bg-[#152035] p-6 border-b border-slate-800 flex flex-wrap justify-between items-center gap-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-[#050914] w-full max-w-7xl h-[92vh] rounded-3xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden"
+      >
+        {/* HEADER EXPEDIENTE */}
+        <div className="p-6 border-b border-slate-800 bg-[#0D1527] flex justify-between items-start shrink-0">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-sky-500/10 rounded-2xl text-sky-400 border border-sky-500/20">
-              <Building2 className="w-8 h-8" />
+            <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+              <FileText className="text-sky-500 w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-white">{client.name}</h2>
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${client.estado === 'Activo' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                  {client.estado}
-                </span>
+                <h2 className="text-xl font-black text-white uppercase tracking-tight">Expediente de Cliente</h2>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 uppercase tracking-widest">Activo</span>
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-400 text-xs mt-1">
-                <span className="font-mono text-slate-300">RUT: {client.rut}</span>
-                {client.nombreFantasia && (
-                  <span className="italic text-slate-500">({client.nombreFantasia})</span>
-                )}
-                <span>•</span>
-                <span>Ingreso: {client.fechaIngreso}</span>
-              </div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 max-w-2xl truncate">
+                {client.name || client.nombre || 'Sin nombre'}
+              </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl border border-slate-750 transition-all active:scale-95"
-            >
-              {isEditing ? <X size={14} /> : <Edit2 size={14} />}
-              {isEditing ? 'Cancelar Edición' : 'Editar Información'}
-            </button>
-            <button 
-              onClick={onClose} 
-              className="p-2.5 bg-red-950/20 border border-red-900/30 text-red-400 hover:bg-red-900/20 rounded-xl transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <button 
+            onClick={onClose}
+            className="px-6 py-2 bg-rose-950/30 hover:bg-rose-950/50 text-rose-500 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+          >
+            Cerrar Expediente
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 bg-[#050914]">
+          {/* SUMMARY CARDS ROW */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 shrink-0">
+            {[
+              { label: 'RUT', value: client.rut || '---' },
+              { label: 'COMUNA', value: client.comuna || 'N/A' },
+              { label: 'TIPO EMPRESA', value: client.tipo_empresa || client.giro || 'Empresa' },
+              { label: 'FECHA INGRESO', value: client.fechaIngreso || client.fecha_ingreso || '---' }
+            ].map((card, i) => (
+              <div key={i} className="bg-[#0D1527] border border-slate-850 p-4 rounded-2xl flex flex-col gap-1 shadow-md shadow-black/20">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{card.label}</span>
+                <span className="text-sm font-bold text-white truncate">{card.value}</span>
+              </div>
+            ))}
+            <div className="bg-[#0D1527] border border-sky-500/20 p-4 rounded-2xl flex items-center justify-between shadow-md shadow-sky-950/10">
+              <div>
+                <span className="text-[9px] font-black text-sky-500 uppercase tracking-widest block mb-1">INSCRITO INTRANET</span>
+                <span className="text-sm font-bold text-emerald-400">Si</span>
+              </div>
+              <button className="bg-orange-600 hover:bg-orange-500 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-lg transition-all shadow-lg shadow-orange-900/20">
+                REGISTRAR
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Tab Bar */}
-        <div className="bg-[#0D1527] border-b border-slate-800 px-6 flex overflow-x-auto gap-2 scrollbar-hide">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setIsEditing(false); }}
-              className={`flex items-center gap-2 py-4 px-4 text-xs font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-sky-400 text-sky-400 bg-sky-500/5' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* LEFT COLUMN: HISTORIAL */}
+            <div className="lg:col-span-8 flex flex-col gap-4">
+              <div className="flex justify-between items-center px-1">
+                <h3 className="text-[10px] font-black text-sky-500 uppercase tracking-widest flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,1)]"></div>
+                  Historial Detallado de Actividades
+                </h3>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{bitacora.length + globalActivities.length} Registros Encontrados</span>
+              </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
-          
-          {/* TAB: GENERAL */}
-          {activeTab === 'general' && (
-            <div>
-              {isEditing ? (
-                <form onSubmit={handleSaveGeneral} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div 
+                className="bg-[#030712] border border-slate-850 rounded-3xl p-8 min-h-[600px] relative overflow-hidden shadow-2xl"
+                style={{ 
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l25.98 15v30L30 60 4.02 45V15z' fill-rule='evenodd' stroke='%23ffffff' stroke-opacity='0.03' fill='none'/%3E%3C/svg%3E")`,
+                  backgroundSize: '40px 40px'
+                }}
+              >
+                <div className="space-y-10 relative z-10 max-w-3xl mx-auto">
+                  {bitacora.length === 0 && globalActivities.length === 0 ? (
+                    <div className="text-center py-32 opacity-20">
+                      <FileText className="mx-auto w-16 h-16 text-white mb-4" />
+                      <p className="text-sm text-white font-medium italic">No hay entradas registradas.</p>
+                    </div>
+                  ) : (
+                    // Merge and sort all entries
+                    [
+                      ...bitacora.map(b => ({ ...b, source: 'Manual', type: 'Nota' })),
+                      ...globalActivities.map(g => ({ 
+                        ...g, 
+                        comentario: g.observaciones, 
+                        creador: g.responsable, 
+                        source: 'Sistema', 
+                        type: g.tipo,
+                        title: g.campania
+                      }))
+                    ]
+                    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+                    .map((entry, idx) => (
+                      <div key={idx} className="relative group">
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center border-b border-slate-800/50 pb-2 mb-3">
+                            <p className="text-[11px] text-slate-500 font-bold italic">
+                              --- {entry.creador || 'Gestión'} ({entry.fecha ? new Date(entry.fecha).toLocaleDateString() : '---'}) ---
+                            </p>
+                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${entry.source === 'Sistema' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                              {entry.source === 'Sistema' ? entry.type : 'Nota Manual'}
+                            </span>
+                          </div>
+                          {entry.title && (
+                            <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-1">{entry.title}</p>
+                          )}
+                          <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-line tracking-tight">
+                            {entry.comentario}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: GESTIÓN */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-3xl space-y-6 shadow-2xl">
+                <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                  <ClipboardList size={14} className="text-sky-500" />
+                  Nueva Gestión / Seguimiento
+                </h3>
+
+                <div className="space-y-5">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Nombre / Razón Social</label>
+                    <input readOnly value={client.name || client.nombre} className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white/70 font-bold truncate cursor-not-allowed" />
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">RUT / ID</label>
+                    <input readOnly value={client.rut} className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white/70 font-mono cursor-not-allowed" />
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Tipo de Actividad</label>
+                    <select className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all cursor-pointer">
+                      <option>Nota de Seguimiento</option>
+                      <option>Llamada Telefónica</option>
+                      <option>Email masivo</option>
+                      <option>WhatsApp</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Detalle de la Actividad</label>
+                    <textarea 
+                      placeholder="Escriba los pormenores de la gestión realizada..."
+                      value={newBitacoraEntry}
+                      onChange={e => setNewBitacoraEntry(e.target.value)}
+                      className="w-full bg-[#050914] border border-slate-800 p-4 rounded-xl text-xs text-white outline-none focus:border-sky-500 transition-all min-h-[120px] resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Razón Social *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={editForm.name || ''} 
-                        onChange={e => setEditForm({...editForm, name: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Categoría</label>
+                      <select className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer">
+                        <option>Bronce</option>
+                        <option>Plata</option>
+                        <option>Oro</option>
+                        <option>Platinum</option>
+                      </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nombre Fantasía</label>
-                      <input 
-                        type="text" 
-                        value={editForm.nombreFantasia || ''} 
-                        onChange={e => setEditForm({...editForm, nombreFantasia: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">RUT *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={editForm.rut || ''} 
-                        onChange={e => setEditForm({...editForm, rut: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Giro Comercial</label>
-                      <input 
-                        type="text" 
-                        value={editForm.giro || ''} 
-                        onChange={e => setEditForm({...editForm, giro: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Email *</label>
-                      <input 
-                        type="email" 
-                        required 
-                        value={editForm.email || ''} 
-                        onChange={e => setEditForm({...editForm, email: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Teléfono</label>
-                      <input 
-                        type="text" 
-                        value={editForm.telefono || ''} 
-                        onChange={e => setEditForm({...editForm, telefono: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Dirección</label>
-                      <input 
-                        type="text" 
-                        value={editForm.direccion || ''} 
-                        onChange={e => setEditForm({...editForm, direccion: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Comuna</label>
-                      <input 
-                        type="text" 
-                        value={editForm.comuna || ''} 
-                        onChange={e => setEditForm({...editForm, comuna: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Ciudad</label>
-                      <input 
-                        type="text" 
-                        value={editForm.ciudad || ''} 
-                        onChange={e => setEditForm({...editForm, ciudad: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Región</label>
-                      <input 
-                        type="text" 
-                        value={editForm.region || ''} 
-                        onChange={e => setEditForm({...editForm, region: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sitio Web</label>
-                      <input 
-                        type="text" 
-                        value={editForm.sitioWeb || ''} 
-                        onChange={e => setEditForm({...editForm, sitioWeb: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Ejecutivo Comercial</label>
-                      <input 
-                        type="text" 
-                        value={editForm.ejecutivoComercial || ''} 
-                        onChange={e => setEditForm({...editForm, ejecutivoComercial: e.target.value})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Estado</label>
-                      <select 
-                        value={editForm.estado} 
-                        onChange={e => setEditForm({...editForm, estado: e.target.value as 'Activo' | 'Inactivo'})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white"
-                      >
-                        <option value="Activo">Activo</option>
-                        <option value="Inactivo">Inactivo</option>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Estado Actual</label>
+                      <select className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer">
+                        <option>En proceso</option>
+                        <option>Completado</option>
+                        <option>Pendiente</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* Edición de Ciclos Club Comercial */}
-                  <div className="bg-sky-950/10 border border-sky-500/20 p-5 rounded-2xl space-y-4">
-                    <h4 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
-                      <Award size={16} /> Edición de Ciclos Históricos (Club Comercial)
-                    </h4>
-                    <p className="text-[10px] text-slate-400 italic">
-                      Ingresa los montos de venta anuales para cada ciclo. Esto define la categoría y los promedios en la ficha 360.
-                    </p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {['2027', '2026', '2025', '2024'].map(year => {
-                        const details = editForm.clubVentasDetail ? (typeof editForm.clubVentasDetail === 'string' ? JSON.parse(editForm.clubVentasDetail) : editForm.clubVentasDetail) : {};
-                        const sales = details[`v${year}`] || 0;
-                        const cat = details[`cat${year}`] || (year === '2026' ? editForm.categoria : '') || 'Sin categoría';
-
-                        return (
-                          <div key={year} className="bg-[#050914] p-3 rounded-xl border border-slate-800 space-y-3">
-                            <div className="text-[10px] font-black text-white uppercase text-center border-b border-slate-800 pb-1 mb-2">Ciclo {year}</div>
-                            
-                            <div>
-                              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Venta Anual ($)</label>
-                              <input 
-                                type="number"
-                                value={sales}
-                                onChange={e => {
-                                  const val = Number(e.target.value);
-                                  const newDetails = { ...details, [`v${year}`]: val };
-                                  setEditForm({ ...editForm, clubVentasDetail: JSON.stringify(newDetails) });
-                                }}
-                                className="w-full bg-[#0D1527] border border-slate-800 p-2 rounded text-[11px] text-white outline-none focus:border-sky-500"
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Categoría</label>
-                              <select 
-                                value={cat}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  const newDetails = { ...details, [`cat${year}`]: val };
-                                  const updates: any = { clubVentasDetail: JSON.stringify(newDetails) };
-                                  if (year === '2026') updates.categoria = val;
-                                  setEditForm({ ...editForm, ...updates });
-                                }}
-                                className="w-full bg-[#0D1527] border border-slate-800 p-2 rounded text-[11px] text-white outline-none focus:border-sky-500"
-                              >
-                                <option value="Sin categoría">Sin categoría</option>
-                                <option value="Bronce">Bronce</option>
-                                <option value="Plata">Plata</option>
-                                <option value="Oro">Oro</option>
-                                <option value="Platinum">Platinum</option>
-                              </select>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Consumo de Frascos</label>
-                      <input 
-                        type="number" 
-                        value={editForm.compras !== undefined ? editForm.compras : (editForm.frascos !== undefined ? editForm.frascos : '')} 
-                        onChange={e => setEditForm({
-                          ...editForm, 
-                          compras: e.target.value ? Number(e.target.value) : 0,
-                          frascos: e.target.value ? Number(e.target.value) : 0,
-                          frascosComprados: e.target.value ? Number(e.target.value) : 0
-                        })}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                        placeholder="Ej: 24"
-                      />
-                    </div>
-                  </div>
-                  
                   <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Observaciones Internas</label>
-                    <textarea 
-                      value={editForm.observaciones || ''} 
-                      onChange={e => setEditForm({...editForm, observaciones: e.target.value})}
-                      className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white h-24" 
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Compra Anual Acumulada ($)</label>
+                    <input 
+                      type="number" 
+                      readOnly
+                      value={client.compraAnual || 144136}
+                      className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white/70 font-black cursor-not-allowed" 
                     />
                   </div>
-                  <div className="flex justify-end">
-                    <button 
-                      type="submit"
-                      className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2"
-                    >
-                      <Save size={14} />
-                      Guardar Cambios
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <DetailField label="Razón Social" value={client.name} icon={<Building2 className="text-sky-400" />} />
-                  <DetailField label="Nombre Fantasía" value={client.nombreFantasia} icon={<User className="text-indigo-400" />} />
-                  <DetailField label="RUT" value={client.rut} icon={<FileText className="text-amber-400" />} />
-                  <DetailField label="Giro Comercial" value={client.giro} icon={<Briefcase className="text-purple-400" />} />
-                  <DetailField label="Email" value={client.email} icon={<Mail className="text-blue-400" />} />
-                  <DetailField label="Teléfono" value={client.telefono} icon={<Phone className="text-emerald-400" />} />
-                  <DetailField label="Dirección" value={client.direccion} icon={<MapPin className="text-rose-400" />} />
-                  <DetailField label="Comuna" value={client.comuna} icon={<MapPin className="text-rose-400" />} />
-                  <DetailField label="Ciudad/Región" value={`${client.ciudad || ''} ${client.region ? `, ${client.region}` : ''}`} icon={<MapPin className="text-rose-400" />} />
-                  <DetailField label="Sitio Web" value={client.sitioWeb} icon={<Globe className="text-teal-400" />} />
-                  <DetailField label="Ejecutivo Comercial" value={client.ejecutivoComercial || 'Sin asignar'} icon={<User className="text-orange-400" />} />
-                  <DetailField label="Responsable Intranet" value={client.responsable || 'Sistema'} icon={<Layers className="text-sky-400" />} />
-                  <DetailField label="Categoría Club" value={client.categoria || 'Sin categoría'} icon={<Award className="text-yellow-500" />} />
-                  <DetailField label="Promedio Frascos Mensual" value={`${Number((((client.compraAnual || 0) / 12) / 10000).toFixed(1))} frascos/mes`} icon={<Activity className="text-emerald-400" />} />
-                  <DetailField label="Consumo de Frascos (Total)" value={`${client.compras !== undefined ? client.compras : (client.frascos !== undefined ? client.frascos : 0)} frascos`} icon={<Activity className="text-orange-500" />} />
-                  
-                  <div className="md:col-span-2 lg:col-span-3 bg-slate-900/30 p-5 rounded-2xl border border-slate-850">
-                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Observaciones Internas</span>
-                    <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{client.observaciones || 'No se registran observaciones.'}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* TAB: CONTACTOS & VETERINARIOS */}
-          {activeTab === 'contactos' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
-              {/* CONTACTS LIST */}
-              <div className="space-y-6">
-                <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
-                  <h3 className="text-sm font-black uppercase text-slate-200 tracking-wider">Contactos de la Empresa</h3>
-                  <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full">{contacts.length}</span>
-                </div>
+                  <label className="flex items-center gap-3 cursor-pointer group py-1">
+                    <div className="w-5 h-5 rounded border border-slate-700 bg-slate-900 flex items-center justify-center group-hover:border-sky-500 transition-all">
+                      <div className="w-3 h-3 rounded-sm bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div>
+                    </div>
+                    <span className="text-[11px] font-black text-slate-400 group-hover:text-slate-200 transition-all uppercase tracking-wide">Es Cliente de Gestión</span>
+                  </label>
 
-                <div className="space-y-3">
-                  {Array.isArray(contacts) && contacts.map((c, i) => (
-                    <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-white">{c.nombre}</span>
-                          {c.esPrincipal && (
-                            <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-black uppercase px-2 py-0.5 border border-emerald-500/25 rounded-md">
-                              Contacto Principal
-                            </span>
-                          )}
+                  <div className="pt-2 space-y-5">
+                    {/* SIMULADOR CLUB CIMASUR */}
+                    <div className="bg-[#050914] border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                          <Award size={14} /> SIMULADOR CLUB CIMASUR
+                        </h4>
+                        <span className="px-3 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase tracking-widest">
+                          CATEGORÍA: {client.categoria || 'Bronce'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex justify-between text-[10px] font-black">
+                          <span className="text-slate-500 uppercase tracking-wider">Progreso para categoría {client.categoria || 'Bronce'}</span>
+                          <span className="text-white">100%</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">{c.cargo || 'Sin Cargo'}</p>
-                        <p className="text-xs text-slate-500">{c.email} {c.telefono ? `| ${c.telefono}` : ''} {c.celular ? `| Cel: ${c.celular}` : ''}</p>
+                        <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: '100%' }}
+                            className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                          />
+                        </div>
+                        <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
+                          <span>Meta para {client.categoria || 'Bronce'}: $30.000</span>
+                          <span>Actual: ${(client.compraAnual || 144136).toLocaleString()}</span>
+                        </div>
                       </div>
-                      <button 
-                        onClick={() => handleDeleteContact(i)}
-                        className="p-1.5 bg-red-950/20 text-red-400 hover:bg-red-900/30 rounded border border-red-900/30 transition-all"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
 
-                  {/* Add Contact Mini Form */}
-                  <div className="bg-slate-900/10 border border-dashed border-slate-800 p-4 rounded-xl space-y-3">
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Agregar Nuevo Contacto</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input 
-                        type="text" 
-                        placeholder="Nombre completo" 
-                        value={newContact.nombre}
-                        onChange={e => setNewContact({...newContact, nombre: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Cargo" 
-                        value={newContact.cargo}
-                        onChange={e => setNewContact({...newContact, cargo: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                      <input 
-                        type="email" 
-                        placeholder="Email" 
-                        value={newContact.email}
-                        onChange={e => setNewContact({...newContact, email: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Celular" 
-                        value={newContact.celular}
-                        onChange={e => setNewContact({...newContact, celular: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <label className="flex items-center gap-2 text-xs text-slate-400">
-                        <input 
-                          type="checkbox" 
-                          checked={newContact.esPrincipal} 
-                          onChange={e => setNewContact({...newContact, esPrincipal: e.target.checked})}
-                          className="rounded text-sky-500 bg-[#050914] border-slate-800" 
-                        />
-                        Establecer como principal
-                      </label>
-                      <button 
-                        onClick={handleAddContact}
-                        className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-[10px] uppercase px-4 py-2 rounded-lg flex items-center gap-1.5"
-                      >
-                        <Plus size={12} />
-                        Agregar
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* VETERINARIOS / PROFESIONALES */}
-              <div className="space-y-6">
-                <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
-                  <h3 className="text-sm font-black uppercase text-slate-200 tracking-wider">Médicos Veterinarios Asoc.</h3>
-                  <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full">{veterinarios.length}</span>
-                </div>
-
-                <div className="space-y-3">
-                  {Array.isArray(veterinarios) && veterinarios.map((v, i) => (
-                    <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl flex justify-between items-start">
-                      <div className="space-y-1">
-                        <span className="text-xs font-black text-white">{v.nombre}</span>
-                        <p className="text-[10px] text-indigo-400 font-bold uppercase">{v.especialidad || 'Generalista'}</p>
-                        <p className="text-xs text-slate-500">{v.email} {v.telefono ? `| Tel: ${v.telefono}` : ''}</p>
-                      </div>
-                      <button 
-                        onClick={() => handleDeleteVet(i)}
-                        className="p-1.5 bg-red-950/20 text-red-400 hover:bg-red-900/30 rounded border border-red-900/30 transition-all"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Add Vet Mini Form */}
-                  <div className="bg-slate-900/10 border border-dashed border-slate-800 p-4 rounded-xl space-y-3">
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Vincular Nuevo Veterinario</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input 
-                        type="text" 
-                        placeholder="Nombre completo" 
-                        value={newVet.nombre}
-                        onChange={e => setNewVet({...newVet, nombre: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Especialidad (ej. Cardiología)" 
-                        value={newVet.especialidad}
-                        onChange={e => setNewVet({...newVet, especialidad: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                      <input 
-                        type="email" 
-                        placeholder="Email" 
-                        value={newVet.email}
-                        onChange={e => setNewVet({...newVet, email: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Teléfono" 
-                        value={newVet.telefono}
-                        onChange={e => setNewVet({...newVet, telefono: e.target.value})}
-                        className="bg-[#050914] border border-slate-850 p-2 rounded text-xs text-white" 
-                      />
-                    </div>
-                    <div className="flex justify-end">
-                      <button 
-                        onClick={handleAddVet}
-                        className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-[10px] uppercase px-4 py-2 rounded-lg flex items-center gap-1.5"
-                      >
-                        <Plus size={12} />
-                        Vincular
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB: CLUB COMERCIAL */}
-          {activeTab === 'club' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center bg-[#050914] p-3 rounded-2xl border border-slate-850">
-                <div className="flex items-center gap-3">
-                  <Award className="text-yellow-500 w-6 h-6" />
-                  <span className="text-xs font-black text-white uppercase tracking-widest">Visualizando Ciclo:</span>
-                </div>
-                <div className="flex bg-[#0D1527] p-1 rounded-xl border border-slate-800">
-                  {['2027', '2026', '2025', '2024'].map(year => (
-                    <button
-                      key={year}
-                      onClick={() => setSelectedClubYear(year)}
-                      className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${selectedClubYear === year ? 'bg-sky-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <div className="bg-[#050914] border border-slate-850 p-6 rounded-2xl space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Award className="text-yellow-500 w-8 h-8" />
-                    <div>
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Categoría del Ciclo {selectedClubYear}</h4>
-                      <div className="text-2xl font-black text-white mt-1">
-                        {(client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail) : {})[`cat${selectedClubYear}`] || (selectedClubYear === '2026' ? client.categoria : 'Sin categoría')}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-850/50 pt-4">
-                     <span className="text-[10px] text-slate-500 font-bold block uppercase mb-4">Línea de Tiempo Histórica</span>
-                     
-                     <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-800">
-                        {['2027', '2026', '2025', '2024'].map((year, idx) => {
-                          const details = client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail) : {};
-                          const cat = details[`cat${year}`] || (year === '2026' ? client.categoria : null) || 'Sin categoría';
-                          const sales = details[`v${year}`] || 0;
-                          
-                          return (
-                            <div key={year} className="relative">
-                              <div className={`absolute -left-[24px] top-1 w-4 h-4 rounded-full border-4 border-[#0D1527] z-10 ${selectedClubYear === year ? 'bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.5)]' : 'bg-slate-700'}`} />
-                              <div className={`bg-[#0D1527] border p-3 rounded-xl transition-all ${selectedClubYear === year ? 'border-sky-500/30 ring-1 ring-sky-500/20' : 'border-slate-850'}`}>
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="text-[10px] font-black text-slate-500 uppercase">Ciclo {year}</span>
-                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${cat === 'Platinum' ? 'bg-purple-950 text-purple-300' : cat === 'Oro' ? 'bg-amber-950 text-amber-300' : cat === 'Plata' ? 'bg-slate-800 text-slate-300' : 'bg-orange-950 text-orange-300'}`}>
-                                    {cat}
-                                  </span>
-                                </div>
-                                <div className="text-xs font-bold text-white">${Number(sales).toLocaleString('es-CL')}</div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                     </div>
-                  </div>
-                </div>
-
-                <div className="bg-[#050914] border border-slate-850 p-6 rounded-2xl space-y-4">
-                  <h4 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
-                    <Gift size={16} />
-                    Detalles de Venta ({selectedClubYear})
-                  </h4>
-                  <div className="space-y-4">
-                    <div className="bg-sky-500/5 p-4 rounded-xl border border-sky-500/10">
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase mb-1">Ventas Anuales Consolidadas</span>
-                      <span className="text-xl font-black text-white">
-                        ${(client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail)[`v${selectedClubYear}`] : 0)?.toLocaleString('es-CL')}
-                      </span>
-                      <div className="mt-2 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-sky-500" style={{ width: '65%' }}></div>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="bg-[#0D1527] p-3 rounded-xl border border-slate-850">
-                         <span className="text-[9px] text-slate-500 font-bold block uppercase mb-1">Prom. Mensual</span>
-                         <span className="text-xs font-bold text-white">
-                           ${((client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail)[`v${selectedClubYear}`] : 0) / 12)?.toLocaleString('es-CL')}
-                         </span>
-                       </div>
-                       <div className="bg-[#0D1527] p-3 rounded-xl border border-slate-850">
-                         <span className="text-[9px] text-slate-500 font-bold block uppercase mb-1">Brecha Prox. Cat.</span>
-                         <span className="text-xs font-bold text-emerald-400">$1.240.000</span>
-                       </div>
-                    </div>
-
-                    {selectedClubYear === '2026' && (client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0) === 0 && (
-                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                        <p className="text-[10px] text-amber-300 italic">
-                          Nota: Los datos del ciclo 2026 aún no están consolidados. La categoría actual se basa en el rendimiento del 2025.
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+                        <p className="text-[10px] text-emerald-400 font-black leading-tight">
+                          ✓ ¡Excelente! Ya cumplió con el mínimo de $30.000 para la categoría {client.categoria || 'Bronce'} durante este año.
                         </p>
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
 
-              </div>
-            </div>
-          )}
-
-          {/* TAB: OPORTUNIDADES & CAMPAÑAS */}
-          {activeTab === 'oportunidades' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
-              <div className="space-y-4">
-                <h3 className="text-sm font-black uppercase text-slate-200 tracking-wider">Oportunidades Comerciales Activas</h3>
-                {Array.isArray(client.oportunidades) && client.oportunidades.length ? (
-                  <div className="space-y-3">
-                    {client.oportunidades.map((o: any, i: number) => (
-                      <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-white">{o.tipo || o.opportunityType}</span>
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${o.prioridad === 'critical' || o.prioridad === 'high' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                            {o.prioridad || 'Media'}
-                          </span>
+                    {/* ACELERACIÓN */}
+                    <div className="bg-[#050914] border border-indigo-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                        <Zap size={14} /> CAMPAÑA & PLAN DE ACELERACIÓN
+                      </h4>
+                      
+                      <div className="space-y-1.5">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">CATEGORÍA OBJETIVO:</span>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {['Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
+                            <button key={cat} className={`py-2 rounded text-[8px] font-black uppercase transition-all ${cat === 'Plata' ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-slate-850 text-slate-600 border border-slate-800'}`}>
+                              {cat}
+                            </button>
+                          ))}
                         </div>
-                        <p className="text-xs text-slate-400">{o.descripcion || o.reason}</p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500">No hay alertas de oportunidad activa para este cliente.</p>
-                )}
-              </div>
 
-              <div className="space-y-4">
-                <h3 className="text-sm font-black uppercase text-slate-200 tracking-wider">Ejecuciones de Campañas</h3>
-                {Array.isArray(client.campanas) && client.campanas.length ? (
-                  <div className="space-y-3">
-                    {client.campanas.map((c: any, i: number) => (
-                      <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl flex justify-between items-center">
-                        <div>
-                          <span className="text-xs font-bold text-white">{c.nombre}</span>
-                          <p className="text-[10px] text-slate-500">Canal: {c.canal} | Fecha: {c.fecha}</p>
-                        </div>
-                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">Enviado</span>
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+                         <span className="text-[10px] text-emerald-400 font-black uppercase">✓ ¡Categoría ya superada hoy!</span>
                       </div>
-                    ))}
+                    </div>
+
+                    <button 
+                      onClick={handleAddBitacora}
+                      className="w-full bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-xs py-4 rounded-2xl transition-all shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2"
+                    >
+                      <Save size={16} />
+                      REGISTRAR GESTIÓN
+                    </button>
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500">No se registran campañas enviadas a este cliente en este ciclo.</p>
-                )}
-              </div>
 
-            </div>
-          )}
-
-          {/* TAB: INTELIGENCIA IA */}
-          {activeTab === 'ia' && (
-            <div className="bg-sky-950/10 border border-sky-500/15 p-6 rounded-2xl space-y-6">
-              <div className="flex items-center gap-2 text-sky-400 border-b border-sky-500/10 pb-3">
-                <Bot size={20} />
-                <h3 className="text-sm font-black uppercase tracking-wider flex items-center gap-2">
-                  Cognición Comercial por Gemini AI
-                  <span className="bg-sky-500 text-slate-950 text-[9px] px-1.5 py-0.5 rounded-full font-black">ACTIVE</span>
-                </h3>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-[10px] font-black uppercase text-sky-400 tracking-widest mb-1.5">Diagnóstico y Salud de Cuenta</h4>
-                  <p className="text-xs text-slate-300 leading-relaxed italic bg-sky-500/5 p-4 rounded-xl border border-sky-500/5">
-                    "{client.iaComercial?.insights || 'El motor de inteligencia está calculando el perfil psicofisiológico y los disparadores de compra preferenciales para este veterinario. Se cargará automáticamente al finalizar.'}"
+                  <p className="text-[9px] text-slate-600 italic text-center pt-2 uppercase font-bold tracking-tight">
+                    Utilice el botón superior para guardar el historial.
                   </p>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-[#050914] p-4 rounded-xl border border-slate-850">
-                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Propensión a Abandono</span>
-                    <span className="text-lg font-black text-white">{client.iaComercial?.propensionAbandono || 'Baja (8.5%)'}</span>
-                  </div>
-                  <div className="bg-[#050914] p-4 rounded-xl border border-slate-850">
-                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Próxima Compra Recomendada</span>
-                    <span className="text-lg font-black text-sky-400">{client.iaComercial?.proximaCompra || 'Cardiología Base Cimasur'}</span>
-                  </div>
-                </div>
               </div>
             </div>
-          )}
-
-          {/* TAB: BITÁCORA */}
-          {activeTab === 'bitacora' && (
-            <div className="space-y-6">
-              <div className="flex gap-3">
-                <input 
-                  type="text" 
-                  placeholder="Agregar comentario de seguimiento..." 
-                  value={newBitacoraEntry}
-                  onChange={e => setNewBitacoraEntry(e.target.value)}
-                  onKeyPress={e => e.key === 'Enter' && handleAddBitacora()}
-                  className="flex-1 bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                />
-                <button 
-                  onClick={handleAddBitacora}
-                  className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-xs px-5 py-3 rounded-xl transition-all active:scale-95"
-                >
-                  Registrar
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {!Array.isArray(bitacora) || bitacora.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">
-                    <FileText className="mx-auto w-10 h-10 mb-2 opacity-50" />
-                    <p className="text-xs">No hay entradas de bitácora registradas.</p>
-                  </div>
-                ) : (
-                  bitacora.filter(e => e && typeof e === 'object').map((entry, idx) => {
-                    let dateDisplay = 'Fecha no disponible';
-                    try {
-                      if (entry.fecha) {
-                        const dateObj = new Date(entry.fecha);
-                        if (!isNaN(dateObj.getTime())) {
-                          dateDisplay = dateObj.toLocaleString();
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Error formatting date in bitacora", e);
-                    }
-
-                    return (
-                      <div key={entry.id || idx} className="bg-slate-900/30 border border-slate-850 p-5 rounded-2xl space-y-2">
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                          <span>Registrado por {entry.creador || 'Sistema'}</span>
-                          <span className="font-mono">{dateDisplay}</span>
-                        </div>
-                        <p className="text-xs text-slate-200 leading-relaxed">{entry.comentario || 'Sin comentario'}</p>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-
+          </div>
         </div>
-
-        {/* Modal Footer */}
-        <div className="bg-[#152035] p-4 border-t border-slate-800 flex justify-end">
-          <button 
-            onClick={onClose} 
-            className="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl border border-slate-750 transition-all active:scale-95"
-          >
-            Cerrar Ficha
-          </button>
-        </div>
-
-      </div>
+      </motion.div>
     </div>
   );
 };
-
-// HELPER MINI COMPONENTS
-const DetailField: React.FC<{ label: string; value?: string; icon: React.ReactNode }> = ({ label, value, icon }) => (
-  <div className="bg-slate-900/20 border border-slate-850 p-4 rounded-2xl flex items-start gap-3">
-    <div className="p-2 bg-slate-900 rounded-xl mt-0.5">
-      {icon}
-    </div>
-    <div className="min-w-0">
-      <span className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-0.5">{label}</span>
-      <span className="text-xs font-bold text-white block truncate">{value || 'N/A'}</span>
-    </div>
-  </div>
-);
