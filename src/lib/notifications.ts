@@ -208,6 +208,7 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
   
   // Local mode fallback
   const handleLocalChange = async () => {
+    if (isFirebaseReady && db) return; // Snapshot handles it
     try {
       const data = await localDB.getCollection('notifications');
       const sorted = [...data].sort((a, b) => {
@@ -226,7 +227,18 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
   window.addEventListener('db-change', handleLocalChange);
   
   // Polling for local mode
-  const pollInterval = setInterval(handleLocalChange, 5000); // More frequent polling (5s)
+  let isPolling = false;
+  const poll = async () => {
+    if (isPolling) return;
+    try {
+      isPolling = true;
+      await handleLocalChange();
+    } finally {
+      isPolling = false;
+    }
+  };
+  
+  const pollInterval = setInterval(poll, 15000); // Less aggressive polling (15s instead of 5s)
   
   return () => {
     window.removeEventListener('db-change', handleLocalChange);

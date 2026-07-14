@@ -2258,16 +2258,16 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                              r.categoria === 'Oro' ? "bg-amber-950 text-amber-300 border-amber-800/80" :
                              r.categoria === 'Plata' ? "bg-slate-800 text-slate-300 border-slate-600/80" :
                              r.categoria === 'Bronce' ? "bg-orange-950 text-orange-300 border-orange-850/80" :
-                             "bg-[#111A2E] text-slate-200 border-slate-700/50"
-                           )}
-                         >
-                           {CATEGORIAS.map(cat => (
-                             <option key={cat} value={cat} className="bg-[#152035] text-white">
-                               {cat}
-                             </option>
-                           ))}
-                         </select>
-                      </td>
+                              "bg-[#111A2E] text-slate-200 border-slate-700/50"
+                            )}
+                          >
+                            {CATEGORIAS.map(cat => (
+                              <option key={cat} value={cat} className="bg-[#152035] text-white">
+                                {cat}
+                              </option>
+                            ))}
+                          </select>
+                       </td>
                       <td className="p-5 font-medium text-slate-350">{r.type}</td>
                       <td className="p-5">
                          <select
@@ -2496,16 +2496,29 @@ function CRMIntranetTable({
   const [existingCRMNames, setExistingCRMNames] = useState<Set<string>>(new Set());
   const [crmContacts, setCrmContacts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('Todos');
 
   const filteredClients = React.useMemo(() => {
-    if (!searchTerm.trim()) return clients;
-    const term = searchTerm.toLowerCase().trim();
-    return clients.filter((client: any) => {
-      const name = (client.name || '').toLowerCase();
-      const email = (client.email || '').toLowerCase();
-      return name.includes(term) || email.includes(term);
-    });
-  }, [clients, searchTerm]);
+    let result = clients;
+    
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      result = result.filter((client: any) => {
+        const name = (client.name || '').toLowerCase();
+        const email = (client.email || '').toLowerCase();
+        return name.includes(term) || email.includes(term);
+      });
+    }
+
+    if (estadoFilter !== 'Todos') {
+      result = result.filter((client: any) => {
+        const estado = client.estado || 'Activo';
+        return estado === estadoFilter;
+      });
+    }
+
+    return result;
+  }, [clients, searchTerm, estadoFilter]);
 
   const permissions = user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
@@ -2750,6 +2763,41 @@ function CRMIntranetTable({
           />
           <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
         </div>
+        <div className="flex items-center gap-2">
+          <select 
+            className="bg-[#152035] text-xs text-slate-300 border border-[#1E293B] rounded-xl px-4 py-2.5 outline-none focus:border-sky-500 transition-colors cursor-pointer"
+            value={estadoFilter}
+            onChange={e => setEstadoFilter(e.target.value)}
+          >
+            <option value="Todos">Estado Motor (Todos)</option>
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+            <option value="Solo CRM Comercial">Solo CRM</option>
+            <option value="Solo Intranet">Solo Intranet</option>
+            <option value="Ambos (Sincronizado)">Ambos</option>
+          </select>
+          <button 
+            onClick={() => {
+              const data = filteredClients.map(c => [
+                c.name,
+                c.email || '---',
+                formatDate(c.fechaIngreso),
+                c.accesoAprobado || 'No',
+                c.estado || 'Activo'
+              ]);
+              exportTableToPDF(
+                'Reporte: Base de Clientes en Plataforma Intranet',
+                ['Nombre / Razón Social', 'Email', 'Fecha Registro', 'Aprobado', 'Estado Motor'],
+                data,
+                'clientes_intranet'
+              );
+            }}
+            className="bg-[#152035] text-[#38BDF8] border border-blue-400/30 rounded-xl px-4 py-2.5 text-xs font-black hover:bg-[#111A2E] flex items-center gap-2 transition-all shadow-lg active:scale-95"
+            title="Exportar a PDF"
+          >
+            <Download size={14} /> EXPORTAR PDF
+          </button>
+        </div>
         <div className="text-[11px] text-slate-400 font-bold font-mono">
           {searchTerm ? (
             <span>Coincidencias: <span className="text-sky-400">{filteredClients.length}</span> de <span className="text-slate-300">{clients.length}</span> total</span>
@@ -2808,31 +2856,58 @@ function CRMIntranetTable({
                     )}
                   </td>
                   <td className="p-5 text-center">
-                    {isTransferred ? (
-                      <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/35 px-2.5 py-1 rounded-full text-[10px] font-bold">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" /> Activo en CRM (Campañas)
-                      </span>
-                    ) : (
-                      <div className="flex justify-center items-center gap-2">
-                        <span className="bg-slate-800 text-slate-400 border border-slate-700/60 px-2.5 py-1 rounded-full text-[10px] font-bold">
-                          Inactivo
-                        </span>
-                        {client.accesoAprobado === 'Si' && onImportSingle && (
-                          <button
-                            onClick={() => onImportSingle(client)}
-                            className="bg-sky-600 hover:bg-sky-700 text-white font-extrabold px-2.5 py-1 rounded text-[10px] uppercase transition-all duration-300 transform active:scale-95 cursor-pointer"
-                            title="Sincronizar este veterinario aprobado individualmente al CRM Comercial"
-                          >
-                            Activar CRM
-                          </button>
+                    {canEdit ? (
+                      <select
+                        value={client.estado || "Activo"}
+                        onChange={async (e) => {
+                          const newVal = e.target.value;
+                          try {
+                            await localDB.updateInCollection("intranet_clients", client.id, { estado: newVal });
+                            window.dispatchEvent(new Event("db-change"));
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 rounded-full font-black text-[9px] uppercase border cursor-pointer bg-[#0F172A] outline-none text-center focus:ring-1 focus:ring-blue-400 font-bold max-w-[125px] disabled:pointer-events-none disabled:opacity-80 transition-all duration-200",
+                          (client.estado || "Activo") === "Activo" || (client.estado || "Activo") === "Ambos (Sincronizado)" 
+                            ? "bg-emerald-950 text-emerald-300 border-emerald-800/80" 
+                            : "bg-slate-800 text-slate-300 border-slate-600/80"
                         )}
-                      </div>
+                      >
+                        <option value="Activo" className="bg-[#152035] text-white">Activo</option>
+                        <option value="Inactivo" className="bg-[#152035] text-white">Inactivo</option>
+                        <option value="Solo CRM Comercial" className="bg-[#152035] text-white">Solo CRM</option>
+                        <option value="Solo Intranet" className="bg-[#152035] text-white">Solo Intranet</option>
+                        <option value="Ambos (Sincronizado)" className="bg-[#152035] text-white">Ambos</option>
+                      </select>
+                    ) : (
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase",
+                        (client.estado || "Activo") === "Activo" || (client.estado || "Activo") === "Ambos (Sincronizado)" 
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" 
+                          : "bg-slate-500/20 text-slate-300 border border-slate-500/30"
+                      )}>
+                        {client.estado || "Activo"}
+                      </span>
                     )}
                   </td>
                   <td className="p-5 text-right">
                      <RecordActions 
                        module="crm"
                        onView={() => onViewClient?.(client.id)}
+                       onDownload={() => {
+                         const data = [
+                           { label: 'Nombre / Razón Social', value: client.name },
+                           { label: 'Email', value: client.email || '---' },
+                           { label: 'Fecha Registro', value: formatDate(client.fechaIngreso) },
+                           { label: 'Aprobado como Veterinario', value: client.accesoAprobado || 'No' },
+                           { label: 'Estado del Motor', value: client.estado || 'Activo' },
+                           { label: 'RUT / ID', value: client.rut || '---' },
+                           { label: 'Región / Comuna', value: client.region || '---' }
+                         ];
+                         exportExpedienteToPDF(`Ficha Cliente Intranet: ${client.name}`, data, `intranet_${client.id}`);
+                       }}
                        onDelete={async () => {
                          if (confirm("¿Está seguro de eliminar este registro de la base Intranet?")) {
                            await localDB.deleteFromCollection('intranet_clients', client.id);

@@ -2,6 +2,8 @@ import { localDB } from './auth';
 import { addNotification } from './notifications';
 
 const sentThisSession = new Set<string>();
+let cachedNotificationsForCheck: any[] | null = null;
+let lastNotificationsFetchTime = 0;
 
 const hasRecentNotification = async (title: string, message: string): Promise<boolean> => {
     const cacheKey = `${title}:${message}`;
@@ -9,7 +11,14 @@ const hasRecentNotification = async (title: string, message: string): Promise<bo
         return true;
     }
 
-    const notifications = await localDB.getCollection('notifications');
+    // Cache the collection for 1 minute during a check cycle
+    const now = Date.now();
+    if (!cachedNotificationsForCheck || (now - lastNotificationsFetchTime > 60000)) {
+        cachedNotificationsForCheck = await localDB.getCollection('notifications');
+        lastNotificationsFetchTime = now;
+    }
+
+    const notifications = cachedNotificationsForCheck;
     if (!Array.isArray(notifications)) return false;
 
     const todayStart = new Date();

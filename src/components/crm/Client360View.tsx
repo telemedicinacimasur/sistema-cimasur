@@ -18,6 +18,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('general');
+  const [selectedClubYear, setSelectedClubYear] = useState<string>('2026');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<Partial<Client>>({});
 
@@ -354,57 +355,69 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                         <option value="Activo">Activo</option>
                         <option value="Inactivo">Inactivo</option>
                       </select>
-                      <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">VENTAS ANUALES (CLP)</label>
-                      <input 
-                        type="number" 
-                        value={editForm.clubComercial?.yearlyData?.[0]?.annualAmount || ''} 
-                        onChange={e => {
-                          const val = Number(e.target.value);
-                          const newYearlyData = [...(editForm.clubComercial?.yearlyData || [{year: new Date().getFullYear(), annualAmount: 0, monthlyAmount: 0, monthlyFrascos: 0}])];
-                          newYearlyData[0].annualAmount = val;
-                          newYearlyData[0].monthlyAmount = val / 12;
-                          setEditForm({...editForm, clubComercial: {...editForm.clubComercial, yearlyData: newYearlyData} as any});
-                        }}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                        placeholder="Ej: 12000000"
-                      />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">PROMEDIO MENSUAL (CLP)</label>
-                      <input 
-                        type="number" 
-                        value={editForm.clubComercial?.yearlyData?.[0]?.monthlyAmount || ''} 
-                        onChange={e => {
-                          const val = Number(e.target.value);
-                          const newYearlyData = [...(editForm.clubComercial?.yearlyData || [{year: new Date().getFullYear(), annualAmount: 0, monthlyAmount: 0, monthlyFrascos: 0}])];
-                          newYearlyData[0].monthlyAmount = val;
-                          setEditForm({...editForm, clubComercial: {...editForm.clubComercial, yearlyData: newYearlyData} as any});
-                        }}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                      />
+                  </div>
+
+                  {/* Edición de Ciclos Club Comercial */}
+                  <div className="bg-sky-950/10 border border-sky-500/20 p-5 rounded-2xl space-y-4">
+                    <h4 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
+                      <Award size={16} /> Edición de Ciclos Históricos (Club Comercial)
+                    </h4>
+                    <p className="text-[10px] text-slate-400 italic">
+                      Ingresa los montos de venta anuales para cada ciclo. Esto define la categoría y los promedios en la ficha 360.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {['2027', '2026', '2025', '2024'].map(year => {
+                        const details = editForm.clubVentasDetail ? (typeof editForm.clubVentasDetail === 'string' ? JSON.parse(editForm.clubVentasDetail) : editForm.clubVentasDetail) : {};
+                        const sales = details[`v${year}`] || 0;
+                        const cat = details[`cat${year}`] || (year === '2026' ? editForm.categoria : '') || 'Sin categoría';
+
+                        return (
+                          <div key={year} className="bg-[#050914] p-3 rounded-xl border border-slate-800 space-y-3">
+                            <div className="text-[10px] font-black text-white uppercase text-center border-b border-slate-800 pb-1 mb-2">Ciclo {year}</div>
+                            
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Venta Anual ($)</label>
+                              <input 
+                                type="number"
+                                value={sales}
+                                onChange={e => {
+                                  const val = Number(e.target.value);
+                                  const newDetails = { ...details, [`v${year}`]: val };
+                                  setEditForm({ ...editForm, clubVentasDetail: JSON.stringify(newDetails) });
+                                }}
+                                className="w-full bg-[#0D1527] border border-slate-800 p-2 rounded text-[11px] text-white outline-none focus:border-sky-500"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Categoría</label>
+                              <select 
+                                value={cat}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  const newDetails = { ...details, [`cat${year}`]: val };
+                                  const updates: any = { clubVentasDetail: JSON.stringify(newDetails) };
+                                  if (year === '2026') updates.categoria = val;
+                                  setEditForm({ ...editForm, ...updates });
+                                }}
+                                className="w-full bg-[#0D1527] border border-slate-800 p-2 rounded text-[11px] text-white outline-none focus:border-sky-500"
+                              >
+                                <option value="Sin categoría">Sin categoría</option>
+                                <option value="Bronce">Bronce</option>
+                                <option value="Plata">Plata</option>
+                                <option value="Oro">Oro</option>
+                                <option value="Platinum">Platinum</option>
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">PROMEDIO MENSUAL (FRASCOS)</label>
-                      <input 
-                        type="number" 
-                        value={editForm.clubComercial?.manualMonthlyFrascos || ''} 
-                        onChange={e => setEditForm({...editForm, clubComercial: {...editForm.clubComercial, manualMonthlyFrascos: Number(e.target.value)} as any})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                        placeholder="Ej: 5.7"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Categoría Actual (Manual)</label>
-                      <input 
-                        type="text" 
-                        value={editForm.clubComercial?.categoria || ''} 
-                        onChange={e => setEditForm({...editForm, clubComercial: {...editForm.clubComercial, categoria: e.target.value} as any})}
-                        className="w-full bg-[#050914] border border-slate-850 p-3 rounded-xl text-xs text-white" 
-                        placeholder="Ej: Bronce"
-                      />
-                    </div>
-          </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Consumo de Frascos</label>
                       <input 
@@ -633,14 +646,34 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
           {/* TAB: CLUB COMERCIAL */}
           {activeTab === 'club' && (
             <div className="space-y-6">
+              <div className="flex justify-between items-center bg-[#050914] p-3 rounded-2xl border border-slate-850">
+                <div className="flex items-center gap-3">
+                  <Award className="text-yellow-500 w-6 h-6" />
+                  <span className="text-xs font-black text-white uppercase tracking-widest">Visualizando Ciclo:</span>
+                </div>
+                <div className="flex bg-[#0D1527] p-1 rounded-xl border border-slate-800">
+                  {['2027', '2026', '2025', '2024'].map(year => (
+                    <button
+                      key={year}
+                      onClick={() => setSelectedClubYear(year)}
+                      className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${selectedClubYear === year ? 'bg-sky-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 <div className="bg-[#050914] border border-slate-850 p-6 rounded-2xl space-y-4">
                   <div className="flex items-center gap-3">
                     <Award className="text-yellow-500 w-8 h-8" />
                     <div>
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Categoría Actual (2026)</h4>
-                      <div className="text-2xl font-black text-white mt-1">{client.categoria || 'Sin categoría'}</div>
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Categoría del Ciclo {selectedClubYear}</h4>
+                      <div className="text-2xl font-black text-white mt-1">
+                        {(client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail) : {})[`cat${selectedClubYear}`] || (selectedClubYear === '2026' ? client.categoria : 'Sin categoría')}
+                      </div>
                     </div>
                   </div>
 
@@ -648,15 +681,15 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                      <span className="text-[10px] text-slate-500 font-bold block uppercase mb-4">Línea de Tiempo Histórica</span>
                      
                      <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-800">
-                        {['2026', '2025', '2024'].map((year, idx) => {
+                        {['2027', '2026', '2025', '2024'].map((year, idx) => {
                           const details = client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail) : {};
                           const cat = details[`cat${year}`] || (year === '2026' ? client.categoria : null) || 'Sin categoría';
                           const sales = details[`v${year}`] || 0;
                           
                           return (
                             <div key={year} className="relative">
-                              <div className={`absolute -left-[24px] top-1 w-4 h-4 rounded-full border-4 border-[#0D1527] z-10 ${idx === 0 ? 'bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.5)]' : 'bg-slate-700'}`} />
-                              <div className="bg-[#0D1527] border border-slate-850 p-3 rounded-xl">
+                              <div className={`absolute -left-[24px] top-1 w-4 h-4 rounded-full border-4 border-[#0D1527] z-10 ${selectedClubYear === year ? 'bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.5)]' : 'bg-slate-700'}`} />
+                              <div className={`bg-[#0D1527] border p-3 rounded-xl transition-all ${selectedClubYear === year ? 'border-sky-500/30 ring-1 ring-sky-500/20' : 'border-slate-850'}`}>
                                 <div className="flex justify-between items-center mb-1">
                                   <span className="text-[10px] font-black text-slate-500 uppercase">Ciclo {year}</span>
                                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${cat === 'Platinum' ? 'bg-purple-950 text-purple-300' : cat === 'Oro' ? 'bg-amber-950 text-amber-300' : cat === 'Plata' ? 'bg-slate-800 text-slate-300' : 'bg-orange-950 text-orange-300'}`}>
@@ -675,12 +708,14 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                 <div className="bg-[#050914] border border-slate-850 p-6 rounded-2xl space-y-4">
                   <h4 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
                     <Gift size={16} />
-                    Detalles de Venta y Promedios
+                    Detalles de Venta ({selectedClubYear})
                   </h4>
                   <div className="space-y-4">
                     <div className="bg-sky-500/5 p-4 rounded-xl border border-sky-500/10">
                       <span className="text-[10px] text-slate-500 font-bold block uppercase mb-1">Ventas Anuales Consolidadas</span>
-                      <span className="text-xl font-black text-white">${(client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0)?.toLocaleString('es-CL')}</span>
+                      <span className="text-xl font-black text-white">
+                        ${(client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail)[`v${selectedClubYear}`] : 0)?.toLocaleString('es-CL')}
+                      </span>
                       <div className="mt-2 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                         <div className="h-full bg-sky-500" style={{ width: '65%' }}></div>
                       </div>
@@ -689,13 +724,23 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                     <div className="grid grid-cols-2 gap-4">
                        <div className="bg-[#0D1527] p-3 rounded-xl border border-slate-850">
                          <span className="text-[9px] text-slate-500 font-bold block uppercase mb-1">Prom. Mensual</span>
-                         <span className="text-xs font-bold text-white">${((client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0) / 12)?.toLocaleString('es-CL')}</span>
+                         <span className="text-xs font-bold text-white">
+                           ${((client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail)[`v${selectedClubYear}`] : 0) / 12)?.toLocaleString('es-CL')}
+                         </span>
                        </div>
                        <div className="bg-[#0D1527] p-3 rounded-xl border border-slate-850">
                          <span className="text-[9px] text-slate-500 font-bold block uppercase mb-1">Brecha Prox. Cat.</span>
                          <span className="text-xs font-bold text-emerald-400">$1.240.000</span>
                        </div>
                     </div>
+
+                    {selectedClubYear === '2026' && (client.clubVentasDetail ? JSON.parse(client.clubVentasDetail).v2026 : 0) === 0 && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                        <p className="text-[10px] text-amber-300 italic">
+                          Nota: Los datos del ciclo 2026 aún no están consolidados. La categoría actual se basa en el rendimiento del 2025.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

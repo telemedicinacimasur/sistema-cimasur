@@ -251,12 +251,48 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                <p className="text-blue-300/60 text-[10px] font-black uppercase tracking-[0.2em]">{client.nombre || client.cliente}</p>
              </div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="text-white bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white font-black text-xs uppercase tracking-widest px-6 py-2.5 rounded-2xl transition-all"
-          >
-            Cerrar Expediente
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => {
+                const data = [
+                  { label: 'Nombre', value: client.nombre || client.cliente },
+                  { label: 'RUT', value: client.rut },
+                  { label: 'Comuna', value: client.comuna || 'Metropolitana' },
+                  { label: 'Región', value: client.region || '---' },
+                  { label: 'Tipo Empresa', value: client.tipoEmpresa || 'Otros' },
+                  { label: 'Celular', value: client.celular || '---' },
+                  { label: 'Email', value: client.email || '---' },
+                  { label: 'Consultora', value: client.consultora || '---' },
+                  { label: 'Categoría', value: client.categoria || '---' },
+                  { label: 'Estado', value: client.estado || '---' },
+                  { label: 'Fecha Ingreso', value: formatDate(client.fechaIngreso) },
+                  { label: 'Observaciones', value: client.observaciones || '---' }
+                ];
+                const tables = activities.length > 0 ? [
+                  {
+                    title: 'Historial de Actividades',
+                    headers: ['Fecha', 'Actividad', 'Responsable', 'Detalle'],
+                    rows: activities.map(a => [
+                      formatDate(a.fecha),
+                      a.actividad,
+                      a.responsable,
+                      a.detalle || '---'
+                    ])
+                  }
+                ] : [];
+                exportExpedienteToPDF(`Expediente Gestión: ${client.nombre || client.cliente}`, data, `expediente_${client.rut}`, tables);
+              }}
+              className="bg-white/10 hover:bg-white/20 text-white font-black text-xs uppercase tracking-widest px-6 py-2.5 rounded-2xl transition-all flex items-center gap-2"
+            >
+              <Download size={14} /> Exportar PDF
+            </button>
+            <button 
+              onClick={onClose} 
+              className="text-white bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white font-black text-xs uppercase tracking-widest px-6 py-2.5 rounded-2xl transition-all"
+            >
+              Cerrar Expediente
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
@@ -987,9 +1023,7 @@ function GestionList({
                                    }
                                  ] : [];
                                  
-                                 import('../lib/pdfUtils').then(pdf => {
-                                   pdf.exportExpedienteToPDF(`Expediente Gestión: ${r.nombre || r.cliente}`, data, `gestion_${r.rut}`, tables);
-                                 });
+                                 exportExpedienteToPDF(`Expediente Gestión: ${r.nombre || r.cliente}`, data, `gestion_${r.rut}`, tables);
                                }}
                                className="bg-red-500/10 p-2 rounded-2xl hover:bg-red-500/20 text-red-500 border border-red-500/35 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
                                title="Descargar Expediente PDF"

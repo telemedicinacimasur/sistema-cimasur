@@ -228,33 +228,59 @@ export const localDB = {
       const result = await fetchPromise;
       return [...result];
     } else {
-      try {
-        let res = await fetch(`/api/records/${name}`);
-        if (!res.ok) {
-          if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
-             console.warn('Rate limit exceeded, retrying in 2 seconds...');
-             await new Promise(resolve => setTimeout(resolve, 2000));
-             res = await fetch(`/api/records/${name}`);
-          }
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`Failed to fetch ${name}: ${text}`);
-          }
-        }
-        let data = await res.json();
-        if (options && options.dateField && options.startDate && options.endDate) {
-          data = data.filter((item: any) => {
-            const val = item[options.dateField!];
-            return val >= options.startDate! && val <= options.endDate!;
-          });
-        }
-        return data;
-      } catch (err: any) {
-        console.error(`Error in localDB.getCollection(${name}):`, err);
-        // Devuelve un arreglo vacío para prevenir Unhandled Promise Rejections
-        // en caso de que el servidor se esté reiniciando (error de red).
-        return [];
+      const cacheKey = options 
+        ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}` 
+        : name;
+
+      if (pendingRequests[cacheKey]) {
+        const data = await pendingRequests[cacheKey];
+        return [...data];
       }
+
+      const fetchPromise = (async () => {
+        const MAX_RETRIES = 2;
+        let lastError: any = null;
+        
+        try {
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+              let res = await fetch(`/api/records/${name}`);
+              if (!res.ok) {
+                if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
+                   console.warn(`Rate limit exceeded for ${name}, attempt ${attempt + 1}/${MAX_RETRIES + 1}. Retrying...`);
+                   await new Promise(resolve => setTimeout(resolve, 2000));
+                   continue;
+                }
+                const text = await res.text();
+                throw new Error(`Failed to fetch ${name}: ${text}`);
+              }
+              let data = await res.json();
+              if (options && options.dateField && options.startDate && options.endDate) {
+                data = data.filter((item: any) => {
+                  const val = item[options.dateField!];
+                  return val >= options.startDate! && val <= options.endDate!;
+                });
+              }
+              return data;
+            } catch (err: any) {
+              lastError = err;
+              if (attempt < MAX_RETRIES) {
+                console.warn(`Fetch ${name} failed (Attempt ${attempt + 1}), retrying in 2s...`, err);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            }
+          }
+          
+          console.error(`Final failure in localDB.getCollection(${name}) after retries:`, lastError);
+          return [];
+        } finally {
+          delete pendingRequests[cacheKey];
+        }
+      })();
+
+      pendingRequests[cacheKey] = fetchPromise;
+      const result = await fetchPromise;
+      return [...result];
     }
   },
   saveToCollection: async (name: string, item: any) => {
