@@ -115,34 +115,36 @@ export default function CampaignsBuilder({
   }, []);
 
   const getFilteredClients = (camp: SuggestedCampaign | null, catFilterOrList: string | string[], clientsList: Client[] = allClients) => {
-    if (!camp) return [];
+    let clients = clientsList;
     
-    // GrowthEngine attaches specific opportunities to each campaign.
-    // Use those to accurately find the clients instead of guessing by category strings.
-    const targetIds = new Set(camp.opportunities?.map((o: any) => o.customerId) || []);
-    
-    let clients = clientsList.filter(c => {
-      return targetIds.has(c.rut) || targetIds.has(c.id);
-    });
-
-    // Fallback logic if the campaign doesn't have specific opportunities (e.g. general campaigns)
-    if (clients.length === 0 && camp.targetCategory) {
-      clients = clientsList.filter(c => {
-        const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
-        const cat = typeof rawCat === 'string' ? rawCat.toUpperCase() : '';
-        const target = typeof camp.targetCategory === 'string' ? camp.targetCategory.toUpperCase() : '';
-        const name = typeof camp.name === 'string' ? camp.name.toUpperCase() : '';
-        
-        // Special Logic for "Primera Compra" or "SIN COMPRA"
-        if (target === 'SIN COMPRA' || name.includes('PRIMERA COMPRA') || target === 'SIN CATEGORÍA' || target === 'SIN CATEGORIA') {
-          const isSinCompra = cat === 'SIN COMPRA' || cat === 'SIN CATEGORIA' || cat === 'SIN CATEGORÍA';
-          const isInactiveIntranet = (c.intranet === true || c.intranet === 'true') && 
-            (c.estado === 'Inactivo' || c.estadoCrm === 'Inactivo' || !c.compras || c.compras === 0);
-          return isSinCompra || isInactiveIntranet;
-        }
-        
-        return cat.includes(target) || target.includes(cat);
+    // If a campaign is specifically selected (though now optional), we use its targets.
+    // Otherwise, we start with all clients to ensure category filters work across the whole DB.
+    if (camp) {
+      const targetIds = new Set(camp.opportunities?.map((o: any) => o.customerId) || []);
+      const targeted = clientsList.filter(c => {
+        return targetIds.has(c.rut) || targetIds.has(c.id);
       });
+
+      // Fallback logic if the campaign doesn't have specific opportunities (e.g. general campaigns)
+      if (targeted.length === 0 && camp.targetCategory) {
+        clients = clientsList.filter(c => {
+          const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
+          const cat = typeof rawCat === 'string' ? rawCat.toUpperCase() : '';
+          const target = typeof camp.targetCategory === 'string' ? camp.targetCategory.toUpperCase() : '';
+          const name = typeof camp.name === 'string' ? camp.name.toUpperCase() : '';
+          
+          if (target === 'SIN COMPRA' || name.includes('PRIMERA COMPRA') || target === 'SIN CATEGORÍA' || target === 'SIN CATEGORIA') {
+            const isSinCompra = cat === 'SIN COMPRA' || cat === 'SIN CATEGORIA' || cat === 'SIN CATEGORÍA';
+            const isInactiveIntranet = (c.intranet === true || c.intranet === 'true') && 
+              (c.estado === 'Inactivo' || c.estadoCrm === 'Inactivo' || !c.compras || c.compras === 0);
+            return isSinCompra || isInactiveIntranet;
+          }
+          
+          return cat.includes(target) || target.includes(cat);
+        });
+      } else if (targeted.length > 0) {
+        clients = targeted;
+      }
     }
 
     const filtersArray = Array.isArray(catFilterOrList) ? catFilterOrList : [catFilterOrList];
@@ -150,9 +152,10 @@ export default function CampaignsBuilder({
     if (!filtersArray.includes('Todos') && filtersArray.length > 0) {
         clients = clients.filter(c => {
           const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
-          const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+          const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+          
           return filtersArray.some(filter => {
-            const normB = typeof filter === 'string' ? filter.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+            const normB = typeof filter === 'string' ? filter.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
             return normA === normB || normA.includes(normB) || normB.includes(normA);
           });
         });
@@ -209,12 +212,9 @@ export default function CampaignsBuilder({
             const clients = getFilteredClients(pcCamp, 'Sin Compra', clientsList);
             setSelectedClientIds(new Set(clients.map(c => c.id)));
           }
-        } else if (suggestedCampaigns.length > 0) {
-          const defaultCamp = selectedCampaign || suggestedCampaigns[0];
-          if (!selectedCampaign) {
-            setSelectedCampaign(defaultCamp);
-          }
-          const clients = getFilteredClients(defaultCamp, selectedCategory, clientsList);
+        } else {
+          // Default: load all clients and filter by category (usually "Todos")
+          const clients = getFilteredClients(null, selectedCategory, clientsList);
           setSelectedClientIds(new Set(clients.map(c => c.id)));
         }
       } catch (e) {
@@ -477,27 +477,6 @@ ${htmlContent}`;
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">Campañas Sugeridas IA</span>
-          {suggestedCampaigns.map((camp: SuggestedCampaign) => (
-            <button 
-              key={camp.id}
-              onClick={() => {
-                setSelectedCampaign(camp);
-                applyFiltersAndSelectAll(camp, selectedCategories);
-              }}
-              className={`p-2.5 rounded-lg text-left border transition-all text-xs cursor-pointer ${
-                selectedCampaign?.id === camp.id 
-                  ? 'bg-sky-900/40 border-sky-500' 
-                  : 'bg-slate-800 border-slate-700 hover:border-slate-600'
-              }`}
-            >
-              <div className="font-bold text-white">{camp.name}</div>
-              <div className="text-[10px] text-slate-400">{camp.targetCategory} • {camp.clientCount} clientes</div>
-            </button>
-          ))}
-        </div>
-
         {/* Panel de Beneficios y Premios del Segmento */}
         <div className="bg-[#050914] border border-slate-850 rounded-xl p-3 space-y-2.5">
           <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
@@ -563,7 +542,6 @@ ${htmlContent}`;
           )}
         </div>
 
-        {selectedCampaign && (
           <div className="flex-1 flex flex-col gap-2 overflow-hidden">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-sm">Clientes ({filteredClients.length})</h3>
@@ -582,7 +560,6 @@ ${htmlContent}`;
               ))}
             </div>
           </div>
-        )}
       </div>
 
       <div className="col-span-8 bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-4 h-[calc(100vh-2rem)]">

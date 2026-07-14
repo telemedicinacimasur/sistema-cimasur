@@ -39,16 +39,21 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   );
 
   const loadData = async () => {
-    setLoading(true);
-    const c = await clientService.getFullClientData(clientId);
-    if (c) {
-      setClient(c);
-      setEditForm(c);
-      setContacts(c.contactos || []);
-      setVeterinarios(c.veterinarios || []);
-      setBitacora(c.bitacora || []);
+    try {
+      setLoading(true);
+      const c = await clientService.getFullClientData(clientId);
+      if (c) {
+        setClient(c);
+        setEditForm(c);
+        setContacts(Array.isArray(c.contactos) ? c.contactos : []);
+        setVeterinarios(Array.isArray(c.veterinarios) ? c.veterinarios : []);
+        setBitacora(Array.isArray(c.bitacora) ? c.bitacora : []);
+      }
+    } catch (error) {
+      console.error("Error loading client 360 data:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -492,7 +497,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                 </div>
 
                 <div className="space-y-3">
-                  {contacts.map((c, i) => (
+                  {Array.isArray(contacts) && contacts.map((c, i) => (
                     <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl flex justify-between items-start">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -578,7 +583,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                 </div>
 
                 <div className="space-y-3">
-                  {veterinarios.map((v, i) => (
+                  {Array.isArray(veterinarios) && veterinarios.map((v, i) => (
                     <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl flex justify-between items-start">
                       <div className="space-y-1">
                         <span className="text-xs font-black text-white">{v.nombre}</span>
@@ -754,7 +759,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
               
               <div className="space-y-4">
                 <h3 className="text-sm font-black uppercase text-slate-200 tracking-wider">Oportunidades Comerciales Activas</h3>
-                {client.oportunidades?.length ? (
+                {Array.isArray(client.oportunidades) && client.oportunidades.length ? (
                   <div className="space-y-3">
                     {client.oportunidades.map((o: any, i: number) => (
                       <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl space-y-2">
@@ -775,7 +780,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
 
               <div className="space-y-4">
                 <h3 className="text-sm font-black uppercase text-slate-200 tracking-wider">Ejecuciones de Campañas</h3>
-                {client.campanas?.length ? (
+                {Array.isArray(client.campanas) && client.campanas.length ? (
                   <div className="space-y-3">
                     {client.campanas.map((c: any, i: number) => (
                       <div key={i} className="bg-slate-900/30 border border-slate-850 p-4 rounded-xl flex justify-between items-center">
@@ -849,21 +854,35 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
               </div>
 
               <div className="space-y-4">
-                {bitacora.length === 0 ? (
+                {!Array.isArray(bitacora) || bitacora.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">
                     <FileText className="mx-auto w-10 h-10 mb-2 opacity-50" />
                     <p className="text-xs">No hay entradas de bitácora registradas.</p>
                   </div>
                 ) : (
-                  bitacora.map((entry, idx) => (
-                    <div key={idx} className="bg-slate-900/30 border border-slate-850 p-5 rounded-2xl space-y-2">
-                      <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                        <span>Registrado por {entry.creador || 'Sistema'}</span>
-                        <span className="font-mono">{new Date(entry.fecha).toLocaleString()}</span>
+                  bitacora.filter(e => e && typeof e === 'object').map((entry, idx) => {
+                    let dateDisplay = 'Fecha no disponible';
+                    try {
+                      if (entry.fecha) {
+                        const dateObj = new Date(entry.fecha);
+                        if (!isNaN(dateObj.getTime())) {
+                          dateDisplay = dateObj.toLocaleString();
+                        }
+                      }
+                    } catch (e) {
+                      console.error("Error formatting date in bitacora", e);
+                    }
+
+                    return (
+                      <div key={entry.id || idx} className="bg-slate-900/30 border border-slate-850 p-5 rounded-2xl space-y-2">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                          <span>Registrado por {entry.creador || 'Sistema'}</span>
+                          <span className="font-mono">{dateDisplay}</span>
+                        </div>
+                        <p className="text-xs text-slate-200 leading-relaxed">{entry.comentario || 'Sin comentario'}</p>
                       </div>
-                      <p className="text-xs text-slate-200 leading-relaxed">{entry.comentario}</p>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { localDB } from '../../lib/auth';
 import { 
   Mail, 
   MessageSquare, 
@@ -267,27 +268,46 @@ export default function MarketingBuilder({
   const [alertNotification, setAlertNotification] = useState<{ type: 'success' | 'info'; message: string } | null>(null);
 
   // Templates Persistence
-  const [templatesList, setTemplatesList] = useState<SavedTemplate[]>([
-    {
-      id: 'tmpl-1',
-      name: 'Bienvenida Club Socios 2026',
-      type: 'email',
-      subject: '✨ Bienvenido al Club de Socios de Precisión CIMASUR 2026',
-      updatedAt: '2026-07-01 14:30',
-      blocks: [
-        { id: 'b-1', type: 'text', content: 'Estimado socio **{{nombre}}**, le damos la bienvenida oficial al Club de Socios CIMASUR.', title: '¡Su membresía está activa!', alignment: 'center', fontSize: 'lg' }
-      ]
-    },
-    {
-      id: 'tmpl-2',
-      name: 'Recordatorio Alerta Clientes en Riesgo',
-      type: 'whatsapp',
-      whatsappBody: 'Estimado *{{nombre}}*, notamos que no ha realizado solicitudes en las últimas semanas. Queremos ofrecerle un beneficio en su promedio habitual de *{{promedio_mensual}}*. Contáctenos.',
-      whatsappSendType: 'individual',
-      updatedAt: '2026-07-05 09:12'
-    }
-  ]);
+  const [templatesList, setTemplatesList] = useState<SavedTemplate[]>([]);
   const [templateName, setTemplateName] = useState('Mi Nueva Plantilla Comercial');
+
+  // Load templates from DB on mount
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const saved = await localDB.getCollection('marketing_templates');
+        if (saved && Array.isArray(saved) && saved.length > 0) {
+          setTemplatesList(saved);
+        } else {
+          // Default templates if none found in DB
+          const defaults: SavedTemplate[] = [
+            {
+              id: 'tmpl-1',
+              name: 'Bienvenida Club Socios 2026',
+              type: 'email',
+              subject: '✨ Bienvenido al Club de Socios de Precisión CIMASUR 2026',
+              updatedAt: '2026-07-01 14:30',
+              blocks: [
+                { id: 'b-1', type: 'text', content: 'Estimado socio **{{nombre}}**, le damos la bienvenida oficial al Club de Socios CIMASUR.', title: '¡Su membresía está activa!', alignment: 'center', fontSize: 'lg' }
+              ]
+            },
+            {
+              id: 'tmpl-2',
+              name: 'Recordatorio Alerta Clientes en Riesgo',
+              type: 'whatsapp',
+              whatsappBody: 'Estimado *{{nombre}}*, notamos que no ha realizado solicitudes en las últimas semanas. Queremos ofrecerle un beneficio en su promedio habitual de *{{promedio_mensual}}*. Contáctenos.',
+              whatsappSendType: 'individual',
+              updatedAt: '2026-07-05 09:12'
+            }
+          ];
+          setTemplatesList(defaults);
+        }
+      } catch (error) {
+        console.error("Error loading templates:", error);
+      }
+    };
+    loadTemplates();
+  }, []);
 
   // Input ref helpers for variable insertion
   const emailTextAreaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
@@ -648,8 +668,8 @@ export default function MarketingBuilder({
     });
   };
 
-  // Save template to memory
-  const handleSaveTemplate = (e: React.FormEvent) => {
+  // Save template to memory and DB
+  const handleSaveTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!templateName.trim()) return;
 
@@ -670,12 +690,26 @@ export default function MarketingBuilder({
       })
     };
 
+    let newList;
     if (isExisting) {
-      setTemplatesList(templatesList.map(t => t.id === isExisting.id ? newTemplate : t));
+      newList = templatesList.map(t => t.id === isExisting.id ? newTemplate : t);
       triggerSuccessToast(`Plantilla "${templateName}" actualizada correctamente`);
     } else {
-      setTemplatesList([newTemplate, ...templatesList]);
+      newList = [newTemplate, ...templatesList];
       triggerSuccessToast(`Nueva Plantilla "${templateName}" guardada en la base de datos comercial`);
+    }
+
+    setTemplatesList(newList);
+    
+    // Persist to localDB
+    try {
+      if (isExisting) {
+        await localDB.updateInCollection('marketing_templates', newTemplate.id, newTemplate);
+      } else {
+        await localDB.saveToCollection('marketing_templates', newTemplate);
+      }
+    } catch (error) {
+      console.error("Error saving template to DB:", error);
     }
   };
 
