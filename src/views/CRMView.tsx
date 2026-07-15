@@ -751,23 +751,24 @@ const getTierForSales = (sales: number) => {
   return list[0];
 };
 
-const getClientAnnualSales2026 = (client: any): number => {
+const getClientAnnualSales = (client: any, year: string): number => {
   if (!client) return 0;
-  if (client.compraAnual !== undefined && client.compraAnual !== null && client.compraAnual !== '') {
-    return Number(client.compraAnual) || 0;
-  }
+  
   if (client.clubVentasDetail) {
     try {
       const parsed = typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail;
-      if (parsed && typeof parsed.v2026 === 'number') {
-        return parsed.v2026;
+      if (parsed && typeof parsed[`v${year}`] === 'number') {
+        return parsed[`v${year}`];
       }
     } catch (e) {
       console.error(e);
     }
   }
-  if (client.ventas && typeof client.ventas.v2026 === 'number') {
-    return client.ventas.v2026;
+  if (client.ventas && typeof client.ventas[`v${year}`] === 'number') {
+    return client.ventas[`v${year}`];
+  }
+  if (year === '2026' && client.compraAnual !== undefined && client.compraAnual !== null && client.compraAnual !== '') {
+    return Number(client.compraAnual) || 0;
   }
   // Fallback based on category
   const cat = normalizeCat(client.categoria || 'Sin categoría');
@@ -834,7 +835,7 @@ function CRMRegister() {
       categoria: calculatedTier.name, // Auto-derive matching category!
       name: resolvedName,
       rut: resolvedRut,
-      clubVentasDetail: JSON.stringify({ v2024: 0, v2025: 0, v2026: Number(form.compraAnual || 0) }),
+      clubVentasDetail: JSON.stringify({ [`v${'2026'}`]: Number(form.compraAnual || 0) }),
       historialUnificado: form.historialUnificado || `Cliente creado manualmente el ${new Date().toLocaleDateString('es-CL')}`
     };
 
@@ -1368,7 +1369,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
       setNewCategory(selectedClient.categoria || 'Sin categoría');
       setNewIntranet(selectedClient.intranet || 'No');
       setNewComoLlego(selectedClient.comoLlego || 'Campañas / Ads');
-      setNewCompraAnual(getClientAnnualSales2026(selectedClient));
+      setNewCompraAnual(getClientAnnualSales(selectedClient, '2026'));
       setCrmCopiedMessageId(null);
       
       const activeTiers = getTiersList();
@@ -1445,7 +1446,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
 
     const updatedIntranet = newIntranet || selectedClient.intranet || 'No';
 
-    let salesObj = { v2024: 0, v2025: 0, v2026: 0 };
+    let salesObj: any = { v2024: 0, v2025: 0, v2026: 0, v2027: 0, v2028: 0 };
     const savedVentasStr = selectedClient.clubVentasDetail;
     if (savedVentasStr) {
       try {
@@ -1456,7 +1457,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
     } else if (selectedClient.ventas) {
       salesObj = { ...selectedClient.ventas };
     }
-    salesObj.v2026 = Number(newCompraAnual);
+    salesObj[`v${'2026'}`] = Number(newCompraAnual);
 
     // Auto-calculate the category based on purchases
     const calculatedTier = getTierForSales(Number(newCompraAnual));
@@ -1528,7 +1529,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
       ["Tipo", record.type || "---"],
       ["Categoría", record.categoria || "---"],
       ["Origen / Cómo Llegó", record.comoLlego || "Campañas / Ads"],
-      ["Compra Anual Acumulada ($)", getClientAnnualSales2026(record)],
+      ["Compra Anual Acumulada ($)", getClientAnnualSales(record, '2026')],
       ["Intranet", record.intranet || "No"],
       ["Fecha Ingreso", formatDateForExcel(record.fechaIngreso)],
       ["Historial", record.historialUnificado || "---"]
@@ -2007,7 +2008,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                   r.phone || '---',
                   r.email || '---',
                   r.comoLlego || 'Campañas / Ads',
-                  `$${getClientAnnualSales2026(r).toLocaleString('es-CL')}`
+                  `$${getClientAnnualSales(r, '2026').toLocaleString('es-CL')}`
                 ]);
                 exportTableToPDF(
                   'Reporte: Cartera de Clientes (CRM Comercial)',
@@ -2216,7 +2217,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                            )}
                            {r.fechaPago && (
                              <span className="text-[9px] bg-[#0284C7]/20 text-[#38BDF8] font-black px-1.5 py-0.5 rounded border border-[#0284C7]/20" title="Frecuencia / Ciclo de Compra">
-                               💰 Compra Anual: ${getClientAnnualSales2026(r).toLocaleString('es-CL')}
+                               💰 Compra Anual: ${getClientAnnualSales(r, '2026').toLocaleString('es-CL')}
                              </span>
                             )}
                           </div>
@@ -2241,7 +2242,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                                  body: JSON.stringify({ 
                                    id: r.id, 
                                    category: newVal,
-                                   year: '2026' // Por defecto año actual si se cambia manual
+                                   year: '2026'
                                  })
                                });
 
@@ -2361,7 +2362,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                                { label: 'Categoría CRM', value: r.categoria },
                                { label: 'Inscrito en Intranet', value: r.intranet || 'No' },
                                { label: 'Cómo Llegó (Origen)', value: r.comoLlego || 'Campañas / Ads' },
-                               { label: 'Compra Anual Acumulada ($)', value: `$${getClientAnnualSales2026(r).toLocaleString('es-CL')}` },
+                               { label: 'Compra Anual Acumulada ($)', value: `$${getClientAnnualSales(r, '2026').toLocaleString('es-CL')}` },
                                { label: 'Fecha de Ingreso', value: formatDate(r.fechaIngreso) || 'N/A' },
                                { label: 'Historial Unificado', value: r.historialUnificado || 'Sin registros preexistentes.' }
                              ];
@@ -2413,15 +2414,12 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
               <div className="p-6 space-y-4">
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Ciclo Comercial a Configurar (Año en Curso)</label>
-                  <select 
+                  <input 
+                    type="number"
                     value={importCycleYear}
                     onChange={(e) => setImportCycleYear(e.target.value)}
                     className="w-full bg-[#050914] border border-slate-800 p-3 rounded-lg text-sm font-bold text-white outline-none focus:border-sky-500"
-                  >
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026">2026</option>
-                  </select>
+                  />
                   <p className="mt-2 text-xs text-slate-400 leading-relaxed">
                     <strong>Regla de congelamiento:</strong> Se evaluarán las ventas del <strong className="text-sky-400">año comercial {Number(importCycleYear) - 1}</strong> y se actualizará la categoría y la bitácora de los clientes en la ficha de 360 de inmediato.
                   </p>

@@ -176,6 +176,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
   const [newComuna, setNewComuna] = useState(client.comuna || '');
   const [loading, setLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
+  const [crmClient, setCrmClient] = useState<any | null>(null);
 
   // Club Cimasur targets
   const CATEGORY_THRESHOLDS: Record<string, number> = {
@@ -194,11 +195,79 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
   else if (currentSales >= 1000000) defaultTarget = 'Oro';
   
   const [targetCategory, setTargetCategory] = useState<string>(defaultTarget);
+  const [selectedYear, setSelectedYear] = useState<string>('2026');
+
+  // Compute dynamic sales and category based on selectedYear
+  const details = crmClient?.clubVentasDetail ? (typeof crmClient.clubVentasDetail === 'string' ? JSON.parse(crmClient.clubVentasDetail) : crmClient.clubVentasDetail) : {};
+  const catKey = `cat${selectedYear}`;
+  const salesKey = `v${selectedYear}`;
+  
+  const dynamicCategory = (details[catKey] || (selectedYear === '2026' ? client.categoria : null) || 'Bronce').toString().trim();
+  const dynamicSales = Number(details[salesKey]) || (selectedYear === '2026' ? Number(client.compraAnual) : 0) || 0;
+  
+  let dynamicTarget = 'Plata';
+  if (dynamicSales >= 5000000) dynamicTarget = 'Platinum';
+  else if (dynamicSales >= 3000000) dynamicTarget = 'Platinum';
+  else if (dynamicSales >= 1000000) dynamicTarget = 'Oro';
+  
+  useEffect(() => {
+    setTargetCategory(dynamicTarget);
+  }, [selectedYear, dynamicTarget]);
 
   const loadActivities = async () => {
-    const all = await localDB.getCollection('gestion_activities');
-    const filtered = all.filter(a => a.clienteRut === client.rut || a.clienteId === client.id);
-    setActivities(filtered.sort((a, b) => b.fecha.localeCompare(a.fecha)));
+    const allGestion = await localDB.getCollection('gestion_activities');
+    const allCrm = await localDB.getCollection('crm_activities');
+    const allContacts = await localDB.getCollection('contacts');
+
+    const matchedCrm = allContacts.find(c => (c.rut && c.rut === client.rut) || (c.email && c.email === client.email) || c.id === client.id);
+    setCrmClient(matchedCrm || null);
+
+    const filteredGestion = allGestion.filter(a => a.clienteRut === client.rut || a.clienteId === client.id);
+    const filteredCrm = allCrm.filter(a => a.clientId === client.id || (matchedCrm && a.clientId === matchedCrm.id));
+
+    let bitacoraEntries = [];
+    if (matchedCrm?.bitacora) {
+      const parsedBitacora = typeof matchedCrm.bitacora === 'string' ? JSON.parse(matchedCrm.bitacora) : matchedCrm.bitacora;
+      bitacoraEntries = Array.isArray(parsedBitacora) ? parsedBitacora.map(b => ({
+        fecha: b.fecha,
+        actividad: b.tipo === 'beneficio' ? 'Canje de Beneficio' : 'Registro de Bitácora',
+        detalle: b.comentario || b.descripcion,
+        responsable: b.usuario || b.responsable || 'Sistema',
+        origen: 'Bitácora CRM'
+      })) : [];
+    }
+
+    const unified = [
+      ...filteredGestion.map(a => ({
+        id: a.id || crypto.randomUUID(),
+        fecha: a.fecha,
+        actividad: a.actividad,
+        detalle: a.detalle,
+        responsable: a.responsable,
+        origen: 'Gestión'
+      })),
+      ...filteredCrm.map(a => ({
+        id: a.id || crypto.randomUUID(),
+        fecha: a.fecha,
+        actividad: a.tipo,
+        detalle: a.observaciones,
+        responsable: a.responsable,
+        origen: a.campania || 'CRM Core'
+      })),
+      ...bitacoraEntries.map(b => ({
+        id: b.id || crypto.randomUUID(),
+        fecha: b.fecha,
+        actividad: b.actividad,
+        detalle: b.detalle,
+        responsable: b.responsable,
+        origen: b.origen
+      }))
+    ];
+
+    // Remove duplicates based on fecha and detalle
+    const uniqueUnified = Array.from(new Map(unified.map(item => [item.fecha.substring(0, 10) + item.detalle, item])).values());
+    
+    setActivities(uniqueUnified.sort((a, b) => b.fecha.localeCompare(a.fecha)));
   };
 
   useEffect(() => {
@@ -370,13 +439,18 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                 {activities.map((act) => (
                   <div key={act.id} className="bg-[#152035] border border-[#1E293B] rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-md transition-all group relative">
                     <div className="flex justify-between items-start mb-4">
-                      <div className="flex gap-4">
+                      <div className="flex flex-wrap gap-4">
                         <div className="px-3 py-1 bg-[#152035] text-[#38BDF8] rounded-2xl text-[10px] font-black uppercase tracking-widest border border-blue-100">
                           {formatDate(act.fecha)}
                         </div>
                         <div className="px-3 py-1 bg-[#111A2E] text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[#1E293B]">
                           {act.actividad}
                         </div>
+                        {act.origen && (
+                          <div className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-amber-500/30">
+                            {act.origen}
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold italic">
                            <Users className="w-3 h-3" />
                            {act.responsable}
@@ -513,56 +587,21 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                   <div className="bg-[#152035] border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
                     <div className="flex justify-between items-center">
                       <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
-                        <Award size={14} /> SIMULADOR CLUB CIMASUR
+                        <Award size={14} /> CLUB CIMASUR: STATUS
+                        <input 
+                          type="number"
+                          value={selectedYear}
+                          onChange={(e) => setSelectedYear(e.target.value)}
+                          className="ml-2 bg-[#050914] border border-amber-500/30 text-amber-500 text-[10px] py-1 px-2 rounded-lg outline-none cursor-pointer font-bold w-16"
+                        />
                       </h4>
                       <span className="px-3 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase tracking-widest">
-                        CATEGORÍA ACTUAL: {currentCategory}
+                        CATEGORÍA ACTUAL: {dynamicCategory}
                       </span>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-[10px] font-black">
-                        <span className="text-slate-400 uppercase tracking-wider">Progreso para objetivo: {targetCategory}</span>
-                        <span className="text-slate-200">
-                          {CATEGORY_THRESHOLDS[targetCategory] > 0 
-                            ? Math.min(100, Math.floor((currentSales / CATEGORY_THRESHOLDS[targetCategory]) * 100))
-                            : 100}%
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-[#0D1527] rounded-full overflow-hidden border border-[#1E293B]">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${CATEGORY_THRESHOLDS[targetCategory] > 0 ? Math.min(100, (currentSales / CATEGORY_THRESHOLDS[targetCategory]) * 100) : 100}%` }}
-                          className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
-                        />
-                      </div>
-                      <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
-                        <span>Meta para {targetCategory}: ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()}</span>
-                        <span>Actual: ${currentSales.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
-                      {currentSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
-                        <p className="text-[10px] text-emerald-400 font-black leading-tight">
-                          ✓ ¡Excelente! Ya cumplió con el mínimo de ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()} para la categoría {targetCategory} durante este año.
-                        </p>
-                      ) : (
-                        <p className="text-[10px] text-amber-400 font-black leading-tight">
-                          Faltan ${(CATEGORY_THRESHOLDS[targetCategory] - currentSales).toLocaleString()} para alcanzar {targetCategory}.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ACELERACIÓN */}
-                  <div className="bg-[#152035] border border-indigo-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
-                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                      <Zap size={14} /> CAMPAÑA & PLAN DE ACELERACIÓN
-                    </h4>
-                    
                     <div className="space-y-1.5">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 block">CATEGORÍA OBJETIVO:</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 block">SIMULADOR DE META (SELECCIONE CATEGORÍA):</span>
                       <div className="grid grid-cols-4 gap-1.5">
                         {['Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
                           <button 
@@ -576,15 +615,76 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                       </div>
                     </div>
 
-                    {currentSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
-                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
-                          <span className="text-[10px] text-emerald-400 font-black uppercase">✓ ¡Categoría ya superada hoy!</span>
+                    <div className="space-y-3 pt-2">
+                      <div className="flex justify-between text-[10px] font-black">
+                        <span className="text-slate-400 uppercase tracking-wider">Progreso para objetivo: {targetCategory}</span>
+                        <span className="text-slate-200">
+                          {CATEGORY_THRESHOLDS[targetCategory] > 0 
+                            ? Math.min(100, Math.floor((dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100))
+                            : 100}%
+                        </span>
                       </div>
-                    ) : (
-                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-center">
-                          <span className="text-[10px] text-indigo-400 font-black uppercase">Falta vender: ${(CATEGORY_THRESHOLDS[targetCategory] - currentSales).toLocaleString()}</span>
+                      <div className="h-2 w-full bg-[#0D1527] rounded-full overflow-hidden border border-[#1E293B]">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${CATEGORY_THRESHOLDS[targetCategory] > 0 ? Math.min(100, (dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100) : 100}%` }}
+                          className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                        />
                       </div>
-                    )}
+                      <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
+                        <span>Meta para {targetCategory}: ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()}</span>
+                        <span>Actual: ${dynamicSales.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+                      {dynamicSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
+                        <p className="text-[10px] text-emerald-400 font-black leading-tight">
+                          ✓ ¡Excelente! Ya cumplió con el mínimo de ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()} para la categoría {targetCategory} durante este año.
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-amber-400 font-black leading-tight">
+                          Faltan ${(CATEGORY_THRESHOLDS[targetCategory] - dynamicSales).toLocaleString()} para alcanzar {targetCategory}.
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* HISTORIAL Y BENEFICIOS */}
+                    <div className="border-t border-[#1E293B] pt-4 mt-4 grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 block">Categoría por Año</span>
+                        <div className="space-y-1.5">
+                          {crmClient?.categoriaHistorico ? (
+                            Object.entries(typeof crmClient.categoriaHistorico === 'string' ? JSON.parse(crmClient.categoriaHistorico) : crmClient.categoriaHistorico).map(([year, cat]) => (
+                              <div key={year} className="flex justify-between items-center text-[10px] font-bold">
+                                <span className="text-slate-300">{year}</span>
+                                <span className="text-amber-500">{String(cat)}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="flex justify-between items-center text-[10px] font-bold">
+                              <span className="text-slate-300">2026</span>
+                              <span className="text-amber-500">{dynamicCategory}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 block">Beneficios Canjeados</span>
+                        <div className="space-y-1.5">
+                          {activities.filter(a => a.origen === 'Bitácora CRM' || a.actividad === 'Canje de Beneficio').length > 0 ? (
+                            activities.filter(a => a.origen === 'Bitácora CRM' || a.actividad === 'Canje de Beneficio').map((b, idx) => (
+                              <div key={idx} className="flex gap-2 text-[9px] font-bold">
+                                <span className="text-sky-400 shrink-0">{b.fecha.substring(0,10)}</span>
+                                <span className="text-slate-300 truncate" title={b.detalle}>{b.detalle}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-[9px] text-slate-500 italic">No hay canjes registrados</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <button 
@@ -597,7 +697,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                     ) : (
                       <>
                         <Save className="w-5 h-5" />
-                        Registrar en Expediente
+                        Registrar en Historial Detallado
                       </>
                     )}
                   </button>

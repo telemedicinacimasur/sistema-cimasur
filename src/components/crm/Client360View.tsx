@@ -21,6 +21,31 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('gestion');
   const [selectedClubYear, setSelectedClubYear] = useState<string>('2026');
+  const [targetCategory, setTargetCategory] = useState<string>('Plata');
+
+  const CATEGORY_THRESHOLDS: Record<string, number> = {
+    'Bronce': 0,
+    'Plata': 1000000,
+    'Oro': 3000000,
+    'Platinum': 5000000
+  };
+
+  // Compute dynamic sales and category based on selectedClubYear
+  const clubDetails = client?.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail) : {};
+  const catKey = `cat${selectedClubYear}`;
+  const salesKey = `v${selectedClubYear}`;
+  
+  const dynamicCategory = (clubDetails[catKey] || (selectedClubYear === '2026' ? client?.categoria : null) || 'Bronce').toString().trim();
+  const dynamicSales = Number(clubDetails[salesKey]) || (selectedClubYear === '2026' ? Number(client?.compraAnual) : 0) || 0;
+  
+  useEffect(() => {
+    let tCat = 'Plata';
+    if (dynamicSales >= 5000000) tCat = 'Platinum';
+    else if (dynamicSales >= 3000000) tCat = 'Platinum';
+    else if (dynamicSales >= 1000000) tCat = 'Oro';
+    setTargetCategory(tCat);
+  }, [selectedClubYear, dynamicSales]);
+
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<Partial<Client>>({});
 
@@ -99,6 +124,16 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     e.preventDefault();
     if (!client) return;
     await clientService.updateClient(client.id, editForm);
+    
+    await localDB.saveToCollection('crm_activities', {
+      fecha: new Date().toISOString(),
+      campania: 'Actualización',
+      tipo: 'Actualización de Datos',
+      observaciones: `Se actualizaron los datos generales de la cuenta.`,
+      responsable: 'Usuario CRM',
+      clientId: client.id
+    });
+    
     setIsEditing(false);
     await loadData();
     if (onSave) onSave();
@@ -109,14 +144,35 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     if (!newContact.nombre) return;
     const updated = [...contacts, newContact];
     await clientService.updateClient(client.id, { contactos: updated });
+    
+    await localDB.saveToCollection('crm_activities', {
+      fecha: new Date().toISOString(),
+      campania: 'Actualización',
+      tipo: 'Nuevo Contacto',
+      observaciones: `Se agregó el contacto: ${newContact.nombre}`,
+      responsable: 'Usuario CRM',
+      clientId: client.id
+    });
+    
     setNewContact({ nombre: '', cargo: '', telefono: '', celular: '', email: '', esPrincipal: false });
     await loadData();
     window.dispatchEvent(new Event('db-change'));
   };
 
   const handleDeleteContact = async (index: number) => {
+    const deletedName = contacts[index]?.nombre;
     const updated = contacts.filter((_, i) => i !== index);
     await clientService.updateClient(client.id, { contactos: updated });
+    
+    await localDB.saveToCollection('crm_activities', {
+      fecha: new Date().toISOString(),
+      campania: 'Actualización',
+      tipo: 'Eliminación Contacto',
+      observaciones: `Se eliminó el contacto: ${deletedName}`,
+      responsable: 'Usuario CRM',
+      clientId: client.id
+    });
+    
     await loadData();
     window.dispatchEvent(new Event('db-change'));
   };
@@ -128,14 +184,35 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     }
     const updated = [...veterinarios, newVet];
     await clientService.updateClient(client.id, { veterinarios: updated });
+    
+    await localDB.saveToCollection('crm_activities', {
+      fecha: new Date().toISOString(),
+      campania: 'Actualización',
+      tipo: 'Nuevo Médico',
+      observaciones: `Se agregó el médico/veterinario: ${newVet.nombre}`,
+      responsable: 'Usuario CRM',
+      clientId: client.id
+    });
+    
     setNewVet({ nombre: '', especialidad: '', email: '', telefono: '' });
     await loadData();
     window.dispatchEvent(new Event('db-change'));
   };
 
   const handleDeleteVet = async (index: number) => {
+    const deletedName = veterinarios[index]?.nombre;
     const updated = veterinarios.filter((_, i) => i !== index);
     await clientService.updateClient(client.id, { veterinarios: updated });
+    
+    await localDB.saveToCollection('crm_activities', {
+      fecha: new Date().toISOString(),
+      campania: 'Actualización',
+      tipo: 'Eliminación Médico',
+      observaciones: `Se eliminó el médico/veterinario: ${deletedName}`,
+      responsable: 'Usuario CRM',
+      clientId: client.id
+    });
+    
     await loadData();
     window.dispatchEvent(new Event('db-change'));
   };
@@ -453,9 +530,58 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                     />
                   </div>
 
-                  <label className="flex items-center gap-3 cursor-pointer group py-1">
+                  <label 
+                    className="flex items-center gap-3 cursor-pointer group py-1"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (client) {
+                        const currentVal = client.isGestionCustomer || false;
+                        const newVal = !currentVal;
+                        
+                        await localDB.updateInCollection('contacts', client.id, { 
+                          isGestionCustomer: newVal 
+                        });
+                        
+                        if (newVal) {
+                          const existingGestionRecords = await localDB.getCollection('gestion_records');
+                          const alreadyExists = existingGestionRecords.some((r: any) => r.rut === client.rut);
+                          
+                          if (!alreadyExists) {
+                            const gestionRecord = {
+                              fechaIngreso: client.fechaIngreso || new Date().toISOString().split('T')[0],
+                              nombre: client.name,
+                              rut: client.rut,
+                              tipoEmpresa: client.type,
+                              comuna: client.region,
+                              celular: client.phone || '',
+                              email: client.email || '',
+                              categoria: client.categoria,
+                              estado: 'En proceso',
+                              consultora: 'CRM',
+                              observaciones: `Sincronizado desde Perfil 360 CRM\n\n${client.historialUnificado || ''}`
+                            };
+                            await localDB.saveToCollection('gestion_records', gestionRecord);
+                          }
+                        }
+                        
+                        await localDB.saveToCollection('crm_activities', {
+                          fecha: new Date().toISOString(),
+                          campania: 'Actualización',
+                          tipo: newVal ? 'Activación Gestión' : 'Desactivación Gestión',
+                          observaciones: `El cliente fue ${newVal ? 'marcado' : 'desmarcado'} como Cliente de Gestión.`,
+                          responsable: 'Usuario CRM',
+                          clientId: client.id
+                        });
+                        
+                        await loadData();
+                        window.dispatchEvent(new Event('db-change'));
+                      }
+                    }}
+                  >
                     <div className="w-5 h-5 rounded border border-slate-700 bg-slate-900 flex items-center justify-center group-hover:border-sky-500 transition-all">
-                      <div className="w-3 h-3 rounded-sm bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div>
+                      {client.isGestionCustomer && (
+                        <div className="w-3 h-3 rounded-sm bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div>
+                      )}
                     </div>
                     <span className="text-[11px] font-black text-slate-400 group-hover:text-slate-200 transition-all uppercase tracking-wide">Es Cliente de Gestión</span>
                   </label>
@@ -465,57 +591,66 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                     <div className="bg-[#050914] border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
                       <div className="flex justify-between items-center">
                         <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
-                          <Award size={14} /> SIMULADOR CLUB CIMASUR
+                          <Award size={14} /> CLUB CIMASUR: STATUS
+                          <input 
+                            type="number"
+                            value={selectedClubYear}
+                            onChange={(e) => setSelectedClubYear(e.target.value)}
+                            className="ml-2 bg-[#0A1120] border border-amber-500/30 text-amber-500 text-[10px] py-1 px-2 rounded-lg outline-none cursor-pointer font-bold w-16"
+                          />
                         </h4>
                         <span className="px-3 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase tracking-widest">
-                          CATEGORÍA: {client.categoria || 'Bronce'}
+                          CATEGORÍA ACTUAL: {dynamicCategory}
                         </span>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-[10px] font-black">
-                          <span className="text-slate-500 uppercase tracking-wider">Progreso para categoría {client.categoria || 'Bronce'}</span>
-                          <span className="text-white">100%</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: '100%' }}
-                            className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
-                          />
-                        </div>
-                        <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
-                          <span>Meta para {client.categoria || 'Bronce'}: $30.000</span>
-                          <span>Actual: ${(client.compraAnual || 144136).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
-                        <p className="text-[10px] text-emerald-400 font-black leading-tight">
-                          ✓ ¡Excelente! Ya cumplió con el mínimo de $30.000 para la categoría {client.categoria || 'Bronce'} durante este año.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* ACELERACIÓN */}
-                    <div className="bg-[#050914] border border-indigo-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
-                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                        <Zap size={14} /> CAMPAÑA & PLAN DE ACELERACIÓN
-                      </h4>
-                      
                       <div className="space-y-1.5">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">CATEGORÍA OBJETIVO:</span>
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">SIMULADOR DE META (SELECCIONE CATEGORÍA):</span>
                         <div className="grid grid-cols-4 gap-1.5">
                           {['Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
-                            <button key={cat} className={`py-2 rounded text-[8px] font-black uppercase transition-all ${cat === 'Plata' ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-slate-850 text-slate-600 border border-slate-800'}`}>
+                            <button 
+                              key={cat} 
+                              onClick={() => setTargetCategory(cat)}
+                              className={`py-2 rounded text-[8px] font-black uppercase transition-all ${targetCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-slate-850 text-slate-600 border border-slate-800'}`}
+                            >
                               {cat}
                             </button>
                           ))}
                         </div>
                       </div>
 
+                      <div className="space-y-3 pt-2">
+                        <div className="flex justify-between text-[10px] font-black">
+                          <span className="text-slate-500 uppercase tracking-wider">Progreso para objetivo: {targetCategory}</span>
+                          <span className="text-white">
+                            {CATEGORY_THRESHOLDS[targetCategory] > 0 
+                              ? Math.min(100, Math.floor((dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100))
+                              : 100}%
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${CATEGORY_THRESHOLDS[targetCategory] > 0 ? Math.min(100, (dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100) : 100}%` }}
+                            className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                          />
+                        </div>
+                        <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
+                          <span>Meta para {targetCategory}: ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()}</span>
+                          <span>Actual: ${dynamicSales.toLocaleString()}</span>
+                        </div>
+                      </div>
+
                       <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
-                         <span className="text-[10px] text-emerald-400 font-black uppercase">✓ ¡Categoría ya superada hoy!</span>
+                        {dynamicSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
+                          <p className="text-[10px] text-emerald-400 font-black leading-tight">
+                            ✓ ¡Excelente! Ya cumplió con el mínimo de ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()} para la categoría {targetCategory} durante este año.
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-amber-400 font-black leading-tight">
+                            Faltan ${(CATEGORY_THRESHOLDS[targetCategory] - dynamicSales).toLocaleString()} para alcanzar {targetCategory}.
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -524,7 +659,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                       className="w-full bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-xs py-4 rounded-2xl transition-all shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2"
                     >
                       <Save size={16} />
-                      REGISTRAR GESTIÓN
+                      REGISTRAR EN HISTORIAL DETALLADO
                     </button>
                   </div>
 

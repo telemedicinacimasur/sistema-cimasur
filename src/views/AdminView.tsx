@@ -56,7 +56,8 @@ import {
   Activity,
   Database,
   Landmark,
-  ChevronDown
+  ChevronDown,
+  Package
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { addAuditLog } from '../lib/auth';
@@ -69,8 +70,9 @@ import CimasurInventoryManager from './admin/CimasurInventoryManager';
 import ResumenVentasManager from './admin/ResumenVentasManager';
 import PresupuestoFlujoManager from './admin/PresupuestoFlujoManager';
 import SalesTiendaMLManager from './admin/SalesTiendaMLManager';
+import VentasConsignacionView from './admin/VentasConsignacionView';
 
-type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'sales_tienda_ml' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas' | 'presupuesto_flujo';
+type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'sales_tienda_ml' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas' | 'presupuesto_flujo' | 'consignacion';
 
 export default function AdminView() {
   const { user } = useAuth();
@@ -286,6 +288,15 @@ export default function AdminView() {
               color="purple"
             />
           )}
+          {(!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('consignacion')) && (
+            <ModuleCard 
+              title="Ventas en Consignación"
+              desc="Gestión de entregas, lotes y declaraciones mensuales."
+              icon={Package}
+              onClick={() => setView('consignacion')}
+              color="sky"
+            />
+          )}
         </div>
       </div>
     );
@@ -357,6 +368,7 @@ export default function AdminView() {
       {view === 'pet_payments' && <PetPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'school_payments' && <SchoolPaymentsManager records={records} setRecords={setRecords} />}
       {view === 'presupuesto_flujo' && <PresupuestoFlujoManager />}
+      {view === 'consignacion' && <VentasConsignacionView />}
       
     </div>
   );

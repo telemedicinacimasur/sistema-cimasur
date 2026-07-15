@@ -75,9 +75,14 @@ const __filename = computedFilename || (typeof (globalThis as any).__filename !=
 const __dirname = computedDirname || (typeof (globalThis as any).__dirname !== 'undefined' ? (globalThis as any).__dirname : process.cwd());
 
 async function startServer() {
+  const consignacionRouter = (await import('./src/server/routes/consignacion.ts')).default;
+
   const app = express();
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  app.use('/api/consignacion', consignacionRouter);
+
 
   // Health check early
   app.get('/api/health', (req, res) => {

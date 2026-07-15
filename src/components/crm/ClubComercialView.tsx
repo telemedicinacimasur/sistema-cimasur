@@ -193,7 +193,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
 
   const handleSaveConfig = async (applyToAll = false) => {
     try {
-      const yearsToSave = applyToAll ? ['2024', '2025', '2026'] : [configYear];
+      const yearsToSave = applyToAll ? ['2024', '2025', '2026', '2027', '2028'] : [configYear];
       
       const promises = yearsToSave.map(year => 
         fetch('/api/crm/config/categories', {
@@ -231,15 +231,15 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
             <p className="text-sm text-slate-400">
               Gestión de categorías y beneficios de clientes fidelizados.
             </p>
-            <select 
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="bg-[#0D1527] border border-slate-800 text-[10px] font-bold text-sky-400 px-2 py-1 rounded-lg outline-none focus:border-sky-500 cursor-pointer"
-            >
-              <option value="2024">Ciclo 2024</option>
-              <option value="2025">Ciclo 2025</option>
-              <option value="2026">Ciclo 2026</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-sky-400">Ciclo:</span>
+              <input 
+                type="number"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="bg-[#0D1527] border border-slate-800 text-[10px] font-bold text-sky-400 px-2 py-1 rounded-lg outline-none focus:border-sky-500 cursor-pointer w-20"
+              />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -509,15 +509,12 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
               <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Año Comercial</label>
-                  <select 
+                  <input 
+                    type="number"
                     value={configYear}
                     onChange={(e) => setConfigYear(e.target.value)}
                     className="w-full bg-[#050914] border border-slate-800 p-3 rounded-lg text-sm font-bold text-white outline-none focus:border-sky-500"
-                  >
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026">2026</option>
-                  </select>
+                  />
                 </div>
 
                 <div className="space-y-6">
