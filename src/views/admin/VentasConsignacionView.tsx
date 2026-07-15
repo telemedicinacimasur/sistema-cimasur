@@ -736,7 +736,7 @@ export default function VentasConsignacionView() {
         const loteData = {
           clienteId: declaracionCliente,
           productoId: uProduct,
-          solucionLote: inlineForm.solucionLote.toUpperCase().trim() || 'S/L',
+          solucionLote: inlineForm.solucionLote.toUpperCase().trim() || 'SALINA',
           fechaEntrega: Timestamp.fromDate(new Date(deliveryDateStr + 'T12:00:00')),
           fechaVencimiento: Timestamp.fromDate(new Date(inlineForm.fechaVencimiento + 'T12:00:00')),
           unidadesIniciales: units,
@@ -755,7 +755,7 @@ export default function VentasConsignacionView() {
           id: `lote_${Date.now()}`,
           clienteId: declaracionCliente,
           productoId: uProduct,
-          solucionLote: inlineForm.solucionLote.toUpperCase().trim() || 'S/L',
+          solucionLote: inlineForm.solucionLote.toUpperCase().trim() || 'SALINA',
           fechaEntrega: deliveryDateStr,
           fechaVencimiento: inlineForm.fechaVencimiento,
           unidadesIniciales: units,
@@ -1452,16 +1452,13 @@ export default function VentasConsignacionView() {
                       >
                         ◀
                       </button>
-                      <select
+                      <input
+                        type="month"
                         className="flex-1 bg-[#050914] text-sky-400 border border-[#1E293B] rounded-xl p-3 outline-none focus:border-sky-500 transition-colors font-black text-xs text-center"
                         value={selectedMonth}
                         disabled={!declaracionCliente}
                         onChange={(e) => setSelectedMonth(e.target.value)}
-                      >
-                        {MONTH_OPTIONS.map(m => (
-                          <option key={m.value} value={m.value}>{m.label}</option>
-                        ))}
-                      </select>
+                      />
                       <button
                         type="button"
                         onClick={() => {
@@ -2427,6 +2424,7 @@ function LoteFixedDataEditor({
   };
 
   const handleDelete = async () => {
+    console.log("Delete button clicked");
     if (!window.confirm('¿Está seguro de que desea eliminar este producto/solución de forma permanente? Esta acción no se puede deshacer.')) {
       return;
     }
@@ -2459,7 +2457,6 @@ function LoteFixedDataEditor({
       <div className="flex-1 min-w-[130px]">
         <input 
           type="text"
-          list="productos-datalist"
           className="w-full bg-[#050914] text-white border border-[#1E293B]/60 rounded-lg px-2.5 py-1.5 font-bold outline-none focus:border-sky-500 text-xs"
           value={form.productoId}
           placeholder="Producto"
