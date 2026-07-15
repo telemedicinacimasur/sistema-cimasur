@@ -26,10 +26,13 @@ import {
   Pencil,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Award,
+  Zap
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
 import { addNotification } from '../lib/notifications';
+import { motion } from 'motion/react';
 
 const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -167,8 +170,30 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
   const [newCategory, setNewCategory] = useState(client.categoria || 'Sin categoría');
   const [newState, setNewState] = useState(client.estado || 'En proceso');
   const [newActivityType, setNewActivityType] = useState('Seguimiento');
+  const [newPhone, setNewPhone] = useState(client.celular || client.telefono || '');
+  const [newEmail, setNewEmail] = useState(client.email || '');
+  const [newDireccion, setNewDireccion] = useState(client.direccion || '');
+  const [newComuna, setNewComuna] = useState(client.comuna || '');
   const [loading, setLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
+
+  // Club Cimasur targets
+  const CATEGORY_THRESHOLDS: Record<string, number> = {
+    'Bronce': 0,
+    'Plata': 1000000,
+    'Oro': 3000000,
+    'Platinum': 5000000
+  };
+  
+  const currentSales = Number(client.compraAnual) || 0;
+  const currentCategory = client.categoria || 'Bronce';
+  
+  let defaultTarget = 'Plata';
+  if (currentSales >= 5000000) defaultTarget = 'Platinum';
+  else if (currentSales >= 3000000) defaultTarget = 'Platinum';
+  else if (currentSales >= 1000000) defaultTarget = 'Oro';
+  
+  const [targetCategory, setTargetCategory] = useState<string>(defaultTarget);
 
   const loadActivities = async () => {
     const all = await localDB.getCollection('gestion_activities');
@@ -219,10 +244,14 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
         sender: user.displayName || user.email || 'Sistema'
       });
       
-      // Update client category and state
+      // Update client category, state and contact info
       await localDB.updateInCollection('gestion_records', client.id, {
         categoria: newCategory,
-        estado: newState
+        estado: newState,
+        celular: newPhone,
+        email: newEmail,
+        direccion: newDireccion,
+        comuna: newComuna
       });
 
       await addAuditLog(
@@ -405,6 +434,48 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                     </select>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Teléfono / Celular</label>
+                      <input 
+                        type="text"
+                        className="w-full p-3 bg-[#152035] border border-[#1E293B] rounded-xl text-xs font-bold text-slate-200 outline-none focus:ring-2 focus:ring-blue-100"
+                        value={newPhone}
+                        onChange={e => setNewPhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</label>
+                      <input 
+                        type="email"
+                        className="w-full p-3 bg-[#152035] border border-[#1E293B] rounded-xl text-xs font-bold text-slate-200 outline-none focus:ring-2 focus:ring-blue-100"
+                        value={newEmail}
+                        onChange={e => setNewEmail(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dirección</label>
+                      <input 
+                        type="text"
+                        className="w-full p-3 bg-[#152035] border border-[#1E293B] rounded-xl text-xs font-bold text-slate-200 outline-none focus:ring-2 focus:ring-blue-100"
+                        value={newDireccion}
+                        onChange={e => setNewDireccion(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Comuna</label>
+                      <input 
+                        type="text"
+                        className="w-full p-3 bg-[#152035] border border-[#1E293B] rounded-xl text-xs font-bold text-slate-200 outline-none focus:ring-2 focus:ring-blue-100"
+                        value={newComuna}
+                        onChange={e => setNewComuna(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalle de la Actividad</label>
                     <textarea 
@@ -436,6 +507,84 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
                         {ESTADOS.filter(est => est !== 'Todos').map(est => <option key={est} value={est}>{est}</option>)}
                       </select>
                     </div>
+                  </div>
+
+                  {/* SIMULADOR CLUB CIMASUR */}
+                  <div className="bg-[#152035] border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                        <Award size={14} /> SIMULADOR CLUB CIMASUR
+                      </h4>
+                      <span className="px-3 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase tracking-widest">
+                        CATEGORÍA ACTUAL: {currentCategory}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-[10px] font-black">
+                        <span className="text-slate-400 uppercase tracking-wider">Progreso para objetivo: {targetCategory}</span>
+                        <span className="text-slate-200">
+                          {CATEGORY_THRESHOLDS[targetCategory] > 0 
+                            ? Math.min(100, Math.floor((currentSales / CATEGORY_THRESHOLDS[targetCategory]) * 100))
+                            : 100}%
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-[#0D1527] rounded-full overflow-hidden border border-[#1E293B]">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${CATEGORY_THRESHOLDS[targetCategory] > 0 ? Math.min(100, (currentSales / CATEGORY_THRESHOLDS[targetCategory]) * 100) : 100}%` }}
+                          className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                        />
+                      </div>
+                      <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
+                        <span>Meta para {targetCategory}: ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()}</span>
+                        <span>Actual: ${currentSales.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+                      {currentSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
+                        <p className="text-[10px] text-emerald-400 font-black leading-tight">
+                          ✓ ¡Excelente! Ya cumplió con el mínimo de ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()} para la categoría {targetCategory} durante este año.
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-amber-400 font-black leading-tight">
+                          Faltan ${(CATEGORY_THRESHOLDS[targetCategory] - currentSales).toLocaleString()} para alcanzar {targetCategory}.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ACELERACIÓN */}
+                  <div className="bg-[#152035] border border-indigo-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                      <Zap size={14} /> CAMPAÑA & PLAN DE ACELERACIÓN
+                    </h4>
+                    
+                    <div className="space-y-1.5">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 block">CATEGORÍA OBJETIVO:</span>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {['Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
+                          <button 
+                            key={cat} 
+                            onClick={() => setTargetCategory(cat)}
+                            className={`py-2 rounded text-[8px] font-black uppercase transition-all ${targetCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-[#0D1527] text-slate-500 border border-[#1E293B] hover:border-slate-600'}`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {currentSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+                          <span className="text-[10px] text-emerald-400 font-black uppercase">✓ ¡Categoría ya superada hoy!</span>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-center">
+                          <span className="text-[10px] text-indigo-400 font-black uppercase">Falta vender: ${(CATEGORY_THRESHOLDS[targetCategory] - currentSales).toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
 
                   <button 

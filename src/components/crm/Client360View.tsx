@@ -19,7 +19,7 @@ interface Client360Props {
 export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onSave }) => {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<string>('general');
+  const [activeTab, setActiveTab] = useState<string>('gestion');
   const [selectedClubYear, setSelectedClubYear] = useState<string>('2026');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<Partial<Client>>({});
@@ -34,6 +34,10 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [newContact, setNewContact] = useState({ nombre: '', cargo: '', telefono: '', celular: '', email: '', esPrincipal: false });
   const [newVet, setNewVet] = useState({ nombre: '', especialidad: '', email: '', telefono: '' });
   const [newBitacoraEntry, setNewBitacoraEntry] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newComuna, setNewComuna] = useState('');
+  const [newDireccion, setNewDireccion] = useState('');
 
   const clientService = new ClientService(
     (col) => localDB.getCollection(col),
@@ -66,6 +70,10 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
         setContacts(parseArray(c.contactos));
         setVeterinarios(parseArray(c.veterinarios));
         setBitacora(parseArray(c.bitacora));
+        setNewPhone(c.telefono || c.phone || c.celular || '');
+        setNewEmail(c.email || '');
+        setNewComuna(c.comuna || '');
+        setNewDireccion(c.direccion || '');
         
         // Fetch global activities for this client
         const allGlobal = await localDB.getCollection('crm_activities');
@@ -141,7 +149,14 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
       creador: 'Usuario CRM'
     };
     const updated = [newEntry, ...bitacora];
-    await clientService.updateClient(client.id, { bitacora: updated });
+    
+    const updates: any = { bitacora: updated };
+    if (newPhone !== (client.telefono || client.phone || client.celular)) updates.telefono = newPhone;
+    if (newEmail !== client.email) updates.email = newEmail;
+    if (newComuna !== client.comuna) updates.comuna = newComuna;
+    if (newDireccion !== client.direccion) updates.direccion = newDireccion;
+    
+    await clientService.updateClient(client.id, updates);
 
     // Also register in global CRM activities for visibility across the platform
     try {
@@ -218,6 +233,22 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
           </button>
         </div>
 
+        {/* TABS */}
+        <div className="flex px-8 border-b border-slate-800 bg-[#050914] gap-8 shrink-0">
+          <button 
+            onClick={() => setActiveTab('gestion')} 
+            className={`py-4 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'gestion' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+          >
+            Gestión e Historial
+          </button>
+          <button 
+            onClick={() => setActiveTab('general')} 
+            className={`py-4 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'general' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+          >
+            Información 360° & Contactos
+          </button>
+        </div>
+
         <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 bg-[#050914]">
           {/* SUMMARY CARDS ROW */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 shrink-0">
@@ -243,9 +274,10 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* LEFT COLUMN: HISTORIAL */}
-            <div className="lg:col-span-8 flex flex-col gap-4">
+          {activeTab === 'gestion' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* LEFT COLUMN: HISTORIAL */}
+              <div className="lg:col-span-8 flex flex-col gap-4">
               <div className="flex justify-between items-center px-1">
                 <h3 className="text-[10px] font-black text-sky-500 uppercase tracking-widest flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,1)]"></div>
@@ -323,6 +355,52 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   <div>
                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">RUT / ID</label>
                     <input readOnly value={client.rut} className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white/70 font-mono cursor-not-allowed" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Teléfono / Celular</label>
+                      <input 
+                        type="text"
+                        value={newPhone}
+                        onChange={e => setNewPhone(e.target.value)}
+                        placeholder="+56 9..."
+                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Email de Contacto</label>
+                      <input 
+                        type="email"
+                        value={newEmail}
+                        onChange={e => setNewEmail(e.target.value)}
+                        placeholder="ejemplo@correo.com"
+                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Dirección</label>
+                      <input 
+                        type="text"
+                        value={newDireccion}
+                        onChange={e => setNewDireccion(e.target.value)}
+                        placeholder="Calle, Número..."
+                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Comuna</label>
+                      <input 
+                        type="text"
+                        value={newComuna}
+                        onChange={e => setNewComuna(e.target.value)}
+                        placeholder="Ej: Providencia"
+                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -457,6 +535,231 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
               </div>
             </div>
           </div>
+          )}
+
+          {activeTab === 'general' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* DATOS GENERALES */}
+              <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-3xl space-y-6 shadow-2xl h-fit">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <Building2 size={16} className="text-sky-500" />
+                    Datos del Negocio
+                  </h3>
+                  {!isEditing ? (
+                    <button onClick={() => setIsEditing(true)} className="text-sky-400 hover:text-sky-300 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                      <Edit2 size={12} /> Editar
+                    </button>
+                  ) : (
+                    <button onClick={handleSaveGeneral} className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/30">
+                      Guardar
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Nombre / Razón Social</label>
+                    <input 
+                      readOnly={!isEditing}
+                      value={editForm.nombre || editForm.name || ''}
+                      onChange={e => setEditForm({...editForm, nombre: e.target.value, name: e.target.value})}
+                      className={`w-full bg-[#050914] border ${isEditing ? 'border-sky-500/50' : 'border-slate-800'} p-3 rounded-xl text-xs text-white font-bold transition-all`} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">RUT</label>
+                    <input 
+                      readOnly={!isEditing}
+                      value={editForm.rut || ''}
+                      onChange={e => setEditForm({...editForm, rut: e.target.value})}
+                      className={`w-full bg-[#050914] border ${isEditing ? 'border-sky-500/50' : 'border-slate-800'} p-3 rounded-xl text-xs text-white font-mono transition-all`} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Email</label>
+                    <input 
+                      readOnly={!isEditing}
+                      value={editForm.email || ''}
+                      onChange={e => setEditForm({...editForm, email: e.target.value})}
+                      className={`w-full bg-[#050914] border ${isEditing ? 'border-sky-500/50' : 'border-slate-800'} p-3 rounded-xl text-xs text-white transition-all`} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Teléfono</label>
+                    <input 
+                      readOnly={!isEditing}
+                      value={editForm.telefono || editForm.phone || editForm.celular || ''}
+                      onChange={e => setEditForm({...editForm, telefono: e.target.value})}
+                      className={`w-full bg-[#050914] border ${isEditing ? 'border-sky-500/50' : 'border-slate-800'} p-3 rounded-xl text-xs text-white transition-all`} 
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Dirección</label>
+                    <input 
+                      readOnly={!isEditing}
+                      value={editForm.direccion || ''}
+                      onChange={e => setEditForm({...editForm, direccion: e.target.value})}
+                      className={`w-full bg-[#050914] border ${isEditing ? 'border-sky-500/50' : 'border-slate-800'} p-3 rounded-xl text-xs text-white transition-all`} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Comuna</label>
+                    <input 
+                      readOnly={!isEditing}
+                      value={editForm.comuna || ''}
+                      onChange={e => setEditForm({...editForm, comuna: e.target.value})}
+                      className={`w-full bg-[#050914] border ${isEditing ? 'border-sky-500/50' : 'border-slate-800'} p-3 rounded-xl text-xs text-white transition-all`} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Tipo Empresa</label>
+                    <input 
+                      readOnly={!isEditing}
+                      value={editForm.tipo_empresa || editForm.giro || ''}
+                      onChange={e => setEditForm({...editForm, tipo_empresa: e.target.value})}
+                      className={`w-full bg-[#050914] border ${isEditing ? 'border-sky-500/50' : 'border-slate-800'} p-3 rounded-xl text-xs text-white transition-all`} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* CONTACTOS Y VETERINARIOS */}
+              <div className="space-y-8">
+                {/* CONTACTOS */}
+                <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-3xl shadow-2xl">
+                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <User size={16} className="text-emerald-500" />
+                    Contactos Clave
+                  </h3>
+                  
+                  <div className="space-y-3 mb-6">
+                    {contacts.map((c, idx) => (
+                      <div key={idx} className="bg-[#050914] border border-slate-800 p-4 rounded-xl flex justify-between items-center group hover:border-slate-700 transition-all">
+                        <div>
+                          <p className="text-xs font-bold text-white flex items-center gap-2">
+                            {c.nombre} 
+                            {c.esPrincipal && <span className="bg-emerald-500/20 text-emerald-400 text-[8px] uppercase tracking-widest px-2 py-0.5 rounded">Principal</span>}
+                          </p>
+                          <p className="text-[10px] text-slate-400">{c.cargo} • {c.email} • {c.telefono || c.celular}</p>
+                        </div>
+                        <button onClick={() => handleDeleteContact(idx)} className="text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-rose-500/10 rounded-lg">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {contacts.length === 0 && (
+                      <div className="text-center py-6 text-slate-600 text-xs italic">No hay contactos registrados.</div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-800 pt-6">
+                    <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Agregar Contacto</h4>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <input 
+                        placeholder="Nombre" 
+                        value={newContact.nombre}
+                        onChange={e => setNewContact({...newContact, nombre: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-emerald-500 outline-none" 
+                      />
+                      <input 
+                        placeholder="Cargo" 
+                        value={newContact.cargo}
+                        onChange={e => setNewContact({...newContact, cargo: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-emerald-500 outline-none" 
+                      />
+                      <input 
+                        placeholder="Teléfono/Celular" 
+                        value={newContact.telefono}
+                        onChange={e => setNewContact({...newContact, telefono: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-emerald-500 outline-none" 
+                      />
+                      <input 
+                        placeholder="Email" 
+                        value={newContact.email}
+                        onChange={e => setNewContact({...newContact, email: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-emerald-500 outline-none" 
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-[10px] text-slate-400 uppercase tracking-wider cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={newContact.esPrincipal}
+                          onChange={e => setNewContact({...newContact, esPrincipal: e.target.checked})}
+                          className="accent-emerald-500" 
+                        />
+                        Contacto Principal
+                      </label>
+                      <button onClick={handleAddContact} className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/30 flex items-center gap-2">
+                        <Plus size={12} /> Añadir
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* VETERINARIOS */}
+                <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-3xl shadow-2xl">
+                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <Stethoscope size={16} className="text-amber-500" />
+                    Cuerpo Médico / Veterinarios
+                  </h3>
+                  
+                  <div className="space-y-3 mb-6">
+                    {veterinarios.map((v, idx) => (
+                      <div key={idx} className="bg-[#050914] border border-slate-800 p-4 rounded-xl flex justify-between items-center group hover:border-slate-700 transition-all">
+                        <div>
+                          <p className="text-xs font-bold text-white">{v.nombre}</p>
+                          <p className="text-[10px] text-slate-400">{v.especialidad || 'General'} • {v.email}</p>
+                        </div>
+                        <button onClick={() => handleDeleteVet(idx)} className="text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-rose-500/10 rounded-lg">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {veterinarios.length === 0 && (
+                      <div className="text-center py-6 text-slate-600 text-xs italic">No hay veterinarios registrados.</div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-800 pt-6">
+                    <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Agregar Veterinario</h4>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <input 
+                        placeholder="Nombre completo" 
+                        value={newVet.nombre}
+                        onChange={e => setNewVet({...newVet, nombre: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-amber-500 outline-none" 
+                      />
+                      <input 
+                        placeholder="Especialidad" 
+                        value={newVet.especialidad}
+                        onChange={e => setNewVet({...newVet, especialidad: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-amber-500 outline-none" 
+                      />
+                      <input 
+                        placeholder="Email" 
+                        value={newVet.email}
+                        onChange={e => setNewVet({...newVet, email: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-amber-500 outline-none" 
+                      />
+                      <input 
+                        placeholder="Teléfono (Opcional)" 
+                        value={newVet.telefono}
+                        onChange={e => setNewVet({...newVet, telefono: e.target.value})}
+                        className="bg-[#050914] border border-slate-800 p-2.5 rounded-lg text-xs text-white focus:border-amber-500 outline-none" 
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button onClick={handleAddVet} className="bg-amber-500/20 text-amber-500 border border-amber-500/30 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/30 flex items-center gap-2">
+                        <Plus size={12} /> Añadir Vet
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>
