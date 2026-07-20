@@ -364,7 +364,7 @@ const crmTools: FunctionDeclaration[] = [
 
   // --- PERSISTENCE IN FIRESTORE ---
   let db: admin.firestore.Firestore | null = null;
-  const DATA_DIR = path.join(__dirname, 'data');
+  const DATA_DIR = path.join(process.cwd(), 'data');
   import('fs/promises').then(fs => fs.mkdir(DATA_DIR, { recursive: true }));
 
   async function getDB(): Promise<admin.firestore.Firestore | null> {

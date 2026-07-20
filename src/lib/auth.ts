@@ -254,6 +254,15 @@ export const localDB = {
                 const text = await res.text();
                 throw new Error(`Failed to fetch ${name}: ${text}`);
               }
+              
+              const contentType = res.headers.get('Content-Type');
+              if (contentType && contentType.includes('text/html')) {
+                throw new Error(`Response is HTML (possible cookie check or redirect), expected JSON`);
+              }
+              if (res.url && (res.url.includes('__cookie_check') || res.url.includes('login'))) {
+                throw new Error(`Redirected to ${res.url} (possible cookie check or login screen)`);
+              }
+              
               let data = await res.json();
               if (options && options.dateField && options.startDate && options.endDate) {
                 data = data.filter((item: any) => {
@@ -271,7 +280,11 @@ export const localDB = {
             }
           }
           
-          console.error(`Final failure in localDB.getCollection(${name}) after retries:`, lastError);
+          if (lastError && (lastError.message?.includes('HTML') || lastError.message?.includes('JSON') || lastError.message?.includes('token') || lastError.message?.includes('Redirected'))) {
+            console.warn(`localDB.getCollection(${name}) returned HTML redirect/cookie-check instead of JSON. This is normal behavior in sandbox previews when third-party cookies are blocked or checking credentials. Returning empty array.`);
+          } else {
+            console.error(`Final failure in localDB.getCollection(${name}) after retries:`, lastError);
+          }
           return [];
         } finally {
           delete pendingRequests[cacheKey];
