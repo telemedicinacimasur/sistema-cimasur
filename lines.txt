@@ -1,0 +1,3 @@
+                                             const availableFixedLotes = lotesActivos.filter(l => {
+                                               return !l.movimientos || l.movimientos[selectedMonth] === undefined;
+                                             }).sort((a, b) => {

@@ -62,7 +62,7 @@ export default function App() {
                         />
                         <Route 
                           path="/administracion" 
-                          element={<RoleRoute roles={['admin', 'manager']}><AdminView /></RoleRoute>} 
+                          element={<RoleRoute roles={['admin', 'manager', 'crm']}><AdminView /></RoleRoute>} 
                         />
                         <Route 
                           path="/crm" 

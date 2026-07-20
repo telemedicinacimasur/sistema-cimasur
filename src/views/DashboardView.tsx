@@ -77,7 +77,7 @@ export default function DashboardView() {
       icon: ShieldCheck,
       path: '/administracion',
       color: 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 shadow-[0_0_15px_rgba(56,189,248,0.2)]',
-      roles: ['admin', 'manager']
+      roles: ['admin', 'manager', 'crm']
     },
     {
       name: 'Comercial CRM',
