@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Award, Users, Gift, Activity, Search, Check, X, ShieldCheck, Clock, Settings, Trash2, Plus } from 'lucide-react';
+import { Award, Users, Gift, Activity, Search, Check, X, ShieldCheck, Clock, Settings, Trash2, Plus, FileSpreadsheet } from 'lucide-react';
 import { PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip } from 'recharts';
 import { localDB } from '../../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
+import * as XLSX from 'xlsx';
 
 const TIER_COLORS: Record<string, string> = {
   'Platinum': '#A855F7',
@@ -60,6 +61,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
   
   // Config Modal State
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [configYear, setConfigYear] = useState('2026');
   const [configRanges, setConfigRanges] = useState<Record<string, {min: number, max: number}>>({
     Bronce: { min: 0, max: 999999 },
@@ -254,6 +256,22 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
             <SubTabButton active={activeSubTab === 'rewards'} onClick={() => setActiveSubTab('rewards')} icon={<Gift size={14} />} label="Catálogo de Beneficios" />
           </div>
         </div>
+      </div>
+
+      <div className="bg-[#0D1527] border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="bg-[#152035] border-b border-slate-800 px-6 py-4 flex justify-between items-center cursor-pointer" onClick={() => setIsTemplatesOpen(!isTemplatesOpen)}>
+          <h3 className="text-md font-black text-white flex items-center gap-2">
+            <Clock size={18} className="text-sky-400" /> Plantillas Guardadas
+          </h3>
+          <button className="text-slate-400 hover:text-white transition-colors">
+            {isTemplatesOpen ? <X size={18} /> : <Settings size={18} />}
+          </button>
+        </div>
+        {isTemplatesOpen && (
+          <div className="p-6">
+            {/* ... templates content ... */}
+          </div>
+        )}
       </div>
 
       {activeSubTab === 'dashboard' && (
@@ -518,6 +536,85 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
                 </div>
 
                 <div className="space-y-6">
+                  {/* Botón de Importación */}
+                  <div className="bg-[#152035] p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Importación Manual Masiva</h4>
+                      <p className="text-[10px] text-slate-400">Carga categorías y beneficios desde un archivo CSV/XLSX</p>
+                    </div>
+                    <button 
+                      className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all"
+                      onClick={() => {
+                        const ws = XLSX.utils.json_to_sheet([
+                          { Categoría: 'Plata', Mínimo: 0, Máximo: 100000, Beneficio: 'Beneficio 1' },
+                          { Categoría: 'Oro', Mínimo: 100001, Máximo: 500000, Beneficio: 'Beneficio 2' }
+                        ]);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+                        XLSX.writeFile(wb, "plantilla_rangos.xlsx");
+                      }}
+                    >
+                      Descargar Plantilla
+                    </button>
+                    <button 
+                      className="flex items-center gap-2 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-900/50 text-emerald-400 text-xs font-bold px-4 py-2 rounded-lg transition-all"
+                      onClick={() => document.getElementById('file-upload')?.click()}
+                    >
+                      <FileSpreadsheet size={16} /> Seleccionar Archivo
+                    </button>
+                    <input 
+                      type="file" 
+                      id="file-upload" 
+                      className="hidden" 
+                      accept=".csv, .xlsx" 
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          try {
+                            const bstr = evt.target?.result;
+                            const wb = XLSX.read(bstr, { type: 'binary' });
+                            const wsname = wb.SheetNames[0];
+                            const ws = wb.Sheets[wsname];
+                            const data = XLSX.utils.sheet_to_json(ws);
+                            
+                            // Parse data assuming cols: Categoría, Mínimo, Máximo, Beneficio
+                            const newRanges = { ...configRanges };
+                            const newBenefits = { ...configBenefits };
+                            
+                            data.forEach((row: any) => {
+                              const cat = row['Categoría'];
+                              if (cat && TIER_COLORS[cat]) {
+                                if (row['Mínimo'] !== undefined && row['Máximo'] !== undefined) {
+                                  newRanges[cat] = { min: Number(row['Mínimo']), max: Number(row['Máximo']) };
+                                }
+                                if (row['Beneficio']) {
+                                  if (!newBenefits[cat]) newBenefits[cat] = [];
+                                  if (!newBenefits[cat].includes(row['Beneficio'])) {
+                                    newBenefits[cat].push(row['Beneficio']);
+                                  }
+                                }
+                              }
+                            });
+                            
+                            setConfigRanges(newRanges);
+                            setConfigBenefits(newBenefits);
+                            alert('Datos importados correctamente.');
+                          } catch (error) {
+                            console.error('Error importing file:', error);
+                            alert('Hubo un error al procesar el archivo.');
+                          }
+                        };
+                        reader.readAsBinaryString(file);
+                        
+                        // Reset input
+                        e.target.value = '';
+                      }} 
+                    />
+                  </div>
+                  
                   {Object.entries(configRanges).map(([cat, range]: [string, {min: number, max: number}]) => (
                     <div key={cat} className="bg-[#050914] border border-slate-850 p-4 rounded-xl space-y-4">
                       <div className="flex items-center gap-4">

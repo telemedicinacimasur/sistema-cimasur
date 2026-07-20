@@ -1349,6 +1349,182 @@ Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de
     }
   });
 
+  app.post('/api/ai/analyze-whatsapp-chat', async (req, res) => {
+    console.log('API call: POST /api/ai/analyze-whatsapp-chat');
+    try {
+      const { leadName, leadClasificacion, chatLog } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor." });
+      }
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Eres un Analista Experto en Ventas y Psicología de Clientes para la Escuela de Educación Médica CIMASUR.
+Tu tarea es analizar la siguiente conversación de WhatsApp entre un potencial alumno (Lead) de clasificación "${leadClasificacion || 'Médico Veterinario'}" llamado "${leadName}" y el asesor de Escuela CIMASUR.
+
+Conversación de WhatsApp:
+"""
+${chatLog}
+"""
+
+Analiza rigurosamente la conversación y genera un objeto JSON con los siguientes campos:
+1. "interestLevel": La temperatura de interés del lead. Debe ser estrictamente "Frío", "Tibio", o "Caliente".
+2. "summary": Un resumen conciso (máximo 3 líneas) de la interacción, destacando de qué hablaron y el tono del lead.
+3. "objections": Un array de strings con las objeciones o dudas principales identificadas (ej. "Precio alto", "Falta de tiempo", "Dudas sobre certificación", "Horarios", etc.). Si no hay, dejar vacío.
+4. "nextAction": Una recomendación de la siguiente mejor acción de seguimiento comercial.
+5. "suggestedMessage": Un mensaje personalizado listo para enviar por WhatsApp que aborde sus dudas o continúe la interacción con calidez y profesionalismo, utilizando emojis atractivos y un tono de aliado clínico de CIMASUR. Puede usar marcadores como "{{NOMBRE}}".`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              interestLevel: { type: Type.STRING },
+              summary: { type: Type.STRING },
+              objections: { type: Type.ARRAY, items: { type: Type.STRING } },
+              nextAction: { type: Type.STRING },
+              suggestedMessage: { type: Type.STRING }
+            },
+            required: ["interestLevel", "summary", "objections", "nextAction", "suggestedMessage"]
+          }
+        }
+      });
+
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      if (!resolved) throw new Error("No se pudo obtener la respuesta de análisis de la conversación.");
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error("Error in analyze-whatsapp-chat:", e);
+      res.status(500).json({ error: e.message || 'Error en el análisis de conversación con IA' });
+    }
+  });
+
+  app.post('/api/ai/parse-whatsapp-export', async (req, res) => {
+    console.log('API call: POST /api/ai/parse-whatsapp-export');
+    try {
+      const { rawText, fileName } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
+      }
+      if (!rawText || !rawText.trim()) {
+        return res.status(400).json({ error: "El contenido de la conversación de WhatsApp está vacío." });
+      }
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Eres un Analista de Datos Clínicos y de Ventas de la Escuela de Educación Médica CIMASUR.
+Tu tarea es auditar, analizar y parsear el siguiente archivo de texto que corresponde a una exportación de chat de WhatsApp de un potencial alumno interesado.
+
+Nombre de archivo original (¡MUY IMPORTANTE! Si el nombre contiene un número de teléfono o indicio del nombre del lead, utilízalo con prioridad, por ejemplo "Chat de WhatsApp con +56 9 1234 5678.txt"):
+"${fileName || 'No provisto'}"
+
+Contenido de la exportación de WhatsApp:
+"""
+${rawText}
+"""
+
+Instrucciones de análisis minuciosas para extraer información verídica (¡NO INVENTES datos ni uses plantillas genéricas si hay información real!):
+
+1. IDENTIFICACIÓN DE ROLES:
+- El asesor de la Escuela CIMASUR usualmente aparece como "formacion cimasur", "Escuela CIMASUR", "CIMASUR", "+56 9 3208 0432" o similar.
+- El CLIENTE (el alumno potencial) es la OTRA persona que interactúa en la conversación. Puede figurar con un nombre (ej. "Dra. Carolina Pérez", "Dr. Claudio", etc.) o con un número de teléfono (ej. "+56 9 8251 7712", "56912345678").
+
+2. EXTRACCIÓN DE DATOS PERSONALES DEL CLIENTE:
+- "leadPhone": 
+  * Analiza el nombre de archivo provisto ("${fileName || 'No provisto'}"). Si tiene un número telefónico como "+56 9 XXXX XXXX", extrae ese número con prioridad.
+  * Analiza los encabezados de las líneas en el chat de WhatsApp. Si el remitente del cliente está identificado con un número de teléfono (ej. "+56 9 8251 7712", "+56 9 XXXX XXXX"), extrae ese número de teléfono de forma exacta.
+  * Si los remitentes son nombres de personas, busca en todos los mensajes de texto del chat (tanto del cliente como confirmaciones escritas por el asesor) cualquier mención a un número de teléfono de contacto.
+  * Si encuentras un número de teléfono real del cliente, devuélvelo en formato "+XX X XXXX XXXX". 
+  * ¡IMPORTANTE! NUNCA inventes un teléfono ni devuelvas un valor de marcador de posición como "+56 9 XXXX XXXX" si lograste detectar el número real o si el remitente de los mensajes contiene un número telefónico. Si no hay absolutamente ningún teléfono y no puedes deducirlo, déjalo vacío o extrae el número que figura en la cabecera de WhatsApp.
+
+- "leadName": 
+  * Revisa minuciosamente los encabezados de los mensajes de WhatsApp para identificar el nombre del cliente (el remitente que no es CIMASUR/formacion cimasur). Si el remitente es un nombre (ej. "Dra. Natalia", "Dr. Juan Pérez"), utilízalo de inmediato como su nombre.
+  * Si el remitente es un número de teléfono (ej. "+56 9 8251 7712"), analiza TODO el texto del chat para encontrar dónde se presenta el cliente (ej. "Hola, soy el Dr. Francisco Reyes", "Atte Dra. Alejandra", "un gusto le saluda Camilo") o dónde el asesor se dirige a él/ella por su nombre (ej. "Hola Dr. Francisco, ¿cómo está?", "Dra. Carolina, le envío el temario"). Extrae ese nombre real.
+  * ¡CRÍTICO! Si es absolutamente imposible deducir o encontrar ningún nombre o apellido real en todo el chat, asigna como nombre el propio número de teléfono del cliente (ej. "+56 9 8251 7712" o el número de WhatsApp extraído). NO uses un nombre genérico inventado como "Dr. Veterinario Interesado" si no hay nombre; ¡muestra el número en su lugar!
+
+- "leadEmail": 
+  * Escanea rigurosamente todo el texto de la conversación buscando patrones de correo electrónico reales (ej. cualquier texto con "@" y un dominio, como "doctor@gmail.com", "carol.mv@hotmail.com"). Extrae este correo de forma exacta. Si no hay ningún correo mencionado, déjalo vacío.
+
+- "interes": 
+  * Deduce e identifica el diplomado o curso específico de CIMASUR por el cual el cliente pregunta o el asesor le ofrece (ej. "Diplomado en Homeopatía Veterinaria", "Diplomado en Acupuntura", "Diplomado en Neurología Veterinaria", "Diplomado en Cardiología", etc.). Si no hay, pon "Diplomado a definir".
+
+3. ESTADÍSTICAS REALES Y ALERTAS:
+- "emailsCount": Cantidad total de direcciones de correo electrónico REALES y únicas encontradas en la conversación.
+- "phonesCount": Cantidad total de números de teléfono REALES y únicos encontrados en la conversación o en el nombre de archivo.
+- "warningMessage": Si no se encontraron datos de correo electrónico ni información sustancial o interés claro, genera una alerta amigable pero rigurosa en español (ej. "¡Alerta comercial! Se detectó el teléfono del alumno, pero no hay datos de correo electrónico ni información clara sobre el diplomado de interés en el historial."). Si todo está completo, pon "Ninguna".
+
+4. ANÁLISIS COMERCIAL:
+- "cleanedChatLog": Transcribe de manera limpia el chat, omitiendo avisos de sistema como "Los mensajes y las llamadas están cifrados", "multimedia omitido", "<Multimedia omitido>", "adjunto", etc. Estructúralo así:
+  [Fecha, Hora] Nombre/Remitente: Mensaje
+- "interestLevel": Temperatura comercial: "Frío" (desinterés, no responde), "Tibio" (respondió algunas dudas pero tiene objeciones o no ha pagado), "Caliente" (muestra altísimo interés, pide formas de pago, envía datos de matrícula, o dice que se va a inscribir).
+- "summary": Un resumen de la conversación de máximo 3 líneas.
+- "objections": Un array de strings con las objeciones encontradas (ej. "Precio", "Horarios", "Certificación", "Falta de tiempo", etc.).
+- "nextAction": Acción inmediata recomendada para el asesor de ventas.
+- "suggestedMessage": Un mensaje ultra persuasivo, profesional y personalizado, redactado especialmente para que el asesor lo envíe por WhatsApp para cerrar la venta o reenganchar al Dr(a)., usando su nombre real y el diplomado de interés (o su número si no hay nombre).
+
+Genera la respuesta estrictamente como un objeto JSON válido con los campos exactos descritos, respetando la estructura schema proporcionada.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              leadName: { type: Type.STRING },
+              leadClasificacion: { type: Type.STRING },
+              leadPhone: { type: Type.STRING },
+              leadEmail: { type: Type.STRING },
+              interes: { type: Type.STRING },
+              cleanedChatLog: { type: Type.STRING },
+              interestLevel: { type: Type.STRING },
+              summary: { type: Type.STRING },
+              objections: { type: Type.ARRAY, items: { type: Type.STRING } },
+              nextAction: { type: Type.STRING },
+              suggestedMessage: { type: Type.STRING },
+              emailsCount: { type: Type.INTEGER },
+              phonesCount: { type: Type.INTEGER },
+              warningMessage: { type: Type.STRING }
+            },
+            required: [
+              "leadName", "leadClasificacion", "leadPhone", "leadEmail", 
+              "interes", "cleanedChatLog", "interestLevel", "summary", 
+              "objections", "nextAction", "suggestedMessage",
+              "emailsCount", "phonesCount", "warningMessage"
+            ]
+          }
+        }
+      });
+
+      const text = response.text;
+      const resolved = typeof text === 'string' ? text : await text;
+      if (!resolved) throw new Error("No se pudo obtener la respuesta estructurada de parseo de WhatsApp.");
+      const data = JSON.parse(resolved);
+      res.json(data);
+    } catch (e: any) {
+      console.error("Error in parse-whatsapp-export:", e);
+      res.status(500).json({ error: e.message || 'Error en el parseo y análisis de exportación con IA' });
+    }
+  });
+
   app.post('/api/ai/converse-bulk-campaign', async (req, res) => {
     console.log('API call: POST /api/ai/converse-bulk-campaign');
     try {

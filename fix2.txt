@@ -1,0 +1,4 @@
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold text-slate-100 truncate">{m.name}</p>
+                          <p className="text-[9px] text-slate-400 font-bold font-mono uppercase mt-0.5 tracking-wider">Duración: {m.duracion} {m.categoria ? `| ${m.categoria}` : ''}</p>
+                        </div>

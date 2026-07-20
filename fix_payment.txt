@@ -1,0 +1,23 @@
+               <div className="col-span-full border-t border-[#1E293B] mt-4 pt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Datos de Matrícula / Pago (Opcional)</h4>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPaymentData(!showPaymentData)} 
+                      className="text-[10px] bg-[#111A2E] border border-[#1E293B] px-3 py-1.5 rounded-lg text-sky-400 hover:text-sky-300 font-bold uppercase tracking-widest"
+                    >
+                      {showPaymentData ? 'Ocultar Filtro' : 'Mostrar Filtro'}
+                    </button>
+                  </div>
+                  {showPaymentData && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in fade-in duration-300">
+                       <FormGroup label="Total de Venta (Opcional)"><input type="number" className="w-full border-b p-2" value={form.montoTotalPagado ?? ''} onChange={e => setForm({...form, montoTotalPagado: e.target.value})} /></FormGroup>
+                       <FormGroup label="Monto Recibido"><input type="number" className="w-full border-b p-2 font-black text-emerald-600 bg-emerald-50 rounded" value={form.montoTotalRecibido ?? ''} onChange={e => setForm({...form, montoTotalRecibido: e.target.value})} /></FormGroup>
+                       <FormGroup label="N° Factura"><input className="w-full border-b p-2" value={form.nroFactura || ''} onChange={e => setForm({...form, nroFactura: e.target.value})} /></FormGroup>
+                       <FormGroup label="Fecha Factura"><input type="date" className="w-full border-b p-2" value={form.fechaFactura || ''} onChange={e => setForm({...form, fechaFactura: e.target.value})} /></FormGroup>
+                       <div className="col-span-1 md:col-span-4">
+                          <FormGroup label="Observación Pago"><input className="w-full border-b p-2 italic" value={form.observacionesPago || ''} onChange={e => setForm({...form, observacionesPago: e.target.value})} placeholder="Ej: Pago total del diplomado..." /></FormGroup>
+                       </div>
+                    </div>
+                  )}
+               </div>

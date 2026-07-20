@@ -213,6 +213,70 @@ const getMockLotesForClient = (clienteId: string): any[] => {
   return clientLotes;
 };
 
+const ClientAutocomplete = ({
+  clientes,
+  value,
+  onChange,
+  placeholder = "Buscar cliente..."
+}: {
+  clientes: any[];
+  value: string;
+  onChange: (id: string) => void;
+  placeholder?: string;
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    if (value) {
+      const c = clientes.find(client => client.id === value);
+      if (c) setSearchTerm(c.name);
+    } else {
+      setSearchTerm('');
+    }
+  }, [value, clientes]);
+
+  return (
+    <div className="relative">
+      <input 
+        type="text"
+        className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-3 outline-none focus:border-sky-500 transition-colors font-bold text-xs"
+        value={searchTerm}
+        onChange={(e) => {
+          setSearchTerm(e.target.value);
+          setShowDropdown(true);
+          if (e.target.value === '') onChange('');
+        }}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        placeholder={placeholder}
+      />
+      {showDropdown && (
+        <div className="absolute z-10 w-full mt-1 bg-[#050914] border border-[#1E293B] rounded-xl shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
+          {clientes
+            .filter(c => (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+            .map(c => (
+              <div
+                key={c.id}
+                className="p-3 text-xs text-slate-300 hover:bg-[#1E293B] cursor-pointer"
+                onMouseDown={() => {
+                  setSearchTerm(c.name);
+                  onChange(c.id);
+                  setShowDropdown(false);
+                }}
+              >
+                {c.name}
+              </div>
+          ))}
+          {clientes.filter(c => (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+            <div className="p-3 text-xs text-slate-500">No se encontraron clientes</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function VentasConsignacionView() {
   const [activeTab, setActiveTab] = useState<'declaraciones' | 'registro_ventas'>('declaraciones');
   const [clientes, setClientes] = useState<any[]>([]);
@@ -834,6 +898,7 @@ export default function VentasConsignacionView() {
   };
 
   const handleRemoveProductFromMonthTemplate = async (loteId: string) => {
+    console.log("Removing product:", loteId);
     if (!confirm("¿Está seguro de remover este producto de la planilla de este mes? El saldo y stock se recalcularán automáticamente.")) return;
     try {
       if (isFirebaseReady()) {
@@ -1138,17 +1203,12 @@ export default function VentasConsignacionView() {
                           >
                             <div>
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Cliente Destinatario</label>
-                              <select
-                                className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500"
+                              <ClientAutocomplete
+                                clientes={clientes}
                                 value={formEntrega.cliente_id}
-                                onChange={e => setFormEntrega({ ...formEntrega, cliente_id: e.target.value })}
-                                required
-                              >
-                                <option value="">-- Seleccionar --</option>
-                                {clientes.map(c => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                              </select>
+                                onChange={(id) => setFormEntrega({ ...formEntrega, cliente_id: id })}
+                                placeholder="Escriba para buscar cliente..."
+                              />
                             </div>
                             <div>
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Producto</label>
@@ -1281,17 +1341,12 @@ export default function VentasConsignacionView() {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="md:col-span-3">
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Cliente Destinatario</label>
-                              <select
-                                className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-purple-500"
+                              <ClientAutocomplete
+                                clientes={clientes}
                                 value={importClienteId}
-                                onChange={e => setImportClienteId(e.target.value)}
-                                required
-                              >
-                                <option value="">-- Seleccionar Cliente --</option>
-                                {clientes.map(c => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                              </select>
+                                onChange={setImportClienteId}
+                                placeholder="Escriba para buscar cliente..."
+                              />
                             </div>
 
                             <div className="md:col-span-3">
@@ -1425,16 +1480,12 @@ export default function VentasConsignacionView() {
                   {/* Filter 1: Cliente */}
                   <div className="bg-[#111A2E] p-5 rounded-2xl border border-[#1E293B] shadow-lg">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Cliente Seleccionado</label>
-                    <select 
-                      className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-3 outline-none focus:border-sky-500 transition-colors font-bold text-xs"
+                    <ClientAutocomplete 
+                      clientes={clientes}
                       value={declaracionCliente}
-                      onChange={(e) => setDeclaracionCliente(e.target.value)}
-                    >
-                      <option value="">-- Seleccione un cliente --</option>
-                      {clientes.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
+                      onChange={setDeclaracionCliente}
+                      placeholder="Ingrese el nombre del cliente..."
+                    />
                   </div>
 
                   {/* Filter 2: Mes de Reporte con Controles Nav */}
@@ -1830,16 +1881,12 @@ export default function VentasConsignacionView() {
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="bg-[#111A2E] p-6 rounded-2xl border border-[#1E293B] shadow-lg max-w-md">
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Filtrar por Cliente</label>
-                  <select 
-                    className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-3 outline-none focus:border-sky-500 transition-colors font-bold text-xs"
+                  <ClientAutocomplete 
+                    clientes={clientes}
                     value={registroVentasCliente}
-                    onChange={(e) => setRegistroVentasCliente(e.target.value)}
-                  >
-                    <option value="">-- Seleccione un cliente --</option>
-                    {clientes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                    onChange={setRegistroVentasCliente}
+                    placeholder="Escriba para buscar cliente..."
+                  />
                 </div>
 
                 {registroVentasCliente ? (
@@ -2424,7 +2471,11 @@ function LoteFixedDataEditor({
   };
 
   const handleDelete = async () => {
-    console.log("Delete button clicked");
+    console.log("Delete button clicked for lote:", lote);
+    if (!lote || !lote.id) {
+      alert("Error: No se puede identificar el producto a eliminar.");
+      return;
+    }
     if (!window.confirm('¿Está seguro de que desea eliminar este producto/solución de forma permanente? Esta acción no se puede deshacer.')) {
       return;
     }
@@ -2445,7 +2496,7 @@ function LoteFixedDataEditor({
       alert('Producto/solución eliminado exitosamente.');
       onRefresh();
     } catch (e: any) {
-      console.error(e);
+      console.error("Error in handleDelete:", e);
       alert('Error al eliminar producto/solución: ' + e.message);
     } finally {
       setSaving(false);
@@ -2513,6 +2564,7 @@ function LoteFixedDataEditor({
             Guardar
           </button>
           <button
+            type="button"
             onClick={handleDelete}
             disabled={saving}
             className="bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-black px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1 text-[11px] uppercase tracking-wider shadow-md shadow-rose-500/10 active:scale-95"

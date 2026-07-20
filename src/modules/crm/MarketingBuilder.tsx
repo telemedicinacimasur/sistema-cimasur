@@ -271,6 +271,8 @@ export default function MarketingBuilder({
   const [templatesList, setTemplatesList] = useState<SavedTemplate[]>([]);
   const [templateName, setTemplateName] = useState('Mi Nueva Plantilla Comercial');
 
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+
   // Load templates from DB on mount
   useEffect(() => {
     const loadTemplates = async () => {
@@ -830,121 +832,42 @@ export default function MarketingBuilder({
         <div className="lg:col-span-4 space-y-6">
           
           {/* Saved Templates Loader Panel */}
-          <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2 mb-3">
-              <Layers className="h-4 w-4 text-teal-400" />
-              Plantillas Guardadas (Club 2026)
-            </h2>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {templatesList.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => handleLoadTemplate(t)}
-                  className="w-full text-left p-3 rounded-lg bg-slate-900/50 hover:bg-slate-700/50 border border-slate-800 hover:border-slate-600 transition-all flex items-center justify-between group"
-                >
-                  <div className="truncate">
-                    <p className="font-medium text-xs md:text-sm text-slate-200 truncate group-hover:text-white">{t.name}</p>
-                    <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400">
-                      <span className={`w-1.5 h-1.5 rounded-full ${t.type === 'email' ? 'bg-teal-400' : 'bg-emerald-400'}`}></span>
-                      <span>{t.type === 'email' ? 'Email' : 'WhatsApp'}</span>
-                      <span>•</span>
-                      <span>{t.updatedAt}</span>
-                    </div>
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-slate-500 -rotate-90 group-hover:text-slate-300 transition-transform" />
-                </button>
-              ))}
-              {templatesList.length === 0 && (
-                <p className="text-xs text-slate-500 italic text-center py-4">No hay plantillas guardadas.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Dynamic Variable Quick-Injector Panel */}
-          <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 overflow-hidden shadow-sm">
+            <button
+              onClick={() => setIsTemplatesOpen(!isTemplatesOpen)}
+              className="w-full flex items-center justify-between p-5 text-left focus:outline-none hover:bg-slate-700/30 transition-colors"
+            >
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                Variables del Club
+                <Layers className="h-4 w-4 text-teal-400" />
+                Plantillas guardadas
               </h2>
-              <div className="flex items-center gap-1 text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
-                <Info className="h-3 w-3" />
-                Reemplazo Activo
-              </div>
-            </div>
-            
-            <p className="text-xs text-slate-400 mb-4">
-              Haga clic sobre cualquier variable para inyectarla en la posición activa de su editor de {activeTab === 'email' ? 'Email (bloque seleccionado)' : 'WhatsApp'}.
-            </p>
-
-            {selectedClients && selectedClients.length > 0 && (
-              <div className="mb-4 bg-slate-900/60 p-3 rounded-lg border border-slate-700/80 space-y-2">
-                <label htmlFor="preview-client-select" className="block text-xs font-semibold text-teal-400 uppercase tracking-wider">
-                  Socio Seleccionado para Previsualizar:
-                </label>
-                <select
-                  id="preview-client-select"
-                  value={previewClientIndex}
-                  onChange={(e) => setPreviewClientIndex(parseInt(e.target.value))}
-                  className="w-full bg-slate-800 border border-slate-700 text-xs text-white rounded px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
-                >
-                  {selectedClients.map((client, idx) => (
-                    <option key={client.id || idx} value={idx}>
-                      {client.name || client.nombre || `Socio ${idx + 1}`} ({client.categoria || client.clubCategory || client.clubComercial?.categoria || 'Sin cat.'})
-                    </option>
-                  ))}
-                </select>
-                <div className="text-[10px] text-slate-400 flex justify-between">
-                  <span>{selectedClients.length} socios listos</span>
-                  <span className="text-emerald-400 font-medium">Previsualizando #{previewClientIndex + 1}</span>
-                </div>
+              <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isTemplatesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isTemplatesOpen && (
+              <div className="px-5 pb-5 space-y-2 max-h-48 overflow-y-auto pr-1 border-t border-slate-700/60 pt-4">
+                {templatesList.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleLoadTemplate(t)}
+                    className="w-full text-left p-3 rounded-lg bg-slate-900/50 hover:bg-slate-700/50 border border-slate-800 hover:border-slate-600 transition-all flex items-center justify-between group"
+                  >
+                    <div className="truncate">
+                      <p className="font-medium text-xs md:text-sm text-slate-200 truncate group-hover:text-white">{t.name}</p>
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400">
+                        <span className={`w-1.5 h-1.5 rounded-full ${t.type === 'email' ? 'bg-teal-400' : 'bg-emerald-400'}`}></span>
+                        <span>{t.type === 'email' ? 'Email' : 'WhatsApp'}</span>
+                        <span>•</span>
+                        <span>{t.updatedAt}</span>
+                      </div>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-slate-500 -rotate-90 group-hover:text-slate-300 transition-transform" />
+                  </button>
+                ))}
+                {templatesList.length === 0 && (
+                  <p className="text-xs text-slate-500 italic text-center py-4">No hay plantillas guardadas.</p>
+                )}
               </div>
             )}
-
-            <div className="grid grid-cols-1 gap-2">
-              {DYNAMIC_VARIABLES.map(v => {
-                const activeValue = currentPreviewClient 
-                  ? getClientVariableValue(currentPreviewClient, v.tag, v.mockValue) 
-                  : v.mockValue;
-                return (
-                  <button
-                    key={v.tag}
-                    onClick={() => insertVariable(v.tag)}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500/40 text-left transition-all group"
-                  >
-                    <div className="space-y-0.5">
-                      <span className="font-mono text-xs text-teal-400 font-bold bg-teal-950/80 px-1.5 py-0.5 rounded border border-teal-500/10 group-hover:border-teal-500/30">
-                        {v.tag}
-                      </span>
-                      <p className="text-[11px] text-slate-400 pl-1">{v.label}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-500 italic block">
-                        {currentPreviewClient ? 'Valor Socio:' : 'Simula:'}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-300 block max-w-[140px] truncate" title={activeValue}>
-                        {activeValue}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Simulated Data Toggle Switch */}
-            <div className="mt-4 pt-4 border-t border-slate-700/60 flex items-center justify-between">
-              <label htmlFor="toggle-mock-data" className="text-xs font-medium text-slate-300 flex flex-col cursor-pointer">
-                <span>Simular Datos del Cliente</span>
-                <span className="text-[10px] text-slate-500 font-normal">Reemplaza variables en la previsualización</span>
-              </label>
-              <button
-                id="toggle-mock-data"
-                onClick={() => setUseMockValues(!useMockValues)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${useMockValues ? 'bg-teal-600' : 'bg-slate-700'}`}
-              >
-                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useMockValues ? 'translate-x-5' : 'translate-x-0'}`} />
-              </button>
-            </div>
           </div>
 
           {/* Save/Template Form */}
@@ -1018,7 +941,7 @@ export default function MarketingBuilder({
                 className={`w-full text-white font-medium py-2 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2 ${activeTab === 'email' ? 'bg-teal-600 hover:bg-teal-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}
               >
                 <Send className="h-4 w-4" />
-                Enviar Prueba de {activeTab === 'email' ? 'Email' : 'WhatsApp'}
+                Registrar prueba en historial de clientes
               </button>
             </form>
           </div>

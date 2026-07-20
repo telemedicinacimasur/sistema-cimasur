@@ -34,7 +34,12 @@ import {
   Upload,
   FileSpreadsheet,
   FileText,
-  Lightbulb
+  Lightbulb,
+  AlertTriangle,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight
 } from 'lucide-react';
 
 import { RecordActions } from '../components/RecordActions';
@@ -42,6 +47,7 @@ import { Expediente } from '../components/Expediente';
 
 import { addNotification } from '../lib/notifications';
 import { syncStudentsToSchoolPayments } from '../lib/syncUtils';
+import { CampaignsMotor } from '../components/school/CampaignsMotor';
 
 interface EstadoAcademicoInputProps {
   studentId: string;
@@ -132,8 +138,8 @@ export default function SchoolView() {
       )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black text-white tracking-tight">Centro Académico CIMASUR</h2>
-          <p className="text-slate-400 text-sm">Ecosistema integrado de captación, formación y seguimiento.</p>
+          <h2 className="text-3xl font-black text-sky-400 tracking-tight">Centro Académico CIMASUR</h2>
+          <p className="text-sky-400 text-sm">Ecosistema integrado de captación, formación y seguimiento.</p>
         </div>
         <div className="flex bg-[#111A2E] p-1 rounded-2xl border border-[#1E293B]">
            {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('register')) && <TabButton active={activeView === 'register'} onClick={() => setActiveView('register')} icon={UserPlus}>Captación</TabButton>}
@@ -148,7 +154,7 @@ export default function SchoolView() {
         {activeView === 'register' && <ContactRegister records={data} />}
         {activeView === 'students' && <StudentManager records={data} />}
         {activeView === 'tracking' && <TrackingView />}
-        {activeView === 'commercial' && <div className="p-8 text-center text-slate-400">Motor de campañas desactivado.</div>}
+        {activeView === 'commercial' && <CampaignsMotor />}
         {activeView === 'activities' && <SchoolActivities />}
       </div>
     </div>
@@ -181,16 +187,19 @@ function ContactRegister({ records }: { records: any[] }) {
     rut: '',
     email: '',
     phone: '',
+    region: 'Sin información',
     clasificacion: 'Sin información',
     interes: 'Diplomado Homeopatía',
-    canal: 'Instagram',
+    canal: '📢 Campañas / Ads',
     estado: 'Nuevo',
+    estadoAcademico: 'En proceso',
     observaciones: '',
     montoTotalPagado: 0,
     montoTotalRecibido: 0,
+    compraAnual: 0,
     nroFactura: '',
     fechaFactura: '',
-    observacionesPago: '',
+    observacionesPago: 'Sin observaciones.',
     estadoPago: 'Pendiente'
   });
 
@@ -202,6 +211,16 @@ function ContactRegister({ records }: { records: any[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [phoneWarning, setPhoneWarning] = useState<{type: 'lead' | 'student', match: string} | null>(null);
+  const [confirmLeadId, setConfirmLeadId] = useState<string | null>(null);
+  const [showPaymentData, setShowPaymentData] = useState(false);
+
+  const [filterCanal, setFilterCanal] = useState('Todos');
+  const [filterInteres, setFilterInteres] = useState('Todos');
+  const [filterClasificacion, setFilterClasificacion] = useState('Todos');
+  const [filterEstado, setFilterEstado] = useState('Todos');
+  const [filterRegion, setFilterRegion] = useState('');
+  const [filterEstadoPago, setFilterEstadoPago] = useState('Todos');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   useEffect(() => {
     if (form.phone && form.phone.length >= 7) {
@@ -231,7 +250,16 @@ function ContactRegister({ records }: { records: any[] }) {
     const rut = safe(r.rut).toLowerCase();
     const email = safe(r.email).toLowerCase();
     const term = searchTerm.toLowerCase();
-    return name.includes(term) || rut.includes(term) || email.includes(term);
+    const matchSearch = name.includes(term) || rut.includes(term) || email.includes(term);
+
+    const matchCanal = filterCanal === 'Todos' || safe(r.canal) === filterCanal;
+    const matchInteres = filterInteres === 'Todos' || safe(r.interes) === filterInteres;
+    const matchClasificacion = filterClasificacion === 'Todos' || safe(r.clasificacion) === filterClasificacion;
+    const matchEstado = filterEstado === 'Todos' || safe(r.estado) === filterEstado;
+    const matchRegion = !filterRegion || safe(r.region).toLowerCase().includes(filterRegion.toLowerCase());
+    const matchEstadoPago = filterEstadoPago === 'Todos' || safe(r.estadoPago) === filterEstadoPago;
+
+    return matchSearch && matchCanal && matchInteres && matchClasificacion && matchEstado && matchRegion && matchEstadoPago;
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -242,7 +270,8 @@ function ContactRegister({ records }: { records: any[] }) {
         name: form.name.trim() || 'Sin Nombre (Solo WhatsApp)',
         rut: form.rut.trim() || 'No detallado',
         montoTotalPagado: form.montoTotalPagado === '' ? 0 : Number(form.montoTotalPagado),
-        montoTotalRecibido: form.montoTotalRecibido === '' ? 0 : Number(form.montoTotalRecibido)
+        montoTotalRecibido: form.montoTotalRecibido === '' ? 0 : Number(form.montoTotalRecibido),
+        compraAnual: form.compraAnual === '' ? 0 : Number(form.compraAnual)
       };
 
       console.log("Saving lead:", editingId, dataToSave);
@@ -264,17 +293,24 @@ function ContactRegister({ records }: { records: any[] }) {
       }
       window.dispatchEvent(new Event('db-change'));
       setForm({ 
-        ...form, 
+        fecha: new Date().toISOString().split('T')[0],
         name: '', 
         rut: '', 
         email: '', 
         phone: '', 
+        region: 'Sin información',
+        clasificacion: 'Sin información',
+        interes: 'Diplomado Homeopatía',
+        canal: '📢 Campañas / Ads',
+        estado: 'Nuevo',
+        estadoAcademico: 'En proceso',
         observaciones: '',
         montoTotalPagado: 0,
         montoTotalRecibido: 0,
+        compraAnual: 0,
         nroFactura: '',
         fechaFactura: '',
-        observacionesPago: '',
+        observacionesPago: 'Sin observaciones.',
         estadoPago: 'Pendiente'
       });
     } catch (error) {
@@ -428,11 +464,19 @@ function ContactRegister({ records }: { records: any[] }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-6">
+    <>
+      <div className="flex flex-col gap-8 w-full">
         <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-x-auto">
-          <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
-               <span className="flex items-center gap-2">Registro de Potenciales Alumnos</span>
+          <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4 font-bold flex items-center justify-between">
+               <button 
+                 type="button"
+                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                 className="flex items-center gap-2 text-white hover:text-[#38BDF8] transition-colors font-bold outline-none cursor-pointer"
+                 title="Haga clic para alternar filtros avanzados"
+               >
+                 <span>Registro de Potenciales Alumnos</span>
+                 {showAdvancedFilters ? <ChevronUp className="w-4 h-4 text-[#38BDF8]" /> : <ChevronDown className="w-4 h-4 text-slate-300" />}
+               </button>
                <div className="flex gap-2">
                  <input 
                    type="file" 
@@ -458,21 +502,116 @@ function ContactRegister({ records }: { records: any[] }) {
                  </button>
                </div>
             </div>
-            <div className="bg-[#152035] p-6 border-b flex justify-between items-center">
-              <input 
-                className="w-64 border rounded-full px-4 py-2 text-xs" 
-                placeholder="Buscar por nombre, RUT o email..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+            <div className="bg-[#152035] p-6 border-b flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input 
+                    className="w-full pl-10 pr-4 py-2 border border-[#1E293B] bg-[#111A2E] text-white rounded-full text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                    placeholder="Buscar por nombre, RUT o email..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              {showAdvancedFilters && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-[#111A2E] rounded-2xl border border-[#1E293B] animate-in fade-in duration-300">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Canal de Origen</label>
+                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterCanal} onChange={e => setFilterCanal(e.target.value)}>
+                      <option value="Todos">Todos</option>
+                      <option value="📢 Campañas / Ads">📢 Campañas / Ads</option>
+                      <option value="📸 Instagram">📸 Instagram</option>
+                      <option value="👥 Facebook">👥 Facebook</option>
+                      <option value="💬 WhatsApp">💬 WhatsApp</option>
+                      <option value="📞 Llamada Directa">📞 Llamada Directa</option>
+                      <option value="🤝 Recomendación">🤝 Recomendación</option>
+                      <option value="🌐 Página Web">🌐 Página Web</option>
+                      <option value="✏️ Otro">✏️ Otro</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Programa de Interés</label>
+                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterInteres} onChange={e => setFilterInteres(e.target.value)}>
+                      <option value="Todos">Todos</option>
+                      <option value="Diplomado Homeopatía">Diplomado Homeopatía</option>
+                      <option value="Diplomado en Homeopatía Veterinaria">Diplomado en Homeopatía Veterinaria</option>
+                      {PROGRAMAS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Clasificación Profesional</label>
+                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}>
+                      <option value="Todos">Todos</option>
+                      {CLASIFICACIONES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Estado Seguimiento</label>
+                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
+                      <option value="Todos">Todos</option>
+                      <option value="Nuevo">Nuevo</option>
+                      <option value="Contactado">Contactado</option>
+                      <option value="En reunión">En reunión</option>
+                      <option value="Matriculado">Matriculado</option>
+                      <option value="No interesado">No interesado</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Región / Comuna</label>
+                    <input 
+                      className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white outline-none" 
+                      placeholder="Filtrar por región o comuna..." 
+                      value={filterRegion} 
+                      onChange={e => setFilterRegion(e.target.value)} 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Estado de Pago</label>
+                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterEstadoPago} onChange={e => setFilterEstadoPago(e.target.value)}>
+                      <option value="Todos">Todos</option>
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="Pagado">Pagado</option>
+                      <option value="En cuotas">En cuotas</option>
+                      <option value="Por mensualidad">Por mensualidad</option>
+                    </select>
+                  </div>
+                  <div className="col-span-full flex justify-end">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setFilterCanal('Todos');
+                        setFilterInteres('Todos');
+                        setFilterClasificacion('Todos');
+                        setFilterEstado('Todos');
+                        setFilterRegion('');
+                        setFilterEstadoPago('Todos');
+                        setSearchTerm('');
+                      }}
+                      className="text-[10px] font-black text-red-400 hover:underline uppercase tracking-wider"
+                    >
+                      Limpiar Filtros
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
-                <FormGroup label="Fecha Registro"><input type="date" className="w-full border-b p-2" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} /></FormGroup>
-               <FormGroup label="Nombre Apellido"><input className="w-full border-b p-2 font-bold" placeholder="Opcional. Ej: Sin Nombre" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} /></FormGroup>
-               <FormGroup label="RUT Escrito"><input className="w-full border-b p-2" placeholder="Opcional." value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} /></FormGroup>
-               <FormGroup label="Email"><input type="email" className="w-full border-b p-2" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></FormGroup>
+                <FormGroup label="Fecha Registro">
+                   <input type="date" className="w-full border-b p-2 bg-[#152035] text-white outline-none" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} />
+                 </FormGroup>
+               <FormGroup label="Nombre Completo">
+                <input className="w-full border-b p-2 font-bold bg-[#152035] text-white outline-none" placeholder="fernanda" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} required />
+              </FormGroup>
+               <FormGroup label="RUT / ID">
+                <input className="w-full border-b p-2 bg-[#152035] text-white outline-none" placeholder="201564425" value={form.rut || ''} onChange={e => setForm({...form, rut: e.target.value})} required />
+              </FormGroup>
+               <FormGroup label="Correo Electrónico">
+                <input type="email" className="w-full border-b p-2 bg-[#152035] text-white outline-none" placeholder="admin@cimasur.cl" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} />
+              </FormGroup>
                <FormGroup label="Teléfono / WhatsApp">
-                  <input className={cn("w-full border-b p-2 font-bold", phoneWarning ? "border-amber-500 text-amber-600 bg-amber-50/50" : "")} placeholder="Requerido. Ej: +569..." value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} required />
+                  <input className={cn("w-full border-b p-2 font-bold bg-[#152035] text-white outline-none", phoneWarning ? "border-amber-500 text-amber-600 bg-amber-50/50" : "")} placeholder="957414102" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} required />
                   {phoneWarning && (
                       <p className="text-[10px] uppercase font-black text-amber-600 mt-1.5 flex items-center gap-1">
                           ⚠️ ALERTA: FONO YA INSCRITO CÓMO {phoneWarning.type === 'student' ? 'ALUMNO' : 'LEAD'} ({phoneWarning.match})
@@ -480,35 +619,86 @@ function ContactRegister({ records }: { records: any[] }) {
                   )}
                </FormGroup>
                
-               <FormGroup label="CLASIFICACIÓN PROFESIONAL">
+               <FormGroup label="Región / Comuna">
+                  <input className="w-full border-b p-2 bg-[#152035] text-white outline-none" placeholder="Sin información" value={form.region || ''} onChange={e => setForm({...form, region: e.target.value})} />
+                </FormGroup>
+
+                <FormGroup label="Estado Académico">
+                  <select className="w-full border-b p-2 text-sm font-bold bg-[#152035] text-white outline-none cursor-pointer" value={form.estadoAcademico || 'En proceso'} onChange={e => setForm({...form, estadoAcademico: e.target.value})}>
+                    <option value="Pendiente">🟡 Pendiente</option>
+                    <option value="En proceso">🔵 En proceso</option>
+                    <option value="Terminado">💚 Terminado</option>
+                  </select>
+                </FormGroup>
+
+                <FormGroup label="Cómo llegó (Canal de Origen)">
+                  <select className="w-full border-b p-2 text-sm bg-[#152035] text-white outline-none cursor-pointer font-bold" value={form.canal || ''} onChange={e => setForm({...form, canal: e.target.value})}>
+                    <option value="📢 Campañas / Ads">📢 Campañas / Ads</option>
+                    <option value="📸 Instagram">📸 Instagram</option>
+                    <option value="👥 Facebook">👥 Facebook</option>
+                    <option value="💬 WhatsApp">💬 WhatsApp</option>
+                    <option value="📞 Llamada Directa">📞 Llamada Directa</option>
+                    <option value="🤝 Recomendación">🤝 Recomendación</option>
+                    <option value="🌐 Página Web">🌐 Página Web</option>
+                    <option value="✏️ Otro">✏️ Otro</option>
+                  </select>
+                </FormGroup>
+
+                <FormGroup label="CLASIFICACIÓN PROFESIONAL">
                   <select className="w-full border-b p-2 text-sm font-bold text-[#38BDF8]" value={form.clasificacion || ''} onChange={e => setForm({...form, clasificacion: e.target.value})}>
                     {CLASIFICACIONES.map(c => <option key={c}>{c}</option>)}
                   </select>
                </FormGroup>
 
-               <FormGroup label="Programa de Interés">
-                  <select className="w-full border-b p-2 text-sm" value={form.interes || ''} onChange={e => setForm({...form, interes: e.target.value})}>
-                    {PROGRAMAS.map(p => <option key={p}>{p}</option>)}
+               <FormGroup label="Programa o Diplomado">
+                  <select className="w-full border-b p-2 text-sm bg-[#152035] text-white outline-none cursor-pointer font-bold" value={form.interes || ''} onChange={e => setForm({...form, interes: e.target.value})}>
+                    <option value="Diplomado Homeopatía">Diplomado Homeopatía</option>
+                    <option value="Diplomado en Homeopatía Veterinaria">Diplomado en Homeopatía Veterinaria</option>
+                    {PROGRAMAS.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                </FormGroup>
 
-               <div className="col-span-full">
-                  <FormGroup label="Observaciones de seguimiento">
+               <>
+                  <FormGroup label="Arancel Total (Monto de Venta)">
+                  <input type="number" className="w-full border-b p-2 font-mono bg-[#152035] text-white outline-none" placeholder="200000" value={form.montoTotalPagado || ''} onChange={e => setForm({...form, montoTotalPagado: e.target.value})} />
+                </FormGroup>
+
+                <FormGroup label="Monto Recibido (Neto en Cuenta)">
+                  <input type="number" className="w-full border-b p-2 font-black text-emerald-600 bg-emerald-50 rounded" placeholder="200000" value={form.montoTotalRecibido || ''} onChange={e => setForm({...form, montoTotalRecibido: e.target.value})} />
+                </FormGroup>
+
+                <FormGroup label="Compra Anual Acumulada ($)">
+                  <input type="number" className="w-full border-b p-2 font-mono text-amber-400 bg-[#152035] outline-none" placeholder="0" value={form.compraAnual || ''} onChange={e => setForm({...form, compraAnual: e.target.value})} />
+                </FormGroup>
+
+                <div className="col-span-full">
+                  <FormGroup label="Observación Pago / Cobranza">
+                    <input className="w-full border-b p-2 italic bg-[#152035] text-white outline-none" placeholder="Sin observaciones." value={form.observacionesPago || ''} onChange={e => setForm({...form, observacionesPago: e.target.value})} />
+                  </FormGroup>
+                </div>
+
+                <div className="col-span-full"><FormGroup label="Observaciones de seguimiento">
                     <textarea className="w-full border rounded-2xl p-4 h-24 bg-[#152035] outline-none focus:bg-[#152035]" value={form.observaciones || ''} onChange={e => setForm({...form, observaciones: e.target.value})} />
                   </FormGroup>
-               </div>
+               </div></>
                
                <div className="col-span-full border-t border-[#1E293B] mt-4 pt-6">
-                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Datos de Matrícula / Pago</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                     <FormGroup label="Total de Venta (Opcional)"><input type="number" className="w-full border-b p-2" value={form.montoTotalPagado ?? ''} onChange={e => setForm({...form, montoTotalPagado: e.target.value})} /></FormGroup>
-                     <FormGroup label="Monto Recibido"><input type="number" className="w-full border-b p-2 font-black text-emerald-600 bg-emerald-50 rounded" value={form.montoTotalRecibido ?? ''} onChange={e => setForm({...form, montoTotalRecibido: e.target.value})} /></FormGroup>
-                     <FormGroup label="N° Factura"><input className="w-full border-b p-2" value={form.nroFactura || ''} onChange={e => setForm({...form, nroFactura: e.target.value})} /></FormGroup>
-                     <FormGroup label="Fecha Factura"><input type="date" className="w-full border-b p-2" value={form.fechaFactura || ''} onChange={e => setForm({...form, fechaFactura: e.target.value})} /></FormGroup>
-                     <div className="col-span-1 md:col-span-4">
-                        <FormGroup label="Observación Pago"><input className="w-full border-b p-2 italic" value={form.observacionesPago || ''} onChange={e => setForm({...form, observacionesPago: e.target.value})} placeholder="Ej: Pago total del diplomado..." /></FormGroup>
-                     </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Facturación (Opcional)</h4>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPaymentData(!showPaymentData)} 
+                      className="text-[10px] bg-[#111A2E] border border-[#1E293B] px-3 py-1.5 rounded-lg text-sky-400 hover:text-sky-300 font-bold uppercase tracking-widest"
+                    >
+                      {showPaymentData ? 'Ocultar Facturación' : 'Mostrar Facturación'}
+                    </button>
                   </div>
+                  {showPaymentData && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-300">
+                       <FormGroup label="N° Factura"><input className="w-full border-b p-2 bg-[#152035] text-white outline-none" value={form.nroFactura || ''} onChange={e => setForm({...form, nroFactura: e.target.value})} /></FormGroup>
+                       <FormGroup label="Fecha Factura"><input type="date" className="w-full border-b p-2 bg-[#152035] text-white outline-none" value={form.fechaFactura || ''} onChange={e => setForm({...form, fechaFactura: e.target.value})} /></FormGroup>
+                    </div>
+                  )}
                </div>
                
                <div className="col-span-full flex gap-3">
@@ -706,10 +896,32 @@ function ContactRegister({ records }: { records: any[] }) {
                               fechaPago: new Date().toISOString().split('T')[0]
                             });
                           }}
-                          className="bg-[#111A2E] p-1.5 rounded hover:bg-amber-100 hover:text-amber-700 transition-colors"
-                          title="Mover a Estudiante"
+                          className="text-amber-400 group-hover:text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-[#111A2E] p-1.5 rounded"
+                          title="Pasar a Alumno"
                         >
-                          <ArrowRight className="w-3 h-3" />
+                          <GraduationCap className="w-3 h-3" /> Pasar a Alumno
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if (true) {
+                              await localDB.saveToCollection('contacts', {
+                                name: r.name,
+                                rut: r.rut,
+                                email: r.email,
+                                phone: r.phone,
+                                type: 'Lead',
+                                origin: 'Escuela CIMASUR',
+                                date: new Date().toISOString()
+                              });
+                              await localDB.deleteFromCollection('school_leads', r.id);
+                              window.dispatchEvent(new Event('db-change'));
+                              alert('Transferido a Leads (CRM General)');
+                            }
+                          }}
+                          className="text-emerald-400 group-hover:text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-[#111A2E] p-1.5 rounded"
+                          title="Pasar a Leads (CRM)"
+                        >
+                          <UserPlus className="w-3 h-3" /> Pasar a Leads
                         </button>
                         <RecordActions 
                           module="school"
@@ -736,7 +948,7 @@ function ContactRegister({ records }: { records: any[] }) {
             </div>
          </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -750,6 +962,41 @@ function StudentManager({ records }: { records: any[] }) {
   const [filterPago, setFilterPago] = useState('Todos');
   const [filterEstadoAcademico, setFilterEstadoAcademico] = useState('Todos');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({
+    'DIPLOMADO': true,
+    'MODULOS': false,
+    'TALLERES': false,
+    'CLASES INDIVIDUALES': false,
+    'CASOS CLINICOS': false,
+    'OTRAS MODALIDADES': false,
+  });
+
+  const categoriesList = [
+    'DIPLOMADO',
+    'MODULOS',
+    'TALLERES',
+    'CLASES INDIVIDUALES',
+    'CASOS CLINICOS',
+    'OTRAS MODALIDADES'
+  ];
+
+  const getStudentCategory = (diplomadoName: string): string => {
+    const name = (diplomadoName || '').toLowerCase();
+    if (name.includes('diplomado')) {
+      return 'DIPLOMADO';
+    } else if (name.includes('módulo') || name.includes('modulo')) {
+      return 'MODULOS';
+    } else if (name.includes('taller')) {
+      return 'TALLERES';
+    } else if (name.includes('clase individual') || name.includes('clase única') || name.includes('clase unica') || name.includes('clases')) {
+      return 'CLASES INDIVIDUALES';
+    } else if (name.includes('caso clínico') || name.includes('caso clinico') || name.includes('casos')) {
+      return 'CASOS CLINICOS';
+    } else {
+      return 'OTRAS MODALIDADES';
+    }
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -904,6 +1151,7 @@ function StudentManager({ records }: { records: any[] }) {
           historialUnificado: selectedStudent.observacionesAcademicas || '[SISTEMA] Sin registros académicos.'
         }}
         showIntranet={false}
+        isStudentMode={true}
         showComuna={false}
         onClose={() => setSelectedStudent(null)}
         onUpdate={handleSaveAndAddNote}
@@ -1044,112 +1292,170 @@ function StudentManager({ records }: { records: any[] }) {
               </div>
            </div>
         </div>
-        <table className="w-full text-sm">
-           <thead>
-              <tr className="bg-[#152035]/50 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
-                 <th className="p-5 w-10">
-                   <input 
-                     type="checkbox"
-                     className="rounded"
-                     checked={selectedIds.length > 0 && selectedIds.length === filteredRecords.length}
-                     onChange={() => toggleSelectAll(filteredRecords)}
-                   />
-                 </th>
-                 <th className="p-5">Estudiante</th>
-                 <th className="p-5">Curso / Diplomado</th>
-                 <th className="p-5">Estado Pago</th>
-                 <th className="p-5">Fecha Pago</th>
-                 <th className="p-5 text-center">Avance</th>
-                 <th className="p-5 text-center">Estado Académico</th>
-                 <th className="p-5 text-right">Acciones</th>
-              </tr>
-           </thead>
-           <tbody className="divide-y divide-slate-200">
-              {filteredRecords.map(s => (
-                <tr key={s.id} className="hover:bg-[#1E293B]/50 transition-colors">
-                   <td className="p-5">
-                     <input 
-                       type="checkbox"
-                       className="rounded"
-                       checked={selectedIds.includes(s.id)}
-                       onChange={() => toggleSelect(s.id)}
-                     />
-                   </td>
-                   <td className="p-5">
-                      <div className="font-bold text-white">{safe(s.name)}</div>
-                      <div className="text-[10px] text-slate-400 font-mono italic">{safe(s.clasificacion)}</div>
-                   </td>
-                   <td className="p-5 font-medium">{safe(s.diplomado) || 'Diplomado Homeopatía'}</td>
-                   <td className="p-5">
-                      <span className={cn(
-                        "px-3 py-1 rounded text-[9px] font-black uppercase border",
-                        safe(s.pago) === 'Al Día' ? "bg-green-50 text-green-700 border-green-100" : (safe(s.pago)?.includes('Pago') ? "bg-blue-50 text-blue-700 border-blue-100" : "bg-amber-50 text-amber-700 border-amber-100")
-                      )}>{safe(s.pago) || 'Al Día'}</span>
-                   </td>
-                   <td className="p-5 text-[10px] font-bold text-slate-400">
-                      📅 {s.fechaPago ? formatDate(s.fechaPago) : '---'}
-                   </td>
-                   <td className="p-5">
-                      <div className="flex flex-col items-center gap-1">
-                         <div className="w-24 h-1.5 bg-slate-700 rounded-full overflow-hidden shadow-inner">
-                            <div className="h-full bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)]" style={{ width: `${s.avance || 0}%` }} />
-                         </div>
-                         <span className="text-[10px] font-black text-emerald-400">{s.avance || 0}%</span>
+        <div className="divide-y divide-[#1E293B] border-t border-[#1E293B]">
+          {categoriesList.map(cat => {
+            const catRecords = filteredRecords.filter(r => getStudentCategory(r.diplomado) === cat);
+            const isExpanded = !!expandedCats[cat];
+            const isAllSelectedInCat = catRecords.length > 0 && catRecords.every(r => selectedIds.includes(r.id));
+            
+            const toggleSelectAllInCat = () => {
+              if (isAllSelectedInCat) {
+                const catIds = catRecords.map(r => r.id);
+                setSelectedIds(prev => prev.filter(id => !catIds.includes(id)));
+              } else {
+                const catIds = catRecords.map(r => r.id);
+                setSelectedIds(prev => Array.from(new Set([...prev, ...catIds])));
+              }
+            };
+
+            return (
+              <div key={cat} className="bg-[#152035]/20">
+                {/* Category Header (Desplegable) */}
+                <button
+                  type="button"
+                  onClick={() => setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }))}
+                  className="w-full bg-[#152035] hover:bg-[#1C2C4E] p-4 flex justify-between items-center transition-all outline-none border-b border-[#1E293B]"
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    <span className="font-bold text-xs text-slate-200 tracking-wider">
+                      {cat === 'DIPLOMADO' ? '🎓 DIPLOMADOS' :
+                       cat === 'MODULOS' ? '📚 MÓDULOS' :
+                       cat === 'TALLERES' ? '🛠️ TALLERES' :
+                       cat === 'CLASES INDIVIDUALES' ? '👤 CLASES INDIVIDUALES' :
+                       cat === 'CASOS CLINICOS' ? '🏥 CASOS CLÍNICOS' :
+                       '🌐 OTRAS MODALIDADES'}
+                    </span>
+                    <span className="bg-[#1E3A5F]/40 text-[#38BDF8] border border-[#1E293B] px-2.5 py-0.5 rounded-full text-[10px] font-bold">
+                      {catRecords.length} {catRecords.length === 1 ? 'Alumno' : 'Alumnos'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#38BDF8] hover:underline font-bold">
+                    {isExpanded ? 'Contraer' : 'Expandir'}
+                  </span>
+                </button>
+
+                {/* Category Table */}
+                {isExpanded && (
+                  <div className="overflow-x-auto bg-[#111A2E]/40">
+                    {catRecords.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-slate-500 italic">
+                        No hay alumnos registrados en esta modalidad.
                       </div>
-                   </td>
-                   <td className="p-5 text-center">
-                      <EstadoAcademicoInput studentId={s.id} initialValue={s.estadoAcademico || ''} />
-                   </td>
-                   <td className="p-5 text-right">
-                       <div className="flex items-center justify-end gap-3">
-                         <button 
-                             onClick={() => {
-                               const studentData = [
-                                 { label: 'Nombre', value: s.name },
-                                 { label: 'RUT', value: s.rut },
-                                 { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
-                                 { label: 'Estado Académico', value: s.estadoAcademico || 'En proceso' },
-                                 { label: 'Estado Pago', value: s.pago || 'Al Día' },
-                                 { label: 'Avance', value: (s.avance || 0).toString() + '%' },
-                                 { label: 'Ficha Académica', value: s.observacionesAcademicas || '' }
-                               ];
-                               viewExpedienteInNewTab('Expediente Académico: Alumno', studentData, `expediente_${s.name.replace(/\s+/g, '_')}`);
-                             }}
-                             className="text-amber-600 hover:text-amber-800" 
-                             title="Expediente (Ver en nueva pestaña)"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                         <button 
-                             onClick={() => {
-                               const studentData = [
-                                 { label: 'Nombre', value: s.name },
-                                 { label: 'RUT', value: s.rut },
-                                 { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
-                                 { label: 'Estado Académico', value: s.estadoAcademico || 'En proceso' },
-                                 { label: 'Estado Pago', value: s.pago || 'Al Día' },
-                                 { label: 'Avance', value: (s.avance || 0).toString() + '%' }
-                               ];
-                               exportExpedienteToPDF('Ficha: Alumno', studentData, `alumno_${s.name.replace(/\s+/g, '_')}`);
-                             }}
-                             className="text-[#38BDF8] hover:text-white" 
-                             title="PDF"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            onClick={() => setSelectedStudent(s)}
-                            className="text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1"
-                          >
-                             <FileText className="w-3 h-3" /> Ver Expediente
-                          </button>
-                          <RecordActions module="school" onDelete={async () => { await localDB.deleteFromCollection('students', s.id); window.dispatchEvent(new Event('db-change')); }} />
-                       </div>
-                    </td>
-                </tr>
-              ))}
-           </tbody>
-        </table>
+                    ) : (
+                      <table className="w-full text-sm">
+                         <thead>
+                            <tr className="bg-[#152035]/60 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-[#1E293B]">
+                               <th className="p-4 w-10">
+                                 <input 
+                                   type="checkbox"
+                                   className="rounded bg-[#152035] border-[#1E293B]"
+                                   checked={isAllSelectedInCat}
+                                   onChange={toggleSelectAllInCat}
+                                 />
+                               </th>
+                               <th className="p-4">Estudiante</th>
+                               <th className="p-4">Curso / Diplomado</th>
+                               <th className="p-4">Estado Pago</th>
+                               <th className="p-4">Fecha Pago</th>
+                               <th className="p-4 text-center">Avance</th>
+                               <th className="p-4 text-center">Estado Académico</th>
+                               <th className="p-4 text-right">Acciones</th>
+                            </tr>
+                         </thead>
+                         <tbody className="divide-y divide-[#1E293B]">
+                            {catRecords.map(s => (
+                              <tr key={s.id} className="hover:bg-[#1E293B]/40 transition-colors">
+                                 <td className="p-4">
+                                   <input 
+                                     type="checkbox"
+                                     className="rounded bg-[#152035] border-[#1E293B]"
+                                     checked={selectedIds.includes(s.id)}
+                                     onChange={() => toggleSelect(s.id)}
+                                   />
+                                 </td>
+                                 <td className="p-4">
+                                    <div className="font-bold text-white text-xs">{safe(s.name)}</div>
+                                    <div className="text-[9px] text-slate-400 font-mono italic">{safe(s.clasificacion)}</div>
+                                 </td>
+                                 <td className="p-4 text-xs font-medium text-slate-300">{safe(s.diplomado) || 'Diplomado Homeopatía'}</td>
+                                 <td className="p-4">
+                                    <span className={cn(
+                                      "px-2.5 py-0.5 rounded text-[8px] font-black uppercase border",
+                                      safe(s.pago) === 'Al Día' ? "bg-green-950/40 text-green-400 border-green-900" : (safe(s.pago)?.includes('Pago') ? "bg-blue-950/40 text-blue-400 border-blue-900" : "bg-amber-950/40 text-amber-400 border-amber-900")
+                                    )}>{safe(s.pago) || 'Al Día'}</span>
+                                 </td>
+                                 <td className="p-4 text-[9px] font-bold text-slate-400">
+                                    📅 {s.fechaPago ? formatDate(s.fechaPago) : '---'}
+                                 </td>
+                                 <td className="p-4">
+                                    <div className="flex flex-col items-center gap-1">
+                                       <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                                          <div className="h-full bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)]" style={{ width: `${s.avance || 0}%` }} />
+                                       </div>
+                                       <span className="text-[9px] font-black text-emerald-400">{s.avance || 0}%</span>
+                                    </div>
+                                 </td>
+                                 <td className="p-4 text-center">
+                                    <EstadoAcademicoInput studentId={s.id} initialValue={s.estadoAcademico || ''} />
+                                 </td>
+                                 <td className="p-4 text-right">
+                                     <div className="flex items-center justify-end gap-2.5">
+                                       <button 
+                                           onClick={() => {
+                                             const studentData = [
+                                               { label: 'Nombre', value: s.name },
+                                               { label: 'RUT', value: s.rut },
+                                               { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
+                                               { label: 'Estado Académico', value: s.estadoAcademico || 'En proceso' },
+                                               { label: 'Estado Pago', value: s.pago || 'Al Día' },
+                                               { label: 'Avance', value: (s.avance || 0).toString() + '%' },
+                                               { label: 'Ficha Académica', value: s.observacionesAcademicas || '' }
+                                             ];
+                                             viewExpedienteInNewTab('Expediente Académico: Alumno', studentData, `expediente_${s.name.replace(/\s+/g, '_')}`);
+                                           }}
+                                           className="text-amber-500 hover:text-amber-400 transition-colors" 
+                                           title="Expediente (Ver en nueva pestaña)"
+                                        >
+                                          <FileText className="w-3.5 h-3.5" />
+                                        </button>
+                                       <button 
+                                           onClick={() => {
+                                             const studentData = [
+                                               { label: 'Nombre', value: s.name },
+                                               { label: 'RUT', value: s.rut },
+                                               { label: 'Curso/Diplomado', value: s.diplomado || 'Diplomado Homeopatía' },
+                                               { label: 'Estado Académico', value: s.estadoAcademico || 'En proceso' },
+                                               { label: 'Estado Pago', value: s.pago || 'Al Día' },
+                                               { label: 'Avance', value: (s.avance || 0).toString() + '%' }
+                                             ];
+                                             exportExpedienteToPDF('Ficha: Alumno', studentData, `alumno_${s.name.replace(/\s+/g, '_')}`);
+                                           }}
+                                           className="text-[#38BDF8] hover:text-white transition-colors" 
+                                           title="PDF"
+                                        >
+                                          <Download className="w-3 h-3" />
+                                        </button>
+                                        <button 
+                                          onClick={() => setSelectedStudent(s)}
+                                          className="text-[#38BDF8] hover:underline font-bold text-[8px] uppercase tracking-widest flex items-center gap-1 bg-[#152035] px-2 py-0.5 rounded border border-[#1E293B]"
+                                        >
+                                           <FileText className="w-2.5 h-2.5" /> Expediente
+                                        </button>
+                                        <RecordActions module="school" onDelete={async () => { await localDB.deleteFromCollection('students', s.id); window.dispatchEvent(new Event('db-change')); }} />
+                                     </div>
+                                  </td>
+                              </tr>
+                            ))}
+                         </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-1 gap-6">

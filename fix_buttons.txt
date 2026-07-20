@@ -1,0 +1,40 @@
+                        <button 
+                          onClick={() => {
+                            setSelectedLead(r);
+                            setTransferPaymentForm({
+                              montoTotalPagado: r.montoTotalPagado || 0,
+                              montoTotalRecibido: r.montoTotalRecibido || 0,
+                              nroFactura: r.nroFactura || '',
+                              fechaFactura: r.fechaFactura || '',
+                              observaciones: r.observacionesPago || '',
+                              estadoPago: r.estadoPago || 'Pendiente',
+                              fechaPago: new Date().toISOString().split('T')[0]
+                            });
+                          }}
+                          className="text-amber-400 group-hover:text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-[#111A2E] p-1.5 rounded"
+                          title="Pasar a Alumno"
+                        >
+                          <GraduationCap className="w-3 h-3" /> Pasar a Alumno
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if (window.confirm(`¿Desea transferir a ${r.name} al CRM general como Lead (sin interacción)?`)) {
+                              await localDB.saveToCollection('contacts', {
+                                name: r.name,
+                                rut: r.rut,
+                                email: r.email,
+                                phone: r.phone,
+                                type: 'Lead',
+                                origin: 'Escuela CIMASUR',
+                                date: new Date().toISOString()
+                              });
+                              await localDB.deleteFromCollection('school_leads', r.id);
+                              window.dispatchEvent(new Event('db-change'));
+                              alert('Transferido a Leads (CRM General)');
+                            }
+                          }}
+                          className="text-emerald-400 group-hover:text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-[#111A2E] p-1.5 rounded"
+                          title="Pasar a Leads (CRM)"
+                        >
+                          <UserPlus className="w-3 h-3" /> Pasar a Leads
+                        </button>

@@ -2511,18 +2511,6 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
 
           await localDB.saveToCollection('lab_records', newRecord);
 
-          // Sincronizar con Stock - SIEMPRE crea nuevo para permitir "duplicados" (lotes distintos/asientos separados)
-          try {
-            await localDB.saveToCollection('inventory', {
-              area: 'Insumos Varios',
-              item: newRecord.nombre,
-              code: newRecord.codigoCimasur,
-              qty: parseInt(newRecord.cantidad) || 0,
-              lote: newRecord.lote,
-              vencimiento: newRecord.vencimiento
-            });
-          } catch (err) { console.error("Stock sync error:", err); }
-
           importedCount++;
           if (importedCount % 20 === 0) await new Promise(r => setTimeout(r, 10));
         }
@@ -2553,23 +2541,8 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
       } else {
         await localDB.saveToCollection('lab_records', { ...form, type: 'insumos' });
         await addAuditLog(user, `Registró Insumo: ${form.nombre}`, 'Laboratorio');
-        
-        // Sincronizar automáticamente con el Stock (Inventario)
-        // Permitir duplicados en inventario (asientos distintos por registro de insumo)
-        try {
-          await localDB.saveToCollection('inventory', {
-            area: 'Insumos Varios',
-            item: form.nombre,
-            code: form.codigoCimasur,
-            qty: parseInt(form.cantidad) || 0,
-            lote: form.lote,
-            vencimiento: form.vencimiento
-          });
-        } catch (err) {
-          console.error("Error syncing to stock:", err);
-        }
 
-        alert('Insumo / Materia Prima registrado exitosamente (Sincronizado con Inventario)');
+        alert('Insumo / Materia Prima registrado exitosamente');
       }
       const updated = await localDB.getCollection('lab_records');
       setRecords(updated);

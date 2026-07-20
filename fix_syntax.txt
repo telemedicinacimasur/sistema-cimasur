@@ -1,0 +1,3 @@
+          {isStudentMode && (
+          <div className="bg-[#121b2d] rounded-2xl border border-[#1e293b]/70 p-6 space-y-5">
+            {/* AVANCE CURRICULAR (MANUAL PERCENTAGE & ENTIRELY WRITABLE CLASS LIST) */}

@@ -165,11 +165,13 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'list', label: 'Cartera de Clientes' },
     { id: 'activities', label: 'Registro de Actividades' },
     { id: 'intranet', label: 'Clientes Intranet' },
-    { id: 'smart', label: 'Motor Comercial' }
+    { id: 'smart', label: 'Motor Comercial' },
+    { id: 'consignacion', label: 'Ventas en Consignación' }
   ],
   gestion: [
     { id: 'register', label: 'Ingreso de Cliente' },
-    { id: 'list', label: 'Gestión de Clientes' }
+    { id: 'list', label: 'Gestión de Clientes' },
+    { id: 'consignacion', label: 'Ventas en Consignación' }
   ],
   school: [
     { id: 'register', label: 'Motor Comercial Lead' },
@@ -192,7 +194,8 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'mantenimiento', label: 'Mantenimiento Equipos' },
     { id: 'magistrales', label: 'Fórmulas Magistrales' },
     { id: 'tracking', label: 'Tracking Laboratorio' },
-    { id: 'diluciones-db', label: 'Códigos y Diluciones' }
+    { id: 'diluciones-db', label: 'Códigos y Diluciones' },
+    { id: 'consignacion', label: 'Ventas en Consignación' }
   ],
   manager: [
     { id: 'menu', label: 'Dashboard Principal' },
@@ -206,7 +209,8 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'codigos_y_diluciones', label: 'Códigos y Diluciones' },
     { id: 'resumen_ventas', label: 'Resumen de Ventas' },
     { id: 'presupuesto_flujo', label: 'Presupuesto y Flujo' },
-    { id: 'inventory', label: 'Inventario Master' }
+    { id: 'inventory', label: 'Inventario Master' },
+    { id: 'consignacion', label: 'Ventas en Consignación' }
   ]
 };
 

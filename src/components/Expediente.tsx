@@ -40,6 +40,7 @@ export interface ExpedienteProps {
   showComuna?: boolean;
   extraTransferFields?: React.ReactNode;
   customForm?: React.ReactNode;
+  isStudentMode?: boolean;
 }
 
 export const Expediente: React.FC<ExpedienteProps> = ({
@@ -60,7 +61,8 @@ export const Expediente: React.FC<ExpedienteProps> = ({
   comunaLabel = 'Comuna',
   showComuna = true,
   extraTransferFields,
-  customForm
+  customForm,
+  isStudentMode = false
 }) => {
   const [isEditingData, setIsEditingData] = useState(false);
   const [editForm, setEditForm] = useState(selectedClient);
@@ -94,6 +96,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
   // Input states for writing modules/classes/workshops manually
   const [newModName, setNewModName] = useState('');
   const [newModDur, setNewModDur] = useState('10 Horas');
+  const [newModCategory, setNewModCategory] = useState('Diplomado Completo');
 
   useEffect(() => {
     setEditForm(selectedClient);
@@ -201,6 +204,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     const newModuleObj = {
       id: newId,
       name: newModName.trim(),
+      categoria: newModCategory,
       duracion: newModDur.trim() || 'Variable',
       estado: 'No Iniciado'
     };
@@ -763,9 +767,9 @@ export const Expediente: React.FC<ExpedienteProps> = ({
               </div>
             )}
           </div>
-
-          {/* AVANCE CURRICULAR (MANUAL PERCENTAGE & ENTIRELY WRITABLE CLASS LIST) */}
+          {isStudentMode && (
           <div className="bg-[#121b2d] rounded-2xl border border-[#1e293b]/70 p-6 space-y-5">
+            {/* AVANCE CURRICULAR (MANUAL PERCENTAGE & ENTIRELY WRITABLE CLASS LIST) */}
             
             {/* Header with Title and Value */}
             <div className="flex justify-between items-center border-b border-[#1e293b] pb-3">
@@ -844,10 +848,23 @@ export const Expediente: React.FC<ExpedienteProps> = ({
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div className="sm:col-span-12">
+                  <select 
+                    className="w-full bg-[#10192e] border border-[#1e293b] text-xs font-bold text-sky-300 rounded-lg p-2.5 outline-none focus:border-emerald-500"
+                    value={newModCategory}
+                    onChange={e => setNewModCategory(e.target.value)}
+                  >
+                    <option value="Diplomado Completo">Diplomado Completo</option>
+                    <option value="Módulos Individuales">Módulos Individuales</option>
+                    <option value="Talleres">Talleres</option>
+                    <option value="Clases">Clases</option>
+                    <option value="Casos Clínicos">Casos Clínicos</option>
+                  </select>
+                </div>
                 <div className="sm:col-span-8">
                   <input 
                     type="text"
-                    placeholder="Escriba el nombre del Taller o Clase..." 
+                    placeholder="Escriba el nombre de la unidad..." 
                     className="w-full bg-[#10192e] border border-[#1e293b] text-xs font-bold text-white rounded-lg p-2.5 outline-none focus:border-emerald-500"
                     value={newModName}
                     onChange={e => setNewModName(e.target.value)}
@@ -904,7 +921,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
                         </span>
                         <div className="min-w-0">
                           <p className="text-[11px] font-bold text-slate-100 truncate">{m.name}</p>
-                          <p className="text-[9px] text-slate-400 font-bold font-mono uppercase mt-0.5 tracking-wider">Duración: {m.duracion}</p>
+                          <p className="text-[9px] text-slate-400 font-bold font-mono uppercase mt-0.5 tracking-wider">Duración: {m.duracion} {m.categoria ? `| ${m.categoria}` : ""}</p>
                         </div>
                       </div>
 
@@ -943,6 +960,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
               </div>
             </div>
           </div>
+          )}
 
         </div>
 

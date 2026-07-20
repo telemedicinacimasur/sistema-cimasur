@@ -39,7 +39,6 @@ import { addNotification } from '../lib/notifications';
 import { CimasurCRM } from '../components/crm/CimasurCRM';
 import { CRMLayout } from '../components/crm/CRMLayout';
 import { CommercialDashboard } from '../modules/crm/CommercialDashboard';
-import { IAComercialView } from '../components/crm/IAComercialView';
 import { AgendaView } from '../components/crm/AgendaView';
 import { ConfigView } from '../components/crm/ConfigView';
 import { BenefitsProvider } from '../context/BenefitsContext';
@@ -491,13 +490,11 @@ export default function CRMView() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('clientes');
   
   const tabs = [
-    { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'clientes', label: '👥 Clientes' },
     { id: 'campanas', label: '📧 Campañas' },
-    { id: 'ia', label: '🤖 Asistente IA CIMASUR' },
     { id: 'fidelizacion', label: '👑 Club Comercial' },
     { id: 'registro_campanas', label: '📈 Registro de Campañas Internas' },
   ];
@@ -534,16 +531,6 @@ export default function CRMView() {
         </div>
         
         <div className="flex-1 overflow-auto">
-          {activeTab === 'dashboard' && (
-            <CommercialDashboard 
-              dashboardData={dashboardData} 
-              onViewClient={(id) => setSelectedClientId(id)} 
-              onDesignInEditor={(client, reason) => {
-                setPreloadedTemplate(`Asunto: Campaña para ${client.customerName}\n\nEstimado/a ${client.customerName},\n\nMotivo: ${reason}\n\n[Personalice su mensaje aquí]`);
-                setActiveTab('campanas');
-              }}
-            />
-          )}
           {activeTab === 'clientes' && (
             <div className="flex flex-col h-full space-y-4 p-4 animate-in fade-in duration-300">
               <div className="flex bg-[#111A2E] p-1.5 rounded-xl border border-[#1E293B] self-start space-x-1.5 shadow-md">
@@ -602,17 +589,6 @@ export default function CRMView() {
               clearPreloadedTemplate={() => {
                 setPreloadedTemplate(null);
                 setPreloadedClientIds([]);
-              }}
-            />
-          )}
-          {activeTab === 'ia' && (
-            <IAComercialView 
-              dashboardData={dashboardData} 
-              onViewClient={(id) => setSelectedClientId(id)} 
-              onNavigateToEditor={(text, clientIds = []) => {
-                setPreloadedTemplate(text);
-                setPreloadedClientIds(clientIds);
-                setActiveTab('campanas');
               }}
             />
           )}

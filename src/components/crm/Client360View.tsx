@@ -8,7 +8,7 @@ import {
   Edit3, Save, Activity, DollarSign, Gift, Layers, Brain, Megaphone, Check,
   Zap, ClipboardList, Stethoscope, Hash, Target, ClipboardCheck, Edit2
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Client360Props {
   clientId: string;
@@ -19,7 +19,7 @@ interface Client360Props {
 export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onSave }) => {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<string>('gestion');
+  const [activeTab, setActiveTab] = useState<string>('general');
   const [selectedClubYear, setSelectedClubYear] = useState<string>('2026');
   const [targetCategory, setTargetCategory] = useState<string>('Plata');
 
@@ -53,6 +53,9 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [contacts, setContacts] = useState<any[]>([]);
   const [veterinarios, setVeterinarios] = useState<any[]>([]);
   const [bitacora, setBitacora] = useState<any[]>([]);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editingEntryText, setEditingEntryText] = useState<string>('');
+  const [deletingSystemEntry, setDeletingSystemEntry] = useState<any | null>(null);
   const [globalActivities, setGlobalActivities] = useState<any[]>([]);
 
   // Add sub-list form states
@@ -313,16 +316,16 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
         {/* TABS */}
         <div className="flex px-8 border-b border-slate-800 bg-[#050914] gap-8 shrink-0">
           <button 
-            onClick={() => setActiveTab('gestion')} 
-            className={`py-4 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'gestion' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-          >
-            Gestión e Historial
-          </button>
-          <button 
             onClick={() => setActiveTab('general')} 
             className={`py-4 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'general' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
           >
             Información 360° & Contactos
+          </button>
+          <button 
+            onClick={() => setActiveTab('gestion')} 
+            className={`py-4 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'gestion' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+          >
+            Gestión e Historial
           </button>
         </div>
 
@@ -355,6 +358,73 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               {/* LEFT COLUMN: HISTORIAL */}
               <div className="lg:col-span-8 flex flex-col gap-4">
+                {/* SIMULADOR CLUB CIMASUR */}
+                <div className="bg-[#050914] border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                      <Award size={14} /> CLUB CIMASUR: STATUS
+                      <input 
+                        type="number"
+                        value={selectedClubYear}
+                        onChange={(e) => setSelectedClubYear(e.target.value)}
+                        className="ml-2 bg-[#0A1120] border border-amber-500/30 text-amber-500 text-[10px] py-1 px-2 rounded-lg outline-none cursor-pointer font-bold w-16"
+                      />
+                    </h4>
+                    <span className="px-3 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase tracking-widest">
+                      CATEGORÍA ACTUAL: {dynamicCategory}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">SIMULADOR DE META (SELECCIONE CATEGORÍA):</span>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {['Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
+                        <button 
+                          key={cat} 
+                          onClick={() => setTargetCategory(cat)}
+                          className={`py-2 rounded text-[8px] font-black uppercase transition-all ${targetCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-slate-850 text-slate-600 border border-slate-800'}`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="flex justify-between text-[10px] font-black">
+                      <span className="text-slate-500 uppercase tracking-wider">Progreso para objetivo: {targetCategory}</span>
+                      <span className="text-white">
+                        {CATEGORY_THRESHOLDS[targetCategory] > 0 
+                          ? Math.min(100, Math.floor((dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100))
+                          : 100}%
+                      </span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${CATEGORY_THRESHOLDS[targetCategory] > 0 ? Math.min(100, (dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100) : 100}%` }}
+                        className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                      />
+                    </div>
+                    <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
+                      <span>Meta para {targetCategory}: ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()}</span>
+                      <span>Actual: ${dynamicSales.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+                    {dynamicSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
+                      <p className="text-[10px] text-emerald-400 font-black leading-tight">
+                        ✓ ¡Excelente! Ya cumplió con el mínimo de ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()} para la categoría {targetCategory} durante este año.
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-amber-400 font-black leading-tight">
+                        Faltan ${(CATEGORY_THRESHOLDS[targetCategory] - dynamicSales).toLocaleString()} para alcanzar {targetCategory}.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
               <div className="flex justify-between items-center px-1">
                 <h3 className="text-[10px] font-black text-sky-500 uppercase tracking-widest flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,1)]"></div>
@@ -397,16 +467,83 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                             <p className="text-[11px] text-slate-500 font-bold italic">
                               --- {entry.creador || 'Gestión'} ({entry.fecha ? new Date(entry.fecha).toLocaleDateString() : '---'}) ---
                             </p>
-                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${entry.source === 'Sistema' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
-                              {entry.source === 'Sistema' ? entry.type : 'Nota Manual'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {entry.source === 'Manual' && (
+                                <>
+                                  <button 
+                                    onClick={() => {
+                                      if (editingEntryId === entry.id) {
+                                        // Save logic
+                                        const updatedBitacora = bitacora.map(b => 
+                                          b.id === entry.id ? { ...b, comentario: editingEntryText } : b
+                                        );
+                                        setBitacora(updatedBitacora);
+                                        if (client) {
+                                          import('../../lib/auth').then(({ localDB }) => {
+                                            localDB.updateInCollection('contacts', client.id, { bitacora: updatedBitacora }).then(() => {
+                                              setEditingEntryId(null);
+                                              window.dispatchEvent(new Event('db-change'));
+                                            });
+                                          });
+                                        }
+                                      } else {
+                                        setEditingEntryId(entry.id || idx.toString());
+                                        setEditingEntryText(entry.comentario || '');
+                                      }
+                                    }}
+                                    className="text-[10px] text-sky-400 hover:text-sky-300 font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    {editingEntryId === (entry.id || idx.toString()) ? 'Guardar' : 'Editar'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm('¿Está seguro de eliminar esta nota manual?')) {
+                                        const updatedBitacora = bitacora.filter(b => b.id !== entry.id);
+                                        setBitacora(updatedBitacora);
+                                        if (client) {
+                                          import('../../lib/auth').then(({ localDB }) => {
+                                            localDB.updateInCollection('contacts', client.id, { bitacora: updatedBitacora }).then(() => {
+                                              window.dispatchEvent(new Event('db-change'));
+                                            });
+                                          });
+                                        }
+                                      }
+                                    }}
+                                    className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </>
+                              )}
+                              {entry.source === 'Sistema' && (
+                                <button
+                                  onClick={() => setDeletingSystemEntry(entry)}
+                                  className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${entry.source === 'Sistema' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                                {entry.source === 'Sistema' ? entry.type : 'Nota Manual'}
+                              </span>
+                            </div>
                           </div>
                           {entry.title && (
                             <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-1">{entry.title}</p>
                           )}
-                          <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-line tracking-tight">
-                            {entry.comentario}
-                          </div>
+                          {editingEntryId === (entry.id || idx.toString()) ? (
+                            <textarea
+                              value={editingEntryText}
+                              onChange={(e) => setEditingEntryText(e.target.value)}
+                              className="w-full bg-[#050914] border border-sky-500/50 p-3 rounded-lg text-xs text-white outline-none min-h-[80px]"
+                            />
+                          ) : (
+                            <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-line tracking-tight">
+                              {entry.comentario}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
@@ -424,62 +561,6 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                 </h3>
 
                 <div className="space-y-5">
-                  <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Nombre / Razón Social</label>
-                    <input readOnly value={client.name || client.nombre} className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white/70 font-bold truncate cursor-not-allowed" />
-                  </div>
-
-                  <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">RUT / ID</label>
-                    <input readOnly value={client.rut} className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white/70 font-mono cursor-not-allowed" />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Teléfono / Celular</label>
-                      <input 
-                        type="text"
-                        value={newPhone}
-                        onChange={e => setNewPhone(e.target.value)}
-                        placeholder="+56 9..."
-                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Email de Contacto</label>
-                      <input 
-                        type="email"
-                        value={newEmail}
-                        onChange={e => setNewEmail(e.target.value)}
-                        placeholder="ejemplo@correo.com"
-                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Dirección</label>
-                      <input 
-                        type="text"
-                        value={newDireccion}
-                        onChange={e => setNewDireccion(e.target.value)}
-                        placeholder="Calle, Número..."
-                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Comuna</label>
-                      <input 
-                        type="text"
-                        value={newComuna}
-                        onChange={e => setNewComuna(e.target.value)}
-                        placeholder="Ej: Providencia"
-                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all" 
-                      />
-                    </div>
-                  </div>
-
                   <div>
                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Tipo de Actividad</label>
                     <select className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all cursor-pointer">
@@ -587,73 +668,6 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   </label>
 
                   <div className="pt-2 space-y-5">
-                    {/* SIMULADOR CLUB CIMASUR */}
-                    <div className="bg-[#050914] border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
-                      <div className="flex justify-between items-center">
-                        <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
-                          <Award size={14} /> CLUB CIMASUR: STATUS
-                          <input 
-                            type="number"
-                            value={selectedClubYear}
-                            onChange={(e) => setSelectedClubYear(e.target.value)}
-                            className="ml-2 bg-[#0A1120] border border-amber-500/30 text-amber-500 text-[10px] py-1 px-2 rounded-lg outline-none cursor-pointer font-bold w-16"
-                          />
-                        </h4>
-                        <span className="px-3 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase tracking-widest">
-                          CATEGORÍA ACTUAL: {dynamicCategory}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">SIMULADOR DE META (SELECCIONE CATEGORÍA):</span>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {['Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
-                            <button 
-                              key={cat} 
-                              onClick={() => setTargetCategory(cat)}
-                              className={`py-2 rounded text-[8px] font-black uppercase transition-all ${targetCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-slate-850 text-slate-600 border border-slate-800'}`}
-                            >
-                              {cat}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 pt-2">
-                        <div className="flex justify-between text-[10px] font-black">
-                          <span className="text-slate-500 uppercase tracking-wider">Progreso para objetivo: {targetCategory}</span>
-                          <span className="text-white">
-                            {CATEGORY_THRESHOLDS[targetCategory] > 0 
-                              ? Math.min(100, Math.floor((dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100))
-                              : 100}%
-                          </span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${CATEGORY_THRESHOLDS[targetCategory] > 0 ? Math.min(100, (dynamicSales / CATEGORY_THRESHOLDS[targetCategory]) * 100) : 100}%` }}
-                            className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
-                          />
-                        </div>
-                        <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-tighter">
-                          <span>Meta para {targetCategory}: ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()}</span>
-                          <span>Actual: ${dynamicSales.toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
-                        {dynamicSales >= CATEGORY_THRESHOLDS[targetCategory] ? (
-                          <p className="text-[10px] text-emerald-400 font-black leading-tight">
-                            ✓ ¡Excelente! Ya cumplió con el mínimo de ${CATEGORY_THRESHOLDS[targetCategory].toLocaleString()} para la categoría {targetCategory} durante este año.
-                          </p>
-                        ) : (
-                          <p className="text-[10px] text-amber-400 font-black leading-tight">
-                            Faltan ${(CATEGORY_THRESHOLDS[targetCategory] - dynamicSales).toLocaleString()} para alcanzar {targetCategory}.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
                     <button 
                       onClick={handleAddBitacora}
                       className="w-full bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-xs py-4 rounded-2xl transition-all shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2"
@@ -896,6 +910,77 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
             </div>
           )}
         </div>
+
+        {/* System Deletion Modal */}
+        <AnimatePresence>
+          {deletingSystemEntry && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            >
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }} 
+                animate={{ scale: 1, opacity: 1 }} 
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-[#050914] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl"
+              >
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-black text-white uppercase flex items-center gap-2">
+                    <Trash2 size={16} className="text-red-500" />
+                    Eliminar Registro de Campaña
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    ¿Desea eliminar este registro solo para este cliente o eliminar todos los registros de la campaña <span className="font-bold text-sky-400">"{deletingSystemEntry.title}"</span> para todos los clientes incorporados?
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <button 
+                    onClick={() => {
+                      if (client) {
+                        import('../../lib/auth').then(({ localDB }) => {
+                          localDB.deleteFromCollection('crm_activities', deletingSystemEntry.id).then(() => {
+                            setGlobalActivities(prev => prev.filter(a => a.id !== deletingSystemEntry.id));
+                            setDeletingSystemEntry(null);
+                            window.dispatchEvent(new Event('db-change'));
+                          });
+                        });
+                      }
+                    }}
+                    className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold py-3 px-4 rounded-xl transition-all"
+                  >
+                    Eliminar SOLO de este cliente
+                  </button>
+                  <button 
+                    onClick={() => {
+                      import('../../lib/auth').then(async ({ localDB }) => {
+                        const allActivities = await localDB.getCollection('crm_activities');
+                        const toDelete = allActivities.filter((a: any) => a.campania === deletingSystemEntry.title);
+                        for (const act of toDelete) {
+                          await localDB.deleteFromCollection('crm_activities', act.id);
+                        }
+                        setGlobalActivities(prev => prev.filter(a => a.campania !== deletingSystemEntry.title));
+                        setDeletingSystemEntry(null);
+                        window.dispatchEvent(new Event('db-change'));
+                      });
+                    }}
+                    className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold py-3 px-4 rounded-xl transition-all"
+                  >
+                    Eliminar de TODOS los clientes (Toda la campaña)
+                  </button>
+                  <button 
+                    onClick={() => setDeletingSystemEntry(null)}
+                    className="w-full text-slate-500 hover:text-white text-xs font-bold py-3 px-4 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </motion.div>
     </div>
   );

@@ -1,0 +1,9 @@
+                    className="w-full bg-[#10192e] border border-[#1e293b] text-xs font-bold text-slate-300 rounded-lg p-2.5 outline-none focus:border-emerald-500"
+                    value={newModDur}
+                    onChange={e => setNewModDur(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button 

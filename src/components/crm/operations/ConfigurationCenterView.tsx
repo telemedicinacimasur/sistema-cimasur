@@ -13,7 +13,8 @@ import {
   Trash2, 
   Save,
   Loader2,
-  HelpCircle
+  HelpCircle,
+  FileSpreadsheet
 } from 'lucide-react';
 import { UATConsole } from './UATConsole';
 
@@ -205,7 +206,7 @@ export const ConfigurationCenterView: React.FC<ConfigurationCenterViewProps> = (
       ) : (
         <div className="space-y-8">
           {/* Conectores Rápidos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <ConfigCard 
               title="Conector Email" 
               description="Configuración SMTP, SendGrid, remitentes autorizados y límites de envío." 
@@ -214,11 +215,11 @@ export const ConfigurationCenterView: React.FC<ConfigurationCenterViewProps> = (
               statusColor="text-amber-400 bg-amber-400/10 border-amber-400/20"
             />
             <ConfigCard 
-              title="Conector WhatsApp" 
-              description="Credenciales Meta Cloud API, Twilio, plantillas pre-aprobadas y webhooks." 
-              icon={<MessageSquare className="text-emerald-400" size={24} />} 
-              status="Pendiente de Integración" 
-              statusColor="text-amber-400 bg-amber-400/10 border-amber-400/20"
+              title="Importación Manual Masiva" 
+              description="Carga masiva de rangos de categorías y beneficios desde archivo externo." 
+              icon={<FileSpreadsheet className="text-emerald-400" size={24} />} 
+              status="Disponible" 
+              statusColor="text-emerald-400 bg-emerald-400/10 border-emerald-400/20"
             />
             <ConfigCard 
               title="Políticas de Automatización" 

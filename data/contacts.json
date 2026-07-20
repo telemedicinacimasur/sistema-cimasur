@@ -1,13 +1,42 @@
 [
   {
     "id": "c1",
-    "rut": "11.111.111-1",
+    "rut": "50960756-2",
     "name": "Dr. Marco Antonio Vilches",
     "email": "marco@veterinaria.cl",
     "accesoAprobado": "Si",
     "ventasHistoricas": 1500000,
     "categoria": "Plata",
-    "clubVentasDetail": "{\"v2026\":0}"
+    "clubVentasDetail": "{\"v2026\":0}",
+    "bitacora": [
+      {
+        "id": "1784558602152",
+        "fecha": "2026-07-20T14:43:22.152Z",
+        "comentario": "",
+        "creador": "Usuario CRM"
+      }
+    ],
+    "campanas": [
+      {
+        "id": "1784558602152",
+        "nombre": "Campaña Manual",
+        "fecha": "2026-07-20T14:43:22.152Z",
+        "tipo": "Email",
+        "canal": "Email",
+        "estado": "Enviado"
+      }
+    ],
+    "isGestionCustomer": false,
+    "ventas": [
+      {
+        "id": "s1",
+        "contactId": "c1",
+        "rut": "11.111.111-1",
+        "fecha": "2025-06-01",
+        "total": 12000000
+      }
+    ],
+    "oportunidades": []
   },
   {
     "id": "c2",
@@ -17,7 +46,9 @@
     "accesoAprobado": "Si",
     "ventasHistoricas": 500000,
     "categoria": "Plata",
-    "clubVentasDetail": "{\"v2026\":0}"
+    "clubVentasDetail": "{\"v2026\":0}",
+    "bitacora": "[{\"id\":\"1784558602381\",\"fecha\":\"2026-07-20T14:43:22.381Z\",\"comentario\":\"Envío de campaña Email: Campaña Manual\",\"creador\":\"Usuario CRM\"}]",
+    "campanas": "[{\"id\":\"1784558602381\",\"nombre\":\"Campaña Manual\",\"fecha\":\"2026-07-20T14:43:22.381Z\",\"tipo\":\"Email\",\"canal\":\"Email\",\"estado\":\"Enviado\"}]"
   },
   {
     "id": "c3",
@@ -27,7 +58,9 @@
     "accesoAprobado": "No",
     "ventasHistoricas": 0,
     "categoria": "Plata",
-    "clubVentasDetail": "{\"v2026\":0}"
+    "clubVentasDetail": "{\"v2026\":0}",
+    "bitacora": "[{\"id\":\"1784558602598\",\"fecha\":\"2026-07-20T14:43:22.598Z\",\"comentario\":\"Envío de campaña Email: Campaña Manual\",\"creador\":\"Usuario CRM\"}]",
+    "campanas": "[{\"id\":\"1784558602598\",\"nombre\":\"Campaña Manual\",\"fecha\":\"2026-07-20T14:43:22.598Z\",\"tipo\":\"Email\",\"canal\":\"Email\",\"estado\":\"Enviado\"}]"
   },
   {
     "id": "c4",
@@ -37,7 +70,9 @@
     "accesoAprobado": "Si",
     "ventasHistoricas": 0,
     "categoria": "Platinum",
-    "clubVentasDetail": "{\"v2026\":0}"
+    "clubVentasDetail": "{\"v2026\":0}",
+    "bitacora": "[{\"id\":\"1784558602804\",\"fecha\":\"2026-07-20T14:43:22.804Z\",\"comentario\":\"Envío de campaña Email: Campaña Manual\",\"creador\":\"Usuario CRM\"}]",
+    "campanas": "[{\"id\":\"1784558602805\",\"nombre\":\"Campaña Manual\",\"fecha\":\"2026-07-20T14:43:22.805Z\",\"tipo\":\"Email\",\"canal\":\"Email\",\"estado\":\"Enviado\"}]"
   },
   {
     "id": "c5",
@@ -47,6 +82,15 @@
     "accesoAprobado": "Si",
     "ventasHistoricas": 100000,
     "categoria": "Platinum",
-    "clubVentasDetail": "{\"v2026\":0}"
+    "clubVentasDetail": "{\"v2026\":0}",
+    "bitacora": "[{\"id\":\"1784558603011\",\"fecha\":\"2026-07-20T14:43:23.011Z\",\"comentario\":\"Envío de campaña Email: Campaña Manual\",\"creador\":\"Usuario CRM\"}]",
+    "campanas": "[{\"id\":\"1784558603011\",\"nombre\":\"Campaña Manual\",\"fecha\":\"2026-07-20T14:43:23.011Z\",\"tipo\":\"Email\",\"canal\":\"Email\",\"estado\":\"Enviado\"}]"
+  },
+  {
+    "name": "KARINA SAADI Y",
+    "rut": "",
+    "categoria": "Consignación",
+    "createdAt": "2026-07-20T15:26:37.152Z",
+    "id": "rec_1784561197152_brbeo9rr5"
   }
 ]
