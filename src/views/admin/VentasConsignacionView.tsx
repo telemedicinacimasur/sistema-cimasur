@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { localDB } from '../../lib/auth';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getDb, isFirebaseReady } from '../../lib/firebase';
@@ -14,7 +15,8 @@ import {
   query, 
   where, 
   Timestamp,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { 
   Save, 
@@ -39,7 +41,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Upload
+  Upload, Edit2, X
 } from 'lucide-react';
 
 const PRODUCTOS_CATALOGO = [
@@ -137,81 +139,15 @@ const getMockLotesForClient = (clienteId: string): any[] => {
     } catch (e) {}
   }
   
-  const clientLotes = allLotes.filter((l: any) => l.clienteId === clienteId);
-  
-  if (clientLotes.length === 0) {
-    const seed = [
-      {
-        id: `lote_arnica_${clienteId}`,
-        clienteId: clienteId,
-        productoId: "ARNICA CS",
-        solucionLote: "LOTE 102A",
-        fechaEntrega: "2026-01-10",
-        fechaVencimiento: "2027-01-10",
-        unidadesIniciales: 100,
-        precioUnitNeto: 12500,
-        totalVentaOriginal: 1250000,
-        activo: true,
-        createdAt: new Date().toISOString(),
-        movimientos: {
-          "2026-01": { unidadesVendidas: 10 },
-          "2026-02": { unidadesVendidas: 15 },
-          "2026-03": { unidadesVendidas: 5 }
-        }
-      },
-      {
-        id: `lote_sarsa_${clienteId}`,
-        clienteId: clienteId,
-        productoId: "SARSAPARRILLA CS",
-        solucionLote: "LOTE 204B",
-        fechaEntrega: "2026-02-15",
-        fechaVencimiento: "2027-02-15",
-        unidadesIniciales: 80,
-        precioUnitNeto: 11500,
-        totalVentaOriginal: 920000,
-        activo: true,
-        createdAt: new Date().toISOString(),
-        movimientos: {
-          "2026-02": { unidadesVendidas: 5 },
-          "2026-03": { unidadesVendidas: 12 }
-        }
-      },
-      {
-        id: `lote_beil_${clienteId}`,
-        clienteId: clienteId,
-        solucionLote: "LOTE 401C",
-        productoId: "BEILSCHMIEDIA CS",
-        fechaEntrega: "2026-03-01",
-        fechaVencimiento: "2027-03-01",
-        unidadesIniciales: 50,
-        precioUnitNeto: 9500,
-        totalVentaOriginal: 475000,
-        activo: true,
-        createdAt: new Date().toISOString(),
-        movimientos: {}
-      },
-      {
-        id: `lote_sili_${clienteId}`,
-        clienteId: clienteId,
-        solucionLote: "LOTE 509D",
-        productoId: "SILIMARINA CS",
-        fechaEntrega: "2026-04-01",
-        fechaVencimiento: "2027-04-01",
-        unidadesIniciales: 120,
-        precioUnitNeto: 13500,
-        totalVentaOriginal: 1620000,
-        activo: true,
-        createdAt: new Date().toISOString(),
-        movimientos: {}
-      }
-    ];
-    allLotes.push(...seed);
-    localStorage.setItem(key, JSON.stringify(allLotes));
-    return seed;
-  }
+  const clientLotes = allLotes.filter((l: any) => {
+    if (l.clienteId !== clienteId) return false;
+    if (l.id && (l.id.startsWith('lote_arnica_') || l.id.startsWith('lote_sarsa_') || l.id.startsWith('lote_beil_') || l.id.startsWith('lote_sili_'))) return false;
+    return true;
+  });
   
   return clientLotes;
 };
+
 
 const ClientAutocomplete = ({
   clientes,
@@ -283,6 +219,7 @@ export default function VentasConsignacionView() {
   const [uniqueProducts, setUniqueProducts] = useState<string[]>(PRODUCTOS_CATALOGO);
   const [loading, setLoading] = useState(true);
   const [loadingLotes, setLoadingLotes] = useState(false);
+  const [lotesCache, setLotesCache] = useState<Record<string, { data: any[], timestamp: number }>>({});
 
   // Tab 1: Declaración Mensual (Select Cliente)
   const [declaracionCliente, setDeclaracionCliente] = useState('');
@@ -290,6 +227,7 @@ export default function VentasConsignacionView() {
 
   // Tab 1 UI states for Unified Excel Layout
   const [selectedMonth, setSelectedMonth] = useState('2026-07');
+  const [selectedMonthlyLoteIds, setSelectedMonthlyLoteIds] = useState<Set<string>>(new Set());
   const [replenishmentFilter, setReplenishmentFilter] = useState<'todos' | 'reposicion' | 'con-stock'>('todos');
   const [salesInputs, setSalesInputs] = useState<Record<string, number>>({});
   const [savingAllMovements, setSavingAllMovements] = useState(false);
@@ -327,7 +265,7 @@ export default function VentasConsignacionView() {
   const [showAddClientForm, setShowAddClientForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
   const [importClienteId, setImportClienteId] = useState('');
-  const [importText, setImportText] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [newClientName, setNewClientName] = useState('');
   const [newClientRut, setNewClientRut] = useState('');
 
@@ -355,21 +293,18 @@ export default function VentasConsignacionView() {
     try {
       setLoading(true);
       const contacts = await localDB.getCollection('consignacion_clientes');
-      contacts.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
       
-      if (contacts.length === 0) {
-        const defaultClients = [
-          { id: "demo_1", name: "Distribuidora Botánica Sur", rut: "76.123.456-7" },
-          { id: "demo_2", name: "Farmacia de la Naturaleza", rut: "77.987.654-3" },
-          { id: "demo_3", name: "Clínica de la Madre Tierra", rut: "85.456.789-k" }
-        ];
-        for (const dc of defaultClients) {
-          await localDB.saveToCollection('consignacion_clientes', dc);
+      // Cleanup any mock/demo clients that were previously seeded
+      for (const c of contacts) {
+        if (c.id && c.id.startsWith('demo_')) {
+          await localDB.deleteFromCollection('consignacion_clientes', c.id);
         }
-        setClientes(defaultClients);
-      } else {
-        setClientes(contacts);
       }
+      
+      const realContacts = contacts.filter((c: any) => c.id && !c.id.startsWith('demo_'));
+      realContacts.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      
+      setClientes(realContacts);
     } catch (e) {
       console.error('Error loading consignment clients:', e);
     } finally {
@@ -443,19 +378,10 @@ export default function VentasConsignacionView() {
         const snap = await getDocs(collection(db, 'crm_consignacion_lotes'));
         const loaded = [];
         for (const d of snap.docs) {
-          const loteId = d.id;
-          const data = d.data();
-          
-          const movsSnap = await getDocs(collection(db, 'crm_consignacion_lotes', loteId, 'movimientos'));
-          const movimientos: Record<string, any> = {};
-          movsSnap.forEach(mDoc => {
-            movimientos[mDoc.id] = mDoc.data();
-          });
-
           loaded.push({
-            id: loteId,
-            ...data,
-            movimientos
+            id: d.id,
+            ...d.data(),
+            movimientos: {} // we don't need movements for the global admin table
           });
         }
         setTodosLosLotes(loaded);
@@ -463,15 +389,17 @@ export default function VentasConsignacionView() {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         if (existing) {
-          setTodosLosLotes(JSON.parse(existing));
-        } else {
-          const demoLotes: any[] = [];
-          const demoClients = ["demo_1", "demo_2", "demo_3"];
-          demoClients.forEach(cId => {
-            const clientLotes = getMockLotesForClient(cId);
-            demoLotes.push(...clientLotes);
+          let allLotes = JSON.parse(existing);
+          // Cleanup dummy data
+          allLotes = allLotes.filter((l: any) => {
+            if (l.clienteId && l.clienteId.startsWith('demo_')) return false;
+            if (l.id && (l.id.startsWith('lote_arnica_') || l.id.startsWith('lote_sarsa_') || l.id.startsWith('lote_beil_') || l.id.startsWith('lote_sili_'))) return false;
+            return true;
           });
-          setTodosLosLotes(demoLotes);
+          localStorage.setItem(key, JSON.stringify(allLotes));
+          setTodosLosLotes(allLotes);
+        } else {
+          setTodosLosLotes([]);
         }
       }
     } catch (e) {
@@ -516,7 +444,7 @@ export default function VentasConsignacionView() {
       setRepDates(prev => ({ ...prev, [loteId]: '' }));
       
       if (declaracionCliente) {
-        await loadLotes(declaracionCliente);
+        await loadLotes(declaracionCliente, true);
       } else {
         await loadTodosLosLotes();
       }
@@ -526,8 +454,16 @@ export default function VentasConsignacionView() {
     }
   };
 
-  const loadLotes = async (clienteId: string) => {
+  const loadLotes = async (clienteId: string, force = false) => {
     try {
+      // Memory Cache Check: Only reload if it's been more than 2 minutes or forced
+      const now = Date.now();
+      const cached = lotesCache[clienteId];
+      if (!force && cached && (now - cached.timestamp < 120000)) {
+        setLotesActivos(cached.data);
+        return;
+      }
+
       setLoadingLotes(true);
       if (isFirebaseReady()) {
         const db = getDb();
@@ -538,28 +474,34 @@ export default function VentasConsignacionView() {
         const snap = await getDocs(q);
         const loadedLotes = [];
         
-        for (const d of snap.docs) {
+        // Use a map to handle movements loading in parallel
+        const promises = snap.docs.map(async (d) => {
           const loteId = d.id;
           const data = d.data();
           
+          // Optimization: If we have many movements, consider only loading relevant ones
+          // For now, we load them in parallel to be faster than the previous sequential loop
           const movsSnap = await getDocs(collection(db, 'crm_consignacion_lotes', loteId, 'movimientos'));
           const movimientos: Record<string, any> = {};
           movsSnap.forEach(mDoc => {
             movimientos[mDoc.id] = mDoc.data();
           });
           
-          loadedLotes.push({
+          return {
             id: loteId,
             ...data,
             movimientos
-          });
-        }
-        setLotesActivos(loadedLotes);
+          };
+        });
+
+        const results = await Promise.all(promises);
+        setLotesActivos(results);
+        setLotesCache(prev => ({ ...prev, [clienteId]: { data: results, timestamp: now } }));
       } else {
         const clientLotes = getMockLotesForClient(clienteId);
         setLotesActivos(clientLotes);
       }
-      await loadTodosLosLotes();
+      // REMOVED: await loadTodosLosLotes(); - This was causing huge overhead
     } catch (e) {
       console.error('Error loading lotes:', e);
     } finally {
@@ -567,13 +509,26 @@ export default function VentasConsignacionView() {
     }
   };
 
+  // Debounced loadLotes to prevent excessive reads during rapid client switching
   useEffect(() => {
-    if (declaracionCliente) {
-      loadLotes(declaracionCliente);
-    } else {
+    if (!declaracionCliente) {
       setLotesActivos([]);
+      return;
     }
+
+    const timer = setTimeout(() => {
+      loadLotes(declaracionCliente);
+    }, 400); // 400ms debounce
+
+    return () => clearTimeout(timer);
   }, [declaracionCliente]);
+
+  // Only load all lotes when specifically needed (e.g., Tab 2 or Fixed Data list)
+  useEffect(() => {
+    if (activeTab === 'registro_ventas' || fixedDataExpanded) {
+      loadTodosLosLotes();
+    }
+  }, [activeTab, fixedDataExpanded]);
 
   useEffect(() => {
     const inputs: Record<string, number> = {};
@@ -583,68 +538,62 @@ export default function VentasConsignacionView() {
     setSalesInputs(inputs);
   }, [lotesActivos, selectedMonth]);
 
-  const handleImportLotes = async (text: string, cid: string) => {
+  const handleImportExcel = async (file: File, cid: string) => {
     if (!cid) {
       alert("Por favor, seleccione un cliente para la importación.");
       return;
     }
-    const lines = text.split(/\r?\n/);
-    const importedList: any[] = [];
-    let successCount = 0;
-    let failCount = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      
-      // Ignore header row if it contains columns keywords
-      if (i === 0 && (line.toLowerCase().includes('producto') || line.toLowerCase().includes('solucion') || line.toLowerCase().includes('vencimiento'))) {
-        continue; 
-      }
-
-      // Try to split by tab, semicolon, or comma
-      let parts = line.split('\t');
-      if (parts.length < 2) parts = line.split(';');
-      if (parts.length < 2) parts = line.split(',');
-
-      if (parts.length < 3) {
-        failCount++;
-        continue;
-      }
-
-      const productoId = parts[0]?.trim().toUpperCase();
-      const solucionLote = parts[1]?.trim().toUpperCase() || 'S/L';
-      const fechaVencimientoStr = parts[2]?.trim();
-      const unidadesIniciales = parseInt(parts[3]?.trim()) || 100;
-      const precioUnitNeto = parseInt(parts[4]?.trim()) || 0;
-
-      if (!productoId) {
-        failCount++;
-        continue;
-      }
-
-      // Validate date format, or default to 1 year from now
-      let finalVenc = fechaVencimientoStr;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(finalVenc)) {
-        finalVenc = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0];
-      }
-
-      importedList.push({
-        clienteId: cid,
-        productoId,
-        solucionLote,
-        fechaVencimiento: finalVenc,
-        unidadesIniciales,
-        precioUnitNeto,
-      });
-    }
-
-    if (importedList.length === 0) {
-      alert("No se encontraron registros válidos para importar. Asegúrese de separar las columnas con TAB, coma (,) o punto y coma (;).");
-      return;
-    }
-
+    
     try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      
+      const importedList: any[] = [];
+      let successCount = 0;
+      let failCount = 0;
+      
+      // Skip header row usually index 0
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row.length < 5) continue;
+        
+        const productoId = (row[0] || '').toString().trim();
+        const solucionLote = (row[1] || '').toString().trim();
+        let fechaVencimiento = '';
+        if (typeof row[2] === 'number') {
+            // Excel date number
+            const date = new Date(Math.round((row[2] - 25569) * 86400 * 1000));
+            fechaVencimiento = date.toISOString().split('T')[0];
+        } else {
+            fechaVencimiento = (row[2] || '').toString().trim();
+        }
+        
+        const unidadesIniciales = Number(row[3]);
+        const precioUnitNeto = Number(row[4]);
+        
+        if (!productoId || isNaN(unidadesIniciales) || isNaN(precioUnitNeto)) {
+          failCount++;
+          continue;
+        }
+        
+        importedList.push({
+          clienteId: cid,
+          productoId,
+          solucionLote,
+          fechaVencimiento,
+          unidadesIniciales,
+          precioUnitNeto
+        });
+      }
+      
+      if (importedList.length === 0) {
+        alert("No se encontraron registros válidos. Formato: Producto | Solución/Lote | Fecha Venc. (AAAA-MM-DD) | Unidades Iniciales | Precio Unitario");
+        return;
+      }
+      
       if (isFirebaseReady()) {
         const db = getDb();
         for (const item of importedList) {
@@ -653,13 +602,14 @@ export default function VentasConsignacionView() {
             clienteId: item.clienteId,
             productoId: item.productoId,
             solucionLote: item.solucionLote,
-            fechaEntrega: Timestamp.fromDate(new Date()),
-            fechaVencimiento: Timestamp.fromDate(new Date(item.fechaVencimiento + 'T12:00:00')),
+            fechaVencimiento: item.fechaVencimiento,
             unidadesIniciales: item.unidadesIniciales,
             precioUnitNeto: item.precioUnitNeto,
-            totalVentaOriginal: totalVal,
-            activo: true,
-            createdAt: Timestamp.now()
+            precioTotalNeto: totalVal,
+            unidadesDisponibles: item.unidadesIniciales,
+            mesesConsignados: 0,
+            movimientos: {},
+            createdAt: new Date().toISOString()
           };
           await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
           successCount++;
@@ -668,7 +618,6 @@ export default function VentasConsignacionView() {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         let allLotes = existing ? JSON.parse(existing) : [];
-
         for (const item of importedList) {
           const totalVal = item.unidadesIniciales * item.precioUnitNeto;
           const newLote = {
@@ -676,32 +625,33 @@ export default function VentasConsignacionView() {
             clienteId: item.clienteId,
             productoId: item.productoId,
             solucionLote: item.solucionLote,
-            fechaEntrega: new Date().toISOString().split('T')[0],
             fechaVencimiento: item.fechaVencimiento,
             unidadesIniciales: item.unidadesIniciales,
             precioUnitNeto: item.precioUnitNeto,
-            totalVentaOriginal: totalVal,
-            activo: true,
-            createdAt: new Date().toISOString(),
-            movimientos: {}
+            precioTotalNeto: totalVal,
+            unidadesDisponibles: item.unidadesIniciales,
+            mesesConsignados: 0,
+            movimientos: {},
+            createdAt: new Date().toISOString()
           };
           allLotes.push(newLote);
           successCount++;
         }
         localStorage.setItem(key, JSON.stringify(allLotes));
       }
-
-      alert(`Importación completada con éxito. Se registraron ${successCount} productos/lotes. Errores: ${failCount}`);
-      setImportText('');
+      
+      alert(`Importación completada. Registrados: ${successCount}. Errores: ${failCount}`);
+      setImportFile(null);
       setShowImportForm(false);
       
       await loadTodosLosLotes();
       if (declaracionCliente === cid) {
-        await loadLotes(declaracionCliente);
+        await loadLotes(declaracionCliente, true);
       }
-    } catch (error: any) {
-      console.error("Error al importar lotes:", error);
-      alert("Error al guardar productos importados: " + error.message);
+      
+    } catch (err: any) {
+      console.error("Error al procesar el archivo Excel:", err);
+      alert("Error: " + err.message);
     }
   };
 
@@ -772,7 +722,7 @@ export default function VentasConsignacionView() {
       });
 
       if (declaracionCliente === formEntrega.cliente_id) {
-        await loadLotes(declaracionCliente);
+        await loadLotes(declaracionCliente, true);
       } else {
         await loadTodosLosLotes();
       }
@@ -848,7 +798,7 @@ export default function VentasConsignacionView() {
         precioUnitNeto: 0,
       });
 
-      await loadLotes(declaracionCliente);
+      await loadLotes(declaracionCliente, true);
     } catch (err: any) {
       console.error(err);
       alert('Error al agregar producto: ' + err.message);
@@ -890,7 +840,7 @@ export default function VentasConsignacionView() {
         }
       }
       
-      await loadLotes(declaracionCliente);
+      await loadLotes(declaracionCliente, true);
       setSalesInputs(prev => ({ ...prev, [loteId]: 0 }));
       setInlineAddOpen(false);
       setSelectedLoteToLink('');
@@ -904,25 +854,25 @@ export default function VentasConsignacionView() {
 
   const handleRemoveProductFromMonthTemplate = async (loteId: string) => {
     console.log("Removing product:", loteId);
-    if (!confirm("¿Está seguro de remover este producto de la planilla de este mes? El saldo y stock se recalcularán automáticamente.")) return;
     try {
       if (isFirebaseReady()) {
         const db = getDb();
         const movDocRef = doc(db, 'crm_consignacion_lotes', loteId, 'movimientos', selectedMonth);
-        await deleteDoc(movDocRef);
+        await setDoc(movDocRef, { hidden: true }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const idx = allLotes.findIndex((l: any) => l.id === loteId);
-          if (idx !== -1 && allLotes[idx].movimientos) {
-            delete allLotes[idx].movimientos[selectedMonth];
+          if (idx !== -1) {
+            if (!allLotes[idx].movimientos) allLotes[idx].movimientos = {};
+            allLotes[idx].movimientos[selectedMonth] = { hidden: true };
             localStorage.setItem(key, JSON.stringify(allLotes));
           }
         }
       }
-      await loadLotes(declaracionCliente);
+      await loadLotes(declaracionCliente, true);
       setSalesInputs(prev => {
         const copy = { ...prev };
         delete copy[loteId];
@@ -932,6 +882,59 @@ export default function VentasConsignacionView() {
     } catch (e: any) {
       console.error(e);
       alert("Error al remover producto: " + e.message);
+    }
+  };
+
+  const handleBulkRemoveFromMonthTemplate = async () => {
+    if (selectedMonthlyLoteIds.size === 0) return;
+    
+    const count = selectedMonthlyLoteIds.size;
+    if (!confirm(`¿Está seguro de remover los ${count} productos seleccionados de la planilla de ${formatMonthName(selectedMonth)}?`)) return;
+
+    try {
+      setSavingAllMovements(true); // Reuse saving state
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const batch = writeBatch(db);
+        selectedMonthlyLoteIds.forEach(loteId => {
+          const movDocRef = doc(db, 'crm_consignacion_lotes', loteId, 'movimientos', selectedMonth);
+          batch.set(movDocRef, { hidden: true }, { merge: true });
+        });
+        await batch.commit();
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          const allLotes = JSON.parse(existing);
+          selectedMonthlyLoteIds.forEach(loteId => {
+            const idx = allLotes.findIndex((l: any) => l.id === loteId);
+            if (idx !== -1) {
+              if (!allLotes[idx].movimientos) allLotes[idx].movimientos = {};
+              allLotes[idx].movimientos[selectedMonth] = { hidden: true };
+            }
+          });
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
+      }
+      
+      const cid = declaracionCliente;
+      const idsToRemove = Array.from(selectedMonthlyLoteIds);
+      
+      setSelectedMonthlyLoteIds(new Set());
+      await loadLotes(cid, true);
+      
+      setSalesInputs(prev => {
+        const copy = { ...prev };
+        idsToRemove.forEach((id: string) => delete copy[id]);
+        return copy;
+      });
+      
+      alert(`${count} productos removidos de la planilla.`);
+    } catch (e: any) {
+      console.error("Error in bulk remove:", e);
+      alert("Error en remoción masiva: " + e.message);
+    } finally {
+      setSavingAllMovements(false);
     }
   };
 
@@ -968,6 +971,9 @@ export default function VentasConsignacionView() {
         const db = getDb();
         
         for (const lote of lotesActivos) {
+          const mov = lote.movimientos?.[selectedMonth];
+          if (!mov || mov.hidden) continue; // ONLY save if it is already in the month!
+          
           const startMonth = parseDateString(lote.fechaEntrega).substring(0, 7);
           if (selectedMonth < startMonth) continue; // Skip if not delivered yet
 
@@ -998,6 +1004,9 @@ export default function VentasConsignacionView() {
           const allLotes = JSON.parse(existing);
           allLotes.forEach((l: any) => {
             if (l.clienteId === declaracionCliente) {
+              const mov = l.movimientos?.[selectedMonth];
+              if (!mov || mov.hidden) return; // ONLY save if already in the month!
+              
               const startMonth = parseDateString(l.fechaEntrega).substring(0, 7);
               if (selectedMonth >= startMonth) {
                 const currentSales = Number(salesInputs[l.id] || 0);
@@ -1021,7 +1030,7 @@ export default function VentasConsignacionView() {
       }
 
       alert(`Planilla de ventas para el mes de ${formatMonthName(selectedMonth)} guardada con éxito.`);
-      await loadLotes(declaracionCliente);
+      await loadLotes(declaracionCliente, true);
     } catch (e: any) {
       console.error(e);
       alert('Error guardando la declaración mensual de ventas: ' + e.message);
@@ -1171,14 +1180,30 @@ export default function VentasConsignacionView() {
                       </div>
 
                       {/* Filters inside fixed data admin */}
-                      <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-3 flex-wrap w-full md:w-auto">
+                        <div className="w-64">
+                          <ClientAutocomplete
+                            clientes={clientes}
+                            value={adminFilterCliente}
+                            onChange={setAdminFilterCliente}
+                            placeholder="Buscar y filtrar por cliente..."
+                          />
+                        </div>
                         <input
                           type="text"
                           placeholder="Buscar producto..."
-                          className="bg-[#050914] text-white border border-[#1E293B] rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-sky-500"
+                          className="bg-[#050914] text-white border border-[#1E293B] rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-sky-500 w-64"
                           value={adminFilterProducto}
                           onChange={(e) => setAdminFilterProducto(e.target.value)}
                         />
+                        {(adminFilterCliente || adminFilterProducto) && (
+                           <button
+                             onClick={() => { setAdminFilterCliente(''); setAdminFilterProducto(''); }}
+                             className="text-xs text-rose-400 hover:text-rose-300 font-bold"
+                           >
+                             Limpiar Filtros
+                           </button>
+                        )}
                       </div>
                     </div>
 
@@ -1329,12 +1354,28 @@ export default function VentasConsignacionView() {
                       {/* Dropdown Form 3: Importar Productos */}
                       {showImportForm && (
                         <div className="bg-[#0D1627] p-5 rounded-2xl border border-purple-500/20 shadow-xl space-y-4 animate-in slide-in-from-top-2 duration-200 mb-2">
-                          <h5 className="text-xs font-black text-purple-400 uppercase tracking-widest flex items-center gap-2">
-                            <Upload size={14} /> Importación de Productos en Consignación
-                          </h5>
+                          <div className="flex justify-between items-center flex-wrap gap-2">
+                            <h5 className="text-xs font-black text-purple-400 uppercase tracking-widest flex items-center gap-2">
+                              <Upload size={14} /> Importación de Productos desde Excel
+                            </h5>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const header = ["Producto", "Solución/Lote", "Fecha Venc. (AAAA-MM-DD)", "Unidades Iniciales", "Precio Unitario"];
+                                const demoRow = ["OZO-100", "L-45", "2027-12-31", 100, 25.50];
+                                const ws = XLSX.utils.aoa_to_sheet([header, demoRow]);
+                                const wb = XLSX.utils.book_new();
+                                XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+                                XLSX.writeFile(wb, "plantilla_importacion.xlsx");
+                              }}
+                              className="text-[10px] text-purple-400 font-bold uppercase underline hover:text-purple-300"
+                            >
+                              Descargar Plantilla Excel
+                            </button>
+                          </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-3">
+                            <div className="md:col-span-1">
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Cliente Destinatario</label>
                               <ClientAutocomplete
                                 clientes={clientes}
@@ -1343,77 +1384,59 @@ export default function VentasConsignacionView() {
                                 placeholder="Escriba para buscar cliente..."
                               />
                             </div>
-
-                            <div className="md:col-span-3">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Cargar Archivo CSV / de Texto</label>
+                            
+                            <div className="md:col-span-2">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Cargar Archivo Excel (.xlsx)</label>
                               <div 
-                                className="border-2 border-dashed border-[#1E293B] hover:border-purple-500/50 rounded-2xl p-6 text-center cursor-pointer transition-all bg-[#050914]/40"
+                                className={cn(
+                                  "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors",
+                                  importFile ? "border-emerald-500 bg-emerald-500/10" : "border-purple-500/30 bg-[#050914] hover:bg-purple-500/5 hover:border-purple-500"
+                                )}
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => {
                                   e.preventDefault();
                                   const file = e.dataTransfer.files[0];
-                                  if (file) {
-                                    const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      setImportText(event.target?.result as string || '');
-                                    };
-                                    reader.readAsText(file);
+                                  if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+                                    setImportFile(file);
+                                  } else {
+                                    alert('Por favor, suba un archivo Excel (.xlsx o .xls)');
                                   }
                                 }}
                                 onClick={() => {
                                   const input = document.createElement('input');
                                   input.type = 'file';
-                                  input.accept = '.csv,.txt';
+                                  input.accept = '.xlsx,.xls';
                                   input.onchange = (e) => {
                                     const file = (e.target as HTMLInputElement).files?.[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onload = (event) => {
-                                        setImportText(event.target?.result as string || '');
-                                      };
-                                      reader.readAsText(file);
-                                    }
+                                    if (file) setImportFile(file);
                                   };
                                   input.click();
                                 }}
                               >
-                                <Upload className="w-8 h-8 text-purple-400 mx-auto mb-2 animate-bounce-slow" />
-                                <span className="text-xs text-slate-300 font-bold block">Arrastre aquí su archivo CSV o haga clic para seleccionar</span>
-                                <span className="text-[10px] text-slate-500 mt-1 block">Formatos soportados: .csv, .txt</span>
+                                {importFile ? (
+                                  <div>
+                                    <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2">
+                                      <Check size={24} />
+                                    </div>
+                                    <span className="text-xs text-emerald-400 font-bold block">{importFile.name}</span>
+                                    <span className="text-[10px] text-slate-500 mt-1 block">{(importFile.size / 1024).toFixed(2)} KB</span>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <Upload className="w-8 h-8 text-purple-400 mx-auto mb-2 animate-bounce-slow" />
+                                    <span className="text-xs text-slate-300 font-bold block">Arrastre aquí su archivo Excel o haga clic para seleccionar</span>
+                                    <span className="text-[10px] text-slate-500 mt-1 block">Formato: .xlsx. Columnas: Producto | Solución | Vencimiento | Unidades | Precio</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-
-                            <div className="md:col-span-3">
-                              <div className="flex justify-between items-center mb-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">O Pegar Datos Directamente</label>
-                                <button 
-                                  type="button"
-                                  onClick={() => {
-                                    setImportText("Producto;Solución;Vencimiento;Unidades;Precio\nARNICA CS;LOTE-A;2027-12-31;120;13500\nSARSAPARRILLA CS;LOTE-B;2027-08-15;150;14000");
-                                  }}
-                                  className="text-[10px] font-bold text-purple-400 hover:underline"
-                                >
-                                  Cargar Ejemplo
-                                </button>
-                              </div>
-                              <textarea
-                                rows={5}
-                                placeholder="Producto;Solución;Vencimiento;Unidades;Precio&#10;ARNICA CS;LOTE-A;2027-12-31;100;13500"
-                                className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-3 text-xs font-mono outline-none focus:border-purple-500"
-                                value={importText}
-                                onChange={e => setImportText(e.target.value)}
-                              />
-                              <p className="text-[9px] text-slate-400 mt-1">
-                                Formato: <strong>Producto; Solución; Fecha Vencimiento (AAAA-MM-DD); Stock Inicial; Precio Unitario s/IVA</strong> (separado por Tabulaciones, comas o puntos y comas).
-                              </p>
-                            </div>
-
+                            
                             <div className="md:col-span-3 flex justify-end gap-2 pt-2">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setShowImportForm(false);
-                                  setImportText('');
+                                  setImportFile(null);
                                 }}
                                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs uppercase"
                               >
@@ -1421,10 +1444,20 @@ export default function VentasConsignacionView() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleImportLotes(importText, importClienteId)}
-                                className="px-5 py-2 bg-purple-500 hover:bg-purple-600 text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider shadow-md shadow-purple-500/10"
+                                onClick={() => {
+                                  if (importFile) {
+                                    handleImportExcel(importFile, importClienteId);
+                                  } else {
+                                    alert('Debe cargar un archivo Excel primero.');
+                                  }
+                                }}
+                                disabled={!importFile}
+                                className={cn(
+                                  "px-5 py-2 font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition-all",
+                                  importFile ? "bg-purple-500 hover:bg-purple-600 text-[#050914] shadow-purple-500/10" : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                                )}
                               >
-                                Importar
+                                Importar Excel
                               </button>
                             </div>
                           </div>
@@ -1435,45 +1468,97 @@ export default function VentasConsignacionView() {
                         <Info size={14} className="text-sky-400 flex-shrink-0" />
                         Edite los datos originales de cada producto en consignación. Los cambios actualizarán secuencialmente el stock remanente para los meses posteriores.
                       </div>
-                      <div className="space-y-2 max-h-[450px] overflow-y-auto pr-2">
-                        {todosLosLotes.filter(lote => {
+                      {(() => {
+                        const filteredLotes = todosLosLotes.filter(lote => {
                           if (adminFilterCliente && lote.clienteId !== adminFilterCliente) return false;
                           if (adminFilterProducto && !lote.productoId.toLowerCase().includes(adminFilterProducto.toLowerCase())) return false;
                           return true;
-                        }).length > 0 ? (
-                          todosLosLotes.filter(lote => {
-                            if (adminFilterCliente && lote.clienteId !== adminFilterCliente) return false;
-                            if (adminFilterProducto && !lote.productoId.toLowerCase().includes(adminFilterProducto.toLowerCase())) return false;
-                            return true;
-                          }).map(lote => {
-                            const clientName = clientes.find(c => c.id === lote.clienteId)?.name || 'Cliente';
-                            return (
-                              <div key={lote.id} className="relative border-l-4 border-sky-500 pl-2">
-                                <div className="absolute -left-[5px] top-2 w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.6)]"></div>
-                                <div className="mb-1 flex items-center gap-2">
-                                  {lote.reposiciones && lote.reposiciones.length > 0 && (
-                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                                      <RefreshCw size={8} /> Con Reposiciones
-                                    </span>
-                                  )}
-                                </div>
-                                <LoteFixedDataEditor 
-                                  lote={lote} 
-                                  uniqueProducts={uniqueProducts} 
-                                  onRefresh={async () => {
-                                    if (declaracionCliente) await loadLotes(declaracionCliente);
-                                    await loadTodosLosLotes();
-                                  }} 
-                                />
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div className="text-center py-8 text-slate-500 font-semibold text-xs">
-                            No se encontraron lotes para los filtros seleccionados.
+                        });
+
+                        const flattenedItems: any[] = [];
+                        filteredLotes.forEach(l => {
+                          const cName = clientes.find(c => c.id === l.clienteId)?.name || 'Cliente';
+                          // Lote original
+                          flattenedItems.push({
+                            ...l,
+                            displayId: l.id,
+                            type: 'ORIGINAL',
+                            sortDate: l.fechaVencimiento,
+                            displayUnidades: l.unidadesIniciales,
+                            clientName: cName
+                          });
+                          
+                          // Reposiciones como filas separadas
+                          l.reposiciones?.forEach((rep: any, idx: number) => {
+                            flattenedItems.push({
+                              ...l,
+                              displayId: `${l.id}_rep_${idx}`,
+                              type: 'REP',
+                              sortDate: l.fechaVencimiento,
+                              displayUnidades: rep.unidades,
+                              fechaRep: rep.fecha,
+                              clientName: cName,
+                              repIndex: idx
+                            });
+                          });
+                        });
+
+                        const sortedItems = [...flattenedItems].sort((a, b) => {
+                          const nameA = (a.productoId || "").toString().toLowerCase();
+                          const nameB = (b.productoId || "").toString().toLowerCase();
+                          if (nameA !== nameB) return nameA.localeCompare(nameB);
+                          return (a.sortDate || "").localeCompare(b.sortDate || "");
+                        });
+
+                        const earliestMap: Record<string, string> = {};
+                        sortedItems.forEach(item => {
+                          if (!earliestMap[item.productoId]) {
+                            earliestMap[item.productoId] = item.displayId;
+                          }
+                        });
+
+                        if (sortedItems.length === 0) {
+                          return (
+                            <div className="text-center py-8 text-slate-500 font-semibold text-xs">
+                              No se encontraron lotes para los filtros seleccionados.
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="max-h-[450px] overflow-y-auto border border-[#1E293B] rounded-xl bg-[#050914] shadow-inner">
+                            <table className="w-full text-left text-[10px]">
+                              <thead className="bg-[#0D1627] text-slate-400 uppercase font-black text-[9px] sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                  <th className="p-2 border-b border-[#1E293B]">Cliente</th>
+                                  <th className="p-2 border-b border-[#1E293B]">Producto</th>
+                                  <th className="p-2 border-b border-[#1E293B] text-center">Stock</th>
+                                  <th className="p-2 border-b border-[#1E293B]">Solución</th>
+                                  <th className="p-2 border-b border-[#1E293B]">Venc.</th>
+                                  <th className="p-2 border-b border-[#1E293B] text-right">Precio</th>
+                                  <th className="p-2 border-b border-[#1E293B] text-center">Acción</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#1E293B]">
+                                {sortedItems.map(l => {
+                                  const isFIFO = earliestMap[l.productoId] === l.displayId;
+                                  return (
+                                    <LoteFixedDataRow 
+                                      key={l.displayId} 
+                                      item={l} 
+                                      isFIFO={isFIFO} 
+                                      onRefresh={async () => {
+                                        if (declaracionCliente) await loadLotes(declaracionCliente, true);
+                                        await loadTodosLosLotes();
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -1555,8 +1640,10 @@ export default function VentasConsignacionView() {
                         const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, salesInputs[lote.id]);
                         return { lote, traj };
                       }).filter(item => {
-                        const hasMov = item.lote.movimientos && item.lote.movimientos[selectedMonth] !== undefined;
-                        return item.traj && item.traj.delivered && hasMov;
+                        const mov = item.lote.movimientos?.[selectedMonth];
+                        if (mov && mov.hidden) return false;
+                        const hasMov = mov !== undefined;
+                        return item.traj && item.traj.delivered && hasMov; // ONLY show if it has a movement/added to this month
                       }).sort((a, b) => {
                         const nameA = (a.lote.productoId || '').toString().toLowerCase();
                         const nameB = (b.lote.productoId || '').toString().toLowerCase();
@@ -1590,20 +1677,52 @@ export default function VentasConsignacionView() {
                                   </p>
                                 </div>
                               </div>
-                              <span className="bg-sky-500/15 text-sky-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-sky-500/20 shadow-lg">
-                                📅 {formatMonthName(selectedMonth)}
-                              </span>
+                              <div className="flex items-center gap-3">
+                                {selectedMonthlyLoteIds.size > 0 && (
+                                  <button
+                                    type="button"
+                                    disabled={savingAllMovements}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleBulkRemoveFromMonthTemplate();
+                                    }}
+                                    className="flex items-center gap-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-rose-500/20 shadow-lg transition-all animate-in zoom-in-95 disabled:opacity-50"
+                                  >
+                                    {savingAllMovements ? <RefreshCw size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                    Remover Seleccionados ({selectedMonthlyLoteIds.size})
+                                  </button>
+                                )}
+                                <span className="bg-sky-500/15 text-sky-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-sky-500/20 shadow-lg">
+                                  📅 {formatMonthName(selectedMonth)}
+                                </span>
+                              </div>
                             </div>
 
                             <div className="overflow-x-auto">
                               <table className="w-full text-left border-collapse">
                                 <thead className="bg-[#0D1627] border-b border-[#1E293B] text-[10px] uppercase font-black tracking-widest text-slate-400">
                                   <tr>
-                                    <th className="p-4 pl-6">Producto</th>
-                                    <th className="p-4 text-center">Stock Disponible</th>
+                                    <th className="p-4 pl-6 w-12 text-center">
+                                      <input 
+                                        type="checkbox"
+                                        className="accent-sky-500 cursor-pointer"
+                                        checked={filteredLotes.length > 0 && selectedMonthlyLoteIds.size === filteredLotes.length}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedMonthlyLoteIds(new Set(filteredLotes.map(item => item.lote.id)));
+                                          } else {
+                                            setSelectedMonthlyLoteIds(new Set());
+                                          }
+                                        }}
+                                      />
+                                    </th>
+                                    <th className="p-4">Producto</th>
+                                    <th className="p-4 text-center">Stock Inicial</th>
+                                    <th className="p-4 text-center">Precio Unit.</th>
                                     <th className="p-4 text-center bg-sky-500/5 text-sky-400 w-44">und vendida</th>
-                                    <th className="p-4 text-center">$ vendido</th>
-                                    <th className="p-4 text-center">Frascos Restantes en Stock</th>
+                                    <th className="p-4 text-center">$ Vendido</th>
+                                    <th className="p-4 text-center">Frascos Restantes</th>
                                     <th className="p-4 pr-6 text-center w-80">Reposición</th>
                                   </tr>
                                 </thead>
@@ -1611,9 +1730,23 @@ export default function VentasConsignacionView() {
                                    {filteredLotes.length > 0 ? (
                                      filteredLotes.map(({ lote, traj }) => {
                                        const currentSales = salesInputs[lote.id] ?? 0;
+                                       const isSelected = selectedMonthlyLoteIds.has(lote.id);
                                        return (
-                                         <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors">
-                                           <td className="p-4 pl-6">
+                                         <tr key={lote.id} className={cn("hover:bg-[#1E293B]/10 transition-colors", isSelected ? "bg-sky-500/5" : "")}>
+                                           <td className="p-4 pl-6 w-12 text-center">
+                                             <input 
+                                               type="checkbox"
+                                               className="accent-sky-500 cursor-pointer"
+                                               checked={isSelected}
+                                               onChange={(e) => {
+                                                 const next = new Set(selectedMonthlyLoteIds);
+                                                 if (e.target.checked) next.add(lote.id);
+                                                 else next.delete(lote.id);
+                                                 setSelectedMonthlyLoteIds(next);
+                                               }}
+                                             />
+                                           </td>
+                                           <td className="p-4">
                                              <div className="flex items-start justify-between gap-2">
                                                <div className="font-black text-slate-200 text-sm">
                                                  {lote.productoId} 
@@ -1651,6 +1784,9 @@ export default function VentasConsignacionView() {
                                            </td>
                                            <td className="p-4 text-center text-slate-300 font-bold font-mono text-sm">
                                              {traj.stockDisponible} u.
+                                           </td>
+                                           <td className="p-4 text-center text-slate-400 font-bold font-mono text-xs">
+                                             {formatCurrency(Number(lote.precioUnitNeto) || 0)}
                                            </td>
                                            <td className="p-4 text-center bg-sky-500/5">
                                              <div className="flex items-center justify-center gap-2">
@@ -1746,15 +1882,39 @@ export default function VentasConsignacionView() {
                                      })
                                    ) : (
                                      <tr>
-                                       <td colSpan={6} className="p-12 text-center text-slate-500 font-semibold">
+                                       <td colSpan={8} className="p-12 text-center text-slate-500 font-semibold">
                                          No hay productos entregados o activos para el mes de {formatMonthName(selectedMonth)}.
+                                       </td>
+                                     </tr>
+                                   )}
+
+                                   {/* Totals Row */}
+                                   {filteredLotes.length > 0 && (
+                                     <tr className="bg-[#050914] border-t-2 border-[#1E293B]">
+                                       <td colSpan={3} className="p-4 text-right text-slate-400 font-bold text-xs uppercase tracking-widest">
+                                         Totales del Mes:
+                                       </td>
+                                       <td className="p-4 text-center font-black font-mono text-[9px] text-slate-500 uppercase">
+                                         {/* unit price sum not meaningful */}
+                                       </td>
+                                       <td className="p-4 text-center font-black font-mono text-xs text-sky-400">
+                                         {filteredLotes.reduce((acc, item) => acc + (salesInputs[item.lote.id] || 0), 0)} u.
+                                       </td>
+                                       <td className="p-4 text-center font-black font-mono text-sm text-emerald-400">
+                                         {formatCurrency(filteredLotes.reduce((acc, item) => {
+                                            const sales = Number(salesInputs[item.lote.id] || 0);
+                                            return acc + (sales * (Number(item.lote.precioUnitNeto) || 0));
+                                         }, 0))}
+                                       </td>
+                                       <td colSpan={2} className="p-4 text-center font-black font-mono text-xs text-slate-300">
+                                         {filteredLotes.reduce((acc, item) => acc + item.traj.frascosRestantes, 0)} u. (Saldo Final)
                                        </td>
                                      </tr>
                                    )}
 
                                    {/* Manual inline product additions row with '+' button */}
                                    <tr>
-                                     <td colSpan={6} className="p-4 border-t border-[#1E293B]/40 bg-[#0F172A]/30">
+                                     <td colSpan={8} className="p-4 border-t border-[#1E293B]/40 bg-[#0F172A]/30">
                                        {!inlineAddOpen ? (
                                          <button
                                            type="button"
@@ -2521,6 +2681,229 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
 }
 
 // Subcomponent to edit a Lote's fixed data
+function LoteFixedDataRow({ item, isFIFO, onRefresh }: { key?: string, item: any, isFIFO: boolean, onRefresh: () => void | Promise<void> }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState({
+    productoId: item.productoId || '',
+    solucionLote: item.solucionLote || '',
+    fechaVencimiento: item.fechaVencimiento || '',
+    unidadesIniciales: Number(item.displayUnidades) || 100,
+    precioUnitNeto: Number(item.precioUnitNeto) || 0,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const units = Number(form.unidadesIniciales);
+      const price = Number(form.precioUnitNeto);
+      const totalVal = units * price;
+      
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const docRef = doc(db, 'crm_consignacion_lotes', item.id);
+        
+        if (item.type === 'ORIGINAL') {
+          await setDoc(docRef, {
+            productoId: form.productoId.toUpperCase().trim(),
+            solucionLote: form.solucionLote.toUpperCase().trim() || 'S/L',
+            fechaVencimiento: form.fechaVencimiento,
+            unidadesIniciales: units,
+            precioUnitNeto: price,
+            totalVentaOriginal: totalVal
+          }, { merge: true });
+        } else if (item.type === 'REP') {
+          // Edit specific reposicion
+          const loteDoc = await getDoc(docRef);
+          if (loteDoc.exists()) {
+            const data = loteDoc.data();
+            const repos = data.reposiciones || [];
+            if (repos[item.repIndex]) {
+               repos[item.repIndex].unidades = units;
+               // Wait, repositions don't have separate prices and dates in this structure?
+               // The user said "Edite los datos originales de cada producto en consignacion"
+               await setDoc(docRef, { reposiciones: repos }, { merge: true });
+            }
+          }
+        }
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          const allLotes = JSON.parse(existing);
+          const index = allLotes.findIndex((l: any) => l.id === item.id);
+          if (index !== -1) {
+            if (item.type === 'ORIGINAL') {
+                allLotes[index].productoId = form.productoId.toUpperCase().trim();
+                allLotes[index].solucionLote = form.solucionLote.toUpperCase().trim() || 'S/L';
+                allLotes[index].fechaVencimiento = form.fechaVencimiento;
+                allLotes[index].unidadesIniciales = units;
+                allLotes[index].precioUnitNeto = price;
+                allLotes[index].totalVentaOriginal = totalVal;
+            } else if (item.type === 'REP') {
+                const repos = allLotes[index].reposiciones || [];
+                if (repos[item.repIndex]) {
+                   repos[item.repIndex].unidades = units;
+                }
+            }
+            localStorage.setItem(key, JSON.stringify(allLotes));
+          }
+        }
+      }
+      setIsEditing(false);
+      onRefresh();
+    } catch (e: any) {
+      console.error(e);
+      alert('Error al guardar datos: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!isDeleting) {
+      setIsDeleting(true);
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const docRef = doc(db, 'crm_consignacion_lotes', item.id);
+        
+        if (item.type === 'ORIGINAL') {
+           // Si elimina el original, sugerimos eliminar todo o las reps tb mueren. 
+           await deleteDoc(docRef);
+        } else if (item.type === 'REP') {
+           const loteDoc = await getDoc(docRef);
+           if (loteDoc.exists()) {
+             const data = loteDoc.data();
+             let repos = data.reposiciones || [];
+             repos.splice(item.repIndex, 1);
+             await setDoc(docRef, { reposiciones: repos }, { merge: true });
+           }
+        }
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          let allLotes = JSON.parse(existing);
+          if (item.type === 'ORIGINAL') {
+             allLotes = allLotes.filter((l: any) => l.id !== item.id);
+          } else if (item.type === 'REP') {
+             const index = allLotes.findIndex((l: any) => l.id === item.id);
+             if (index !== -1) {
+                let repos = allLotes[index].reposiciones || [];
+                repos.splice(item.repIndex, 1);
+                allLotes[index].reposiciones = repos;
+             }
+          }
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
+      }
+      onRefresh();
+    } catch (e: any) {
+      console.error(e);
+      alert('Error al eliminar: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <tr className="bg-[#15233C]/40">
+        <td className="p-2 border-l-4 border-sky-500">
+           <span className="text-[9px] text-slate-500 block truncate w-24">{item.clientName}</span>
+        </td>
+        <td className="p-2">
+          {item.type === 'ORIGINAL' ? (
+            <input type="text" className="w-full bg-[#050914] text-white border border-[#1E293B]/60 rounded px-1.5 py-1 text-xs outline-none" value={form.productoId} onChange={e => setForm({...form, productoId: e.target.value})} />
+          ) : (
+             <div className="text-white text-xs font-black">{item.productoId} <span className="ml-1 text-[8px] bg-emerald-500 text-[#050914] px-1 rounded-full uppercase">REP</span></div>
+          )}
+        </td>
+        <td className="p-2">
+          <input type="number" className="w-16 mx-auto block bg-[#050914] text-sky-400 border border-[#1E293B]/60 rounded px-1.5 py-1 text-xs outline-none text-center" value={form.unidadesIniciales} onChange={e => setForm({...form, unidadesIniciales: parseInt(e.target.value) || 0})} />
+        </td>
+        <td className="p-2">
+          {item.type === 'ORIGINAL' ? (
+             <input type="text" className="w-full bg-[#050914] text-emerald-400 border border-[#1E293B]/60 rounded px-1.5 py-1 text-xs outline-none font-mono uppercase text-center" value={form.solucionLote} onChange={e => setForm({...form, solucionLote: e.target.value})} />
+          ) : (
+             <div className="text-emerald-400 font-mono text-[10px] text-center">{item.solucionLote || 'S/L'}</div>
+          )}
+        </td>
+        <td className="p-2">
+          {item.type === 'ORIGINAL' ? (
+            <input type="date" className="w-full bg-[#050914] text-rose-400 border border-[#1E293B]/60 rounded px-1.5 py-1 text-xs outline-none text-center" value={form.fechaVencimiento} onChange={e => setForm({...form, fechaVencimiento: e.target.value})} />
+          ) : (
+            <div className="text-rose-400 text-[10px] text-center font-bold">{item.sortDate}</div>
+          )}
+        </td>
+        <td className="p-2">
+          {item.type === 'ORIGINAL' ? (
+             <input type="number" step="0.01" className="w-20 mx-auto block bg-[#050914] text-amber-400 border border-[#1E293B]/60 rounded px-1.5 py-1 text-xs outline-none text-right font-black" value={form.precioUnitNeto} onChange={e => setForm({...form, precioUnitNeto: parseFloat(e.target.value) || 0})} />
+          ) : (
+             <div className="text-amber-400 text-xs text-right font-black">{formatCurrency(item.precioUnitNeto || 0)}</div>
+          )}
+        </td>
+        <td className="p-2 text-center w-24">
+          <div className="flex gap-1 justify-center">
+             <button onClick={handleSave} disabled={saving} className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-[#050914] p-1 rounded transition-colors"><Save size={12} /></button>
+             <button onClick={() => setIsEditing(false)} className="bg-slate-700/50 text-slate-400 hover:bg-slate-700 p-1 rounded transition-colors"><X size={12} /></button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className={cn("hover:bg-[#1E293B]/60 transition-colors group", isFIFO ? "bg-rose-500/5" : "")}>
+      <td className="p-2">
+         <span className="text-[9px] text-slate-400 block truncate w-24 font-bold">{item.clientName}</span>
+      </td>
+      <td className="p-2">
+        <div className={cn("font-black text-xs", isFIFO ? "text-rose-400" : "text-white")}>
+          {item.productoId}
+          {isFIFO && <span className="ml-2 text-[8px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Prioridad FIFO</span>}
+          {item.type === 'REP' && <span className="ml-2 text-[8px] bg-emerald-500 text-[#050914] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">REP</span>}
+        </div>
+      </td>
+      <td className="p-2 text-center">
+        <div className="flex flex-col items-center">
+          <span className="text-[9px] text-sky-400 font-mono font-black bg-sky-500/10 px-2 py-0.5 rounded">
+            {item.displayUnidades} u.
+          </span>
+          <span className="text-[8px] text-slate-500 font-bold uppercase mt-0.5">
+            {item.type === 'ORIGINAL' ? 'Original' : `Rep (${item.fechaRep})`}
+          </span>
+        </div>
+      </td>
+      <td className="p-2 text-emerald-400 font-mono text-[10px]">{item.solucionLote || 'S/L'}</td>
+      <td className="p-2 font-bold text-rose-400 text-[10px]">{item.sortDate}</td>
+      <td className="p-2 text-right font-black text-amber-400 text-xs">{formatCurrency(item.precioUnitNeto || 0)}</td>
+      <td className="p-2 text-center w-20">
+         <div className="flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isDeleting ? (
+              <>
+                <button onClick={() => setIsEditing(true)} className="bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-[#050914] p-1.5 rounded transition-colors"><Edit2 size={12} /></button>
+                <button onClick={handleDelete} disabled={saving} className="bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-[#050914] p-1.5 rounded transition-colors"><Trash2 size={12} /></button>
+              </>
+            ) : (
+              <div className="flex items-center gap-1 bg-rose-500/10 p-1 rounded border border-rose-500/30">
+                 <button onClick={handleDelete} className="text-[9px] font-black uppercase text-rose-400 px-1 hover:text-white">Confirmar</button>
+                 <button onClick={() => setIsDeleting(false)} className="text-[9px] font-black uppercase text-slate-400 px-1 hover:text-white">X</button>
+              </div>
+            )}
+         </div>
+      </td>
+    </tr>
+  );
+}
+
 function LoteFixedDataEditor({ 
   lote, 
   uniqueProducts, 

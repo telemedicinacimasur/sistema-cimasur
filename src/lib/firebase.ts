@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
 
 let app: any = null;
 let db: any = null;
@@ -38,7 +43,14 @@ function initFirebase() {
     try {
       app = initializeApp(firebaseConfig);
       const dbId = getEnv('VITE_FIREBASE_FIRESTORE_DATABASE_ID') || "(default)";
-      db = getFirestore(app, dbId);
+      
+      // Initialize Firestore with persistent local cache for better performance and reduced reads
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      }, dbId);
+
       auth = getAuth(app);
     } catch (error) {
       console.warn("Firebase failed to initialize:", error);
