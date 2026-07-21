@@ -228,7 +228,7 @@ export default function VentasConsignacionView() {
   // Tab 1 UI states for Unified Excel Layout
   const [selectedMonth, setSelectedMonth] = useState('2026-07');
   const [selectedMonthlyLoteIds, setSelectedMonthlyLoteIds] = useState<Set<string>>(new Set());
-  const [replenishmentFilter, setReplenishmentFilter] = useState<'todos' | 'reposicion' | 'con-stock'>('todos');
+  const [replenishmentFilter, setReplenishmentFilter] = useState<'todos' | 'reposicion' | 'con-stock' | 'agotados'>('todos');
   const [salesInputs, setSalesInputs] = useState<Record<string, number>>({});
   const [savingAllMovements, setSavingAllMovements] = useState(false);
   const [fixedDataExpanded, setFixedDataExpanded] = useState(false);
@@ -1112,12 +1112,13 @@ export default function VentasConsignacionView() {
         
         for (const lote of lotesActivos) {
           const mov = lote.movimientos?.[selectedMonth];
-          if (!mov || mov.hidden) continue; // ONLY save if it is already in the month!
+          if (mov?.hidden) continue; // Skip if explicitly hidden
           
           const startMonth = parseDateString(lote.fechaEntrega).substring(0, 7);
           if (selectedMonth < startMonth) continue; // Skip if not delivered yet
 
           const currentSales = Number(salesInputs[lote.id] || 0);
+          console.log(`Debug: Saving lote ${lote.id}, currentSales=${currentSales}`);
           const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, currentSales);
           if (!traj) continue;
 
@@ -1145,7 +1146,7 @@ export default function VentasConsignacionView() {
           allLotes.forEach((l: any) => {
             if (l.clienteId === declaracionCliente) {
               const mov = l.movimientos?.[selectedMonth];
-              if (!mov || mov.hidden) return; // ONLY save if already in the month!
+              if (mov?.hidden) return; // Skip if explicitly hidden
               
               const startMonth = parseDateString(l.fechaEntrega).substring(0, 7);
               if (selectedMonth >= startMonth) {
@@ -1813,6 +1814,7 @@ export default function VentasConsignacionView() {
                       <option value="todos">📋 Mostrar Todas las Soluciones</option>
                       <option value="reposicion">⚠️ Requiere Reposición (Stock 0)</option>
                       <option value="con-stock">✅ Con Stock Disponible (&gt; 0)</option>
+                      <option value="agotados">🚫 Agotados / Comprados (Stock 0)</option>
                     </select>
                   </div>
                 </div>
@@ -1846,6 +1848,9 @@ export default function VentasConsignacionView() {
                         }
                         if (replenishmentFilter === 'con-stock') {
                           return item.traj.frascosRestantes > 0;
+                        }
+                        if (replenishmentFilter === 'agotados') {
+                          return item.traj.frascosRestantes === 0;
                         }
                         return true;
                       });
@@ -2873,6 +2878,8 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
       ? tempSalesForTargetMonth
       : Number(lote.movimientos?.[m]?.unidadesVendidas || 0);
 
+    console.log(`Debug: Month m=${m}, targetMonth=${targetMonth}, stockDisp=${stockDisp}, ventas=${ventas}`);
+    
     const remaining = Math.max(stockDisp - ventas, 0);
     runningStock = remaining;
 
