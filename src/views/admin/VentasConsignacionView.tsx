@@ -2810,7 +2810,11 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
 
   const startMonth = parseDateString(rawDate).substring(0, 7);
   if (!startMonth || startMonth.length < 7) return null;
-  if (targetMonth < startMonth) {
+  
+  // Si el lote fue agregado explícitamente a este mes, se considera activo aunque la fecha de creación sea distinta
+  const isExplicitlyAdded = lote.movimientos?.[targetMonth] !== undefined;
+
+  if (targetMonth < startMonth && !isExplicitlyAdded) {
     return {
       delivered: false,
       stockDisponible: 0,
