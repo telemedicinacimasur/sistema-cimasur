@@ -81,7 +81,15 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  app.use('/api/consignacion', consignacionRouter);
+  // CRM Backend Routes - Only enabled if DATABASE_URL is set
+  if (process.env.DATABASE_URL) {
+    app.use('/api/consignacion', consignacionRouter);
+  } else {
+    console.warn('Consignacion SQL routes disabled: DATABASE_URL not set.');
+    app.use('/api/consignacion', (req, res) => {
+      res.status(503).json({ error: 'Database not configured. This feature is disabled in preview.' });
+    });
+  }
 
 
   // Health check early
@@ -1006,6 +1014,41 @@ const crmTools: FunctionDeclaration[] = [
     const { collection, id } = req.params;
     let records = await readRecords(collection);
     records = records.filter(r => r.id !== id);
+    await writeRecords(collection, records);
+    res.json({ success: true });
+  });
+
+  app.post('/api/records/:collection/bulk-delete', async (req, res) => {
+    console.log('API call: POST /api/records/:collection/bulk-delete');
+    const { collection } = req.params;
+    const { ids, groupedInfo } = req.body; 
+    // ids: string[] of IDs to delete entirely
+    // groupedInfo: optional object for complex logic like repositions
+    
+    let records = await readRecords(collection);
+    
+    if (ids && Array.isArray(ids)) {
+      records = records.filter(r => !ids.includes(r.id.toString()));
+    }
+    
+    if (groupedInfo && typeof groupedInfo === 'object') {
+      for (const [loteId, info] of Object.entries(groupedInfo) as [string, any][]) {
+        const idx = records.findIndex(r => r.id.toString() === loteId);
+        if (idx === -1) continue;
+        
+        if (info.original) {
+          records.splice(idx, 1);
+        } else if (info.repIndices && Array.isArray(info.repIndices)) {
+          let repos = records[idx].reposiciones || [];
+          const sortedIndices = [...info.repIndices].sort((a: number, b: number) => b - a);
+          sortedIndices.forEach((rIdx: number) => {
+            if (repos[rIdx]) repos.splice(rIdx, 1);
+          });
+          records[idx].reposiciones = repos;
+        }
+      }
+    }
+    
     await writeRecords(collection, records);
     res.json({ success: true });
   });

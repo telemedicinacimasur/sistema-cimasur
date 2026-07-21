@@ -93,3 +93,9 @@ export const syncStudentsToSchoolPayments = async () => {
       console.error("Error in student global synchronization:", err);
     }
   };
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('sync-students-trigger', () => {
+    syncStudentsToSchoolPayments().catch(console.error);
+  });
+}

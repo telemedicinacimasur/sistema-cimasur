@@ -13,13 +13,7 @@ import { UsersManager } from '../components/settings/UsersManager';
 import { AuditLogManager } from '../components/settings/AuditLogManager';
 import { TrashBinManager } from '../components/settings/TrashBinManager';
 
-export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-  const wb = XLSX.utils.book_new();
-  const safeTitle = title.substring(0, 31).replace(/[\\/?*\[\]]/g, '');
-  XLSX.utils.book_append_sheet(wb, ws, safeTitle);
-  XLSX.writeFile(wb, `${fileName}.xlsx`);
-};
+import * as XLSX from 'xlsx';
 import { 
   FileText, 
   ArrowLeft, 
@@ -59,7 +53,7 @@ import {
   ChevronDown,
   Package
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+
 import { addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
@@ -71,6 +65,14 @@ import ResumenVentasManager from './admin/ResumenVentasManager';
 import PresupuestoFlujoManager from './admin/PresupuestoFlujoManager';
 import SalesTiendaMLManager from './admin/SalesTiendaMLManager';
 import VentasConsignacionView from './admin/VentasConsignacionView';
+
+export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+  const wb = XLSX.utils.book_new();
+  const safeTitle = title.substring(0, 31).replace(/[\\/?*\[\]]/g, '');
+  XLSX.utils.book_append_sheet(wb, ws, safeTitle);
+  XLSX.writeFile(wb, `${fileName}.xlsx`);
+};
 
 type AdminTab = 'menu' | 'quotes' | 'sales' | 'sales_gestion' | 'sales_tienda_ml' | 'dte' | 'pet_payments' | 'school_payments' | 'codigos_y_diluciones' | 'resumen_ventas' | 'presupuesto_flujo' | 'consignacion';
 
