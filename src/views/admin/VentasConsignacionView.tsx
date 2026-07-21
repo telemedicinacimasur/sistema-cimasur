@@ -378,9 +378,11 @@ export default function VentasConsignacionView() {
         const snap = await getDocs(collection(db, 'crm_consignacion_lotes'));
         const loaded = [];
         for (const d of snap.docs) {
+          const data = d.data();
+          if (!data) continue;
           loaded.push({
             id: d.id,
-            ...d.data(),
+            ...data,
             movimientos: {} // we don't need movements for the global admin table
           });
         }
@@ -389,9 +391,16 @@ export default function VentasConsignacionView() {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         if (existing) {
-          let allLotes = JSON.parse(existing);
+          let allLotes = [];
+          try {
+            allLotes = JSON.parse(existing);
+            if (!Array.isArray(allLotes)) allLotes = [];
+          } catch(e) {
+            allLotes = [];
+          }
           // Cleanup dummy data
           allLotes = allLotes.filter((l: any) => {
+            if (!l) return false;
             if (l.clienteId && l.clienteId.startsWith('demo_')) return false;
             if (l.id && (l.id.startsWith('lote_arnica_') || l.id.startsWith('lote_sarsa_') || l.id.startsWith('lote_beil_') || l.id.startsWith('lote_sili_'))) return false;
             return true;
@@ -456,6 +465,8 @@ export default function VentasConsignacionView() {
 
   const loadLotes = async (clienteId: string, force = false) => {
     try {
+      if (!clienteId) return;
+      
       // Memory Cache Check: Only reload if it's been more than 2 minutes or forced
       const now = Date.now();
       const cached = lotesCache[clienteId];
@@ -472,20 +483,27 @@ export default function VentasConsignacionView() {
           where('clienteId', '==', clienteId)
         );
         const snap = await getDocs(q);
-        const loadedLotes = [];
         
         // Use a map to handle movements loading in parallel
         const promises = snap.docs.map(async (d) => {
           const loteId = d.id;
           const data = d.data();
           
-          // Optimization: If we have many movements, consider only loading relevant ones
-          // For now, we load them in parallel to be faster than the previous sequential loop
-          const movsSnap = await getDocs(collection(db, 'crm_consignacion_lotes', loteId, 'movimientos'));
+          // CRITICAL OPTIMIZATION: Instead of loading ALL movements for ALL lotes,
+          // we only load the movement for the selectedMonth.
+          // This reduces reads from N*M to N*1.
           const movimientos: Record<string, any> = {};
-          movsSnap.forEach(mDoc => {
-            movimientos[mDoc.id] = mDoc.data();
-          });
+          
+          if (selectedMonth) {
+            try {
+              const movDoc = await getDoc(doc(db, 'crm_consignacion_lotes', loteId, 'movimientos', selectedMonth));
+              if (movDoc.exists()) {
+                movimientos[selectedMonth] = movDoc.data();
+              }
+            } catch (e) {
+              console.warn(`Error loading movement for lote ${loteId} and month ${selectedMonth}:`, e);
+            }
+          }
           
           return {
             id: loteId,
@@ -501,7 +519,6 @@ export default function VentasConsignacionView() {
         const clientLotes = getMockLotesForClient(clienteId);
         setLotesActivos(clientLotes);
       }
-      // REMOVED: await loadTodosLosLotes(); - This was causing huge overhead
     } catch (e) {
       console.error('Error loading lotes:', e);
     } finally {
@@ -521,13 +538,19 @@ export default function VentasConsignacionView() {
     }, 400); // 400ms debounce
 
     return () => clearTimeout(timer);
-  }, [declaracionCliente]);
+  }, [declaracionCliente, selectedMonth]);
 
   // Only load all lotes when specifically needed (e.g., Tab 2 or Fixed Data list)
   useEffect(() => {
-    if (activeTab === 'registro_ventas' || fixedDataExpanded) {
-      loadTodosLosLotes();
+    let active = true;
+    if (activeTab === 'declaraciones_mensuales' || fixedDataExpanded) {
+      loadTodosLosLotes().then(() => {
+        if (active && activeTab === 'declaraciones_mensuales') {
+          // Additional logic if needed
+        }
+      });
     }
+    return () => { active = false; };
   }, [activeTab, fixedDataExpanded]);
 
   useEffect(() => {
@@ -1095,7 +1118,7 @@ export default function VentasConsignacionView() {
       <div className="flex-1 p-8 overflow-y-auto">
         {/* Dynamic Product Autocomplete List */}
         <datalist id="productos-datalist">
-          {uniqueProducts.map(p => (
+          {Array.isArray(uniqueProducts) && uniqueProducts.map(p => (
             <option key={p} value={p} />
           ))}
         </datalist>
@@ -1471,7 +1494,7 @@ export default function VentasConsignacionView() {
                       {(() => {
                         const filteredLotes = todosLosLotes.filter(lote => {
                           if (adminFilterCliente && lote.clienteId !== adminFilterCliente) return false;
-                          if (adminFilterProducto && !lote.productoId.toLowerCase().includes(adminFilterProducto.toLowerCase())) return false;
+                          if (adminFilterProducto && !(lote.productoId || "").toLowerCase().includes(adminFilterProducto.toLowerCase())) return false;
                           return true;
                         });
 
@@ -1483,7 +1506,7 @@ export default function VentasConsignacionView() {
                             ...l,
                             displayId: l.id,
                             type: 'ORIGINAL',
-                            sortDate: l.fechaVencimiento,
+                            sortDate: parseDateString(l.fechaVencimiento),
                             displayUnidades: l.unidadesIniciales,
                             clientName: cName
                           });
@@ -1494,7 +1517,7 @@ export default function VentasConsignacionView() {
                               ...l,
                               displayId: `${l.id}_rep_${idx}`,
                               type: 'REP',
-                              sortDate: l.fechaVencimiento,
+                              sortDate: parseDateString(l.fechaVencimiento),
                               displayUnidades: rep.unidades,
                               fechaRep: rep.fecha,
                               clientName: cName,
@@ -1941,7 +1964,7 @@ export default function VentasConsignacionView() {
                                                  ...l,
                                                  displayId: l.id,
                                                  type: 'ORIGINAL',
-                                                 sortDate: l.fechaVencimiento,
+                                                 sortDate: parseDateString(l.fechaVencimiento),
                                                  displayUnidades: l.unidadesIniciales
                                                });
                                                
@@ -1951,7 +1974,7 @@ export default function VentasConsignacionView() {
                                                    ...l,
                                                    displayId: `${l.id}_rep_${idx}`,
                                                    type: 'REP',
-                                                   sortDate: l.fechaVencimiento,
+                                                   sortDate: parseDateString(l.fechaVencimiento),
                                                    displayUnidades: rep.unidades,
                                                    fechaRep: rep.fecha
                                                  });
@@ -1974,7 +1997,7 @@ export default function VentasConsignacionView() {
                                              });
 
                                              const filteredItems = sortedItems.filter(l => 
-                                               l.productoId.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                               (l.productoId || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                                                (l.solucionLote || "").toLowerCase().includes(searchTerm.toLowerCase())
                                              );
 
@@ -2615,8 +2638,12 @@ const MONTH_OPTIONS = [
 
 // Helper to calculate the sequential trajectory of inventory from startMonth up to targetMonth
 function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesForTargetMonth?: number) {
-  const startMonth = parseDateString(lote.fechaEntrega).substring(0, 7);
-  if (!startMonth) return null;
+  if (!lote) return null;
+  const rawDate = lote.fechaEntrega || lote.createdAt;
+  if (!rawDate) return null;
+
+  const startMonth = parseDateString(rawDate).substring(0, 7);
+  if (!startMonth || startMonth.length < 7) return null;
   if (targetMonth < startMonth) {
     return {
       delivered: false,
@@ -2629,10 +2656,23 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
 
   // Generate sequence of months from startMonth up to targetMonth
   const months: string[] = [];
-  let [currYear, currMonth] = startMonth.split('-').map(Number);
-  const [targetYear, targetMonthNum] = targetMonth.split('-').map(Number);
+  const parts = startMonth.split('-');
+  if (parts.length < 2) return null;
+  
+  let currYear = parseInt(parts[0]);
+  let currMonth = parseInt(parts[1]);
+  
+  const targetParts = targetMonth.split('-');
+  if (targetParts.length < 2) return null;
+  const targetYear = parseInt(targetParts[0]);
+  const targetMonthNum = parseInt(targetParts[1]);
 
-  while (currYear < targetYear || (currYear === targetYear && currMonth <= targetMonthNum)) {
+  if (isNaN(currYear) || isNaN(currMonth) || isNaN(targetYear) || isNaN(targetMonthNum)) return null;
+
+  // Safety limit to prevent infinite loops (max 10 years of trajectory)
+  let safetyCounter = 0;
+  while ((currYear < targetYear || (currYear === targetYear && currMonth <= targetMonthNum)) && safetyCounter < 120) {
+    safetyCounter++;
     const mStr = String(currMonth).padStart(2, '0');
     months.push(`${currYear}-${mStr}`);
     currMonth++;
@@ -2686,7 +2726,7 @@ function LoteFixedDataRow({ item, isFIFO, onRefresh }: { key?: string, item: any
   const [form, setForm] = useState({
     productoId: item.productoId || '',
     solucionLote: item.solucionLote || '',
-    fechaVencimiento: item.fechaVencimiento || '',
+    fechaVencimiento: parseDateString(item.fechaVencimiento),
     unidadesIniciales: Number(item.displayUnidades) || 100,
     precioUnitNeto: Number(item.precioUnitNeto) || 0,
   });
@@ -2705,8 +2745,8 @@ function LoteFixedDataRow({ item, isFIFO, onRefresh }: { key?: string, item: any
         
         if (item.type === 'ORIGINAL') {
           await setDoc(docRef, {
-            productoId: form.productoId.toUpperCase().trim(),
-            solucionLote: form.solucionLote.toUpperCase().trim() || 'S/L',
+            productoId: (form.productoId || "").toUpperCase().trim(),
+            solucionLote: (form.solucionLote || "").toUpperCase().trim() || 'S/L',
             fechaVencimiento: form.fechaVencimiento,
             unidadesIniciales: units,
             precioUnitNeto: price,

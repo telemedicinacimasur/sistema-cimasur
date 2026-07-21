@@ -17,7 +17,6 @@ import {
   Trash2, 
   Edit, 
   Plus,
-  Trash,
   Filter,
   Save,
   Package,
@@ -973,7 +972,7 @@ export default function SalesTiendaMLManager() {
                           className="text-red-400 hover:text-red-300 p-1"
                           title="Remover de esta Venta"
                         >
-                          <Trash className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>

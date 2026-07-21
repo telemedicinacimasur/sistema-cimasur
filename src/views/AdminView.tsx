@@ -159,10 +159,8 @@ export default function AdminView() {
       return;
     }
     
-    // Auto-sync students with admin school payments before loading the view
-    if (col === 'school_payments') {
-      await syncStudentsToSchoolPayments();
-    }
+    // Removed redundant auto-sync from loadData as it's already handled by localDB.save/update/delete
+    // and was causing an infinite loop when col === 'school_payments'
     
     try {
       const options = getQueryOptions(col);
