@@ -374,6 +374,16 @@ export default function VentasConsignacionView() {
 
   const loadTodosLosLotes = async () => {
     try {
+      const cacheKey = 'cache_todos_los_lotes';
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < 300000) { // 5 minutes cache
+          setTodosLosLotes(data);
+          return;
+        }
+      }
+
       if (isFirebaseReady()) {
         const db = getDb();
         const snap = await getDocs(collection(db, 'crm_consignacion_lotes'));
@@ -384,9 +394,10 @@ export default function VentasConsignacionView() {
           loaded.push({
             id: d.id,
             ...data,
-            movimientos: {} // we don't need movements for the global admin table
+            movimientos: {} 
           });
         }
+        localStorage.setItem(cacheKey, JSON.stringify({ data: loaded, timestamp: Date.now() }));
         setTodosLosLotes(loaded);
       } else {
         const key = 'mock_consignacion_lotes';
@@ -468,12 +479,18 @@ export default function VentasConsignacionView() {
     try {
       if (!clienteId) return;
       
-      // Memory Cache Check: Only reload if it's been more than 2 minutes or forced
+      // Memory Cache Check
       const now = Date.now();
-      const cached = lotesCache[clienteId];
-      if (!force && cached && (now - cached.timestamp < 120000)) {
-        setLotesActivos(cached.data);
-        return;
+      
+      // Persistent Cache Check
+      const cacheKey = `cache_lotes_${clienteId}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (!force && cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (now - timestamp < 600000) { // 10 minutes cache
+          setLotesActivos(data);
+          return;
+        }
       }
 
       setLoadingLotes(true);
@@ -485,14 +502,10 @@ export default function VentasConsignacionView() {
         );
         const snap = await getDocs(q);
         
-        // Use a map to handle movements loading in parallel
         const promises = snap.docs.map(async (d) => {
           const loteId = d.id;
           const data = d.data();
           
-          // CRITICAL OPTIMIZATION: Instead of loading ALL movements for ALL lotes,
-          // we only load the movement for the selectedMonth.
-          // This reduces reads from N*M to N*1.
           const movimientos: Record<string, any> = {};
           
           if (selectedMonth) {
@@ -514,8 +527,8 @@ export default function VentasConsignacionView() {
         });
 
         const results = await Promise.all(promises);
+        localStorage.setItem(cacheKey, JSON.stringify({ data: results, timestamp: now }));
         setLotesActivos(results);
-        setLotesCache(prev => ({ ...prev, [clienteId]: { data: results, timestamp: now } }));
       } else {
         const clientLotes = getMockLotesForClient(clienteId);
         setLotesActivos(clientLotes);
@@ -1135,7 +1148,7 @@ export default function VentasConsignacionView() {
           // Update active status as metadata
           const loteRef = doc(db, 'crm_consignacion_lotes', lote.id);
           await setDoc(loteRef, {
-            activo: traj.frascosRestantes > 0
+            activo: true
           }, { merge: true });
         }
       } else {
@@ -1161,7 +1174,7 @@ export default function VentasConsignacionView() {
                     montoVentaNeto: Number(traj.montoVentaNeto),
                     fechaRegistro: new Date().toISOString()
                   };
-                  l.activo = traj.frascosRestantes > 0;
+                  l.activo = true;
                 }
               }
             }
