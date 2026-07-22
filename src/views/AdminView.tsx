@@ -66,6 +66,21 @@ import PresupuestoFlujoManager from './admin/PresupuestoFlujoManager';
 import SalesTiendaMLManager from './admin/SalesTiendaMLManager';
 import VentasConsignacionView from './admin/VentasConsignacionView';
 
+export function normalizeDateForCompare(dateStr: string) {
+  if (!dateStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const match = dateStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (match) {
+    return `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    d.setUTCHours(12, 0, 0, 0);
+    return `${d.getUTCFullYear()}-${(d.getUTCMonth() + 1).toString().padStart(2, '0')}-${d.getUTCDate().toString().padStart(2, '0')}`;
+  }
+  return dateStr;
+}
+
 export const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
   const wb = XLSX.utils.book_new();
@@ -95,7 +110,7 @@ export default function AdminView() {
   }, [location.state]);
 
   const [loadRange, setLoadRange] = useState<'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
-    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'mes_actual';
+    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'historico_completo';
   });
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1456,8 +1471,9 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
 
   const filteredRecords = records.filter(r => {
     let match = true;
-    if (dateFrom && r.fecha < dateFrom) match = false;
-    if (dateTo && r.fecha > dateTo) match = false;
+    const rDateNorm = normalizeDateForCompare(r.fecha);
+    if (dateFrom && rDateNorm && rDateNorm < dateFrom) match = false;
+    if (dateTo && rDateNorm && rDateNorm > dateTo) match = false;
     if (filterMonth !== 'Todos' && r.mes !== filterMonth) match = false;
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
@@ -2005,8 +2021,9 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 
   const filteredRecords = records.filter(r => {
     let match = true;
-    if (dateFrom && r.fecha < dateFrom) match = false;
-    if (dateTo && r.fecha > dateTo) match = false;
+    const rDateNorm = normalizeDateForCompare(r.fecha);
+    if (dateFrom && rDateNorm && rDateNorm < dateFrom) match = false;
+    if (dateTo && rDateNorm && rDateNorm > dateTo) match = false;
     if (filterTipoPago !== 'Todos') {
       const rTipo = r.tipoPago || 'Contado';
       if (rTipo !== filterTipoPago) match = false;
