@@ -57,51 +57,122 @@ export const ClientForm: React.FC<ClientFormProps> = ({ client, onSave, onCancel
     try {
       if (formData.id) {
         await clientService.updateClient(formData.id, { ...formData, email });
-      } else {
-        const newClient: Client = {
-          ...formData,
-          email,
-          id: Date.now().toString(),
-          contactos: [],
-          veterinarios: [],
-          ventas: [],
-          clubComercial: {
-            categoria: 'Sin categoría',
-            beneficios: [],
-            puntos: 0,
-            estado: 'Sin categoría'
-          },
-          oportunidades: [],
-          campanas: [],
-          iaComercial: {
-            insights: 'Nueva cuenta creada. Se calculará el perfil comercial automáticamente.',
-            propensionAbandono: 'Baja',
-            proximaCompra: 'Sin recomendación'
-          },
-          bitacora: [{
-            id: Date.now().toString(),
-            fecha: new Date().toISOString().split('T')[0],
-            comentario: 'Cliente ingresado al CRM.',
-            creador: 'Sistema'
-          }],
-          documentos: []
-        } as unknown as Client;
 
-        // Register global activity
-        try {
-          await localDB.saveToCollection('crm_activities', {
-            fecha: new Date().toISOString(),
-            campania: 'CRM Core',
-            tipo: 'Alta de Socio',
-            observaciones: 'Cliente ingresado manualmente al CRM.',
-            responsable: 'Sistema',
-            clientId: newClient.id
+        // Ensure both collections stay synchronized in real-time
+        const contacts = await localDB.getCollection('contacts');
+        const intranetClients = await localDB.getCollection('intranet_clients');
+
+        const phoneVal = formData.telefono || formData.phone || '';
+        const rutClean = formData.rut || 'Sin RUT';
+
+        const existingContact = contacts.find((c: any) => 
+          c.id === formData.id || 
+          (c.email && c.email.toLowerCase().trim() === email.toLowerCase().trim()) || 
+          (c.rut && c.rut !== 'Sin RUT' && c.rut === rutClean)
+        );
+
+        const existingIntranet = intranetClients.find((c: any) => 
+          c.id === formData.id || 
+          (c.email && c.email.toLowerCase().trim() === email.toLowerCase().trim()) || 
+          (c.rut && c.rut !== 'Sin RUT' && c.rut === rutClean)
+        );
+
+        if (existingContact) {
+          await localDB.updateInCollection('contacts', existingContact.id, {
+            ...formData,
+            email,
+            phone: phoneVal,
+            rut: rutClean,
+            categoria: (!existingContact.categoria || existingContact.categoria === 'Sin compra' || existingContact.categoria === 'Sin categoría') ? 'Bronce' : existingContact.categoria,
+            intranet: (formData.accesoAprobado === 'Si' || existingContact.intranet === 'Si') ? 'Si' : existingContact.intranet
           });
-        } catch (err) {
-          console.error("Error logging global activity", err);
+        } else if (formData.accesoAprobado === 'Si') {
+          // Pass automatically to Cartera Única CIE
+          await localDB.saveToCollection('contacts', {
+            ...formData,
+            email,
+            phone: phoneVal,
+            rut: rutClean,
+            type: 'Veterinario',
+            categoria: 'Bronce',
+            intranet: 'Si',
+            comoLlego: 'Plataforma Intranet',
+            fechaIngreso: formData.fechaIngreso || new Date().toISOString().split('T')[0]
+          });
         }
 
-        await clientService.saveClient(newClient);
+        if (existingIntranet) {
+          await localDB.updateInCollection('intranet_clients', existingIntranet.id, {
+            name: formData.name,
+            email,
+            rut: rutClean,
+            telefono: phoneVal,
+            region: formData.region,
+            comuna: formData.comuna,
+            accesoAprobado: formData.accesoAprobado || existingIntranet.accesoAprobado || 'No'
+          });
+        }
+      } else {
+        if (formData.estado === 'Solo Intranet') {
+          await localDB.saveToCollection('intranet_clients', {
+            fechaIngreso: formData.fechaIngreso || new Date().toISOString().split('T')[0],
+            name: formData.name,
+            email,
+            rut: formData.rut || 'Sin RUT',
+            telefono: formData.telefono || '',
+            comuna: formData.comuna || '',
+            region: formData.region || 'Metropolitana',
+            accesoAprobado: 'No',
+            estado: 'Solo Intranet',
+            historialUnificado: formData.observaciones || 'Registrado en Intranet manualmente desde Inscribir Socio',
+            responsable: formData.responsable || 'Sistema'
+          });
+        } else {
+          const newClient: Client = {
+            ...formData,
+            email,
+            id: Date.now().toString(),
+            contactos: [],
+            veterinarios: [],
+            ventas: [],
+            clubComercial: {
+              categoria: 'Sin categoría',
+              beneficios: [],
+              puntos: 0,
+              estado: 'Sin categoría'
+            },
+            oportunidades: [],
+            campanas: [],
+            iaComercial: {
+              insights: 'Nueva cuenta creada. Se calculará el perfil comercial automáticamente.',
+              propensionAbandono: 'Baja',
+              proximaCompra: 'Sin recomendación'
+            },
+            bitacora: [{
+              id: Date.now().toString(),
+              fecha: new Date().toISOString().split('T')[0],
+              comentario: 'Cliente ingresado al CRM.',
+              creador: 'Sistema'
+            }],
+            documentos: []
+          } as unknown as Client;
+
+          // Register global activity
+          try {
+            await localDB.saveToCollection('crm_activities', {
+              fecha: new Date().toISOString(),
+              campania: 'CRM Core',
+              tipo: 'Alta de Socio',
+              observaciones: 'Cliente ingresado manualmente al CRM.',
+              responsable: 'Sistema',
+              clientId: newClient.id
+            });
+          } catch (err) {
+            console.error("Error logging global activity", err);
+          }
+
+          await clientService.saveClient(newClient);
+        }
       }
       onSave();
       window.dispatchEvent(new Event('db-change'));

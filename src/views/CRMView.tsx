@@ -22,7 +22,8 @@ import {
   Upload,
   FileSpreadsheet,
   X,
-  Check
+  Check,
+  Edit
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
 import { CommentDialog } from '../components/CommentDialog';
@@ -145,22 +146,50 @@ export async function syncToIntranetClientsIfNeeded(contact: any, user?: any) {
   if (!contact || contact.intranet !== 'Si') return;
   try {
     const intranetClients = await localDB.getCollection('intranet_clients');
-    const exists = intranetClients.some((ic: any) => areContactsDuplicate(ic, contact));
+    const existingIntranet = intranetClients.find((ic: any) => areContactsDuplicate(ic, contact));
 
-    if (!exists) {
+    const phoneVal = contact.phone || contact.telefono || '';
+    const rutVal = contact.rut || 'Sin RUT';
+
+    if (!existingIntranet) {
       await localDB.saveToCollection('intranet_clients', {
         fechaIngreso: contact.fechaIngreso || new Date().toISOString().split('T')[0],
         name: contact.name,
+        rut: rutVal,
+        telefono: phoneVal,
         email: contact.email || '',
+        region: contact.region || 'Metropolitana',
+        comuna: contact.comuna || '',
+        direccion: contact.direccion || '',
         accesoAprobado: 'Si',
         historialUnificado: `Registrado automáticamente en base Intranet de forma sincrónica el ${new Date().toLocaleDateString('es-CL')}.`,
         responsable: user?.displayName || user?.email || contact.responsable || 'Sistema'
       });
+    } else {
+      const updates: any = {};
+      let hasChanges = false;
+      if (contact.name && existingIntranet.name !== contact.name) { updates.name = contact.name; hasChanges = true; }
+      if (rutVal && rutVal !== 'Sin RUT' && existingIntranet.rut !== rutVal) { updates.rut = rutVal; hasChanges = true; }
+      if (phoneVal && existingIntranet.telefono !== phoneVal) { updates.telefono = phoneVal; hasChanges = true; }
+      if (contact.email && existingIntranet.email !== contact.email) { updates.email = contact.email; hasChanges = true; }
+      if (contact.region && existingIntranet.region !== contact.region) { updates.region = contact.region; hasChanges = true; }
+      if (contact.comuna && existingIntranet.comuna !== contact.comuna) { updates.comuna = contact.comuna; hasChanges = true; }
+      if (contact.direccion && existingIntranet.direccion !== contact.direccion) { updates.direccion = contact.direccion; hasChanges = true; }
+      if (existingIntranet.accesoAprobado !== 'Si') { updates.accesoAprobado = 'Si'; hasChanges = true; }
+
+      if (hasChanges) {
+        await localDB.updateInCollection('intranet_clients', existingIntranet.id, updates);
+      }
     }
   } catch (err) {
     console.error("Error automatic sync to intranet_clients:", err);
   }
 }
+
+export const isApproved = (val: any) => {
+  const s = String(val || '').toLowerCase().trim();
+  return s === 'si' || s === 'sí' || s === 'true' || s === 'yes';
+};
 
 export async function syncIntranetClientToCRM(ic: any, user?: any) {
   if (!ic) return;
@@ -171,6 +200,9 @@ export async function syncIntranetClientToCRM(ic: any, user?: any) {
     const contacts = await localDB.getCollection('contacts');
     const existingContact = contacts.find((c: any) => areContactsDuplicate(c, ic));
 
+    const phoneVal = ic.telefono || ic.phone || '';
+    const rutVal = (ic.rut && ic.rut !== 'Sin RUT') ? ic.rut : undefined;
+
     if (existingContact) {
       let needsUpdate = false;
       const updates: any = {};
@@ -180,26 +212,65 @@ export async function syncIntranetClientToCRM(ic: any, user?: any) {
         needsUpdate = true;
       }
 
+      if (!existingContact.categoria || existingContact.categoria === 'Sin compra' || existingContact.categoria === 'Sin categoría') {
+        updates.categoria = 'Bronce';
+        needsUpdate = true;
+      }
+
+      if (ic.name && ic.name !== 'Contacto de Intranet' && existingContact.name !== ic.name) {
+        updates.name = ic.name;
+        needsUpdate = true;
+      }
+
+      if (rutVal && existingContact.rut !== rutVal) {
+        updates.rut = rutVal;
+        needsUpdate = true;
+      }
+
+      if (phoneVal && existingContact.phone !== phoneVal) {
+        updates.phone = phoneVal;
+        needsUpdate = true;
+      }
+
+      if (ic.email && existingContact.email !== ic.email) {
+        updates.email = ic.email;
+        needsUpdate = true;
+      }
+
+      if (ic.region && ic.region !== 'Metropolitana' && existingContact.region !== ic.region) {
+        updates.region = ic.region;
+        needsUpdate = true;
+      }
+
+      if (ic.comuna && existingContact.comuna !== ic.comuna) {
+        updates.comuna = ic.comuna;
+        needsUpdate = true;
+      }
+
+      if (ic.direccion && existingContact.direccion !== ic.direccion) {
+        updates.direccion = ic.direccion;
+        needsUpdate = true;
+      }
+
       if (needsUpdate) {
-        const currentObs = existingContact.historialUnificado || '';
-        updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
-          `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' automáticamente por ser aprobado en plataforma el ${new Date().toLocaleDateString('es-CL')}.`;
         await localDB.updateInCollection('contacts', existingContact.id, updates);
       }
     } else {
       const newContact = {
         fechaIngreso: ic.fechaIngreso || new Date().toISOString().split('T')[0],
         name: ic.name || 'Contacto de Intranet',
-        rut: 'Sin RUT',
-        phone: '',
+        rut: ic.rut || 'Sin RUT',
+        phone: phoneVal,
         email: ic.email || '',
-        region: 'Metropolitana',
+        region: ic.region || 'Metropolitana',
+        comuna: ic.comuna || '',
+        direccion: ic.direccion || '',
         type: 'Veterinario',
-        categoria: 'Sin compra',
+        categoria: 'Bronce',
         intranet: 'Si',
         comoLlego: 'Plataforma Intranet',
         fechaPago: 'Mensual',
-        historialUnificado: `Sincronizado automáticamente desde plataforma de ventas online Intranet (Acceso Aprobado: Veterinario/Compra) el ${new Date().toLocaleDateString('es-CL')}.`,
+        historialUnificado: `Sincronizado automáticamente desde plataforma de ventas online Intranet (Acceso Aprobado: Veterinario/Compra) a Cartera Única CIE el ${new Date().toLocaleDateString('es-CL')}.`,
         responsable: user?.displayName || user?.email || 'Sistema',
         isGestionCustomer: false
       };
@@ -223,6 +294,7 @@ export default function CRMView() {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [activeFormClient, setActiveFormClient] = useState<any | null>(null);
 
   useEffect(() => {
     const loadEngineData = async () => {
@@ -331,15 +403,12 @@ export default function CRMView() {
         }
       }
 
-      // Automáticamente sincronizar veterinarios aprobados preexistentes al CRM Comercial para corregir discrepancias
+      // Automáticamente sincronizar veterinarios aprobados preexistentes al CRM Comercial (Cartera Única CIE)
       let didSync = false;
       for (const ic of intranetData) {
         if (ic.accesoAprobado === 'Si') {
-          const isDuplicate = cleanContactsList.some((c: any) => areContactsDuplicate(c, ic));
-          if (!isDuplicate) {
-            await syncIntranetClientToCRM(ic, user);
-            didSync = true;
-          }
+          await syncIntranetClientToCRM(ic, user);
+          didSync = true;
         }
       }
 
@@ -401,14 +470,14 @@ export default function CRMView() {
           }
         } else {
           // If they don't exist in CRM, they only import/transfer automatically if they are APPROVED (veterinarians!)
-          if (ic.accesoAprobado === 'Si') {
+          if (isApproved(ic.accesoAprobado)) {
             const newContact = {
               fechaIngreso: ic.fechaIngreso || new Date().toISOString().split('T')[0],
               name: ic.name || 'Contacto de Intranet',
-              rut: 'Sin RUT',
-              phone: '',
+              rut: ic.rut || 'Sin RUT',
+              phone: ic.telefono || '',
               email: ic.email || '',
-              region: 'Metropolitana',
+              region: ic.region || 'Metropolitana',
               type: 'Veterinario',
               categoria: 'Sin compra', // Force "Sin compra" to trigger purchase campaigns!
               intranet: 'Si',
@@ -436,15 +505,18 @@ export default function CRMView() {
   };
 
   const handleImportSingleFromIntranet = async (ic: any) => {
-    if (ic.accesoAprobado !== 'Si') {
-      alert("No se puede traspasar este cliente porque no está aprobado en la Intranet (debe ser Veterinario).");
-      return;
+    // If client is not yet approved in Intranet, approve them automatically upon syncing
+    if (!isApproved(ic.accesoAprobado)) {
+      await localDB.updateInCollection('intranet_clients', ic.id, { accesoAprobado: 'Si' });
+      ic.accesoAprobado = 'Si';
     }
     try {
       const contacts = await localDB.getCollection('contacts');
       const existingContact = contacts.find(c => areContactsDuplicate(c, ic));
+      let targetId = '';
 
       if (existingContact) {
+        targetId = existingContact.id;
         let needsUpdate = false;
         const updates: any = {};
 
@@ -453,37 +525,47 @@ export default function CRMView() {
           needsUpdate = true;
         }
 
+        if (!existingContact.categoria || existingContact.categoria === 'Sin compra') {
+          updates.categoria = 'Bronce';
+          needsUpdate = true;
+        }
+
         if (needsUpdate) {
           const currentObs = existingContact.historialUnificado || '';
           updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
-            `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' individualmente el ${new Date().toLocaleDateString('es-CL')}.`;
+            `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' y Motor Comercial a 'Con Compra' el ${new Date().toLocaleDateString('es-CL')}.`;
           await localDB.updateInCollection('contacts', existingContact.id, updates);
         }
-        alert(`El cliente "${ic.name}" ya existe en la Cartera de Clientes (se detectó de forma inteligente). Se actualizó su estado en el sistema de manera segura.`);
+        alert(`El cliente "${ic.name}" ya está en la Cartera Única CIE.\n\nAl estar en Cartera CIE puedes modificar libremente su Categoría ("Sin categoría", "Bronce", etc.), su Compra Anual Acumulada ($) y sus datos generales.\n\nSe abrirá su Expediente 360° a continuación.`);
       } else {
         const newContact = {
           fechaIngreso: ic.fechaIngreso || new Date().toISOString().split('T')[0],
           name: ic.name || 'Contacto de Intranet',
-          rut: 'Sin RUT',
-          phone: '',
+          rut: ic.rut || 'Sin RUT',
+          phone: ic.telefono || ic.phone || '',
           email: ic.email || '',
-          region: 'Metropolitana',
+          region: ic.region || 'Metropolitana',
           type: 'Veterinario',
-          categoria: 'Sin compra', // Force "Sin compra" to start purchase campaigns!
+          categoria: 'Bronce', // Set to Bronce so Motor Comercial status becomes "Con Compra"
           intranet: 'Si',
           comoLlego: 'Plataforma Intranet',
           fechaPago: 'Mensual',
-          historialUnificado: `Sincronizado individualmente desde Intranet el ${new Date().toLocaleDateString('es-CL')}.`,
+          historialUnificado: `Sincronizado individualmente desde Intranet a Cartera Única CIE el ${new Date().toLocaleDateString('es-CL')}.`,
           responsable: user?.displayName || user?.email || 'Sistema',
           isGestionCustomer: false
         };
 
-        await localDB.saveToCollection('contacts', newContact);
-        alert(`Cliente "${ic.name}" traspasado con éxito al CRM con Categoría "Sin compra" (Motor Comercial listo).`);
+        const saved = await localDB.saveToCollection('contacts', newContact);
+        targetId = saved.id;
+        alert(`¡Cliente "${ic.name}" traspasado con éxito a la Cartera Única CIE!\n\nQuedó totalmente habilitado en la Cartera Comercial y ahora puedes modificar su Categoría (incluyendo "Sin categoría"), Compra Anual Acumulada ($) y datos generales.\n\nSe abrirá su Expediente 360° para que puedas ajustarlo ahora mismo.`);
       }
 
-      await addAuditLog(user, `Traspasó cliente de Intranet individual: ${ic.name}`, 'CRM');
+      await addAuditLog(user, `Traspasó cliente de Intranet individual a Cartera Única CIE: ${ic.name}`, 'CRM');
       window.dispatchEvent(new Event('db-change'));
+
+      if (targetId) {
+        setSelectedClientId(targetId);
+      }
     } catch (err) {
       console.error(err);
       alert('Error al realizar la importación individual.');
@@ -506,7 +588,7 @@ export default function CRMView() {
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-xl font-bold text-white">Centro de Crecimiento Comercial CIMASUR</h1>
             <button
-              onClick={() => setIsFormOpen(true)}
+              onClick={() => { setActiveFormClient(null); setIsFormOpen(true); }}
               className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black px-4 py-2 rounded-xl transition-all active:scale-95 shadow-md cursor-pointer"
             >
               <span className="text-sm font-black">+</span> Inscribir Socio
@@ -562,19 +644,27 @@ export default function CRMView() {
                 {clientesSubTab === 'cartera' && (
                   <CRMTable 
                     records={records} 
+                    setRecords={setRecords}
                     filters={filters} 
                     setFilters={setFilters} 
                     onComment={(c: any) => setCommentTarget(c)} 
                     onViewClient={(id) => setSelectedClientId(id)} 
-                    onAddClient={() => setIsFormOpen(true)}
+                    onAddClient={() => { setActiveFormClient(null); setIsFormOpen(true); }}
                   />
                 )}
                 {clientesSubTab === 'intranet' && (
                   <CRMIntranetTable 
                     clients={intranetClients} 
-                    onImportFromIntranet={handleImportFromIntranet} 
+                    setClients={setIntranetClients}
                     onImportSingle={handleImportSingleFromIntranet} 
                     onViewClient={(id) => setSelectedClientId(id)} 
+                    onEditClient={(client) => {
+                      setActiveFormClient({
+                        ...client,
+                        telefono: client.telefono || client.phone || ''
+                      });
+                      setIsFormOpen(true);
+                    }}
                   />
                 )}
               </div>
@@ -619,13 +709,19 @@ export default function CRMView() {
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <ClientForm 
+              client={activeFormClient}
               onSave={async () => {
                 setIsFormOpen(false);
-                // Re-fetch records immediately
+                setActiveFormClient(null);
                 const data = await localDB.getCollection('contacts');
                 setRecords(data);
+                const intranetData = await localDB.getCollection('intranet_clients');
+                setIntranetClients(intranetData);
               }} 
-              onCancel={() => setIsFormOpen(false)} 
+              onCancel={() => {
+                setIsFormOpen(false);
+                setActiveFormClient(null);
+              }} 
             />
           </div>
         </div>
@@ -640,7 +736,7 @@ const REGIONES = [
   'Los Lagos', 'Aysén', 'Magallanes'
 ];
 
-const CATEGORIAS = ['Sin compra', 'Sin categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'];
+const CATEGORIAS = ['Sin compra', 'Sin categoría', 'Con compra', 'Bronce', 'Plata', 'Oro', 'Platinum'];
 
 const normalizeCat = (val: any) => {
   const str = typeof val === 'string' ? val : '';
@@ -1047,7 +1143,7 @@ function CRMRegister() {
   );
 }
 
-function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAddClient }: { records: any[], filters: any, setFilters: any, onComment: (r: any) => void, onViewClient?: (id: string) => void, onAddClient?: () => void }) {
+function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewClient, onAddClient }: { records: any[], setRecords: any, filters: any, setFilters: any, onComment: (r: any) => void, onViewClient?: (id: string) => void, onAddClient?: () => void }) {
   const { user } = useAuth();
   const permissions = user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
@@ -2203,13 +2299,14 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                        <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || "---"}</td>
                        <td className="p-5">
                          <select
-                           value={(() => { const current = r.categoria || 'Sin categoría'; return CATEGORIAS.find(c => c.toLowerCase() === current.toLowerCase()) || 'Sin categoría'; })()}
+                           value={CATEGORIAS.find(c => c.toLowerCase() === String(r.categoria || 'Sin categoría').toLowerCase()) || 'Sin categoría'}
                            disabled={!canEdit}
                            onChange={async (e) => {
                              const newVal = e.target.value;
                              try {
                                // 1. Eliminar estado volátil anterior y actualizar localDB
-                               await localDB.updateInCollection('contacts', r.id, { categoria: newVal });
+                               setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, categoria: newVal } : rec));
+                                await localDB.updateInCollection('contacts', r.id, { categoria: newVal });
                                
                                // 2. Disparar fetch PUT directo a /api/crm/clients/category
                                await fetch('/api/crm/clients/category', {
@@ -2231,10 +2328,10 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                            }}
                            className={cn(
                              "px-2.5 py-1 rounded-full font-black text-[9px] uppercase border cursor-pointer bg-[#0F172A] outline-none text-center focus:ring-1 focus:ring-blue-400 font-bold max-w-[125px] disabled:pointer-events-none disabled:opacity-80",
-                             r.categoria === 'Platinum' ? "bg-purple-950 text-purple-300 border-purple-800/80" :
-                             r.categoria === 'Oro' ? "bg-amber-950 text-amber-300 border-amber-800/80" :
-                             r.categoria === 'Plata' ? "bg-slate-800 text-slate-300 border-slate-600/80" :
-                             r.categoria === 'Bronce' ? "bg-orange-950 text-orange-300 border-orange-850/80" :
+                             String(r.categoria).toLowerCase() === 'platinum' ? "bg-purple-950 text-purple-300 border-purple-800/80" :
+                             String(r.categoria).toLowerCase() === 'oro' ? "bg-amber-950 text-amber-300 border-amber-800/80" :
+                             String(r.categoria).toLowerCase() === 'plata' ? "bg-slate-800 text-slate-300 border-slate-600/80" :
+                             String(r.categoria).toLowerCase() === 'bronce' ? "bg-orange-950 text-orange-300 border-orange-850/80" :
                               "bg-[#111A2E] text-slate-200 border-slate-700/50"
                             )}
                           >
@@ -2248,12 +2345,13 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                       <td className="p-5 font-medium text-slate-350">{r.type}</td>
                       <td className="p-5">
                          <select
-                           value={r.intranet || 'No'}
+                           value={isApproved(r.intranet) ? 'Si' : 'No'}
                            disabled={!canEdit}
                            onChange={async (e) => {
                              const newVal = e.target.value;
                              try {
-                               await localDB.updateInCollection('contacts', r.id, { intranet: newVal });
+                               setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, intranet: newVal } : rec));
+                                await localDB.updateInCollection('contacts', r.id, { intranet: newVal });
                                if (newVal === 'Si') {
                                  await syncToIntranetClientsIfNeeded({ ...r, intranet: 'Si' }, user);
                                }
@@ -2265,7 +2363,7 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
                            }}
                            className={cn(
                              "px-2.5 py-1 rounded-full font-black text-[9px] uppercase border cursor-pointer bg-[#0F172A] outline-none text-center focus:ring-1 focus:ring-blue-400 font-bold max-w-[80px] disabled:pointer-events-none disabled:opacity-80 transition-all duration-200",
-                             (r.intranet === 'Si') 
+                             (isApproved(r.intranet)) 
                                ? "bg-emerald-950 text-emerald-300 border-emerald-800/80" 
                                : "bg-rose-950 text-rose-300 border-rose-800/80"
                            )}
@@ -2455,14 +2553,16 @@ function CRMTable({ records, filters, setFilters, onComment, onViewClient, onAdd
 
 function CRMIntranetTable({ 
   clients, 
-  onImportFromIntranet,
+  setClients,
   onImportSingle,
-  onViewClient
+  onViewClient,
+  onEditClient
 }: { 
   clients: any[], 
-  onImportFromIntranet?: () => void,
+  setClients?: any,
   onImportSingle?: (client: any) => void,
-  onViewClient?: (id: string) => void
+  onViewClient?: (id: string) => void,
+  onEditClient?: (client: any) => void
 }) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2471,6 +2571,29 @@ function CRMIntranetTable({
   const [crmContacts, setCrmContacts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('Todos');
+
+  const getAutomaticMotorStatus = (client: any) => {
+    if (client.accesoAprobado !== 'Si') {
+      return {
+        label: 'Esperando Confirmación',
+        badgeClass: 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+      };
+    }
+    const matchedContact = crmContacts.find(c => areContactsDuplicate(c, client));
+    const hasPurchase = matchedContact && matchedContact.categoria && matchedContact.categoria !== 'Sin compra' && matchedContact.categoria !== 'Sin categoría';
+
+    if (hasPurchase) {
+      return {
+        label: 'Con Compra',
+        badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+      };
+    } else {
+      return {
+        label: 'Registrado sin Compra',
+        badgeClass: 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+      };
+    }
+  };
 
   const filteredClients = React.useMemo(() => {
     let result = clients;
@@ -2486,13 +2609,13 @@ function CRMIntranetTable({
 
     if (estadoFilter !== 'Todos') {
       result = result.filter((client: any) => {
-        const estado = client.estado || 'Activo';
-        return estado === estadoFilter;
+        const autoStatus = getAutomaticMotorStatus(client).label;
+        return autoStatus === estadoFilter;
       });
     }
 
     return result;
-  }, [clients, searchTerm, estadoFilter]);
+  }, [clients, searchTerm, estadoFilter, crmContacts]);
 
   const permissions = user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
@@ -2711,17 +2834,6 @@ function CRMIntranetTable({
            >
              <Download className="w-3.5 h-3.5 text-amber-400" /> Exportar Base a Excel
            </button>
-
-           {onImportFromIntranet && (
-             <button
-               type="button"
-               onClick={onImportFromIntranet}
-               className="text-[10px] bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 border-2 border-[#1C2541] px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-all font-bold uppercase cursor-pointer"
-               title="Mover todos los clientes de Intranet que están aprobados al CRM Comercial"
-             >
-               <UserCheck className="w-4 h-4 text-emerald-300 animate-bounce" /> Sincronizar Aprobados al CRM
-             </button>
-           )}
          </div>
       </div>
 
@@ -2744,11 +2856,9 @@ function CRMIntranetTable({
             onChange={e => setEstadoFilter(e.target.value)}
           >
             <option value="Todos">Estado Motor (Todos)</option>
-            <option value="Activo">Activo</option>
-            <option value="Inactivo">Inactivo</option>
-            <option value="Solo CRM Comercial">Solo CRM</option>
-            <option value="Solo Intranet">Solo Intranet</option>
-            <option value="Ambos (Sincronizado)">Ambos</option>
+            <option value="Con Compra">Con Compra</option>
+            <option value="Registrado sin Compra">Registrado sin Compra</option>
+            <option value="Esperando Confirmación">Esperando Confirmación</option>
           </select>
           <button 
             onClick={() => {
@@ -2757,7 +2867,7 @@ function CRMIntranetTable({
                 c.email || '---',
                 formatDate(c.fechaIngreso),
                 c.accesoAprobado || 'No',
-                c.estado || 'Activo'
+                getAutomaticMotorStatus(c).label
               ]);
               exportTableToPDF(
                 'Reporte: Base de Clientes en Plataforma Intranet',
@@ -2789,13 +2899,15 @@ function CRMIntranetTable({
               <th className="p-5">Email</th>
               <th className="p-5">Fecha Registro</th>
               <th className="p-5 text-center">Acceso Aprobado (Veterinario)</th>
-              <th className="p-5 text-center">Estado del Motor Comercial</th>
+              <th className="p-5 text-center">Estado del Motor Comercial (Automático)</th>
               <th className="p-5 text-right">Acción</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/10">
             {filteredClients.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '')).map(client => {
-              const isTransferred = crmContacts.some(c => areContactsDuplicate(c, client));
+              const matchingContact = crmContacts.find(c => areContactsDuplicate(c, client));
+              const isTransferred = !!matchingContact;
+              const autoStatus = getAutomaticMotorStatus(client);
               return (
                 <tr key={client.id} className="hover:bg-[#1E293B]/50 transition-colors">
                   <td className="p-5 font-bold text-white">{ client.name }</td>
@@ -2808,10 +2920,13 @@ function CRMIntranetTable({
                         onChange={async (e) => {
                           const newVal = e.target.value;
                           try {
+                            if (setClients) {
+                              setClients((prev: any[]) => prev.map(c => c.id === client.id ? { ...c, accesoAprobado: newVal } : c));
+                            }
                             await localDB.updateInCollection('intranet_clients', client.id, { accesoAprobado: newVal });
                             if (newVal === 'Si') {
-                              await syncIntranetClientToCRM(client, user);
-                              alert(`Cliente "${client.name}" aprobado como Veterinario. Se traspasó automáticamente al CRM Comercial.`);
+                              await syncIntranetClientToCRM({ ...client, accesoAprobado: 'Si' }, user);
+                              alert(`Cliente "${client.name}" aprobado como Veterinario. Se traspasó automáticamente a la Cartera Única CIE.`);
                             }
                             window.dispatchEvent(new Event('db-change'));
                           } catch (err) {
@@ -2830,65 +2945,73 @@ function CRMIntranetTable({
                     )}
                   </td>
                   <td className="p-5 text-center">
-                    {canEdit ? (
-                      <select
-                        value={client.estado || "Activo"}
-                        onChange={async (e) => {
-                          const newVal = e.target.value;
-                          try {
-                            await localDB.updateInCollection("intranet_clients", client.id, { estado: newVal });
-                            window.dispatchEvent(new Event("db-change"));
-                          } catch (err) {
-                            console.error(err);
-                          }
-                        }}
-                        className={cn(
-                          "px-2.5 py-1 rounded-full font-black text-[9px] uppercase border cursor-pointer bg-[#0F172A] outline-none text-center focus:ring-1 focus:ring-blue-400 font-bold max-w-[125px] disabled:pointer-events-none disabled:opacity-80 transition-all duration-200",
-                          (client.estado || "Activo") === "Activo" || (client.estado || "Activo") === "Ambos (Sincronizado)" 
-                            ? "bg-emerald-950 text-emerald-300 border-emerald-800/80" 
-                            : "bg-slate-800 text-slate-300 border-slate-600/80"
-                        )}
-                      >
-                        <option value="Activo" className="bg-[#152035] text-white">Activo</option>
-                        <option value="Inactivo" className="bg-[#152035] text-white">Inactivo</option>
-                        <option value="Solo CRM Comercial" className="bg-[#152035] text-white">Solo CRM</option>
-                        <option value="Solo Intranet" className="bg-[#152035] text-white">Solo Intranet</option>
-                        <option value="Ambos (Sincronizado)" className="bg-[#152035] text-white">Ambos</option>
-                      </select>
-                    ) : (
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase",
-                        (client.estado || "Activo") === "Activo" || (client.estado || "Activo") === "Ambos (Sincronizado)" 
-                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" 
-                          : "bg-slate-500/20 text-slate-300 border border-slate-500/30"
-                      )}>
-                        {client.estado || "Activo"}
+                    <span className={cn("px-3 py-1 rounded-full text-[10px] font-black uppercase inline-block shadow-sm", autoStatus.badgeClass)} title="Estado determinado automáticamente por el motor comercial enlazando Intranet y Cartera Única CIE">
+                      {autoStatus.label}
+                    </span>
+                    {isTransferred && (
+                      <span className="mt-1 px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[9px] font-black uppercase tracking-wider block">
+                        💼 En Cartera CIE
                       </span>
                     )}
                   </td>
                   <td className="p-5 text-right">
-                     <RecordActions 
-                       module="crm"
-                       onView={() => onViewClient?.(client.id)}
-                       onDownload={() => {
-                         const data = [
-                           { label: 'Nombre / Razón Social', value: client.name },
-                           { label: 'Email', value: client.email || '---' },
-                           { label: 'Fecha Registro', value: formatDate(client.fechaIngreso) },
-                           { label: 'Aprobado como Veterinario', value: client.accesoAprobado || 'No' },
-                           { label: 'Estado del Motor', value: client.estado || 'Activo' },
-                           { label: 'RUT / ID', value: client.rut || '---' },
-                           { label: 'Región / Comuna', value: client.region || '---' }
-                         ];
-                         exportExpedienteToPDF(`Ficha Cliente Intranet: ${client.name}`, data, `intranet_${client.id}`);
-                       }}
-                       onDelete={async () => {
-                         if (confirm("¿Está seguro de eliminar este registro de la base Intranet?")) {
-                           await localDB.deleteFromCollection('intranet_clients', client.id);
-                           window.dispatchEvent(new Event('db-change'));
-                         }
-                       }}
-                     />
+                     <div className="flex items-center justify-end gap-1.5">
+                       {isTransferred ? (
+                         <button
+                           type="button"
+                           onClick={() => {
+                             if (matchingContact) {
+                               onViewClient?.(matchingContact.id);
+                             }
+                           }}
+                           className="bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border border-sky-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition-all shadow-md cursor-pointer"
+                           title="Este cliente ya pertenece a la Cartera Única CIE. Haz clic para abrir su Expediente 360° y modificar su Categoría y Compra Anual."
+                         >
+                           <UserCheck className="w-3.5 h-3.5 text-sky-400" />
+                           <span>💼 Modificar en Cartera CIE</span>
+                         </button>
+                       ) : (
+                         <button
+                           type="button"
+                           onClick={() => onImportSingle?.(client)}
+                           className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition-all cursor-pointer"
+                           title="Traspasar a Cartera Única CIE (Permite modificar Categoría y Compra Anual Acumulada)"
+                         >
+                           <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                           <span>Traspasar a CIE</span>
+                         </button>
+                       )}
+                       <button
+                         type="button"
+                         onClick={() => onEditClient?.(client)}
+                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 p-1.5 rounded-lg transition-colors cursor-pointer"
+                         title="Editar datos y rellenar faltantes con ficha Inscribir Socio"
+                       >
+                         <Edit className="w-4 h-4" />
+                       </button>
+                       <RecordActions 
+                         module="crm"
+                         onView={() => onViewClient?.(client.id)}
+                         onDownload={() => {
+                           const data = [
+                             { label: 'Nombre / Razón Social', value: client.name },
+                             { label: 'Email', value: client.email || '---' },
+                             { label: 'Fecha Registro', value: formatDate(client.fechaIngreso) },
+                             { label: 'Aprobado como Veterinario', value: client.accesoAprobado || 'No' },
+                             { label: 'Estado del Motor', value: client.estado || 'Activo' },
+                             { label: 'RUT / ID', value: client.rut || '---' },
+                             { label: 'Región / Comuna', value: client.region || '---' }
+                           ];
+                           exportExpedienteToPDF(`Ficha Cliente Intranet: ${client.name}`, data, `intranet_${client.id}`);
+                         }}
+                         onDelete={async () => {
+                           if (confirm("¿Está seguro de eliminar este registro de la base Intranet?")) {
+                             await localDB.deleteFromCollection('intranet_clients', client.id);
+                             window.dispatchEvent(new Event('db-change'));
+                           }
+                         }}
+                       />
+                     </div>
                   </td>
                 </tr>
               );
@@ -2903,6 +3026,8 @@ function CRMIntranetTable({
           </tbody>
         </table>
       </div>
+
+
     </div>
   );
 }

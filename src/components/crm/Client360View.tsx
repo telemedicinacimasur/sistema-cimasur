@@ -24,10 +24,19 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [targetCategory, setTargetCategory] = useState<string>('Plata');
 
   const CATEGORY_THRESHOLDS: Record<string, number> = {
-    'Bronce': 0,
-    'Plata': 1000000,
-    'Oro': 3000000,
-    'Platinum': 5000000
+    'Sin categoría': 0,
+    'Bronce': 684000,
+    'Plata': 2760000,
+    'Oro': 6600000,
+    'Platinum': 12000000
+  };
+
+  const getTierForSales = (sales: number) => {
+    if (sales >= 12000000) return 'Platinum';
+    if (sales >= 6600000) return 'Oro';
+    if (sales >= 2760000) return 'Plata';
+    if (sales >= 684000) return 'Bronce';
+    return 'Sin categoría';
   };
 
   // Compute dynamic sales and category based on selectedClubYear
@@ -35,14 +44,18 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const catKey = `cat${selectedClubYear}`;
   const salesKey = `v${selectedClubYear}`;
   
-  const dynamicCategory = (clubDetails[catKey] || (selectedClubYear === '2026' ? client?.categoria : null) || 'Bronce').toString().trim();
-  const dynamicSales = Number(clubDetails[salesKey]) || (selectedClubYear === '2026' ? Number(client?.compraAnual) : 0) || 0;
+  const dynamicCategory = (clubDetails[catKey] || (selectedClubYear === '2026' ? client?.categoria : null) || 'Sin categoría').toString().trim();
+  const dynamicSales = Number(clubDetails[salesKey]) !== undefined && !isNaN(Number(clubDetails[salesKey]))
+    ? Number(clubDetails[salesKey])
+    : (selectedClubYear === '2026' ? (Number(client?.compraAnual) || 0) : 0);
   
   useEffect(() => {
     let tCat = 'Plata';
-    if (dynamicSales >= 5000000) tCat = 'Platinum';
-    else if (dynamicSales >= 3000000) tCat = 'Platinum';
-    else if (dynamicSales >= 1000000) tCat = 'Oro';
+    if (dynamicSales >= 12000000) tCat = 'Platinum';
+    else if (dynamicSales >= 6600000) tCat = 'Oro';
+    else if (dynamicSales >= 2760000) tCat = 'Plata';
+    else if (dynamicSales >= 684000) tCat = 'Bronce';
+    else tCat = 'Sin categoría';
     setTargetCategory(tCat);
   }, [selectedClubYear, dynamicSales]);
 
@@ -66,6 +79,10 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [newEmail, setNewEmail] = useState('');
   const [newComuna, setNewComuna] = useState('');
   const [newDireccion, setNewDireccion] = useState('');
+  const [newCategory, setNewCategory] = useState<string>('Sin categoría');
+  const [newCompraAnual, setNewCompraAnual] = useState<string>('0');
+  const [activityType, setActivityType] = useState<string>('Nota de Seguimiento');
+  const [gestionStatus, setGestionStatus] = useState<string>('En proceso');
 
   const clientService = new ClientService(
     (col) => localDB.getCollection(col),
@@ -102,6 +119,8 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
         setNewEmail(c.email || '');
         setNewComuna(c.comuna || '');
         setNewDireccion(c.direccion || '');
+        setNewCategory(c.categoria || 'Sin categoría');
+        setNewCompraAnual(c.compraAnual !== undefined && c.compraAnual !== null ? String(c.compraAnual) : '0');
         
         // Fetch global activities for this client
         const allGlobal = await localDB.getCollection('crm_activities');
@@ -220,31 +239,90 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     window.dispatchEvent(new Event('db-change'));
   };
 
+  const handleQuickSaveCategoryAndSales = async () => {
+    if (!client) return;
+    const amount = Number(newCompraAnual) || 0;
+    const catToSave = newCategory || getTierForSales(amount);
+
+    let existingClubDetails: any = {};
+    if (client.clubVentasDetail) {
+      try {
+        existingClubDetails = typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail;
+      } catch (e) {
+        existingClubDetails = {};
+      }
+    }
+    existingClubDetails['v2026'] = amount;
+    existingClubDetails['cat2026'] = catToSave;
+
+    await clientService.updateClient(client.id, {
+      compraAnual: amount,
+      categoria: catToSave,
+      clubVentasDetail: JSON.stringify(existingClubDetails)
+    });
+
+    await localDB.saveToCollection('crm_activities', {
+      fecha: new Date().toISOString(),
+      campania: 'Actualización Comercial',
+      tipo: 'Actualización Compra/Categoría',
+      observaciones: `Se actualizó la Compra Anual Acumulada a $${amount.toLocaleString('es-CL')} y Categoría a "${catToSave}".`,
+      responsable: 'Usuario CRM',
+      clientId: client.id
+    });
+
+    alert(`¡Datos Comerciales Guardados Con Éxito!\n\n- Compra Anual Acumulada: $${amount.toLocaleString('es-CL')}\n- Categoría Club: ${catToSave}`);
+    await loadData();
+    if (onSave) onSave();
+    window.dispatchEvent(new Event('db-change'));
+  };
+
   const handleAddBitacora = async () => {
-    if (!newBitacoraEntry.trim()) return;
+    if (!client) return;
+    const amount = Number(newCompraAnual) || 0;
+    const catToSave = newCategory || getTierForSales(amount);
+    const commentText = newBitacoraEntry.trim() || `Gestión ${activityType}: Categoría ${catToSave}, Compra Anual $${amount.toLocaleString('es-CL')}`;
+
     const newEntry = {
       id: Date.now().toString(),
       fecha: new Date().toISOString(),
-      comentario: newBitacoraEntry,
-      creador: 'Usuario CRM'
+      comentario: commentText,
+      creador: 'Usuario CRM',
+      title: activityType,
+      source: 'Manual'
     };
     const updated = [newEntry, ...bitacora];
-    
-    const updates: any = { bitacora: updated };
-    if (newPhone !== (client.telefono || client.phone || client.celular)) updates.telefono = newPhone;
-    if (newEmail !== client.email) updates.email = newEmail;
-    if (newComuna !== client.comuna) updates.comuna = newComuna;
-    if (newDireccion !== client.direccion) updates.direccion = newDireccion;
-    
+
+    let existingClubDetails: any = {};
+    if (client.clubVentasDetail) {
+      try {
+        existingClubDetails = typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail;
+      } catch (e) {
+        existingClubDetails = {};
+      }
+    }
+    existingClubDetails['v2026'] = amount;
+    existingClubDetails['cat2026'] = catToSave;
+
+    const updates: any = { 
+      bitacora: updated,
+      compraAnual: amount,
+      categoria: catToSave,
+      clubVentasDetail: JSON.stringify(existingClubDetails)
+    };
+
+    if (newPhone && newPhone !== (client.telefono || client.phone || client.celular)) updates.telefono = newPhone;
+    if (newEmail && newEmail !== client.email) updates.email = newEmail;
+    if (newComuna && newComuna !== client.comuna) updates.comuna = newComuna;
+    if (newDireccion && newDireccion !== client.direccion) updates.direccion = newDireccion;
+
     await clientService.updateClient(client.id, updates);
 
-    // Also register in global CRM activities for visibility across the platform
     try {
       await localDB.saveToCollection('crm_activities', {
         fecha: newEntry.fecha,
         campania: 'Gestión Directa',
-        tipo: 'Nota de Seguimiento',
-        observaciones: newBitacoraEntry,
+        tipo: activityType,
+        observaciones: commentText,
         responsable: 'Usuario CRM',
         clientId: client.id
       });
@@ -254,6 +332,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
 
     setNewBitacoraEntry('');
     await loadData();
+    if (onSave) onSave();
     window.dispatchEvent(new Event('db-change'));
   };
 
@@ -377,12 +456,12 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
 
                   <div className="space-y-1.5">
                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">SIMULADOR DE META (SELECCIONE CATEGORÍA):</span>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {['Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {['Sin categoría', 'Bronce', 'Plata', 'Oro', 'Platinum'].map(cat => (
                         <button 
                           key={cat} 
                           onClick={() => setTargetCategory(cat)}
-                          className={`py-2 rounded text-[8px] font-black uppercase transition-all ${targetCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-slate-850 text-slate-600 border border-slate-800'}`}
+                          className={`py-2 px-1 rounded text-[8px] font-black uppercase transition-all truncate ${targetCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' : 'bg-slate-850 text-slate-600 border border-slate-800'}`}
                         >
                           {cat}
                         </button>
@@ -563,7 +642,11 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                 <div className="space-y-5">
                   <div>
                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Tipo de Actividad</label>
-                    <select className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all cursor-pointer">
+                    <select 
+                      value={activityType}
+                      onChange={e => setActivityType(e.target.value)}
+                      className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all cursor-pointer"
+                    >
                       <option>Nota de Seguimiento</option>
                       <option>Llamada Telefónica</option>
                       <option>Email masivo</option>
@@ -584,16 +667,25 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Categoría</label>
-                      <select className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer">
-                        <option>Bronce</option>
-                        <option>Plata</option>
-                        <option>Oro</option>
-                        <option>Platinum</option>
+                      <select 
+                        value={newCategory}
+                        onChange={e => setNewCategory(e.target.value)}
+                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer outline-none focus:border-sky-500"
+                      >
+                        <option value="Sin categoría">Sin categoría</option>
+                        <option value="Bronce">Bronce</option>
+                        <option value="Plata">Plata</option>
+                        <option value="Oro">Oro</option>
+                        <option value="Platinum">Platinum</option>
                       </select>
                     </div>
                     <div>
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Estado Actual</label>
-                      <select className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer">
+                      <select 
+                        value={gestionStatus}
+                        onChange={e => setGestionStatus(e.target.value)}
+                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer outline-none focus:border-sky-500"
+                      >
                         <option>En proceso</option>
                         <option>Completado</option>
                         <option>Pendiente</option>
@@ -602,14 +694,34 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Compra Anual Acumulada ($)</label>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Compra Anual Acumulada ($)</label>
+                      <span className="text-[9px] text-sky-400 font-bold">
+                        Sugerido: {getTierForSales(Number(newCompraAnual) || 0)}
+                      </span>
+                    </div>
                     <input 
                       type="number" 
-                      readOnly
-                      value={client.compraAnual || 144136}
-                      className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white/70 font-black cursor-not-allowed" 
+                      value={newCompraAnual}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setNewCompraAnual(val);
+                        const autoCat = getTierForSales(Number(val) || 0);
+                        setNewCategory(autoCat);
+                      }}
+                      className="w-full bg-[#050914] border border-sky-500/50 p-3 rounded-xl text-xs text-white font-black outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-all" 
+                      placeholder="0"
                     />
                   </div>
+
+                  <button 
+                    type="button"
+                    onClick={handleQuickSaveCategoryAndSales}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-black text-[10px] py-2.5 rounded-xl transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                  >
+                    <Save size={14} />
+                    GUARDAR COMPRA Y CATEGORÍA
+                  </button>
 
                   <label 
                     className="flex items-center gap-3 cursor-pointer group py-1"
