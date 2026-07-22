@@ -165,8 +165,8 @@ export async function addAuditLog(user: UserProfile, action: string, module: str
 }
 
 // Firebase Database Logic
-// Cache TTL in milliseconds (10 minutes)
-const CACHE_TTL = 10 * 60 * 1000;
+// Cache TTL in milliseconds (12 hours to prevent quota exhaustion)
+const CACHE_TTL = 12 * 60 * 60 * 1000;
 
 const getFromLocalStorage = (key: string) => {
   const cached = localStorage.getItem(key);
@@ -203,6 +203,76 @@ const invalidateCollectionCache = (name: string) => {
       delete collectionCache[key];
     }
   });
+};
+
+const updateCachedCollectionItem = (name: string, savedItem: { id: string, [key: string]: any }) => {
+  // Update in memory cache and localStorage cache for base collection and any query variants
+  Object.keys(collectionCache).forEach(cacheKey => {
+    if (cacheKey === name || cacheKey.startsWith(`${name}_`)) {
+      const list = collectionCache[cacheKey];
+      if (list) {
+        const idx = list.findIndex(r => r.id === savedItem.id);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], ...savedItem };
+        } else {
+          list.unshift(savedItem);
+        }
+      }
+    }
+  });
+
+  // Also update localStorage keys
+  for (let i = 0; i < localStorage.length; i++) {
+    const lsKey = localStorage.key(i);
+    if (lsKey && (lsKey === name || lsKey.startsWith(`${name}_`))) {
+      const cached = localStorage.getItem(lsKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.data)) {
+            const idx = parsed.data.findIndex((r: any) => r.id === savedItem.id);
+            if (idx >= 0) {
+              parsed.data[idx] = { ...parsed.data[idx], ...savedItem };
+            } else {
+              parsed.data.unshift(savedItem);
+            }
+            localStorage.setItem(lsKey, JSON.stringify(parsed));
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  }
+};
+
+const removeCachedCollectionItem = (name: string, id: string) => {
+  Object.keys(collectionCache).forEach(cacheKey => {
+    if (cacheKey === name || cacheKey.startsWith(`${name}_`)) {
+      const list = collectionCache[cacheKey];
+      if (list) {
+        collectionCache[cacheKey] = list.filter(r => r.id !== id);
+      }
+    }
+  });
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const lsKey = localStorage.key(i);
+    if (lsKey && (lsKey === name || lsKey.startsWith(`${name}_`))) {
+      const cached = localStorage.getItem(lsKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.data)) {
+            parsed.data = parsed.data.filter((r: any) => r.id !== id);
+            localStorage.setItem(lsKey, JSON.stringify(parsed));
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  }
 };
 
 export const localDB = {
@@ -323,7 +393,6 @@ export const localDB = {
     }
   },
   saveToCollection: async (name: string, item: any) => {
-    invalidateCollectionCache(name);
     if (isFirebaseReady && db) {
       if (item.id) {
         await setDoc(doc(db, name, item.id), {
@@ -331,19 +400,23 @@ export const localDB = {
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }, { merge: true });
+        const saved = { ...item, updatedAt: new Date().toISOString() };
+        updateCachedCollectionItem(name, saved);
         if (name === 'students') {
           window.dispatchEvent(new CustomEvent('sync-students-trigger'));
         }
-        return { ...item };
+        return saved;
       }
       const docRef = await addDoc(collection(db, name), {
         ...item,
         createdAt: new Date().toISOString()
       });
+      const saved = { id: docRef.id, ...item, createdAt: new Date().toISOString() };
+      updateCachedCollectionItem(name, saved);
       if (name === 'students') {
         window.dispatchEvent(new CustomEvent('sync-students-trigger'));
       }
-      return { id: docRef.id, ...item };
+      return saved;
     } else {
       const id = item.id || `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const response = await fetch(`/api/records/${name}`, {
@@ -354,20 +427,23 @@ export const localDB = {
       if (!response.ok) {
         throw new Error(`Failed to save to ${name}: ${response.statusText}`);
       }
+      const saved = { ...item, id };
+      updateCachedCollectionItem(name, saved);
       if (name === 'students') {
         window.dispatchEvent(new CustomEvent('sync-students-trigger'));
       }
-      return { ...item, id };
+      return saved;
     }
   },
   updateInCollection: async (name: string, id: string, updates: any) => {
-    invalidateCollectionCache(name);
     if (isFirebaseReady && db) {
       try {
+        const updatedAt = new Date().toISOString();
         await setDoc(doc(db, name, id), {
           ...updates,
-          updatedAt: new Date().toISOString()
+          updatedAt
         }, { merge: true });
+        updateCachedCollectionItem(name, { id, ...updates, updatedAt });
         if (name === 'students') {
           window.dispatchEvent(new CustomEvent('sync-students-trigger'));
         }
@@ -386,6 +462,7 @@ export const localDB = {
         console.error(`API update error in ${name}/${id}:`, response.status, errorText);
         throw new Error(`Failed to update ${id} in ${name}: Status ${response.status} - ${errorText}`);
       }
+      updateCachedCollectionItem(name, { id, ...updates });
       if (name === 'students') {
         window.dispatchEvent(new CustomEvent('sync-students-trigger'));
       }
@@ -483,7 +560,7 @@ export const localDB = {
       console.error("Failed to backup deleted record into trash bin:", e);
     }
 
-    invalidateCollectionCache(name);
+    removeCachedCollectionItem(name, id);
     console.log(`Debug: Attempting to delete from ${name} with id: ${id}`);
     if (isFirebaseReady && db) {
       await deleteDoc(doc(db, name, id));
