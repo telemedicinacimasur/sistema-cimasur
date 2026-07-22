@@ -32,6 +32,7 @@ import {
   Layers, 
   Sparkles,
   ChevronDown,
+  ChevronUp,
   Info,
   Settings,
   Filter,
@@ -43,30 +44,9 @@ import {
   EyeOff,
   Upload, Edit2, X
 } from 'lucide-react';
+const PRODUCTOS_CATALOGO: string[] = [];
 
-const PRODUCTOS_CATALOGO = [
-  "ARNICA CS", "SARSAPARRILLA CS", "BEILSCHMIEDIA CS", "SILIMARINA CS",
-  "MELISSA P CS SALINA", "BEILSCHMIEDIA CS SALINA", "CALOSTRUM CS SALINA",
-  "COCCULUS CS SALINA", "MAQUI CS SALINA", "ECHINAC A CS SALINA", "MUCES CS SALINA",
-  "KIT OSTEOARTICULAR CS SALINA", "KIT MODULADOR DIGESTIVO CS SALINA", "KIT VIAJE CS SALINA"
-];
-
-const PRECIOS_BASE: Record<string, number> = {
-  "ARNICA CS": 12500,
-  "SARSAPARRILLA CS": 11500,
-  "BEILSCHMIEDIA CS": 9500,
-  "SILIMARINA CS": 13500,
-  "MELISSA P CS SALINA": 9500,
-  "BEILSCHMIEDIA CS SALINA": 9500,
-  "CALOSTRUM CS SALINA": 14500,
-  "COCCULUS CS SALINA": 9500,
-  "MAQUI CS SALINA": 10500,
-  "ECHINAC A CS SALINA": 10500,
-  "MUCES CS SALINA": 10500,
-  "KIT OSTEOARTICULAR CS SALINA": 32000,
-  "KIT MODULADOR DIGESTIVO CS SALINA": 32000,
-  "KIT VIAJE CS SALINA": 25000
-};
+const PRECIOS_BASE: Record<string, number> = {};
 
 // Robust date parsing helpers to guarantee YYYY-MM-DD
 const parseDateString = (dateVal: any): string => {
@@ -228,9 +208,12 @@ export default function VentasConsignacionView() {
   // Tab 1 UI states for Unified Excel Layout
   const [selectedMonth, setSelectedMonth] = useState('2026-07');
   const [selectedMonthlyLoteIds, setSelectedMonthlyLoteIds] = useState<Set<string>>(new Set());
+  const [isEditingHistory, setIsEditingHistory] = useState(false);
   const [replenishmentFilter, setReplenishmentFilter] = useState<'todos' | 'reposicion' | 'con-stock' | 'agotados'>('todos');
   const [salesInputs, setSalesInputs] = useState<Record<string, number>>({});
   const [savingAllMovements, setSavingAllMovements] = useState(false);
+  const [saveNotification, setSaveNotification] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [fixedDataExpanded, setFixedDataExpanded] = useState(false);
   const [selectedFixedLoteIds, setSelectedFixedLoteIds] = useState<Set<string>>(new Set());
 
@@ -238,6 +221,7 @@ export default function VentasConsignacionView() {
   const [todosLosLotes, setTodosLosLotes] = useState<any[]>([]);
   const [adminFilterCliente, setAdminFilterCliente] = useState('');
   const [adminFilterProducto, setAdminFilterProducto] = useState('');
+  const [adminTabStatus, setAdminTabStatus] = useState<'activos' | 'inactivos'>('activos');
   const [repUnits, setRepUnits] = useState<Record<string, number>>({});
   const [repDates, setRepDates] = useState<Record<string, string>>({});
 
@@ -372,15 +356,17 @@ export default function VentasConsignacionView() {
     }
   }, [formEntrega.producto_id, formEntrega.cliente_id]);
 
-  const loadTodosLosLotes = async () => {
+  const loadTodosLosLotes = async (force = false) => {
     try {
       const cacheKey = 'cache_todos_los_lotes';
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 300000) { // 5 minutes cache
-          setTodosLosLotes(data);
-          return;
+      if (!force) {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < 300000) { // 5 minutes cache
+            setTodosLosLotes(data);
+            return;
+          }
         }
       }
 
@@ -1115,6 +1101,68 @@ export default function VentasConsignacionView() {
     }
   };
 
+  const handleDeletePlanilla = async (monthToDelete: string) => {
+    if (!declaracionCliente) return;
+    if (!confirm(`¿Estás seguro de que deseas borrar la planilla de ${formatMonthName(monthToDelete)}? Esto también eliminará los movimientos registrados para este mes.`)) return;
+
+    try {
+      if (isFirebaseReady()) {
+        const db = getDb();
+        
+        // 1. Delete movements for this month
+        for (const lote of lotesActivos) {
+          const movDocRef = doc(db, 'crm_consignacion_lotes', lote.id, 'movimientos', monthToDelete);
+          await deleteDoc(movDocRef);
+        }
+
+        // 2. Delete planilla record
+        const planillaRef = doc(db, 'planillas_consignacion', `${declaracionCliente}_${monthToDelete}`);
+        await deleteDoc(planillaRef);
+        
+        alert("Planilla y movimientos borrados exitosamente.");
+      } else {
+        localStorage.removeItem(`mock_planilla_${declaracionCliente}_${monthToDelete}`);
+        
+        // Also delete from local mock db
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          const allLotes = JSON.parse(existing);
+          allLotes.forEach((l: any) => {
+             if (l.movimientos && l.movimientos[monthToDelete]) {
+                delete l.movimientos[monthToDelete];
+             }
+          });
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
+        
+        alert("Planilla borrada exitosamente.");
+      }
+      await loadLotes(declaracionCliente, true);
+      await loadTodosLosLotes(true);
+      setIsEditingHistory(false);
+    } catch (e: any) {
+      console.error(e);
+      alert('Error borrando la planilla: ' + e.message);
+    }
+  };
+
+  const handleEditPlanilla = (planilla: any) => {
+    setActiveTab('declaraciones');
+    setSelectedMonth(planilla.month);
+    setIsEditingHistory(true);
+    
+    // Cargar unidades vendidas
+    const newSalesInputs: Record<string, number> = {};
+    todosLosLotes.forEach(lote => {
+      const mov = lote.movimientos?.[planilla.month];
+      if (mov) {
+        newSalesInputs[lote.id] = mov.unidadesVendidas || 0;
+      }
+    });
+    setSalesInputs(newSalesInputs);
+  };
+
   const handleSaveAllMovements = async () => {
     if (!declaracionCliente) return;
     try {
@@ -1125,17 +1173,15 @@ export default function VentasConsignacionView() {
         
         for (const lote of lotesActivos) {
           const mov = lote.movimientos?.[selectedMonth];
-          if (mov?.hidden) continue; // Skip if explicitly hidden
+          if (mov?.hidden) continue; 
           
           const startMonth = parseDateString(lote.fechaEntrega).substring(0, 7);
-          if (selectedMonth < startMonth) continue; // Skip if not delivered yet
+          if (selectedMonth < startMonth) continue;
 
           const currentSales = Number(salesInputs[lote.id] || 0);
-          console.log(`Debug: Saving lote ${lote.id}, currentSales=${currentSales}`);
           const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, currentSales);
           if (!traj) continue;
 
-          // Save movement
           const movDocRef = doc(db, 'crm_consignacion_lotes', lote.id, 'movimientos', selectedMonth);
           await setDoc(movDocRef, {
             unidadesVendidas: currentSales,
@@ -1145,12 +1191,22 @@ export default function VentasConsignacionView() {
             fechaRegistro: Timestamp.now()
           });
 
-          // Update active status as metadata
           const loteRef = doc(db, 'crm_consignacion_lotes', lote.id);
           await setDoc(loteRef, {
             activo: true
           }, { merge: true });
         }
+        
+        const planillaRef = doc(db, 'planillas_consignacion', `${declaracionCliente}_${selectedMonth}`);
+        await setDoc(planillaRef, {
+          clienteId: declaracionCliente,
+          month: selectedMonth,
+          savedAt: Timestamp.now()
+        });
+        
+        setSalesInputs({});
+        setSaveNotification("Plantilla guardada exitosamente en Ventas en Consignación");
+        setTimeout(() => setSaveNotification(null), 5000);
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
@@ -1159,7 +1215,7 @@ export default function VentasConsignacionView() {
           allLotes.forEach((l: any) => {
             if (l.clienteId === declaracionCliente) {
               const mov = l.movimientos?.[selectedMonth];
-              if (mov?.hidden) return; // Skip if explicitly hidden
+              if (mov?.hidden) return;
               
               const startMonth = parseDateString(l.fechaEntrega).substring(0, 7);
               if (selectedMonth >= startMonth) {
@@ -1180,11 +1236,24 @@ export default function VentasConsignacionView() {
             }
           });
           localStorage.setItem(key, JSON.stringify(allLotes));
+          
+          const planillaKey = `mock_planilla_${declaracionCliente}_${selectedMonth}`;
+          localStorage.setItem(planillaKey, JSON.stringify({
+            clienteId: declaracionCliente,
+            month: selectedMonth,
+            savedAt: new Date().toISOString()
+          }));
+          
+          setSalesInputs({});
+          setSaveNotification("Plantilla guardada exitosamente en Ventas en Consignación");
+          setTimeout(() => setSaveNotification(null), 5000);
         }
       }
 
       alert(`Planilla de ventas para el mes de ${formatMonthName(selectedMonth)} guardada con éxito.`);
       await loadLotes(declaracionCliente, true);
+      await loadTodosLosLotes(true);
+      setIsEditingHistory(false);
     } catch (e: any) {
       console.error(e);
       alert('Error guardando la declaración mensual de ventas: ' + e.message);
@@ -1195,6 +1264,11 @@ export default function VentasConsignacionView() {
 
   return (
     <div className="bg-[#152035] rounded-3xl border border-[#1E293B] shadow-2xl overflow-hidden min-h-[700px] flex flex-col font-sans">
+      {saveNotification && (
+        <div className="fixed bottom-6 right-6 bg-emerald-500 text-white p-4 rounded-xl shadow-lg z-50">
+          {saveNotification}
+        </div>
+      )}
       {/* Header */}
       <div className="bg-gradient-to-r from-[#1E3A5F] to-[#122540] p-8 pb-12 relative overflow-hidden flex-shrink-0">
         <div className="absolute top-0 right-0 p-8 opacity-10">
@@ -1632,24 +1706,38 @@ export default function VentasConsignacionView() {
                         const flattenedItems: any[] = [];
                         filteredLotes.forEach(l => {
                           const cName = clientes.find(c => c.id === l.clienteId)?.name || 'Cliente';
+                          let totalVendidas = 0;
+                          Object.values(l.movimientos || {}).forEach((m: any) => {
+                            if (!m.hidden) {
+                               totalVendidas += Number(m.unidadesVendidas || 0);
+                            }
+                          });
+                          let remainingOriginal = Math.max(0, Number(l.unidadesIniciales || 0) - totalVendidas);
+                          let remainingVentasForReps = Math.max(0, totalVendidas - Number(l.unidadesIniciales || 0));
+
                           // Lote original
                           flattenedItems.push({
                             ...l,
                             displayId: l.id,
                             type: 'ORIGINAL',
                             sortDate: parseDateString(l.fechaVencimiento),
-                            displayUnidades: l.unidadesIniciales,
+                            displayUnidades: remainingOriginal,
+                            originalUnidades: l.unidadesIniciales,
                             clientName: cName
                           });
                           
                           // Reposiciones como filas separadas
                           l.reposiciones?.forEach((rep: any, idx: number) => {
+                            const currentRepUnits = Number(rep.unidades || 0);
+                            const remainingRep = Math.max(0, currentRepUnits - remainingVentasForReps);
+                            remainingVentasForReps = Math.max(0, remainingVentasForReps - currentRepUnits);
                             flattenedItems.push({
                               ...l,
                               displayId: `${l.id}_rep_${idx}`,
                               type: 'REP',
                               sortDate: parseDateString(l.fechaVencimiento),
-                              displayUnidades: rep.unidades,
+                              displayUnidades: remainingRep,
+                              originalUnidades: currentRepUnits,
                               fechaRep: rep.fecha,
                               clientName: cName,
                               repIndex: idx
@@ -1671,16 +1759,51 @@ export default function VentasConsignacionView() {
                           }
                         });
 
-                        if (sortedItems.length === 0) {
-                          return (
-                            <div className="text-center py-8 text-slate-500 font-semibold text-xs">
-                              No se encontraron lotes para los filtros seleccionados.
-                            </div>
-                          );
-                        }
+                        const activosItems = sortedItems.filter(item => item.displayUnidades > 0);
+                        const inactivosItems = sortedItems.filter(item => item.displayUnidades <= 0);
+                        const displaySortedItems = adminTabStatus === 'activos' ? activosItems : inactivosItems;
 
                         return (
-                          <div className="relative">
+                          <div className="space-y-3">
+                            {/* Activos / Inactivos Tab Switcher */}
+                            <div className="flex items-center justify-between bg-[#0B1220] p-2 rounded-xl border border-[#1E293B]">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAdminTabStatus('activos')}
+                                  className={cn(
+                                    "px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
+                                    adminTabStatus === 'activos'
+                                      ? "bg-emerald-500 text-[#050914] shadow-lg shadow-emerald-500/20"
+                                      : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
+                                  )}
+                                >
+                                  🟢 Activos ({activosItems.length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAdminTabStatus('inactivos')}
+                                  className={cn(
+                                    "px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
+                                    adminTabStatus === 'inactivos'
+                                      ? "bg-slate-700 text-white shadow-lg shadow-slate-700/20"
+                                      : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
+                                  )}
+                                >
+                                  ⚪ Inactivos / Stock 0 ({inactivosItems.length})
+                                </button>
+                              </div>
+                              <div className="text-[11px] text-slate-400 font-medium px-2">
+                                Mostrando lotes {adminTabStatus === 'activos' ? 'con stock activo (> 0)' : 'sin stock (0 o agotados)'}
+                              </div>
+                            </div>
+
+                            {displaySortedItems.length === 0 ? (
+                              <div className="text-center py-10 bg-[#050914] border border-[#1E293B] rounded-xl text-slate-500 font-semibold text-xs">
+                                No se encontraron lotes {adminTabStatus === 'activos' ? 'activos con stock' : 'inactivos (stock 0)'} para los filtros seleccionados.
+                              </div>
+                            ) : (
+                              <div className="relative">
                             {/* Floating Action Bar */}
                             {selectedFixedLoteIds.size > 0 && (
                               <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-[#0F172A] border border-sky-500/30 px-6 py-4 rounded-2xl shadow-2xl shadow-sky-500/10 animate-in fade-in slide-in-from-bottom-4">
@@ -1718,12 +1841,12 @@ export default function VentasConsignacionView() {
                                     <div className="flex justify-center">
                                       <input 
                                         type="checkbox" 
-                                        checked={selectedFixedLoteIds.size === sortedItems.length && sortedItems.length > 0}
+                                        checked={selectedFixedLoteIds.size === displaySortedItems.length && displaySortedItems.length > 0}
                                         onChange={() => {
-                                          if (selectedFixedLoteIds.size === sortedItems.length) {
+                                          if (selectedFixedLoteIds.size === displaySortedItems.length) {
                                             setSelectedFixedLoteIds(new Set());
                                           } else {
-                                            setSelectedFixedLoteIds(new Set(sortedItems.map(l => l.displayId)));
+                                            setSelectedFixedLoteIds(new Set(displaySortedItems.map(l => l.displayId)));
                                           }
                                         }}
                                         className="w-4 h-4 accent-sky-500 rounded border-slate-600 bg-slate-800 cursor-pointer hover:border-sky-500/50 transition-colors"
@@ -1740,7 +1863,7 @@ export default function VentasConsignacionView() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-[#1E293B]">
-                                {sortedItems.map(l => {
+                                {displaySortedItems.map(l => {
                                   const isFIFO = earliestMap[l.productoId] === l.displayId;
                                   return (
                                     <LoteFixedDataRow 
@@ -1749,6 +1872,18 @@ export default function VentasConsignacionView() {
                                       isFIFO={isFIFO} 
                                       isSelected={selectedFixedLoteIds.has(l.displayId)}
                                       onToggle={toggleFixedLoteSelection}
+                                      onReponer={(item) => {
+                                        setShowAddLoteForm(true);
+                                        setShowAddClientForm(false);
+                                        setShowImportForm(false);
+                                        setFormEntrega({
+                                          ...formEntrega,
+                                          cliente_id: item.clienteId,
+                                          producto_id: item.productoId,
+                                          solucion_lote: item.solucionLote || ''
+                                        });
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                      }}
                                       onRefresh={async () => {
                                         if (declaracionCliente) await loadLotes(declaracionCliente, true);
                                         await loadTodosLosLotes();
@@ -1760,11 +1895,13 @@ export default function VentasConsignacionView() {
                             </table>
                           </div>
                         </div>
-                      );
-                    })()}
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
                 {/* Filters Row */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1787,7 +1924,7 @@ export default function VentasConsignacionView() {
                         type="button"
                         onClick={() => {
                           const idx = MONTH_OPTIONS.findIndex(m => m.value === selectedMonth);
-                          if (idx > 0) setSelectedMonth(MONTH_OPTIONS[idx - 1].value);
+                          if (idx > 0) { setSelectedMonth(MONTH_OPTIONS[idx - 1].value); setIsEditingHistory(false); }
                         }}
                         disabled={selectedMonth === MONTH_OPTIONS[0].value || !declaracionCliente}
                         className="p-2.5 bg-[#050914] hover:bg-[#1E293B]/40 disabled:opacity-30 border border-[#1E293B] rounded-xl text-slate-400 hover:text-white transition-all text-xs font-black"
@@ -1799,13 +1936,13 @@ export default function VentasConsignacionView() {
                         className="flex-1 bg-[#050914] text-sky-400 border border-[#1E293B] rounded-xl p-3 outline-none focus:border-sky-500 transition-colors font-black text-xs text-center"
                         value={selectedMonth}
                         disabled={!declaracionCliente}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        onChange={(e) => { setSelectedMonth(e.target.value); setIsEditingHistory(false); }}
                       />
                       <button
                         type="button"
                         onClick={() => {
                           const idx = MONTH_OPTIONS.findIndex(m => m.value === selectedMonth);
-                          if (idx < MONTH_OPTIONS.length - 1) setSelectedMonth(MONTH_OPTIONS[idx + 1].value);
+                          if (idx < MONTH_OPTIONS.length - 1) { setSelectedMonth(MONTH_OPTIONS[idx + 1].value); setIsEditingHistory(false); }
                         }}
                         disabled={selectedMonth === MONTH_OPTIONS[MONTH_OPTIONS.length - 1].value || !declaracionCliente}
                         className="p-2.5 bg-[#050914] hover:bg-[#1E293B]/40 disabled:opacity-30 border border-[#1E293B] rounded-xl text-slate-400 hover:text-white transition-all text-xs font-black"
@@ -1930,20 +2067,20 @@ export default function VentasConsignacionView() {
                                     <th className="p-4 text-center bg-sky-500/5 text-sky-400 w-44">und vendida</th>
                                     <th className="p-4 text-center">$ Vendido</th>
                                     <th className="p-4 text-center">Frascos Restantes</th>
-                                    <th className="p-4 pr-6 text-center w-80">Reposición</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#1E293B]/20 text-xs">
                                    {filteredLotes.length > 0 ? (
                                      filteredLotes.map(({ lote, traj }) => {
                                        const currentSales = salesInputs[lote.id] ?? 0;
-                                       const isSelected = selectedMonthlyLoteIds.has(lote.id);
+                                       const isSelected = selectedMonthlyLoteIds.has(lote.id); const isSaved = !!lote.movimientos?.[selectedMonth] && !lote.movimientos?.[selectedMonth]?.added && !isEditingHistory;
                                        return (
                                          <tr key={lote.id} className={cn("hover:bg-[#1E293B]/10 transition-colors", isSelected ? "bg-sky-500/5" : "")}>
                                            <td className="p-4 pl-6 w-12 text-center">
-                                             <input 
+                                             <input
                                                type="checkbox"
-                                               className="accent-sky-500 cursor-pointer"
+                                               disabled={isSaved}
+                                               className="accent-sky-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                checked={isSelected}
                                                onChange={(e) => {
                                                  const next = new Set(selectedMonthlyLoteIds);
@@ -1978,15 +2115,6 @@ export default function VentasConsignacionView() {
                                                </div>
                                                
                                                {/* Replenishments History List */}
-                                               {lote.reposiciones && lote.reposiciones.length > 0 && (
-                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                   {lote.reposiciones.map((rep: any, idx: number) => (
-                                                     <span key={idx} className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[9px] font-mono font-semibold">
-                                                       Rep: +{rep.unidades} u ({rep.fecha})
-                                                     </span>
-                                                   ))}
-                                                 </div>
-                                               )}
                                              </div>
                                            </td>
                                            <td className="p-4 text-center text-slate-300 font-bold font-mono text-sm">
@@ -2000,8 +2128,8 @@ export default function VentasConsignacionView() {
                                                <input 
                                                  type="number"
                                                  min="0"
-                                                 max={traj.stockDisponible}
-                                                 className="bg-[#050914] border border-sky-500/30 rounded-lg p-2 text-sky-400 font-black w-24 text-center outline-none focus:border-sky-500 text-xs font-mono shadow-inner"
+                                                 max={traj.stockDisponible} disabled={isSaved}
+                                                 className={cn("bg-[#050914] border border-sky-500/30 rounded-lg p-2 text-sky-400 font-black w-24 text-center outline-none focus:border-sky-500 text-xs font-mono shadow-inner", isSaved && "opacity-50 cursor-not-allowed border-slate-600 text-slate-400 grayscale")}
                                                  value={currentSales || ''}
                                                  onChange={e => {
                                                    const val = Math.min(Math.max(parseInt(e.target.value) || 0, 0), traj.stockDisponible);
@@ -2015,7 +2143,7 @@ export default function VentasConsignacionView() {
                                            <td className="p-4 text-center text-emerald-400 font-black font-mono text-sm">
                                              {formatCurrency(currentSales * (Number(lote.precioUnitNeto) || 0))}
                                            </td>
-                                           <td className="p-4 text-center">
+                                           <td className="p-4 text-center pr-6">
                                              <span className={cn(
                                                "font-black px-3 py-1 rounded-full font-mono text-xs",
                                                traj.frascosRestantes === 0
@@ -2024,65 +2152,6 @@ export default function VentasConsignacionView() {
                                              )}>
                                                {traj.frascosRestantes} u.
                                              </span>
-                                           </td>
-                                           <td className="p-4 pr-6 text-center">
-                                             {(() => {
-                                               const isRepOpen = expandedRep[lote.id];
-                                               return (
-                                                 <div className="flex flex-col items-center justify-center gap-1.5">
-                                                   <button
-                                                     type="button"
-                                                     onClick={() => setExpandedRep(prev => ({ ...prev, [lote.id]: !prev[lote.id] }))}
-                                                     className={cn(
-                                                       "p-2.5 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-wider border shadow-md active:scale-95 min-w-[125px]",
-                                                       isRepOpen
-                                                         ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                                                         : "bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20"
-                                                     )}
-                                                   >
-                                                     {isRepOpen ? <EyeOff size={13} /> : <Eye size={13} />}
-                                                     <span>{isRepOpen ? "Ocultar" : "Reposición"}</span>
-                                                   </button>
-                                                   
-                                                   {isRepOpen && (
-                                                     <div className="flex flex-col gap-1.5 p-2 bg-[#1A263E]/40 rounded-xl border border-sky-500/10 min-w-[200px] text-left mx-auto animate-in fade-in slide-in-from-top-1 duration-200 mt-2">
-                                                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block mb-0.5">
-                                                         🔄 Reposición / Agregar Stock
-                                                       </span>
-                                                       <div className="grid grid-cols-2 gap-1.5">
-                                                         <div>
-                                                           <label className="text-[8px] text-slate-400 block mb-0.5 font-bold uppercase">Unidades</label>
-                                                           <input 
-                                                             type="number"
-                                                             min="1"
-                                                             placeholder="Cant."
-                                                             className="w-full bg-[#050914] border border-[#1E293B] rounded-lg p-1 text-sky-400 font-bold text-center text-xs outline-none focus:border-sky-500 font-mono"
-                                                             value={repUnits[lote.id] || ''}
-                                                             onChange={e => setRepUnits(prev => ({ ...prev, [lote.id]: parseInt(e.target.value) || 0 }))}
-                                                           />
-                                                         </div>
-                                                         <div>
-                                                           <label className="text-[8px] text-slate-400 block mb-0.5 font-bold uppercase">Fecha</label>
-                                                           <input 
-                                                             type="date"
-                                                             className="w-full bg-[#050914] border border-[#1E293B] rounded-lg p-1 text-slate-200 font-bold text-xs outline-none focus:border-sky-500 [color-scheme:dark]"
-                                                             value={repDates[lote.id] || ''}
-                                                             onChange={e => setRepDates(prev => ({ ...prev, [lote.id]: e.target.value }))}
-                                                           />
-                                                         </div>
-                                                       </div>
-                                                       <button
-                                                         type="button"
-                                                         onClick={() => handleSaveReplenishment(lote.id, repUnits[lote.id] || 0, repDates[lote.id] || '')}
-                                                         className="w-full mt-1 bg-emerald-500 hover:bg-emerald-600 text-[#050914] font-black py-1.5 rounded-lg text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all active:scale-95"
-                                                       >
-                                                         <Save size={10} /> Guardar Stock
-                                                       </button>
-                                                     </div>
-                                                   )}
-                                                 </div>
-                                               );
-                                             })()}
                                            </td>
                                          </tr>
                                        );
@@ -2143,29 +2212,45 @@ export default function VentasConsignacionView() {
                                            {(() => {
                                              const flattenedItems: any[] = [];
                                              lotesActivos.forEach(l => {
+                                               let totalVendidas = 0;
+                                               Object.values(l.movimientos || {}).forEach((m: any) => {
+                                                 if (!m.hidden) {
+                                                    totalVendidas += Number(m.unidadesVendidas || 0);
+                                                 }
+                                               });
+                                               let remainingOriginal = Math.max(0, Number(l.unidadesIniciales || 0) - totalVendidas);
+                                               let remainingVentasForReps = Math.max(0, totalVendidas - Number(l.unidadesIniciales || 0));
+
                                                // Lote original
                                                flattenedItems.push({
                                                  ...l,
                                                  displayId: l.id,
                                                  type: 'ORIGINAL',
                                                  sortDate: parseDateString(l.fechaVencimiento),
-                                                 displayUnidades: l.unidadesIniciales
+                                                 displayUnidades: remainingOriginal,
+                                                 originalUnidades: l.unidadesIniciales
                                                });
                                                
                                                // Reposiciones como filas separadas
                                                l.reposiciones?.forEach((rep: any, idx: number) => {
+                                                 const currentRepUnits = Number(rep.unidades || 0);
+                                                 const remainingRep = Math.max(0, currentRepUnits - remainingVentasForReps);
+                                                 remainingVentasForReps = Math.max(0, remainingVentasForReps - currentRepUnits);
                                                  flattenedItems.push({
                                                    ...l,
                                                    displayId: `${l.id}_rep_${idx}`,
                                                    type: 'REP',
                                                    sortDate: parseDateString(l.fechaVencimiento),
-                                                   displayUnidades: rep.unidades,
+                                                   displayUnidades: remainingRep,
+                                                   originalUnidades: currentRepUnits,
                                                    fechaRep: rep.fecha
                                                  });
                                                });
                                              });
 
-                                             const sortedItems = [...flattenedItems].sort((a, b) => {
+                                             const itemsWithStock = flattenedItems.filter(item => item.displayUnidades > 0);
+
+                                             const sortedItems = [...itemsWithStock].sort((a, b) => {
                                                const nameA = (a.productoId || "").toString().toLowerCase();
                                                const nameB = (b.productoId || "").toString().toLowerCase();
                                                if (nameA !== nameB) return nameA.localeCompare(nameB);
@@ -2185,7 +2270,7 @@ export default function VentasConsignacionView() {
                                                (l.solucionLote || "").toLowerCase().includes(searchTerm.toLowerCase())
                                              );
 
-                                             if (flattenedItems.length === 0) {
+                                             if (itemsWithStock.length === 0) {
                                                return (
                                                  <div className="text-slate-400 text-xs font-medium bg-[#111A2E]/55 p-4 rounded-xl border border-[#1E293B] flex flex-col gap-2">
                                                    <p>⚠️ No hay más productos/lotes registrados en Datos Fijos para este cliente que no estén ya en esta planilla.</p>
@@ -2324,7 +2409,7 @@ export default function VentasConsignacionView() {
                               <button
                                 type="button"
                                 onClick={handleSaveAllMovements}
-                                disabled={savingAllMovements || filteredLotes.length === 0}
+                                disabled={savingAllMovements || activeLotesForMonth.length === 0}
                                 className="bg-sky-500 hover:bg-sky-600 disabled:opacity-55 text-[#050914] font-black px-8 py-4 rounded-xl flex items-center gap-2 transition-all active:scale-95 text-xs uppercase tracking-widest shadow-lg shadow-sky-500/25 font-sans"
                               >
                                 {savingAllMovements ? (
@@ -2375,9 +2460,12 @@ export default function VentasConsignacionView() {
                     
                     // Compute current stock inventory to export
                     const inventoryStatus = clientLotes.map(lote => {
-                      const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, 0);
+                      const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, undefined);
                       return { lote, traj };
                     }).filter(item => item.traj);
+
+                    const activeItems = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) > 0);
+                    const inactiveItems = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) <= 0);
 
                     // Summarize saved month templates
                     // Let's gather all months that have any saved movimientos
@@ -2608,31 +2696,55 @@ export default function VentasConsignacionView() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-[#1E293B]/10 text-xs">
-                                {inventoryStatus.length > 0 ? (
-                                  inventoryStatus.map(({ lote, traj }) => (
-                                    <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors">
-                                      <td className="p-4 pl-6">
-                                        <div className="font-bold text-slate-200">
-                                          {lote.productoId}
-                                        </div>
-                                        <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
-                                      </td>
-                                      <td className="p-4 text-center text-slate-400 font-semibold font-mono">
-                                        {parseDateString(lote.fechaVencimiento)}
-                                      </td>
-                                      <td className="p-4 text-center">
-                                        <span className={cn(
-                                          "font-black px-2.5 py-1 rounded-full font-mono text-[11px]",
-                                          (traj?.frascosRestantes || 0) === 0
-                                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                            : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                                        )}>
-                                          {traj?.frascosRestantes || 0} u.
-                                        </span>
+                                {activeItems.length > 0 && (
+                                  <>
+                                    <tr className="bg-[#15233C]/50">
+                                      <td colSpan={3} className="p-2 pl-6 font-black text-emerald-400 uppercase text-[10px]">Stock Activos</td>
+                                    </tr>
+                                    {activeItems.map(({ lote, traj }) => (
+                                      <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors">
+                                        <td className="p-4 pl-6">
+                                          <div className="font-bold text-slate-200">{lote.productoId}</div>
+                                          <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
+                                        </td>
+                                        <td className="p-4 text-center text-slate-400 font-semibold font-mono">{parseDateString(lote.fechaVencimiento)}</td>
+                                        <td className="p-4 text-center">
+                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                            {traj?.frascosRestantes || 0} u.
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </>
+                                )}
+                                {inactiveItems.length > 0 && (
+                                  <>
+                                    <tr 
+                                      className="bg-[#15233C]/50 cursor-pointer hover:bg-[#15233C]/70"
+                                      onClick={() => setShowInactive(!showInactive)}
+                                    >
+                                      <td colSpan={3} className="p-2 pl-6 font-black text-rose-400 uppercase text-[10px] flex items-center justify-between">
+                                        <span>Stock Inactivos (Agotados)</span>
+                                        {showInactive ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                       </td>
                                     </tr>
-                                  ))
-                                ) : (
+                                    {showInactive && inactiveItems.map(({ lote, traj }) => (
+                                      <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors opacity-50 grayscale">
+                                        <td className="p-4 pl-6">
+                                          <div className="font-bold text-slate-500 line-through">{lote.productoId}</div>
+                                          <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
+                                        </td>
+                                        <td className="p-4 text-center text-slate-500 font-semibold font-mono">{parseDateString(lote.fechaVencimiento)}</td>
+                                        <td className="p-4 text-center">
+                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-slate-500/10 text-slate-500 border border-slate-500/20">
+                                            Agotado
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </>
+                                )}
+                                {inventoryStatus.length === 0 && (
                                   <tr>
                                     <td colSpan={3} className="p-12 text-center text-slate-500 font-bold">
                                       Este cliente no posee ningún producto registrado en consignación.
@@ -2750,8 +2862,23 @@ export default function VentasConsignacionView() {
                                           </table>
                                         </div>
 
-                                        {/* Download Quote Button */}
-                                        <div className="flex justify-end pr-1">
+                                        <div className="flex justify-end gap-2 pr-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleEditPlanilla(m)}
+                                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                                          >
+                                            <Settings size={13} />
+                                            Editar
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeletePlanilla(m.month)}
+                                            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                                          >
+                                            <Trash2 size={13} />
+                                            Borrar
+                                          </button>
                                           <button
                                             type="button"
                                             onClick={() => handleDownloadQuoteReport(m.month, itemsInMonth)}
@@ -2916,21 +3043,23 @@ function LoteFixedDataRow({
   isFIFO, 
   onRefresh,
   isSelected,
-  onToggle
+  onToggle,
+  onReponer
 }: { 
   key?: string, 
   item: any, 
   isFIFO: boolean, 
   onRefresh: () => void | Promise<void>,
   isSelected: boolean,
-  onToggle: (id: string) => void
+  onToggle: (id: string) => void,
+  onReponer: (item: any) => void
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
     productoId: item.productoId || '',
     solucionLote: item.solucionLote || '',
     fechaVencimiento: parseDateString(item.fechaVencimiento),
-    unidadesIniciales: Number(item.displayUnidades) || 100,
+    unidadesIniciales: Number(item.originalUnidades ?? item.displayUnidades) || 100,
     precioUnitNeto: Number(item.precioUnitNeto) || 0,
   });
   const [saving, setSaving] = useState(false);
@@ -3144,8 +3273,9 @@ function LoteFixedDataRow({
          <div className="flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             {!isDeleting ? (
               <>
-                <button onClick={() => setIsEditing(true)} className="bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-[#050914] p-1.5 rounded transition-colors"><Edit2 size={12} /></button>
-                <button onClick={handleDelete} disabled={saving} className="bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-[#050914] p-1.5 rounded transition-colors"><Trash2 size={12} /></button>
+                <button onClick={() => setIsEditing(true)} title="Editar" className="bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-[#050914] p-1.5 rounded transition-colors"><Edit2 size={12} /></button>
+                <button onClick={() => onReponer(item)} title="Nuevo Producto" className="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-[#050914] p-1.5 rounded transition-colors"><Plus size={12} /></button>
+                <button onClick={handleDelete} disabled={saving} title="Eliminar" className="bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-[#050914] p-1.5 rounded transition-colors"><Trash2 size={12} /></button>
               </>
             ) : (
               <div className="flex items-center gap-1 bg-rose-500/10 p-1 rounded border border-rose-500/30">

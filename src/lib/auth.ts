@@ -165,6 +165,28 @@ export async function addAuditLog(user: UserProfile, action: string, module: str
 }
 
 // Firebase Database Logic
+// Cache TTL in milliseconds (10 minutes)
+const CACHE_TTL = 10 * 60 * 1000;
+
+const getFromLocalStorage = (key: string) => {
+  const cached = localStorage.getItem(key);
+  if (!cached) return null;
+  try {
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp < CACHE_TTL) {
+      return data;
+    }
+  } catch (e) {
+    console.error(`Error parsing cache for ${key}`, e);
+  }
+  localStorage.removeItem(key);
+  return null;
+};
+
+const saveToLocalStorage = (key: string, data: any) => {
+  localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+};
+
 const collectionCache: Record<string, any[]> = {};
 const pendingRequests: Record<string, Promise<any[]>> = {};
 
@@ -188,11 +210,14 @@ export const localDB = {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
   },
   getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string }): Promise<any[]> => {
-    if (isFirebaseReady && db) {
-      const cacheKey = options 
-        ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}` 
-        : name;
+    const cacheKey = options 
+      ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}` 
+      : name;
 
+    const cachedData = getFromLocalStorage(cacheKey);
+    if (cachedData) return cachedData;
+
+    if (isFirebaseReady && db) {
       if (collectionCache[cacheKey]) {
         return [...collectionCache[cacheKey]];
       }
@@ -217,6 +242,7 @@ export const localDB = {
             return { ...docData, id: doc.id };
           });
           collectionCache[cacheKey] = data;
+          saveToLocalStorage(cacheKey, data);
           return data;
         } finally {
           delete pendingRequests[cacheKey];
@@ -269,6 +295,7 @@ export const localDB = {
                   return val >= options.startDate! && val <= options.endDate!;
                 });
               }
+              saveToLocalStorage(cacheKey, data);
               return data;
             } catch (err: any) {
               lastError = err;
