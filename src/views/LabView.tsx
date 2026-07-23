@@ -4755,7 +4755,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       console.log('Sync: Fetching approved quotes...');
       const quotesQuery = query(collection(db, 'quotes'), where('estado', '==', 'APROBADA'));
       const quotesSnapshot = await getDocs(quotesQuery);
-      const approvedQuotes = quotesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const approvedQuotes: any[] = quotesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       console.log(`Sync: Found ${approvedQuotes.length} approved quotes.`);
 
       // 2. Fetch Existing Tracking IDs

@@ -532,9 +532,9 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
     const matchesEnd = !dateEnd || date <= dateEnd;
     return mMatch && yMatch && matchesSearch && matchesStart && matchesEnd;
   }).sort((a,b) => {
-    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    const d = String(b.fecha || '').localeCompare(String(a.fecha || ''));
     if (d !== 0) return d;
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 
   const totalVet = filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0);
@@ -915,7 +915,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
       }
     });
     years.add(new Date().getFullYear().toString());
-    return Array.from(years).sort((a, b) => b.localeCompare(a));
+    return Array.from(years).sort((a, b) => String(b || '').localeCompare(String(a || '')));
   }, [records]);
 
   const availableMonths = [
@@ -1514,9 +1514,9 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
     }
     return match;
   }).sort((a,b) => {
-    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    const d = String(b.fecha || '').localeCompare(String(a.fecha || ''));
     if (d !== 0) return d;
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 
   const getConsolidatedProducts = () => {
@@ -1550,7 +1550,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
     
     return Object.entries(counts)
       .map(([name, qty]) => ({ name, qty }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
   };
 
   const getSalesForProduct = (productName: string) => {
@@ -2080,9 +2080,9 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     }
     return match;
   }).sort((a,b) => {
-    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    const d = String(b.fecha || '').localeCompare(String(a.fecha || ''));
     if (d !== 0) return d;
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 
   const totalFrascos = filteredRecords.reduce((sum, r) => {
@@ -2804,9 +2804,9 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
     
     return true;
   }).sort((a,b) => {
-    const d = (b.fechaPago || '').localeCompare(a.fechaPago || '');
+    const d = String(b.fechaPago || '').localeCompare(String(a.fechaPago || ''));
     if (d !== 0) return d;
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -3536,9 +3536,9 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
     }
     return match;
   }).sort((a,b) => {
-    const d = (b.fecha || '').localeCompare(a.fecha || '');
+    const d = String(b.fecha || '').localeCompare(String(a.fecha || ''));
     if (d !== 0) return d;
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 
   const totalNeto = filteredRecords.reduce((acc, curr) => acc + (Number(curr.montoNeto) || 0), 0);

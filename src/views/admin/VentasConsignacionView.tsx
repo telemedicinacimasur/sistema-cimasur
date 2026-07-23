@@ -1161,10 +1161,7 @@ export default function VentasConsignacionView() {
           const mov = lote.movimientos?.[selectedMonth];
           if (mov?.hidden) continue; 
           
-          const startMonth = parseDateString(lote.fechaEntrega).substring(0, 7);
-          if (selectedMonth < startMonth) continue;
-
-          const currentSales = Number(salesInputs[lote.id] || 0);
+          const currentSales = Number(salesInputs[lote.id] ?? lote.movimientos?.[selectedMonth]?.unidadesVendidas ?? 0);
           const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, currentSales);
           if (!traj) continue;
 
@@ -1203,21 +1200,18 @@ export default function VentasConsignacionView() {
               const mov = l.movimientos?.[selectedMonth];
               if (mov?.hidden) return;
               
-              const startMonth = parseDateString(l.fechaEntrega).substring(0, 7);
-              if (selectedMonth >= startMonth) {
-                const currentSales = Number(salesInputs[l.id] || 0);
-                const traj = getLoteTrajectoryUpToMonth(l, selectedMonth, currentSales);
-                if (traj) {
-                  if (!l.movimientos) l.movimientos = {};
-                  l.movimientos[selectedMonth] = {
-                    unidadesVendidas: currentSales,
-                    saldoAnterior: Number(traj.stockDisponible),
-                    saldoResultante: Number(traj.frascosRestantes),
-                    montoVentaNeto: Number(traj.montoVentaNeto),
-                    fechaRegistro: new Date().toISOString()
-                  };
-                  l.activo = true;
-                }
+              const currentSales = Number(salesInputs[l.id] ?? l.movimientos?.[selectedMonth]?.unidadesVendidas ?? 0);
+              const traj = getLoteTrajectoryUpToMonth(l, selectedMonth, currentSales);
+              if (traj) {
+                if (!l.movimientos) l.movimientos = {};
+                l.movimientos[selectedMonth] = {
+                  unidadesVendidas: currentSales,
+                  saldoAnterior: Number(traj.stockDisponible),
+                  saldoResultante: Number(traj.frascosRestantes),
+                  montoVentaNeto: Number(traj.montoVentaNeto),
+                  fechaRegistro: new Date().toISOString()
+                };
+                l.activo = true;
               }
             }
           });
@@ -1236,7 +1230,6 @@ export default function VentasConsignacionView() {
         }
       }
 
-      alert(`Planilla de ventas para el mes de ${formatMonthName(selectedMonth)} guardada con éxito.`);
       await loadLotes(declaracionCliente, true);
       await loadTodosLosLotes(true);
       setIsEditingHistory(false);
@@ -2473,8 +2466,9 @@ export default function VentasConsignacionView() {
                     const clientLotes = todosLosLotes.filter(l => l.clienteId === registroVentasCliente);
                     
                     // Compute current stock inventory to export
+                    const currentMonth = new Date().toISOString().substring(0, 7);
                     const inventoryStatus = clientLotes.map(lote => {
-                      const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, undefined);
+                      const traj = getLoteTrajectoryUpToMonth(lote, currentMonth, undefined);
                       return { lote, traj };
                     }).filter(item => item.traj);
 
@@ -2967,21 +2961,11 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
   const rawDate = lote.fechaEntrega || lote.createdAt;
   if (!rawDate) return null;
 
-  const startMonth = parseDateString(rawDate).substring(0, 7);
-  if (!startMonth || startMonth.length < 7) return null;
+  const actualStartMonth = parseDateString(rawDate).substring(0, 7);
+  if (!actualStartMonth || actualStartMonth.length < 7) return null;
   
-  // Si el lote fue agregado explícitamente a este mes, se considera activo aunque la fecha de creación sea distinta
-  const isExplicitlyAdded = lote.movimientos?.[targetMonth] !== undefined;
-
-  if (targetMonth < startMonth && !isExplicitlyAdded) {
-    return {
-      delivered: false,
-      stockDisponible: 0,
-      ventas: 0,
-      montoVentaNeto: 0,
-      frascosRestantes: 0
-    };
-  }
+  // Allow registration and calculation from targetMonth even if earlier than actualStartMonth
+  const startMonth = targetMonth < actualStartMonth ? targetMonth : actualStartMonth;
 
   // Generate sequence of months from startMonth up to targetMonth
   const months: string[] = [];
