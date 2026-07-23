@@ -171,13 +171,11 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'list', label: 'Cartera de Clientes' },
     { id: 'activities', label: 'Registro de Actividades' },
     { id: 'intranet', label: 'Clientes Intranet' },
-    { id: 'smart', label: 'Motor Comercial' },
-    { id: 'consignacion', label: 'Ventas en Consignación' }
+    { id: 'smart', label: 'Motor Comercial' }
   ],
   gestion: [
     { id: 'register', label: 'Ingreso de Cliente' },
-    { id: 'list', label: 'Gestión de Clientes' },
-    { id: 'consignacion', label: 'Ventas en Consignación' }
+    { id: 'list', label: 'Gestión de Clientes' }
   ],
   school: [
     { id: 'register', label: 'Motor Comercial Lead' },
@@ -200,8 +198,7 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'mantenimiento', label: 'Mantenimiento Equipos' },
     { id: 'magistrales', label: 'Fórmulas Magistrales' },
     { id: 'tracking', label: 'Tracking Laboratorio' },
-    { id: 'diluciones-db', label: 'Códigos y Diluciones' },
-    { id: 'consignacion', label: 'Ventas en Consignación' }
+    { id: 'diluciones-db', label: 'Códigos y Diluciones' }
   ],
   manager: [
     { id: 'menu', label: 'Dashboard Principal' },
