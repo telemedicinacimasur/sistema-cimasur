@@ -1985,7 +1985,9 @@ export default function VentasConsignacionView() {
                         const nameA = (a.lote.productoId || '').toString().toLowerCase();
                         const nameB = (b.lote.productoId || '').toString().toLowerCase();
                         if (nameA !== nameB) return nameA.localeCompare(nameB);
-                        return (a.lote.fechaVencimiento || '').localeCompare(b.lote.fechaVencimiento || '');
+                        const dateA = String(a.lote?.fechaVencimiento?.toDate ? a.lote.fechaVencimiento.toDate().toISOString() : (a.lote?.fechaVencimiento || ''));
+                        const dateB = String(b.lote?.fechaVencimiento?.toDate ? b.lote.fechaVencimiento.toDate().toISOString() : (b.lote?.fechaVencimiento || ''));
+                        return dateA.localeCompare(dateB);
                       });
 
                       const filteredLotes = activeLotesForMonth.filter(item => {
@@ -2501,7 +2503,7 @@ export default function VentasConsignacionView() {
                     const savedMonthsList = Object.entries(monthSummaryMap).map(([month, data]) => ({
                       month,
                       ...data
-                    })).sort((a, b) => b.month.localeCompare(a.month));
+                    })).sort((a, b) => String(b.month || '').localeCompare(String(a.month || '')));
 
                     // Function to export the remaining stock report as PDF
                     const handleExportStockPDF = () => {
