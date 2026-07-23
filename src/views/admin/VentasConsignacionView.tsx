@@ -16,7 +16,9 @@ import {
   where, 
   Timestamp,
   deleteDoc,
-  writeBatch
+  writeBatch,
+  updateDoc,
+  deleteField
 } from 'firebase/firestore';
 import { 
   Save, 
@@ -198,7 +200,6 @@ const ClientAutocomplete = ({
 export default function VentasConsignacionView() {
   const [activeTab, setActiveTab] = useState<'declaraciones' | 'registro_ventas'>('declaraciones');
   const [clientes, setClientes] = useState<any[]>([]);
-  const [uniqueProducts, setUniqueProducts] = useState<string[]>(PRODUCTOS_CATALOGO);
   const [loading, setLoading] = useState(true);
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [lotesCache, setLotesCache] = useState<Record<string, { data: any[], timestamp: number }>>({});
@@ -221,6 +222,12 @@ export default function VentasConsignacionView() {
 
   // Additional state variables for managing replenishments and all lotes
   const [todosLosLotes, setTodosLosLotes] = useState<any[]>([]);
+
+  const uniqueProducts = useMemo(() => {
+    const set = new Set(PRODUCTOS_CATALOGO);
+    todosLosLotes.forEach(l => l.productoId && set.add(l.productoId));
+    return Array.from(set);
+  }, [todosLosLotes]);
   const [adminFilterCliente, setAdminFilterCliente] = useState('');
   const [adminFilterProducto, setAdminFilterProducto] = useState('');
   const [adminTabStatus, setAdminTabStatus] = useState<'activos' | 'inactivos'>('activos');
@@ -272,10 +279,6 @@ export default function VentasConsignacionView() {
     loadTodosLosLotes();
   }, []);
 
-  useEffect(() => {
-    loadUniqueProducts();
-  }, [declaracionCliente, activeTab]);
-
   const loadClientes = async () => {
     try {
       setLoading(true);
@@ -297,32 +300,6 @@ export default function VentasConsignacionView() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadUniqueProducts = async () => {
-    const productsSet = new Set(PRODUCTOS_CATALOGO);
-    try {
-      if (isFirebaseReady()) {
-        const db = getDb();
-        const snap = await getDocs(collection(db, 'crm_consignacion_lotes'));
-        snap.forEach(doc => {
-          const p = doc.data().productoId;
-          if (p) productsSet.add(p);
-        });
-      } else {
-        const key = 'mock_consignacion_lotes';
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const lotes = JSON.parse(saved);
-          lotes.forEach((l: any) => {
-            if (l.productoId) productsSet.add(l.productoId);
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Error scanning unique products:', e);
-    }
-    setUniqueProducts(Array.from(productsSet));
   };
 
   // Pre-fill price when product is selected in delivery form
@@ -380,20 +357,10 @@ export default function VentasConsignacionView() {
           const data = d.data();
           if (!data) continue;
           
-          const movs: Record<string, any> = {};
-          try {
-            const movSnap = await getDocs(collection(db, 'crm_consignacion_lotes', d.id, 'movimientos'));
-            movSnap.docs.forEach(mDoc => {
-              movs[mDoc.id] = mDoc.data();
-            });
-          } catch (e) {
-            console.warn(`Error loading movimientos for lote ${d.id}:`, e);
-          }
-
           loaded.push({
             id: d.id,
             ...data,
-            movimientos: movs
+            movimientos: data.movimientos || {}
           });
         }
         localStorage.setItem(cacheKey, JSON.stringify({ data: loaded, timestamp: Date.now() }));
@@ -505,21 +472,10 @@ export default function VentasConsignacionView() {
           const loteId = d.id;
           const data = d.data();
           
-          const movimientos: Record<string, any> = {};
-          
-          try {
-            const movSnap = await getDocs(collection(db, 'crm_consignacion_lotes', loteId, 'movimientos'));
-            movSnap.docs.forEach(mDoc => {
-              movimientos[mDoc.id] = mDoc.data();
-            });
-          } catch (e) {
-            console.warn(`Error loading movements for lote ${loteId}:`, e);
-          }
-          
           return {
             id: loteId,
             ...data,
-            movimientos
+            movimientos: data.movimientos || {}
           };
         });
 
@@ -847,15 +803,19 @@ export default function VentasConsignacionView() {
     try {
       if (isFirebaseReady()) {
         const db = getDb();
-        const movDocRef = doc(db, 'crm_consignacion_lotes', loteId, 'movimientos', selectedMonth);
-        await setDoc(movDocRef, {
-          unidadesVendidas: 0,
-          saldoAnterior: 0,
-          saldoResultante: 0,
-          montoVentaNeto: 0,
-          fechaRegistro: Timestamp.now(),
-          added: true
-        });
+        const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
+        await setDoc(loteRef, {
+          movimientos: {
+            [selectedMonth]: {
+              unidadesVendidas: 0,
+              saldoAnterior: 0,
+              saldoResultante: 0,
+              montoVentaNeto: 0,
+              fechaRegistro: Timestamp.now(),
+              added: true
+            }
+          }
+        }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
@@ -891,8 +851,12 @@ export default function VentasConsignacionView() {
     try {
       if (isFirebaseReady()) {
         const db = getDb();
-        const movDocRef = doc(db, 'crm_consignacion_lotes', loteId, 'movimientos', selectedMonth);
-        await setDoc(movDocRef, { hidden: true }, { merge: true });
+        const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
+        await setDoc(loteRef, {
+          movimientos: {
+            [selectedMonth]: { hidden: true }
+          }
+        }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
@@ -931,8 +895,8 @@ export default function VentasConsignacionView() {
         const db = getDb();
         const batch = writeBatch(db);
         selectedMonthlyLoteIds.forEach(loteId => {
-          const movDocRef = doc(db, 'crm_consignacion_lotes', loteId, 'movimientos', selectedMonth);
-          batch.set(movDocRef, { hidden: true }, { merge: true });
+          const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
+          batch.set(loteRef, { movimientos: { [selectedMonth]: { hidden: true } } }, { merge: true });
         });
         await batch.commit();
       } else {
@@ -1122,8 +1086,10 @@ export default function VentasConsignacionView() {
         
         // 1. Delete movements for this month
         for (const lote of lotesActivos) {
-          const movDocRef = doc(db, 'crm_consignacion_lotes', lote.id, 'movimientos', monthToDelete);
-          await deleteDoc(movDocRef);
+          const loteRef = doc(db, 'crm_consignacion_lotes', lote.id);
+          await updateDoc(loteRef, {
+            [`movimientos.${monthToDelete}`]: deleteField()
+          });
         }
 
         // 2. Delete planilla record
@@ -1193,18 +1159,18 @@ export default function VentasConsignacionView() {
           const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, currentSales);
           if (!traj) continue;
 
-          const movDocRef = doc(db, 'crm_consignacion_lotes', lote.id, 'movimientos', selectedMonth);
-          await setDoc(movDocRef, {
-            unidadesVendidas: currentSales,
-            saldoAnterior: Number(traj.stockDisponible),
-            saldoResultante: Number(traj.frascosRestantes),
-            montoVentaNeto: Number(traj.montoVentaNeto),
-            fechaRegistro: Timestamp.now()
-          });
-
           const loteRef = doc(db, 'crm_consignacion_lotes', lote.id);
           await setDoc(loteRef, {
-            activo: true
+            activo: true,
+            movimientos: {
+              [selectedMonth]: {
+                unidadesVendidas: currentSales,
+                saldoAnterior: Number(traj.stockDisponible),
+                saldoResultante: Number(traj.frascosRestantes),
+                montoVentaNeto: Number(traj.montoVentaNeto),
+                fechaRegistro: Timestamp.now()
+              }
+            }
           }, { merge: true });
         }
         
