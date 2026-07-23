@@ -1333,7 +1333,7 @@ export default function VentasConsignacionView() {
                         </div>
                         <div>
                           <h4 className="text-sm font-black text-slate-200 uppercase tracking-widest">
-                            ⚙️ Administración de Datos Fijos (Lotes Registrados)
+                            ⚙️ Administración de Datos Fijos
                           </h4>
                           <p className="text-xs text-slate-400 mt-0.5">
                             Visualice, edite y guarde los datos originales de todos los lotes del sistema sin espacio.
