@@ -1472,8 +1472,12 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
   const filteredRecords = records.filter(r => {
     let match = true;
     const rDateNorm = normalizeDateForCompare(r.fecha);
-    if (dateFrom && rDateNorm && rDateNorm < dateFrom) match = false;
-    if (dateTo && rDateNorm && rDateNorm > dateTo) match = false;
+    if (dateFrom) {
+      if (!rDateNorm || rDateNorm < dateFrom) match = false;
+    }
+    if (dateTo) {
+      if (!rDateNorm || rDateNorm > dateTo) match = false;
+    }
     if (filterMonth !== 'Todos' && r.mes !== filterMonth) match = false;
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
@@ -2022,8 +2026,12 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
   const filteredRecords = records.filter(r => {
     let match = true;
     const rDateNorm = normalizeDateForCompare(r.fecha);
-    if (dateFrom && rDateNorm && rDateNorm < dateFrom) match = false;
-    if (dateTo && rDateNorm && rDateNorm > dateTo) match = false;
+    if (dateFrom) {
+      if (!rDateNorm || rDateNorm < dateFrom) match = false;
+    }
+    if (dateTo) {
+      if (!rDateNorm || rDateNorm > dateTo) match = false;
+    }
     if (filterTipoPago !== 'Todos') {
       const rTipo = r.tipoPago || 'Contado';
       if (rTipo !== filterTipoPago) match = false;
@@ -2726,9 +2734,14 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
     }
     if (!r.fechaPago) return false;
     
+    const rDateNorm = normalizeDateForCompare(r.fechaPago);
     // Date range filter
-    if (dateFrom && r.fechaPago < dateFrom) return false;
-    if (dateTo && r.fechaPago > dateTo) return false;
+    if (dateFrom) {
+       if (!rDateNorm || rDateNorm < dateFrom) return false;
+    }
+    if (dateTo) {
+       if (!rDateNorm || rDateNorm > dateTo) return false;
+    }
 
     // Month/Year filter only if range is not set
     if (!dateFrom && !dateTo) {
@@ -3463,8 +3476,13 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
 
   const filteredRecords = records.filter(r => {
     let match = true;
-    if (dateFrom && r.fecha < dateFrom) match = false;
-    if (dateTo && r.fecha > dateTo) match = false;
+    const rDateNorm = normalizeDateForCompare(r.fecha);
+    if (dateFrom) {
+      if (!rDateNorm || rDateNorm < dateFrom) match = false;
+    }
+    if (dateTo) {
+      if (!rDateNorm || rDateNorm > dateTo) match = false;
+    }
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       const text = String(r.nroDto || '') + ' ' + String(r.nombre || '') + ' ' + String(r.rut || '');
