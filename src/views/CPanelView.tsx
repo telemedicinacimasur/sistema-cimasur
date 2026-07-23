@@ -167,11 +167,10 @@ function CPanelManager({ records }: { records: any[] }) {
 
 const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
   crm: [
-    { id: 'register', label: 'Ficha Registro' },
-    { id: 'list', label: 'Cartera de Clientes' },
-    { id: 'activities', label: 'Registro de Actividades' },
-    { id: 'intranet', label: 'Clientes Intranet' },
-    { id: 'smart', label: 'Motor Comercial' }
+    { id: 'clientes', label: '👥 Clientes' },
+    { id: 'campanas', label: '📧 Campañas' },
+    { id: 'club', label: '👑 Club Comercial' },
+    { id: 'campanas-internas', label: '📈 Registro de Campañas Internas' }
   ],
   gestion: [
     { id: 'register', label: 'Ingreso de Cliente' },
@@ -185,20 +184,17 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'commercial', label: 'Motor Escuela' }
   ],
   lab: [
-    { id: 'default', label: 'Dashboard Laboratorio' },
-    { id: 'registro', label: 'Ingreso Muestras' },
-    { id: 'gotas-puras', label: 'Gotas Puras' },
+    { id: 'tracking', label: 'Seguimiento de Pedidos' },
+    { id: 'stock', label: 'Stock de Insumo Diario' },
+    { id: 'gotas', label: 'Elaboración Gotas y Diluciones' },
+    { id: 'magistrales', label: 'Formulación Magistral' },
+    { id: 'evaluacion', label: 'Evaluación Gotas Puras' },
+    { id: 'nosodes', label: 'Ingreso Nosodes' },
+    { id: 'tinturas', label: 'Ficha Tinturas Madres' },
     { id: 'preparacion', label: 'Preparación Gotas Puras' },
-    { id: 'elaboracion', label: 'Elaboración de Gotas' },
-    { id: 'nosodes', label: 'Nosodes' },
-    { id: 'tinturas', label: 'Tinturas Madre' },
-    { id: 'insumos', label: 'Insumos y Materias Primas' },
+    { id: 'insumos', label: 'Registro de Insumos laboratorio T.M. y otros' },
     { id: 'vademecum', label: 'Vademécum' },
-    { id: 'stock', label: 'Stock Equipos Lab' },
-    { id: 'mantenimiento', label: 'Mantenimiento Equipos' },
-    { id: 'magistrales', label: 'Fórmulas Magistrales' },
-    { id: 'tracking', label: 'Tracking Laboratorio' },
-    { id: 'diluciones-db', label: 'Códigos y Diluciones' }
+    { id: 'mantenimiento', label: 'Mantención' }
   ],
   manager: [
     { id: 'menu', label: 'Dashboard Principal' },

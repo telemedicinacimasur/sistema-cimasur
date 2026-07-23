@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
+import { getDb, isFirebaseReady } from '../lib/firebase';
 import { checkStockAlerts, checkPendingOrderAlerts } from '../lib/stockAlerts';
 import { cn, formatDate, safe, parseExcelDate, formatDateForExcel } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -4743,52 +4744,70 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
   const handleSyncFromQuotes = async () => {
     try {
-      const quotes = await localDB.getCollection('quotes');
-      const currentRecords = await localDB.getCollection('order_tracking');
+      if (!isFirebaseReady()) {
+        alert('Firebase no está configurado.');
+        return;
+      }
       
-      const approvedQuotes = quotes.filter(q => 
-        q.estado && safe(q.estado).trim().toLowerCase() === 'aprobada'
-      );
-      
+      const db = getDb();
+      const { collection, getDocs, query, where, doc, setDoc } = await import('firebase/firestore');
+
+      console.log('Sync: Fetching approved quotes...');
+      const quotesQuery = query(collection(db, 'quotes'), where('estado', '==', 'APROBADA'));
+      const quotesSnapshot = await getDocs(quotesQuery);
+      const approvedQuotes = quotesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      console.log(`Sync: Found ${approvedQuotes.length} approved quotes.`);
+
+      // 2. Fetch Existing Tracking IDs
+      console.log('Sync: Fetching existing tracking IDs...');
+      const trackingSnapshot = await getDocs(collection(db, 'order_tracking'));
+      const existingTrackingIds = new Set(trackingSnapshot.docs.map(d => safe(d.data().nroCotiz).trim()));
+      console.log(`Sync: Found ${existingTrackingIds.size} existing tracking records.`);
+
       let addedCount = 0;
       for (const quote of approvedQuotes) {
-        const quoteNro = safe(quote.nroCotiz).trim();
-        const exists = currentRecords.find(r => 
-          safe(r.nroCotiz).trim() === quoteNro
-        );
-        
-        if (!exists) {
-          await localDB.saveToCollection('order_tracking', {
-            nroCotiz: safe(quote.nroCotiz),
+        const numCotiz = safe(quote.nroCotiz).trim();
+        if (!numCotiz) continue;
+
+        if (!existingTrackingIds.has(numCotiz)) {
+          console.log(`Sync: Adding new record for ${numCotiz}...`);
+          // 3. Save new using numCotiz as ID
+          await setDoc(doc(db, "order_tracking", numCotiz), {
+            nroCotiz: numCotiz,
             ot: '',
             cliente: safe(quote.cliente),
             fechaCotiz: safe(quote.fechaElab) || new Date().toISOString().split('T')[0],
             fechaEnvio: '',
             fechaCierre: '',
-            fechaRecepcion: '',
+            fechaRecepción: '',
             courier: 'Retiro en Oficina',
             detalleSeguimiento: '',
             situacion: 'PENDIENTE',
-            logs: [{ 
-              date: new Date().toLocaleString('es-CL'), 
-              user: 'Sistema (Sync)', 
-              action: 'Pedido sincronizado desde Administración' 
+            logs: [{
+              date: new Date().toLocaleString('es-CL'),
+              user: 'Sistema (Sync)',
+              action: 'Pedido sincronizado desde Administración'
             }]
           });
           addedCount++;
+          existingTrackingIds.add(numCotiz); // Keep local set updated
+        } else {
+            console.log(`Sync: Skipping existing ${numCotiz}.`);
         }
       }
       
       if (addedCount > 0) {
         alert(`Éxito: Se sincronizaron ${addedCount} nuevos pedidos.`);
+        // Reload locally
         const updated = await localDB.getCollection('order_tracking');
         setTrackingRecords(updated);
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
       } else {
         alert('Información: No hay nuevas cotizaciones aprobadas para sincronizar.');
       }
     } catch (err) {
       console.error('Sync Error:', err);
-      alert('Error técnico al sincronizar. Revise la consola.');
+      alert('Error técnico al sincronizar. Revise la consola. Detalle: ' + (err as Error).message);
     }
   };
 
@@ -4820,6 +4839,21 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       const user = localAuth.getCurrentUser();
       const userName = user?.displayName || user?.email || 'Sistema';
       const timestamp = new Date().toLocaleString('es-CL');
+
+      const nuevoNroCotiz = safe(form.nroCotiz).trim();
+      if (!nuevoNroCotiz) {
+        alert('El N° de Pedido / Cotización es obligatorio.');
+        return;
+      }
+      
+      // NUEVO: Validación de duplicados para manual entry
+      if (!editingId) {
+          const existeDuplicado = trackingRecords.some(r => safe(r.nroCotiz).trim() === nuevoNroCotiz);
+          if (existeDuplicado) {
+              alert('Error: Ya existe un registro con ese N° de Pedido / Cotización.');
+              return;
+          }
+      }
 
       if (editingId) {
         const existing = trackingRecords.find(r => r.id === editingId);
