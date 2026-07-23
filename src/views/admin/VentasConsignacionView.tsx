@@ -25,6 +25,8 @@ import {
   Package, 
   Tag, 
   Check, 
+  CheckCircle,
+  Clock,
   RefreshCw, 
   TriangleAlert, 
   Calendar, 
@@ -377,10 +379,21 @@ export default function VentasConsignacionView() {
         for (const d of snap.docs) {
           const data = d.data();
           if (!data) continue;
+          
+          const movs: Record<string, any> = {};
+          try {
+            const movSnap = await getDocs(collection(db, 'crm_consignacion_lotes', d.id, 'movimientos'));
+            movSnap.docs.forEach(mDoc => {
+              movs[mDoc.id] = mDoc.data();
+            });
+          } catch (e) {
+            console.warn(`Error loading movimientos for lote ${d.id}:`, e);
+          }
+
           loaded.push({
             id: d.id,
             ...data,
-            movimientos: {} 
+            movimientos: movs
           });
         }
         localStorage.setItem(cacheKey, JSON.stringify({ data: loaded, timestamp: Date.now() }));
@@ -494,15 +507,13 @@ export default function VentasConsignacionView() {
           
           const movimientos: Record<string, any> = {};
           
-          if (selectedMonth) {
-            try {
-              const movDoc = await getDoc(doc(db, 'crm_consignacion_lotes', loteId, 'movimientos', selectedMonth));
-              if (movDoc.exists()) {
-                movimientos[selectedMonth] = movDoc.data();
-              }
-            } catch (e) {
-              console.warn(`Error loading movement for lote ${loteId} and month ${selectedMonth}:`, e);
-            }
+          try {
+            const movSnap = await getDocs(collection(db, 'crm_consignacion_lotes', loteId, 'movimientos'));
+            movSnap.docs.forEach(mDoc => {
+              movimientos[mDoc.id] = mDoc.data();
+            });
+          } catch (e) {
+            console.warn(`Error loading movements for lote ${loteId}:`, e);
           }
           
           return {
@@ -1981,10 +1992,16 @@ export default function VentasConsignacionView() {
                         const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, salesInputs[lote.id]);
                         return { lote, traj };
                       }).filter(item => {
+                        if (!item.traj || !item.traj.delivered) return false;
                         const mov = item.lote.movimientos?.[selectedMonth];
                         if (mov && mov.hidden) return false;
+                        
+                        const stockDisponible = item.traj.stockDisponible ?? 0;
+                        const frascosRestantes = item.traj.frascosRestantes ?? 0;
                         const hasMov = mov !== undefined;
-                        return item.traj && item.traj.delivered && hasMov; // ONLY show if it has a movement/added to this month
+                        
+                        // Lote delivered to client appears if it has available stock, remaining frascos, or a recorded movement
+                        return stockDisponible > 0 || frascosRestantes > 0 || hasMov;
                       }).sort((a, b) => {
                         const nameA = (a.lote.productoId || '').toString().toLowerCase();
                         const nameB = (b.lote.productoId || '').toString().toLowerCase();
@@ -2037,9 +2054,21 @@ export default function VentasConsignacionView() {
                                     Remover Seleccionados ({selectedMonthlyLoteIds.size})
                                   </button>
                                 )}
-                                <span className="bg-sky-500/15 text-sky-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-sky-500/20 shadow-lg">
-                                  📅 {formatMonthName(selectedMonth)}
-                                </span>
+                                {(() => {
+                                  const isCurrentMonthSaved = activeLotesForMonth.some(item => {
+                                    const mov = item.lote.movimientos?.[selectedMonth];
+                                    return mov && (mov.fechaRegistro || mov.unidadesVendidas !== undefined);
+                                  });
+                                  return isCurrentMonthSaved ? (
+                                    <span className="bg-emerald-500/15 text-emerald-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-500/30 shadow-lg flex items-center gap-1.5">
+                                      <CheckCircle size={14} /> Planilla Guardada ({formatMonthName(selectedMonth)})
+                                    </span>
+                                  ) : (
+                                    <span className="bg-sky-500/15 text-sky-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-sky-500/20 shadow-lg">
+                                      📅 {formatMonthName(selectedMonth)}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </div>
 
@@ -2474,7 +2503,7 @@ export default function VentasConsignacionView() {
                       if (lote.movimientos) {
                         Object.keys(lote.movimientos).forEach(m => {
                           const mov = lote.movimientos[m];
-                          if (mov && Number(mov.unidadesVendidas) > 0) {
+                          if (mov && !mov.hidden && (mov.fechaRegistro || mov.unidadesVendidas !== undefined)) {
                             if (!monthSummaryMap[m]) {
                               monthSummaryMap[m] = { unidadesVendidas: 0, montoVendido: 0, count: 0 };
                             }
@@ -2780,13 +2809,13 @@ export default function VentasConsignacionView() {
                                 // Get details of products sold in this saved month
                                 const itemsInMonth = clientLotes.map(lote => {
                                   const mov = lote.movimientos?.[m.month];
-                                  if (mov && Number(mov.unidadesVendidas) > 0) {
+                                  if (mov && !mov.hidden && (mov.unidadesVendidas !== undefined || mov.fechaRegistro)) {
                                     return {
                                       productoId: lote.productoId,
                                       solucionLote: lote.solucionLote,
-                                      unidadesVendidas: Number(mov.unidadesVendidas),
+                                      unidadesVendidas: Number(mov.unidadesVendidas || 0),
                                       precioUnitNeto: Number(lote.precioUnitNeto) || 0,
-                                      montoVendido: Number(mov.unidadesVendidas) * (Number(lote.precioUnitNeto) || 0)
+                                      montoVendido: Number(mov.unidadesVendidas || 0) * (Number(lote.precioUnitNeto) || 0)
                                     };
                                   }
                                   return null;
