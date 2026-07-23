@@ -1735,7 +1735,11 @@ export default function VentasConsignacionView() {
                           const nameA = (a.productoId || "").toString().toLowerCase();
                           const nameB = (b.productoId || "").toString().toLowerCase();
                           if (nameA !== nameB) return nameA.localeCompare(nameB);
-                          return (a.sortDate || "").localeCompare(b.sortDate || "");
+                          
+                          // Safe date comparison
+                          const dateA = a.sortDate ? new Date(a.sortDate).getTime() : 0;
+                          const dateB = b.sortDate ? new Date(b.sortDate).getTime() : 0;
+                          return dateA - dateB;
                         });
 
                         const earliestMap: Record<string, string> = {};
@@ -2258,7 +2262,11 @@ export default function VentasConsignacionView() {
                                                const nameA = (a.productoId || "").toString().toLowerCase();
                                                const nameB = (b.productoId || "").toString().toLowerCase();
                                                if (nameA !== nameB) return nameA.localeCompare(nameB);
-                                               return (a.sortDate || "").localeCompare(b.sortDate || "");
+                                               
+                                               // Safe date comparison
+                                               const dateA = a.sortDate ? new Date(a.sortDate).getTime() : 0;
+                                               const dateB = b.sortDate ? new Date(b.sortDate).getTime() : 0;
+                                               return dateA - dateB;
                                              });
 
                                              // Mapa de prioridad FIFO por producto
