@@ -70,9 +70,15 @@ export const UATConsole: React.FC<UATConsoleProps> = ({ onViewClient }) => {
 
   useEffect(() => {
     loadUATClients();
-    window.addEventListener('db-change', loadUATClients);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === 'contacts') {
+        loadUATClients();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
     return () => {
-      window.removeEventListener('db-change', loadUATClients);
+      window.removeEventListener('db-change', handleDbChange);
     };
   }, []);
 
@@ -190,8 +196,8 @@ export const UATConsole: React.FC<UATConsoleProps> = ({ onViewClient }) => {
       };
       
       window.addEventListener('db-change', testListener);
-      addLog('🔊 Despachando evento global: window.dispatchEvent(new Event("db-change"))');
-      window.dispatchEvent(new Event('db-change'));
+      addLog('🔊 Despachando evento global: window.dispatchEvent(new CustomEvent("db-change", { detail: { collection: "contacts" } }))');
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       
       // Wait a tiny bit for the call-stack to process the event
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -293,7 +299,7 @@ export const UATConsole: React.FC<UATConsoleProps> = ({ onViewClient }) => {
 
       await localDB.saveToCollection('contacts', newClient);
       setTestClient(newClient);
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       addLog(`📝 Cliente manual creado: "${newClient.nombre}" (${newClient.categoria})`);
       alert(`Cliente "${newClient.nombre}" creado exitosamente. ¡Ya está persistido y sincronizado en todos los módulos!`);
     } catch (err: any) {
@@ -312,7 +318,7 @@ export const UATConsole: React.FC<UATConsoleProps> = ({ onViewClient }) => {
       }
       
       setTestClient(null);
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       addLog('🧹 Base de datos limpia. Se eliminaron todos los registros temporales de prueba UAT.');
       alert('Limpieza completada con éxito.');
     } catch (err: any) {

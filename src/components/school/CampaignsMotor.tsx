@@ -223,7 +223,7 @@ export function CampaignsMotor() {
       setSelectedExistingLeadId('');
       
       // Trigger global event so lists re-render
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
       loadLeads();
     } catch (e: any) {
       alert('Error al guardar datos: ' + e.message);
@@ -300,8 +300,14 @@ export function CampaignsMotor() {
 
   useEffect(() => {
     loadLeads();
-    window.addEventListener('db-change', loadLeads);
-    return () => window.removeEventListener('db-change', loadLeads);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === 'school_leads' || detail.collection === 'students') {
+        loadLeads();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, []);
 
   // Filter leads according to search term and veterinary classification filter
@@ -435,7 +441,7 @@ export function CampaignsMotor() {
       }));
 
       // Trigger global event so lists re-render
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
       
       // Add audit log
       const user = JSON.parse(localStorage.getItem('cimasur_user') || '{}');
@@ -520,7 +526,7 @@ export function CampaignsMotor() {
     for (const mock of mockLeads) {
       await localDB.saveToCollection('school_leads', mock);
     }
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
     alert('Leads de prueba veterinarios (MV) creados con éxito.');
   };
 

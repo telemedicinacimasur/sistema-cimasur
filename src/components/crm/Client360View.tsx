@@ -159,7 +159,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     setIsEditing(false);
     await loadData();
     if (onSave) onSave();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const handleAddContact = async () => {
@@ -178,7 +178,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     
     setNewContact({ nombre: '', cargo: '', telefono: '', celular: '', email: '', esPrincipal: false });
     await loadData();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const handleDeleteContact = async (index: number) => {
@@ -196,7 +196,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     });
     
     await loadData();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const handleAddVet = async () => {
@@ -218,7 +218,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     
     setNewVet({ nombre: '', especialidad: '', email: '', telefono: '' });
     await loadData();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const handleDeleteVet = async (index: number) => {
@@ -236,7 +236,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     });
     
     await loadData();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const handleQuickSaveCategoryAndSales = async () => {
@@ -273,7 +273,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     alert(`¡Datos Comerciales Guardados Con Éxito!\n\n- Compra Anual Acumulada: $${amount.toLocaleString('es-CL')}\n- Categoría Club: ${catToSave}`);
     await loadData();
     if (onSave) onSave();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const handleAddBitacora = async () => {
@@ -333,7 +333,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     setNewBitacoraEntry('');
     await loadData();
     if (onSave) onSave();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   if (loading) {
@@ -561,7 +561,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                                           import('../../lib/auth').then(({ localDB }) => {
                                             localDB.updateInCollection('contacts', client.id, { bitacora: updatedBitacora }).then(() => {
                                               setEditingEntryId(null);
-                                              window.dispatchEvent(new Event('db-change'));
+                                              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                                             });
                                           });
                                         }
@@ -582,7 +582,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                                         if (client) {
                                           import('../../lib/auth').then(({ localDB }) => {
                                             localDB.updateInCollection('contacts', client.id, { bitacora: updatedBitacora }).then(() => {
-                                              window.dispatchEvent(new Event('db-change'));
+                                              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                                             });
                                           });
                                         }
@@ -767,7 +767,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                         });
                         
                         await loadData();
-                        window.dispatchEvent(new Event('db-change'));
+                        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                       }
                     }}
                   >
@@ -1055,7 +1055,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                           localDB.deleteFromCollection('crm_activities', deletingSystemEntry.id).then(() => {
                             setGlobalActivities(prev => prev.filter(a => a.id !== deletingSystemEntry.id));
                             setDeletingSystemEntry(null);
-                            window.dispatchEvent(new Event('db-change'));
+                            window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'crm_activities' } }));
                           });
                         });
                       }
@@ -1074,7 +1074,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                         }
                         setGlobalActivities(prev => prev.filter(a => a.campania !== deletingSystemEntry.title));
                         setDeletingSystemEntry(null);
-                        window.dispatchEvent(new Event('db-change'));
+                        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'crm_activities' } }));
                       });
                     }}
                     className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold py-3 px-4 rounded-xl transition-all"

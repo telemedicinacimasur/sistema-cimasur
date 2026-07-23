@@ -34,6 +34,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [isMuted, setIsMuted] = React.useState(() => {
     return localStorage.getItem('notifications_muted') === 'true';
   });
+  const isMutedRef = React.useRef(isMuted);
+
+  React.useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
   const prevUnreadRef = React.useRef(0);
   
   // Real-time toast "cloud" states
@@ -63,55 +69,61 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   React.useEffect(() => {
     if (user) {
       const userRoles = user.roles || [user.role || 'viewer'];
-      const unsubscribe = subscribeToNotifications(userRoles, user.displayName || user.email || 'Sistema', user.email || '', (data) => {
-        const newUnread = data.filter(n => !n.read).length;
-        if (newUnread > prevUnreadRef.current && prevUnreadRef.current !== 0) {
-          if (!isMuted) {
-            try {
-              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-              audio.volume = 1.0; // MAX VOLUME! Louder sound (tono máximo)
-              audio.play().catch(e => console.log('Audio autoplay prevented', e));
-            } catch(e) {}
-          }
+      const unsubscribe = subscribeToNotifications(
+        userRoles, 
+        user.displayName || user.email || 'Sistema', 
+        user.email || '', 
+        (data) => {
+          const newUnread = data.filter(n => !n.read).length;
+          if (newUnread > prevUnreadRef.current && prevUnreadRef.current !== 0) {
+            if (!isMutedRef.current) {
+              try {
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.volume = 1.0; // MAX VOLUME! Louder sound (tono máximo)
+                audio.play().catch(e => console.log('Audio autoplay prevented', e));
+              } catch(e) {}
+            }
 
-          // Search for the newly added unread notification to show a real-time toast
-          const unreadList = data.filter(n => !n.read);
-          const latestUnread = unreadList[0];
-          if (latestUnread) {
-            setToastNotification(latestUnread);
-            setShowToast(true);
+            // Search for the newly added unread notification to show a real-time toast
+            const unreadList = data.filter(n => !n.read);
+            const latestUnread = unreadList[0];
+            if (latestUnread) {
+              setToastNotification(latestUnread);
+              setShowToast(true);
 
-            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-            toastTimeoutRef.current = setTimeout(() => {
-              setShowToast(false);
-            }, 15000); // 15 seconds visible on-screen (Nube Visual de 15 segundos)
+              if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+              toastTimeoutRef.current = setTimeout(() => {
+                setShowToast(false);
+              }, 15000); // 15 seconds visible on-screen (Nube Visual de 15 segundos)
 
-            // Trigger Browser Native Notification (Visible in other tabs & background)
-            try {
-              if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                const browserNotif = new Notification(latestUnread.title, {
-                  body: latestUnread.message,
-                  icon: '/favicon.ico',
-                  tag: latestUnread.id || String(Date.now()),
-                });
+              // Trigger Browser Native Notification (Visible in other tabs & background)
+              try {
+                if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                  const browserNotif = new Notification(latestUnread.title, {
+                    body: latestUnread.message,
+                    icon: '/favicon.ico',
+                    tag: latestUnread.id || String(Date.now()),
+                  });
 
-                browserNotif.onclick = () => {
-                  window.focus();
-                  setIsNotificationsOpen(true);
-                  browserNotif.close();
-                };
+                  browserNotif.onclick = () => {
+                    window.focus();
+                    setIsNotificationsOpen(true);
+                    browserNotif.close();
+                  };
+                }
+              } catch (e) {
+                console.warn('Native Notification construction or permission check failed:', e);
               }
-            } catch (e) {
-              console.warn('Native Notification construction or permission check failed:', e);
             }
           }
-        }
-        prevUnreadRef.current = newUnread;
-        setNotifications(data);
-      });
+          prevUnreadRef.current = newUnread;
+          setNotifications(data);
+        },
+        user.uid || user.email
+      );
       return () => unsubscribe();
     }
-  }, [user, isMuted]);
+  }, [user]);
 
   React.useEffect(() => {
     return () => {

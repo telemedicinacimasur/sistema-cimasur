@@ -976,9 +976,22 @@ export default function VentasConsignacionView() {
 
       if (isFirebaseReady()) {
         const db = getDb();
-        const { writeBatch } = await import('firebase/firestore');
+        const { writeBatch, query, collection, documentId, where, getDocs } = await import('firebase/firestore');
         const batch = writeBatch(db);
         let batchCount = 0;
+
+        const loteIds = Object.keys(groupedByLote);
+        const loteDataMap: Record<string, any> = {};
+
+        // Fetch all lote documents in chunks of 30
+        for (let i = 0; i < loteIds.length; i += 30) {
+          const chunk = loteIds.slice(i, i + 30);
+          const q = query(collection(db, 'crm_consignacion_lotes'), where(documentId(), 'in', chunk));
+          const snapshot = await getDocs(q);
+          snapshot.forEach(doc => {
+            loteDataMap[doc.id] = doc.data();
+          });
+        }
 
         for (const [loteId, info] of Object.entries(groupedByLote)) {
           const docRef = doc(db, 'crm_consignacion_lotes', loteId);
@@ -988,12 +1001,8 @@ export default function VentasConsignacionView() {
             batch.delete(docRef);
             batchCount++;
           } else if (info.repIndices.length > 0) {
-            // This part is tricky with batch because we need the current data
-            // Since batch doesn't support "get and then update" atomically in one call without a transaction
-            // We'll do these individually but still inside the try-catch
-            const loteDoc = await getDoc(docRef);
-            if (loteDoc.exists()) {
-              const data = loteDoc.data();
+            const data = loteDataMap[loteId];
+            if (data) {
               let repos = data.reposiciones || [];
               const sortedIndices = [...info.repIndices].sort((a, b) => b - a);
               sortedIndices.forEach(idx => {

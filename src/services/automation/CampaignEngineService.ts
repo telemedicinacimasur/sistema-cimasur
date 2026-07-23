@@ -92,7 +92,7 @@ export class CampaignEngineService {
       // Wait a moment for the server to update the status to "running" or "scheduled" before dispatching
       setTimeout(() => {
         window.dispatchEvent(new Event('campaign-executed'));
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'crm_campaigns' } }));
       }, 500);
 
     } catch (error) {

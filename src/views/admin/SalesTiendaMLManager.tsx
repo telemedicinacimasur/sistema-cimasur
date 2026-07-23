@@ -338,8 +338,11 @@ export default function SalesTiendaMLManager() {
   useEffect(() => {
     loadData();
     
-    const handleRefresh = () => {
-      loadData();
+    const handleRefresh = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['sales', 'tienda_sales'].includes(detail.collection)) {
+        loadData();
+      }
     };
     
     window.addEventListener('db-change', handleRefresh);

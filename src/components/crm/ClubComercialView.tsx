@@ -74,9 +74,12 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
   useEffect(() => {
     loadContacts();
     loadConfig(selectedYear);
-    const handleDbChange = () => {
-      loadContacts();
-      loadConfig(selectedYear);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['contacts', 'crm_config'].includes(detail.collection)) {
+        loadContacts();
+        loadConfig(selectedYear);
+      }
     };
     window.addEventListener('db-change', handleDbChange);
     return () => window.removeEventListener('db-change', handleDbChange);
@@ -211,7 +214,7 @@ export default function ClubComercialView({ onViewClient }: { onViewClient?: (id
         setBeneficiosPorCategoria(configBenefits);
         setIsConfigOpen(false);
         loadContacts();
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       } else {
         throw new Error('API Error');
       }

@@ -74,8 +74,14 @@ export default function GestionView() {
 
   useEffect(() => {
     loadData();
-    window.addEventListener('db-change', loadData);
-    return () => window.removeEventListener('db-change', loadData);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['gestion_records', 'gestion_activities'].includes(detail.collection)) {
+        loadData();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, []);
 
   const selectedExpediente = records.find(r => r.id === selectedExpedienteId);
@@ -331,7 +337,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
 
       setNewNote('');
       loadActivities();
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_activities' } }));
     } catch (err) {
       console.error(err);
       alert('Error al registrar actividad');
@@ -346,7 +352,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
     await localDB.deleteFromCollection('gestion_activities', id);
     await addAuditLog(user, `Eliminó actividad: ${detail.substring(0, 30)}...`, 'Gestión');
     loadActivities();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_activities' } }));
   };
 
   return (
@@ -832,7 +838,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
         observaciones: ''
       });
     }
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_records' } }));
   };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -875,7 +881,7 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
         }
         if (user) await addAuditLog(user, `Importó ${count} clientes a Gestión desde Excel`, 'Gestión');
         alert(`Se importaron ${count} clientes correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_records' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo Excel.");
@@ -1065,7 +1071,7 @@ function GestionList({
     try {
       await localDB.deleteFromCollection('gestion_records', id);
       await addAuditLog(user, `Eliminó Cliente de Gestión: ${name}`, 'Gestión');
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_records' } }));
       // Adding a local alert to confirm success
       alert(`Cliente ${name} eliminado correctamente.`);
     } catch (error) {

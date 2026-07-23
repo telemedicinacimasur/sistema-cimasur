@@ -64,12 +64,13 @@ export default function LabView() {
   useEffect(() => {
     if (activeForm === 'default') return;
 
+    let collectionName = 'lab_records';
+    if (activeForm === 'stock') collectionName = 'inventory';
+    if (activeForm === 'tracking') collectionName = 'order_tracking';
+    if (activeForm === 'magistrales') collectionName = 'lab_records';
+
     const loadData = async () => {
       try {
-        let collectionName = 'lab_records';
-        if (activeForm === 'stock') collectionName = 'inventory';
-        if (activeForm === 'tracking') collectionName = 'order_tracking';
-        if (activeForm === 'magistrales') collectionName = 'lab_records';
         const data = await localDB.getCollection(collectionName);
         setRecords(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -79,8 +80,14 @@ export default function LabView() {
     };
 
     loadData();
-    window.addEventListener('db-change', loadData);
-    return () => window.removeEventListener('db-change', loadData);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === collectionName) {
+        loadData();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, [activeForm]);
 
   const handleBack = () => setActiveForm('default');
@@ -2517,7 +2524,7 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
 
         await addAuditLog(user, `Importó ${importedCount} insumos desde Excel`, 'Laboratorio');
         alert(`Éxito: Se importaron ${importedCount} insumos correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'lab_records' } }));
         const updated = await localDB.getCollection('lab_records');
         setRecords(updated);
       } catch (error) {
@@ -3254,7 +3261,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 
         await addAuditLog(user, `Importó ${importedCount} equipos desde Excel`, 'Laboratorio');
         alert(`Éxito: Se importaron ${importedCount} equipos correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'lab_records' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
@@ -3676,10 +3683,9 @@ const getRecordAlertaThreshold = (record: any) => {
   return 5;
 };
 
-function StockManager({ records: _, setRecords: __ }: { records: any[], setRecords: (data: any[]) => void }) {
+function StockManager({ records: inventoryRecords, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [inventoryRecords, setInventoryRecords] = useState<any[]>([]);
   const [selectedArea, setSelectedArea] = useState<string>('Etiquetas salina');
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -3738,7 +3744,7 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     const newVal = !globalAlertsMuted;
     setGlobalAlertsMuted(newVal);
     localStorage.setItem('all_stock_alerts_muted', String(newVal));
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'inventory' } }));
   };
 
   const toggleRecordAlert = async (record: any) => {
@@ -3750,8 +3756,8 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
         updatedAt: new Date().toISOString()
       });
       const updated = await localDB.getCollection('inventory');
-      setInventoryRecords(updated);
-      window.dispatchEvent(new Event('db-change'));
+      setRecords(updated);
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'inventory' } }));
     } catch (err) {
       console.error("Error toggling item alert:", err);
     }
@@ -3776,8 +3782,8 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
           });
         }
         const updated = await localDB.getCollection('inventory');
-        setInventoryRecords(updated);
-        window.dispatchEvent(new Event('db-change'));
+        setRecords(updated);
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'inventory' } }));
         alert(`Se han ${deactivate ? 'desactivado' : 'activado'} las alertas de bajo stock para los ${itemsToUpdate.length} insumos correctamente.`);
       }
     } catch (err) {
@@ -3787,29 +3793,31 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
   };
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadFollowups = async () => {
       try {
-        const invData = await localDB.getCollection('inventory');
-        setInventoryRecords(Array.isArray(invData) ? invData : []);
-        
         const folData = await localDB.getCollection('stock_followups');
         setFollowups(Array.isArray(folData) ? folData : []);
       } catch (err) {
         console.error('StockManager Load Error:', err);
-        setInventoryRecords([]);
         setFollowups([]);
       }
     };
-    loadData();
-    window.addEventListener('db-change', loadData);
-    return () => window.removeEventListener('db-change', loadData);
+    loadFollowups();
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === 'stock_followups') {
+        loadFollowups();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, []);
 
   const handleDeleteItem = async (id: string) => {
     await localDB.deleteFromCollection('inventory', id);
     const updated = await localDB.getCollection('inventory');
-    setInventoryRecords(updated);
-    window.dispatchEvent(new Event('db-change'));
+    setRecords(updated);
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'inventory' } }));
     alert('Item eliminado del inventario');
   };
 
@@ -3823,8 +3831,8 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
       });
       setEditingStockId(null);
       const updated = await localDB.getCollection('inventory');
-      setInventoryRecords(updated);
-      window.dispatchEvent(new Event('db-change'));
+      setRecords(updated);
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'inventory' } }));
       alert('Cambios guardados');
     } catch (err) {
       console.error(err);
@@ -3911,8 +3919,8 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
       
       setForm({ ...form, item: '', code: '', qty: 0, alertaStock: 5, motivo: 'Compra / Ingreso Nuevo' });
       const updated = await localDB.getCollection('inventory');
-      setInventoryRecords(updated);
-      window.dispatchEvent(new Event('db-change'));
+      setRecords(updated);
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'inventory' } }));
     } catch (err) {
       console.error(err);
       alert('Error crítico al procesar el ingreso de stock. Revise consola.');
@@ -3997,8 +4005,8 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
 
         alert(`Importación Finalizada:\n- Leídas: ${rawData.length} filas\n- Nuevos items: ${importedCount}\n- Actualizados: ${updateCount}\n- Omitidos (sin nombre): ${skippedCount}`);
         const updated = await localDB.getCollection('inventory');
-        setInventoryRecords(updated);
-        window.dispatchEvent(new Event('db-change'));
+        setRecords(updated);
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'inventory' } }));
         // Clear input
         e.target.value = '';
       } catch (error) {
@@ -4036,10 +4044,10 @@ function StockManager({ records: _, setRecords: __ }: { records: any[], setRecor
     alert(`Descontado: ${deductQty} unidades. Stock Final: ${newQty}`);
     setConsumptionQty({ ...consumptionQty, [record.id]: 0 });
     const updatedInv = await localDB.getCollection('inventory');
-    setInventoryRecords(updatedInv);
+    setRecords(updatedInv);
     const updatedFollow = await localDB.getCollection('stock_followups');
     setFollowups(updatedFollow);
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'stock_followups' } }));
   };
 
   const handleDeleteFollowup = async (id: string) => {
@@ -4610,7 +4618,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
         await addAuditLog(user, `Importó ${importedCount} seguimientos de pedidos desde Excel`, 'Laboratorio');
         alert(`Éxito: Se importaron ${importedCount} registros correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
@@ -4643,8 +4651,14 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       }
     };
     loadTrackingData();
-    window.addEventListener('db-change', loadTrackingData);
-    return () => window.removeEventListener('db-change', loadTrackingData);
+    const handleTrackingDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === 'order_tracking') {
+        loadTrackingData();
+      }
+    };
+    window.addEventListener('db-change', handleTrackingDbChange);
+    return () => window.removeEventListener('db-change', handleTrackingDbChange);
   }, []);
 
   useEffect(() => {
@@ -4917,7 +4931,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         await addAuditLog(user, `Realizó limpieza de ${deletedCount} registros antiguos en Seguimiento de Pedidos/Courier`, 'Laboratorio');
         const updated = await localDB.getCollection('order_tracking');
         setTrackingRecords(updated);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
         alert(`Optimización Exitosa: Se eliminaron ${deletedCount} registros de seguimiento antiguos. El sistema de lecturas se ha alivianado correctamente.`);
       } catch (err) {
         console.error("Cleanup error:", err);
@@ -5358,7 +5372,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
     // Refresh records
     const updated = await localDB.getCollection('lab_records');
     setRecords(updated);
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'lab_records' } }));
     
     setSelectedElabRecord(null);
     alert('Registro de elaboración guardado exitosamente');
@@ -5416,7 +5430,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
 
     const updated = await localDB.getCollection('lab_records');
     setRecords(updated);
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'lab_records' } }));
     
     setForm({
       nroCotizacion: '',
@@ -5713,7 +5727,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                               await localDB.deleteFromCollection('lab_records', r.id);
                               const updated = await localDB.getCollection('lab_records');
                               setRecords(updated);
-                              window.dispatchEvent(new Event('db-change'));
+                              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'lab_records' } }));
                               if (user) await addAuditLog(user, `Eliminó Fórmula Magistral: ${r.nroCotizacion}`, 'Laboratorio');
                               alert(`Registro ${r.nroCotizacion} eliminado exitosamente`);
                             } catch (err) {

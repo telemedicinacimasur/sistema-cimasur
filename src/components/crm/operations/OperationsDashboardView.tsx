@@ -32,10 +32,16 @@ export const OperationsDashboardView: React.FC<OperationsDashboardViewProps> = (
 
   useEffect(() => {
     loadData();
-    window.addEventListener('db-change', loadData);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['crm_campaigns', 'contacts'].includes(detail.collection)) {
+        loadData();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
     window.addEventListener('campaign-executed', loadData);
     return () => {
-      window.removeEventListener('db-change', loadData);
+      window.removeEventListener('db-change', handleDbChange);
       window.removeEventListener('campaign-executed', loadData);
     };
   }, []);

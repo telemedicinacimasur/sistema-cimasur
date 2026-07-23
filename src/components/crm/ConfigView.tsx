@@ -17,7 +17,7 @@ export const ConfigView: React.FC = () => {
       }
     }
     alert('Clientes de demostración eliminados.');
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   return (

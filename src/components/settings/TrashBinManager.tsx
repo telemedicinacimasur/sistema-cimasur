@@ -98,7 +98,8 @@ export function TrashBinManager() {
 
       // Refresh list
       alert(`✅ Restauración Exitosa:\n\nEl registro ha sido re-insertado de forma correcta en la colección "${getCollectionFriendlyName(trashRecord.originalCollection)}".`);
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: trashRecord.originalCollection } }));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'trash_bin' } }));
       loadTrash();
     } catch (e) {
       console.error("Error restoring record:", e);
@@ -110,7 +111,7 @@ export function TrashBinManager() {
     if (window.confirm("⚠️ ELIMINACIÓN PERMANENTE:\n\n¿Está absolutamente seguro de eliminar permanentemente este registro de la papelera? Esta acción destruirá la información para siempre y no podrá recuperarse en el futuro.")) {
       try {
         await localDB.deleteFromCollection('trash_bin', id);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'trash_bin' } }));
         loadTrash();
       } catch (err) {
         console.error(err);
@@ -127,7 +128,7 @@ export function TrashBinManager() {
         for (const item of trashItems) {
           await localDB.deleteFromCollection('trash_bin', item.id);
         }
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'trash_bin' } }));
         await loadTrash();
         alert("Papelera de reciclaje vaciada correctamente.");
       } catch (e) {

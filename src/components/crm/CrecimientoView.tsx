@@ -33,9 +33,15 @@ export const CrecimientoView: React.FC<CrecimientoViewProps> = ({ onViewClient }
 
   useEffect(() => {
     loadClients();
-    window.addEventListener('db-change', loadClients);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === 'contacts') {
+        loadClients();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
     return () => {
-      window.removeEventListener('db-change', loadClients);
+      window.removeEventListener('db-change', handleDbChange);
     };
   }, []);
 

@@ -175,7 +175,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({ client, onSave, onCancel
         }
       }
       onSave();
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       alert('Socio comercial guardado exitosamente.');
     } catch (err) {
       console.error(err);

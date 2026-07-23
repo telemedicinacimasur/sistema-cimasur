@@ -63,7 +63,7 @@ const EstadoAcademicoInput = ({ studentId, initialValue }: EstadoAcademicoInputP
 
   const handleSave = async (selectedVal: string) => {
     await localDB.updateInCollection('students', studentId, { estadoAcademico: selectedVal });
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'students' } }));
   };
 
   const normalizedVal = (val || '').toLowerCase();
@@ -119,8 +119,14 @@ export default function SchoolView() {
       setData(result);
     };
     loadData();
-    window.addEventListener('db-change', loadData);
-    return () => window.removeEventListener('db-change', loadData);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['students', 'school_leads', 'school_activities', 'school_payments'].includes(detail.collection)) {
+        loadData();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, [activeView]);
 
   return (
@@ -291,7 +297,7 @@ function ContactRegister({ records }: { records: any[] }) {
         if (user) await addAuditLog(user, `Registró lead académico: ${form.name}`, 'SCHOOL');
         alert('Lead Académico Registrado');
       }
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
       setForm({ 
         fecha: new Date().toISOString().split('T')[0],
         name: '', 
@@ -371,7 +377,7 @@ function ContactRegister({ records }: { records: any[] }) {
 
         await addAuditLog(user, `Importó ${importedCount} leads académicos desde Excel`, 'SCHOOL');
         alert(`Éxito: Se importaron ${importedCount} leads académicos correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
@@ -442,7 +448,8 @@ function ContactRegister({ records }: { records: any[] }) {
       });
       await localDB.deleteFromCollection('school_leads', lead.id);
       setSelectedLead(null);
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'students' } }));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
       alert(`${lead.name} ahora es ALUMNO VIGENTE`);
     } catch(err) {
       console.error("Transfer error:", err);
@@ -914,7 +921,8 @@ function ContactRegister({ records }: { records: any[] }) {
                                 date: new Date().toISOString()
                               });
                               await localDB.deleteFromCollection('school_leads', r.id);
-                              window.dispatchEvent(new Event('db-change'));
+                              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
+                              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                               alert('Transferido a Leads (CRM General)');
                             }
                           }}
@@ -1023,7 +1031,7 @@ function StudentManager({ records }: { records: any[] }) {
         await localDB.deleteFromCollection('students', id);
       }
       setSelectedIds([]);
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'students' } }));
       alert(`Se han eliminado ${selectedIds.length} registros correctamente.`);
     } catch (err) {
       console.error('Error during bulk delete:', err);
@@ -1083,7 +1091,7 @@ function StudentManager({ records }: { records: any[] }) {
         };
         await localDB.updateInCollection('students', selectedStudent.id, updates);
         setSelectedStudent({ ...selectedStudent, ...updates });
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'students' } }));
         alert('Datos base actualizados');
         return;
     }
@@ -1107,7 +1115,7 @@ function StudentManager({ records }: { records: any[] }) {
 
     // 3. Update DB
     await localDB.updateInCollection('students', selectedStudent.id, updates);
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'students' } }));
     
     // 4. Update UI
     setSelectedStudent({
@@ -1442,7 +1450,7 @@ function StudentManager({ records }: { records: any[] }) {
                                         >
                                            <FileText className="w-2.5 h-2.5" /> Expediente
                                         </button>
-                                        <RecordActions module="school" onDelete={async () => { await localDB.deleteFromCollection('students', s.id); window.dispatchEvent(new Event('db-change')); }} />
+                                        <RecordActions module="school" onDelete={async () => { await localDB.deleteFromCollection('students', s.id); window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'students' } })); }} />
                                      </div>
                                   </td>
                               </tr>

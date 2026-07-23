@@ -1,6 +1,6 @@
 import { localDB } from './auth';
 import { dbInstance as db, isFirebaseReady } from './firebase';
-import { collection, onSnapshot, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 
 export interface Notification {
   id?: string;
@@ -15,7 +15,13 @@ export interface Notification {
   read: boolean;
 }
 
-export const subscribeToNotifications = (userRoles: string[], currentUserName: string, currentUserEmail: string, callback: (notifications: Notification[]) => void) => {
+export const subscribeToNotifications = (
+  userRoles: string[], 
+  currentUserName: string, 
+  currentUserEmail: string, 
+  callback: (notifications: Notification[]) => void,
+  usuarioActualIdParam?: string
+) => {
   const isRecipient = (notification: any) => {
     // Attempt to load current user identity from session storage
     let currentUser: any = null;
@@ -194,20 +200,47 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
   };
 
   if (isFirebaseReady && db) {
+    const usuarioActualId = usuarioActualIdParam || currentUserEmail || currentUserName;
+
     const q = query(
       collection(db, 'notifications'),
-      orderBy('createdAt', 'desc')
+      where('usuarioId', '==', usuarioActualId),
+      where('leida', '==', false),
+      limit(50)
     );
 
     return onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          read: d.read ?? d.leida ?? false,
+          leida: d.leida ?? d.read ?? false,
+        } as unknown as Notification;
+      });
       const filtered = data.filter(isRecipient);
       callback(filtered);
+    }, (err) => {
+      console.warn("Firestore onSnapshot index error, falling back to basic notifications query:", err);
+      const fallbackQ = query(
+        collection(db, 'notifications'),
+        limit(50)
+      );
+      return onSnapshot(fallbackQ, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        const filtered = data.filter(isRecipient);
+        callback(filtered);
+      });
     });
   }
   
   // Local mode fallback
-  const handleLocalChange = async () => {
+  const handleLocalChange = async (e?: Event) => {
+    if (e) {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.collection && detail.collection !== 'notifications') return;
+    }
     if (isFirebaseReady && db) return; // Snapshot handles it
     try {
       const data = await localDB.getCollection('notifications');
@@ -223,8 +256,15 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
     }
   };
 
+  const onDbChange = (e?: Event) => {
+    const detail = (e as CustomEvent)?.detail;
+    if (!detail?.collection || detail.collection === 'notifications') {
+      handleLocalChange();
+    }
+  };
+
   handleLocalChange();
-  window.addEventListener('db-change', handleLocalChange);
+  window.addEventListener('db-change', onDbChange);
   
   // Polling for local mode
   let isPolling = false;
@@ -249,11 +289,11 @@ export const subscribeToNotifications = (userRoles: string[], currentUserName: s
 export const markNotificationAsRead = async (id: string) => {
   if (isFirebaseReady && db) {
     const { doc, updateDoc } = await import('firebase/firestore');
-    await updateDoc(doc(db, 'notifications', id), { read: true });
+    await updateDoc(doc(db, 'notifications', id), { read: true, leida: true });
   } else {
-    await localDB.updateInCollection('notifications', id, { read: true });
+    await localDB.updateInCollection('notifications', id, { read: true, leida: true });
   }
-  window.dispatchEvent(new Event('db-change'));
+  window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'notifications' } }));
 };
 
 export const addNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
@@ -292,6 +332,7 @@ export const addNotification = async (notification: Omit<Notification, 'id' | 'c
 
   const payload: any = {
     ...notification,
+    usuarioId: (notification as any).usuarioId || (notification.recipientUsers && notification.recipientUsers[0]) || notification.senderEmail || currentUserEmail || '',
     senderEmail: notification.senderEmail || currentUserEmail || (notification.sender && notification.sender.includes('@') ? notification.sender : ''),
   };
 
@@ -299,16 +340,18 @@ export const addNotification = async (notification: Omit<Notification, 'id' | 'c
     await addDoc(collection(db, 'notifications'), {
         ...payload,
         read: false,
+        leida: false,
         createdAt: serverTimestamp()
     });
   } else {
     await localDB.saveToCollection('notifications', {
         ...payload,
         read: false,
+        leida: false,
         createdAt: new Date().toISOString()
     });
   }
-  window.dispatchEvent(new Event('db-change'));
+  window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'notifications' } }));
 };
 
 export const deleteNotification = async (id: string) => {
@@ -318,5 +361,34 @@ export const deleteNotification = async (id: string) => {
   } else {
     await localDB.deleteFromCollection('notifications', id);
   }
-  window.dispatchEvent(new Event('db-change'));
+  window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'notifications' } }));
 };
+
+export const migrateLegacyNotifications = async () => {
+  if (!isFirebaseReady || !db) return;
+  const { query, collection, getDocs, writeBatch } = await import('firebase/firestore');
+  
+  const q = query(collection(db, 'notifications'));
+  const snapshot = await getDocs(q);
+  
+  const batch = writeBatch(db);
+  let batchCount = 0;
+  
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+    if (data.usuarioId === undefined || data.leida === undefined) {
+      batch.update(docSnap.ref, {
+        usuarioId: data.usuarioId || (data.recipientUsers && data.recipientUsers[0]) || data.senderEmail || '',
+        leida: data.leida ?? data.read ?? false
+      });
+      batchCount++;
+      if (batchCount >= 450) { // Firestore batch limit
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+  }
+  if (batchCount > 0) await batch.commit();
+  console.log(`Migración de notificaciones completada: ${batchCount} documentos actualizados.`);
+};
+

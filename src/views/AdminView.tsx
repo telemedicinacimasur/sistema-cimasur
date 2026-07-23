@@ -58,7 +58,7 @@ import { addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 
-import { addNotification } from '../lib/notifications';
+import { addNotification, migrateLegacyNotifications } from '../lib/notifications';
 
 import CimasurInventoryManager from './admin/CimasurInventoryManager';
 import ResumenVentasManager from './admin/ResumenVentasManager';
@@ -109,13 +109,13 @@ export default function AdminView() {
     }
   }, [location.state]);
 
-  const [loadRange, setLoadRange] = useState<'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
-    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'historico_completo';
+  const [loadRange, setLoadRange] = useState<'ultimos_30_dias' | 'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
+    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'ultimos_30_dias';
   });
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleLoadRangeChange = (range: 'mes_actual' | 'anio_actual' | 'historico_completo') => {
+  const handleLoadRangeChange = (range: 'ultimos_30_dias' | 'mes_actual' | 'anio_actual' | 'historico_completo') => {
     setLoadRange(range);
     localStorage.setItem('cimasur_admin_load_range', range);
   };
@@ -136,7 +136,14 @@ export default function AdminView() {
     
     const pad = (n: number) => n.toString().padStart(2, '0');
     
-    if (loadRange === 'mes_actual') {
+    if (loadRange === 'ultimos_30_dias') {
+      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return {
+        dateField,
+        startDate: `${past30.getFullYear()}-${pad(past30.getMonth() + 1)}-${pad(past30.getDate())}`,
+        endDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+      };
+    } else if (loadRange === 'mes_actual') {
       const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
       return {
         dateField,
@@ -197,8 +204,12 @@ export default function AdminView() {
     if (view !== 'menu') {
       loadData();
       
-      const handleDbChange = () => {
-        loadData();
+      const handleDbChange = (e?: Event) => {
+        const detail = (e as CustomEvent)?.detail;
+        const currentCol = VIEWS_WITH_DB_LOAD[view];
+        if (!detail?.collection || detail.collection === currentCol) {
+          loadData();
+        }
       };
       
       window.addEventListener('db-change', handleDbChange);
@@ -218,6 +229,22 @@ export default function AdminView() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {isMainAdmin && (
+             <div className="md:col-span-4 p-4 border rounded-xl bg-red-900/10 border-red-500/50 flex justify-between items-center">
+               <span className="text-red-400 font-bold">Herramientas de Administrador</span>
+               <button 
+                 onClick={async () => {
+                   if (confirm('¿Estás seguro de que deseas ejecutar la migración de notificaciones?')) {
+                     await migrateLegacyNotifications();
+                     alert('Migración iniciada.');
+                   }
+                 }}
+                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm"
+               >
+                 Migrar Notificaciones Legado
+               </button>
+             </div>
+          )}
           {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('quotes')) && (
             <ModuleCard 
               title="Seguimiento de Cotizaciones"
@@ -359,7 +386,8 @@ export default function AdminView() {
             className="bg-transparent text-[#38BDF8] text-xs font-black border-none outline-none cursor-pointer focus:ring-0 p-0 pr-6 text-right uppercase tracking-wider"
             title="Seleccionar rango de datos a cargar para optimizar rendimiento"
           >
-            <option value="mes_actual" className="bg-[#152035] text-white">⚡ Mes actual (rápido)</option>
+            <option value="ultimos_30_dias" className="bg-[#152035] text-white">🗓️ Últimos 30 días (default)</option>
+            <option value="mes_actual" className="bg-[#152035] text-white">⚡ Mes actual</option>
             <option value="anio_actual" className="bg-[#152035] text-white">📅 Año actual</option>
             <option value="historico_completo" className="bg-[#152035] text-white">⌛ Historial completo</option>
           </select>
@@ -961,7 +989,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
 
         await addAuditLog(user, `Importó ${importedCount} cotizaciones desde Excel`, 'Administración');
         alert(`Éxito: Se importaron ${importedCount} cotizaciones correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'quotes' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
@@ -1457,7 +1485,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
 
         await addAuditLog(user, `Importó ${importedCount} ventas gestión desde Excel`, 'Administración');
         alert(`Éxito: Se importaron ${importedCount} ventas gestión correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'sales_gestion' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
@@ -1544,7 +1572,16 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
 
   const consolidated = getConsolidatedProducts();
 
-  const totalFrascos = filteredRecords.reduce((sum, r) => sum + (Number(r.nroFrascos) || 0), 0);
+  const totalFrascos = filteredRecords.reduce((sum, r) => {
+    const val = r.nroFrascos;
+    let num = 0;
+    if (typeof val === 'number') num = val;
+    else if (typeof val === 'string') {
+      const cleaned = val.replace(/[^0-9.-]/g, '');
+      num = parseFloat(cleaned) || 0;
+    }
+    return sum + num;
+  }, 0);
   const totalCotizacion = filteredRecords.reduce((sum, r) => sum + (Number(r.valorCotizacion) || 0), 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2011,7 +2048,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 
         await addAuditLog(user, `Importó ${importedCount} ventas desde Excel`, 'Administración');
         alert(`Éxito: Se importaron ${importedCount} ventas correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'sales' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert("Error al procesar el archivo. Asegúrese de usar la plantilla correcta.");
@@ -2048,7 +2085,16 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
 
-  const totalFrascos = filteredRecords.reduce((sum, r) => sum + (Number(r.nroFrascos) || 0), 0);
+  const totalFrascos = filteredRecords.reduce((sum, r) => {
+    const val = r.nroFrascos;
+    let num = 0;
+    if (typeof val === 'number') num = val;
+    else if (typeof val === 'string') {
+      const cleaned = val.replace(/[^0-9.-]/g, '');
+      num = parseFloat(cleaned) || 0;
+    }
+    return sum + num;
+  }, 0);
   const totalMonto = filteredRecords.reduce((sum, r) => sum + (Number(r.montoTotal) || 0), 0);
   const totalAbonado = filteredRecords.reduce((sum, r) => {
     const isCred = r.tipoPago === 'Crédito';
@@ -2839,7 +2885,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
 
     // Force clear localDB cache to ensure fresh read
     localDB.clearCache();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_payments' } }));
 
     await addAuditLog(user!, `Actualizó abonos/pagos de ${record.nombreAlumno || 'Alumno'}. Nuevo total recibido: ${formatCurrency(finalReceived)}`, 'Administración');
 

@@ -91,7 +91,7 @@ export const ConfigurationCenterView: React.FC<ConfigurationCenterViewProps> = (
       if (response.ok) {
         setSaveSuccess(true);
         // Despachar evento global para que todos los componentes actualicen sus cálculos en tiempo real
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'loyalty_config' } }));
         setTimeout(() => setSaveSuccess(false), 4000);
       } else {
         alert('Error al guardar la configuración comercial.');

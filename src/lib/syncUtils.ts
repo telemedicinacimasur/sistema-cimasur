@@ -87,7 +87,7 @@ export const syncStudentsToSchoolPayments = async () => {
       
       if (hasChanges) {
         localDB.clearCache();
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_payments' } }));
       }
     } catch (err) {
       console.error("Error in student global synchronization:", err);

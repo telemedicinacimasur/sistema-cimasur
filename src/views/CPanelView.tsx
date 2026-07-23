@@ -28,8 +28,14 @@ export default function CPanelView() {
       setRecords(data);
     };
     loadAuditLogs();
-    window.addEventListener('db-change', loadAuditLogs);
-    return () => window.removeEventListener('db-change', loadAuditLogs);
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === 'audit_logs') {
+        loadAuditLogs();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, []);
 
   return <CPanelManager records={records} />;

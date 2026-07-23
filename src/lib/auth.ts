@@ -1,6 +1,6 @@
 import { authInstance as auth, dbInstance as db, isFirebaseReady } from './firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, limit } from 'firebase/firestore';
 
 export interface UserProfile {
   uid: string;
@@ -191,9 +191,14 @@ const collectionCache: Record<string, any[]> = {};
 const pendingRequests: Record<string, Promise<any[]>> = {};
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('db-change', () => {
-    // Clear all caches on database changes so views always read fresh updated data
-    Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
+  window.addEventListener('db-change', (e: Event) => {
+    const detail = (e as CustomEvent)?.detail;
+    if (!detail?.collection) {
+      // Clear all caches on database changes so views always read fresh updated data
+      Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
+    } else {
+      invalidateCollectionCache(detail.collection);
+    }
   });
 }
 
@@ -279,10 +284,11 @@ export const localDB = {
   clearCache: () => {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
   },
-  getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string }): Promise<any[]> => {
+  getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number }): Promise<any[]> => {
+    const limitVal = options?.limitCount || 200;
     const cacheKey = options 
-      ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}` 
-      : name;
+      ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}_${limitVal}` 
+      : `${name}_limit_${limitVal}`;
 
     const cachedData = getFromLocalStorage(cacheKey);
     if (cachedData) return cachedData;
@@ -298,12 +304,18 @@ export const localDB = {
       
       const fetchPromise = (async () => {
         try {
-          let qRef: any = collection(db, name);
+          let qRef: any;
           if (options && options.dateField && options.startDate && options.endDate) {
             qRef = query(
               collection(db, name),
               where(options.dateField, '>=', options.startDate),
-              where(options.dateField, '<=', options.endDate)
+              where(options.dateField, '<=', options.endDate),
+              limit(limitVal)
+            );
+          } else {
+            qRef = query(
+              collection(db, name),
+              limit(limitVal)
             );
           }
           const snapshot = await getDocs(qRef);
@@ -323,10 +335,6 @@ export const localDB = {
       const result = await fetchPromise;
       return [...result];
     } else {
-      const cacheKey = options 
-        ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}` 
-        : name;
-
       if (pendingRequests[cacheKey]) {
         const data = await pendingRequests[cacheKey];
         return [...data];
@@ -364,6 +372,9 @@ export const localDB = {
                   const val = item[options.dateField!];
                   return val >= options.startDate! && val <= options.endDate!;
                 });
+              }
+              if (Array.isArray(data) && data.length > limitVal) {
+                data = data.slice(0, limitVal);
               }
               saveToLocalStorage(cacheKey, data);
               return data;

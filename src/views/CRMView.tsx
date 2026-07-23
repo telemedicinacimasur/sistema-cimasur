@@ -317,12 +317,19 @@ export default function CRMView() {
       }
     };
 
+    const handleEngineDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['crm_campaigns', 'contacts'].includes(detail.collection)) {
+        loadEngineData();
+      }
+    };
+
     window.addEventListener('campaign-executed', loadEngineData);
-    window.addEventListener('db-change', loadEngineData);
+    window.addEventListener('db-change', handleEngineDbChange);
     window.addEventListener('preload-campaign', handlePreload);
     return () => {
       window.removeEventListener('campaign-executed', loadEngineData);
-      window.removeEventListener('db-change', loadEngineData);
+      window.removeEventListener('db-change', handleEngineDbChange);
       window.removeEventListener('preload-campaign', handlePreload);
     };
   }, []);
@@ -425,9 +432,15 @@ export default function CRMView() {
       setIntranetClients(intranetData);
       setImports(importData);
     };
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['contacts', 'intranet_clients', 'import_logs', 'gestion_records', 'crm_activities'].includes(detail.collection)) {
+        loadData();
+      }
+    };
     loadData();
-    window.addEventListener('db-change', loadData);
-    return () => window.removeEventListener('db-change', loadData);
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, [user]);
 
   const handleImportFromIntranet = async () => {
@@ -497,7 +510,7 @@ export default function CRMView() {
       await addAuditLog(user, `Sincronizó base Intranet: ${importedCount} veterinarios registrados, ${updatedCount} actualizados`, 'CRM');
       alert(`Sincronización de Intranet completada:\n\n- ${importedCount} Nuevos veterinarios aprobados agregados al CRM con Categoría "Sin compra" listo para campañas del motor comercial.\n- ${updatedCount} Clientes repetidos actualizados con acceso de Intranet "Sí" automáticamente.`);
       
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
     } catch (err) {
       console.error(err);
       alert('Error en la sincronización desde la plataforma.');
@@ -561,7 +574,7 @@ export default function CRMView() {
       }
 
       await addAuditLog(user, `Traspasó cliente de Intranet individual a Cartera Única CIE: ${ic.name}`, 'CRM');
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
 
       if (targetId) {
         setSelectedClientId(targetId);
@@ -955,7 +968,7 @@ function CRMRegister() {
       comoLlego: 'Campañas / Ads',
       compraAnual: 0
     });
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const downloadExcelTemplate = () => {
@@ -1018,7 +1031,7 @@ function CRMRegister() {
 
         await addAuditLog(user, `Importó ${importedCount} clientes desde Excel`, 'CRM');
         alert(`Éxito: Se importaron ${importedCount} clientes correctamente.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       } catch (error) {
         console.error("Import Error:", error);
         alert(`Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}. Asegúrese de usar la plantilla correcta y que el archivo no esté abierto.`);
@@ -1301,7 +1314,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
 
     setPastedData('');
     setIsImportModalOpen(false);
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const handleImportClick = () => {
@@ -1403,7 +1416,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
         }
         
         alert(`Se procesaron ${processed} registros. Las categorías fueron actualizadas evaluando el promedio mensual de ventas de ${prevYear} para el ciclo comercial ${importCycleYear}.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsBinaryString(file);
@@ -1497,7 +1510,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
         await localDB.deleteFromCollection('contacts', id);
       }
       setSelectedIds([]);
-      window.dispatchEvent(new Event('db-change'));
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       alert(`Se han eliminado ${selectedIds.length} registros correctamente.`);
     } catch (err) {
       console.error('Error during bulk delete:', err);
@@ -1588,7 +1601,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
     setNewComoLlego('Campañas / Ads');
     setNewCompraAnual(0);
     setNewIsGestionCustomer(null);
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
   };
 
   const exportRecordToExcel = (record: any) => {
@@ -2145,7 +2158,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                     await localDB.updateBulkCategory(selectedIds, bulkCategory);
                     setSelectedIds([]);
                     setBulkCategory('');
-                    window.dispatchEvent(new Event('db-change'));
+                    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                     alert(`Se actualizó la categoría a "${bulkCategory}" para los clientes seleccionados.`);
                   } catch (err) {
                     console.error(err);
@@ -2200,7 +2213,8 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                       }
                     }
                     setSelectedIds([]);
-                    window.dispatchEvent(new Event('db-change'));
+                    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+                    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_records' } }));
                     alert(`Traspaso masivo finalizado. ${count} clientes nuevos fueron agregados a Gestión.`);
                   } catch (err) {
                     console.error(err);
@@ -2320,7 +2334,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                                });
 
                                // 3. Refrescar datos globalmente
-                               window.dispatchEvent(new Event('db-change'));
+                               window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                              } catch (err) {
                                console.error(err);
                                alert('Error al actualizar la categoría. Revisa la consola.');
@@ -2355,7 +2369,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                                if (newVal === 'Si') {
                                  await syncToIntranetClientsIfNeeded({ ...r, intranet: 'Si' }, user);
                                }
-                               window.dispatchEvent(new Event('db-change'));
+                               window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                              } catch (err) {
                                console.error(err);
                                alert('Error al actualizar el estado de Intranet.');
@@ -2408,7 +2422,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                                    };
                                    await localDB.saveToCollection('gestion_records', gestionRecord);
                                    await addAuditLog(user, `Sincronizó cliente ${r.name} a Gestión (Rápido)`, 'CRM');
-                                   window.dispatchEvent(new Event('db-change'));
+                                   window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_records' } }));
                                    alert(`Cliente "${r.name}" traspasado exitosamente a Gestión.`);
                                  } catch (err) {
                                    console.error(err);
@@ -2451,7 +2465,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                            onDelete={async () => {
                              try {
                                await localDB.deleteFromCollection('contacts', r.id);
-                               window.dispatchEvent(new Event('db-change'));
+                               window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                              } catch (err) {
                                console.error(err);
                                alert('Error al eliminar');
@@ -2635,8 +2649,14 @@ function CRMIntranetTable({
       }
     };
     checkCRM();
-    window.addEventListener('db-change', checkCRM);
-    return () => window.removeEventListener('db-change', checkCRM);
+    const handleCrmDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['contacts', 'intranet_clients'].includes(detail.collection)) {
+        checkCRM();
+      }
+    };
+    window.addEventListener('db-change', handleCrmDbChange);
+    return () => window.removeEventListener('db-change', handleCrmDbChange);
   }, []);
 
   const downloadIntranetTemplate = () => {
@@ -2766,7 +2786,7 @@ function CRMIntranetTable({
 
         await addAuditLog(user, `Importó Excel Intranet: ${newLeadsCount} nuevos, ${crmUpdatedCount} actualizados en CRM`, 'CRM');
         alert(`Éxito al procesar Excel de Intranet:\n\n- ${newLeadsCount} clientes registrados.\n- ${crmUpdatedCount} veterinarios aprobados ("Sí") sincronizados automáticamente con el CRM Comercial.`);
-        window.dispatchEvent(new Event('db-change'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'intranet_clients' } })); window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       } catch (error) {
         console.error("Error importing intranet excel file:", error);
         alert("Error al procesar el archivo Excel. Asegúrese de que tenga las columnas correctas.");
@@ -2928,7 +2948,7 @@ function CRMIntranetTable({
                               await syncIntranetClientToCRM({ ...client, accesoAprobado: 'Si' }, user);
                               alert(`Cliente "${client.name}" aprobado como Veterinario. Se traspasó automáticamente a la Cartera Única CIE.`);
                             }
-                            window.dispatchEvent(new Event('db-change'));
+                            window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'intranet_clients' } })); window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
                           } catch (err) {
                             console.error("Error updating acceso aprobado:", err);
                           }
@@ -3007,7 +3027,7 @@ function CRMIntranetTable({
                          onDelete={async () => {
                            if (confirm("¿Está seguro de eliminar este registro de la base Intranet?")) {
                              await localDB.deleteFromCollection('intranet_clients', client.id);
-                             window.dispatchEvent(new Event('db-change'));
+                             window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'intranet_clients' } }));
                            }
                          }}
                        />
@@ -3063,7 +3083,7 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
                     module="crm"
                     onDelete={async () => {
                       await localDB.deleteFromCollection('import_logs', imp.id);
-                      window.dispatchEvent(new Event('db-change'));
+                      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'import_logs' } }));
                     }}
                   />
                 </td>
@@ -3213,7 +3233,7 @@ function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }
       incluirAGestion: false
     });
     loadActivities();
-    window.dispatchEvent(new Event('db-change'));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'crm_activities' } }));
   };
 
   const filteredActivities = activities.filter(a => a.campania.toLowerCase().includes(filterSearch.toLowerCase()));

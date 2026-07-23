@@ -106,8 +106,11 @@ export const OpportunityEngineView: React.FC<{ onViewClient?: (id: string) => vo
   useEffect(() => {
     loadOpportunities();
 
-    const handleDbChange = () => {
-      loadOpportunities();
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['contacts', 'crm_opportunities', 'sales'].includes(detail.collection)) {
+        loadOpportunities();
+      }
     };
 
     window.addEventListener('db-change', handleDbChange);
@@ -162,9 +165,16 @@ export const OpportunityEngineView: React.FC<{ onViewClient?: (id: string) => vo
 
     loadClientIntelligence();
 
-    window.addEventListener('db-change', loadClientIntelligence);
+    const handleIntelligenceDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['contacts', 'crm_opportunities', 'sales'].includes(detail.collection)) {
+        loadClientIntelligence();
+      }
+    };
+
+    window.addEventListener('db-change', handleIntelligenceDbChange);
     return () => {
-      window.removeEventListener('db-change', loadClientIntelligence);
+      window.removeEventListener('db-change', handleIntelligenceDbChange);
     };
   }, [selectedContactId]);
 
