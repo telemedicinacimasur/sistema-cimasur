@@ -1319,18 +1319,16 @@ export default function VentasConsignacionView() {
       if (isFirebaseReady()) {
         const db = getDb();
         const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
-        await setDoc(loteRef, {
-          movimientos: {
-            [selectedMonth]: {
-              unidadesVendidas: 0,
-              saldoAnterior: 0,
-              saldoResultante: 0,
-              montoVentaNeto: 0,
-              fechaRegistro: Timestamp.now(),
-              added: true
-            }
+        await updateDoc(loteRef, {
+          [`movimientos.${selectedMonth}`]: {
+            unidadesVendidas: 0,
+            saldoAnterior: 0,
+            saldoResultante: 0,
+            montoVentaNeto: 0,
+            fechaRegistro: Timestamp.now(),
+            added: true
           }
-        }, { merge: true });
+        });
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
@@ -1367,11 +1365,9 @@ export default function VentasConsignacionView() {
       if (isFirebaseReady()) {
         const db = getDb();
         const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
-        await setDoc(loteRef, {
-          movimientos: {
-            [selectedMonth]: { hidden: true }
-          }
-        }, { merge: true });
+        await updateDoc(loteRef, {
+          [`movimientos.${selectedMonth}`]: { hidden: true }
+        });
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
@@ -1411,7 +1407,9 @@ export default function VentasConsignacionView() {
         const batch = writeBatch(db);
         selectedMonthlyLoteIds.forEach(loteId => {
           const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
-          batch.set(loteRef, { movimientos: { [selectedMonth]: { hidden: true } } }, { merge: true });
+          batch.update(loteRef, {
+            [`movimientos.${selectedMonth}`]: { hidden: true }
+          });
         });
         await batch.commit();
       } else {
@@ -1688,18 +1686,16 @@ export default function VentasConsignacionView() {
           const hadMovement = !!lote.movimientos?.[selectedMonth];
           if (currentSales > 0 || hadMovement) {
             const loteRef = doc(db, 'crm_consignacion_lotes', lote.id);
-            await setDoc(loteRef, {
+            await updateDoc(loteRef, {
               activo: true,
-              movimientos: {
-                [selectedMonth]: {
-                  unidadesVendidas: currentSales,
-                  saldoAnterior: Number(traj.stockDisponible),
-                  saldoResultante: Number(traj.frascosRestantes),
-                  montoVentaNeto: Number(traj.montoVentaNeto),
-                  fechaRegistro: Timestamp.now()
-                }
+              [`movimientos.${selectedMonth}`]: {
+                unidadesVendidas: currentSales,
+                saldoAnterior: Number(traj.stockDisponible),
+                saldoResultante: Number(traj.frascosRestantes),
+                montoVentaNeto: Number(traj.montoVentaNeto),
+                fechaRegistro: Timestamp.now()
               }
-            }, { merge: true });
+            });
           }
         }
         
