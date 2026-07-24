@@ -121,42 +121,9 @@ export default function AdminView() {
   };
 
   const getQueryOptions = (colName: string) => {
-    if (loadRange === 'historico_completo') return undefined;
-    
-    let dateField = 'fecha';
-    if (colName === 'quotes') {
-      dateField = 'fechaElab';
-    } else if (colName === 'school_payments') {
-      dateField = 'fechaPago';
-    }
-    
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-indexed
-    
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    
-    if (loadRange === 'ultimos_30_dias') {
-      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      return {
-        dateField,
-        startDate: `${past30.getFullYear()}-${pad(past30.getMonth() + 1)}-${pad(past30.getDate())}`,
-        endDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-      };
-    } else if (loadRange === 'mes_actual') {
-      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
-      return {
-        dateField,
-        startDate: `${currentYear}-${pad(currentMonth + 1)}-01`,
-        endDate: `${currentYear}-${pad(currentMonth + 1)}-${pad(lastDay)}`
-      };
-    } else { // anio_actual
-      return {
-        dateField,
-        startDate: `${currentYear}-01-01`,
-        endDate: `${currentYear}-12-31`
-      };
-    }
+    // Return undefined to always load the full history,
+    // allowing the local filters in each submodule to function correctly.
+    return undefined;
   };
 
   const VIEWS_WITH_DB_LOAD: Record<string, string> = {
@@ -229,22 +196,7 @@ export default function AdminView() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {isMainAdmin && (
-             <div className="md:col-span-4 p-4 border rounded-xl bg-red-900/10 border-red-500/50 flex justify-between items-center">
-               <span className="text-red-400 font-bold">Herramientas de Administrador</span>
-               <button 
-                 onClick={async () => {
-                   if (confirm('¿Estás seguro de que deseas ejecutar la migración de notificaciones?')) {
-                     await migrateLegacyNotifications();
-                     alert('Migración iniciada.');
-                   }
-                 }}
-                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm"
-               >
-                 Migrar Notificaciones Legado
-               </button>
-             </div>
-          )}
+
           {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('quotes')) && (
             <ModuleCard 
               title="Seguimiento de Cotizaciones"
@@ -376,32 +328,17 @@ export default function AdminView() {
           <span>Volver al Menú de Administración</span>
         </button>
 
-        {/* Compact Inline performance control */}
+        {/* Sync control */}
         <div className="flex items-center gap-2 bg-[#0F172A]/80 border border-[#1E293B] px-3 py-1.5 rounded-2xl shadow-inner shrink-0">
-          <Settings className={cn("w-3.5 h-3.5 text-slate-400", isRefreshing ? "animate-spin text-[#38BDF8]" : "")} />
-          
-          <select
-            value={loadRange}
-            onChange={e => handleLoadRangeChange(e.target.value as any)}
-            className="bg-transparent text-[#38BDF8] text-xs font-black border-none outline-none cursor-pointer focus:ring-0 p-0 pr-6 text-right uppercase tracking-wider"
-            title="Seleccionar rango de datos a cargar para optimizar rendimiento"
-          >
-            <option value="ultimos_30_dias" className="bg-[#152035] text-white">🗓️ Últimos 30 días (default)</option>
-            <option value="mes_actual" className="bg-[#152035] text-white">⚡ Mes actual</option>
-            <option value="anio_actual" className="bg-[#152035] text-white">📅 Año actual</option>
-            <option value="historico_completo" className="bg-[#152035] text-white">⌛ Historial completo</option>
-          </select>
-          
-          <div className="w-[1px] h-3.5 bg-[#1E293B]" />
-          
           <button
             type="button"
             onClick={() => loadData(true)}
             disabled={isRefreshing}
-            className="p-1 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center shrink-0"
+            className="p-1 text-[#38BDF8] hover:text-white hover:bg-[#1E293B] rounded-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-2 justify-center shrink-0 font-black text-xs uppercase tracking-wider"
             title="Actualizar datos (limpia caché local y recarga desde servidor de forma fresca)"
           >
             <RefreshCw className={cn("w-3 h-3", isRefreshing ? "animate-spin text-[#38BDF8]" : "")} />
+            Sincronizar Datos
           </button>
         </div>
       </div>
@@ -523,14 +460,35 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
   };
 
   const filteredRecords = records.filter(r => {
-    const rDate = new Date(r.fecha);
-    const mMatch = filterMonth ? (rDate.getMonth() + 1).toString() === filterMonth : true;
-    const yMatch = filterYear ? rDate.getFullYear().toString() === filterYear : true;
+    let mMatch = true;
+    let yMatch = true;
+    
+    if (r.fecha) {
+      const rDate = new Date(r.fecha);
+      if (!isNaN(rDate.getTime())) {
+        mMatch = filterMonth && filterMonth !== '' ? (rDate.getMonth() + 1).toString() === filterMonth : true;
+        yMatch = filterYear && filterYear !== '' ? rDate.getFullYear().toString() === filterYear : true;
+      }
+    }
+    
     const matchesSearch = !searchTutor || r.tutor?.toLowerCase().includes(searchTutor.toLowerCase());
-    const date = r.fecha;
-    const matchesStart = !dateStart || date >= dateStart;
-    const matchesEnd = !dateEnd || date <= dateEnd;
-    return mMatch && yMatch && matchesSearch && matchesStart && matchesEnd;
+    const rDateNorm = normalizeDateForCompare(r.fecha);
+    
+    let matchesStart = true;
+    if (dateStart) {
+      matchesStart = !rDateNorm || rDateNorm >= dateStart;
+    }
+    
+    let matchesEnd = true;
+    if (dateEnd) {
+      matchesEnd = !rDateNorm || rDateNorm <= dateEnd;
+    }
+    
+    // Only apply month/year filters if exact dates aren't provided
+    if (dateStart || dateEnd) {
+      return matchesSearch && matchesStart && matchesEnd;
+    }
+    return mMatch && yMatch && matchesSearch;
   }).sort((a,b) => {
     const d = String(b.fecha || '').localeCompare(String(a.fecha || ''));
     if (d !== 0) return d;
@@ -700,6 +658,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
                     value={filterYear} 
                     onChange={e => setFilterYear(e.target.value)}
                   >
+                    <option value="">Año...</option>
                     {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y.toString()}>{y}</option>)}
                   </select>
                </div>
@@ -902,7 +861,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [yearFilter, setYearFilter] = useState('Todos');
   const [monthFilter, setMonthFilter] = useState('Todos');
@@ -1038,13 +998,23 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
 
   const filteredRecords = records
     .filter(r => {
+      let matchesDate = true;
+      const rDateNorm = normalizeDateForCompare(r.fechaElab);
+      if (dateFrom && (!rDateNorm || rDateNorm < dateFrom)) matchesDate = false;
+      if (dateTo && (!rDateNorm || rDateNorm > dateTo)) matchesDate = false;
+      
       const matchesSearch = !searchFilter || 
         r.cliente?.toLowerCase().includes(searchFilter.toLowerCase()) || 
         r.nroCotiz?.toString().includes(searchFilter);
-      const matchesDate = !dateFilter || r.fechaElab === dateFilter;
-      const matchesStatus = statusFilter === 'Todos' || r.estado === statusFilter;
-      const matchesYear = yearFilter === 'Todos' || String(r.anio || '').trim() === yearFilter;
-      const matchesMonth = monthFilter === 'Todos' || String(r.mes || '').trim().toLowerCase() === monthFilter.toLowerCase();
+      const matchesStatus = statusFilter === 'Todos' || (r.estado && r.estado.toLowerCase() === statusFilter.toLowerCase());
+      
+      let matchesYear = true;
+      let matchesMonth = true;
+      if (!dateFrom && !dateTo) {
+        matchesYear = yearFilter === 'Todos' || String(r.anio || '').trim() === yearFilter;
+        matchesMonth = monthFilter === 'Todos' || String(r.mes || '').trim().toLowerCase() === monthFilter.toLowerCase();
+      }
+      
       return matchesSearch && matchesDate && matchesStatus && matchesYear && matchesMonth;
     })
     .sort((a, b) => {
@@ -1220,12 +1190,24 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
              </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Filtros:</span>
-              <input 
-                type="date" 
-                className="text-[10px] border border-slate-705 rounded p-1 outline-none bg-[#0F172A] text-white cursor-pointer" 
-                value={dateFilter}
-                onChange={e => setDateFilter(e.target.value)}
-              />
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
+                <input 
+                  type="date" 
+                  className="text-[10px] border border-slate-700 rounded p-1 outline-none bg-[#0F172A] text-white cursor-pointer" 
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
+                <input 
+                  type="date" 
+                  className="text-[10px] border border-slate-700 rounded p-1 outline-none bg-[#0F172A] text-white cursor-pointer" 
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                />
+              </div>
               <select 
                 className="text-[10px] border border-slate-705 rounded p-1 outline-none font-bold bg-[#0F172A] text-white cursor-pointer"
                 value={statusFilter}
@@ -1506,7 +1488,9 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
     if (dateTo) {
       if (!rDateNorm || rDateNorm > dateTo) match = false;
     }
-    if (filterMonth !== 'Todos' && r.mes !== filterMonth) match = false;
+    if (!dateFrom && !dateTo) {
+      if (filterMonth !== 'Todos' && r.mes !== filterMonth) match = false;
+    }
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       const text = `${r.documento || ''} ${r.cliente || ''} ${r.nroFrascos || ''} ${r.detalleProductos || ''}`.toLowerCase();
@@ -3519,6 +3503,8 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [yearFilter, setYearFilter] = useState('Todos');
+  const [monthFilter, setMonthFilter] = useState('Todos');
 
   const filteredRecords = records.filter(r => {
     let match = true;
@@ -3534,7 +3520,17 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
       const text = String(r.nroDto || '') + ' ' + String(r.nombre || '') + ' ' + String(r.rut || '');
       if (!text.toLowerCase().includes(s)) match = false;
     }
-    return match;
+    
+    let matchesYear = true;
+    let matchesMonth = true;
+    
+    // Only apply year/month filters if exact dates aren't provided
+    if (!dateFrom && !dateTo) {
+      matchesYear = yearFilter === 'Todos' || String(r.anio || '').trim() === yearFilter;
+      matchesMonth = monthFilter === 'Todos' || String(r.mes || '').trim().toLowerCase() === monthFilter.toLowerCase();
+    }
+    
+    return match && matchesYear && matchesMonth;
   }).sort((a,b) => {
     const d = String(b.fecha || '').localeCompare(String(a.fecha || ''));
     if (d !== 0) return d;
@@ -3846,6 +3842,29 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
              })()}
           </div>
           <div className="flex items-center gap-2 flex-wrap text-normal normal-case">
+              <select 
+                className="text-xs border rounded p-1 text-slate-300 bg-transparent font-normal"
+                value={yearFilter}
+                onChange={e => setYearFilter(e.target.value)}
+              >
+                <option value="Todos" className="bg-[#152035] text-white">Todos los Años</option>
+                <option value="2023" className="bg-[#152035] text-white">2023</option>
+                <option value="2024" className="bg-[#152035] text-white">2024</option>
+                <option value="2025" className="bg-[#152035] text-white">2025</option>
+                <option value="2026" className="bg-[#152035] text-white">2026</option>
+                <option value="2027" className="bg-[#152035] text-white">2027</option>
+                <option value="2028" className="bg-[#152035] text-white">2028</option>
+              </select>
+              <select 
+                className="text-xs border rounded p-1 text-slate-300 bg-transparent font-normal"
+                value={monthFilter}
+                onChange={e => setMonthFilter(e.target.value)}
+              >
+                <option value="Todos" className="bg-[#152035] text-white">Todos los Meses</option>
+                {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map(m => (
+                  <option key={m} value={m.toLowerCase()} className="bg-[#152035] text-white">{m}</option>
+                ))}
+              </select>
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
                 <input 

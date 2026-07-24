@@ -410,16 +410,9 @@ export default function CRMView() {
         }
       }
 
-      // Automáticamente sincronizar veterinarios aprobados preexistentes al CRM Comercial (Cartera Única CIE)
-      let didSync = false;
-      for (const ic of intranetData) {
-        if (ic.accesoAprobado === 'Si') {
-          await syncIntranetClientToCRM(ic, user);
-          didSync = true;
-        }
-      }
 
-      if (didSync || cleanedSomeDuplicates) {
+
+      if (cleanedSomeDuplicates) {
         const uContacts = await localDB.getCollection('contacts');
         const processedUContacts = uContacts.map((c: any) => ({
           ...c,
@@ -2464,13 +2457,39 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                            onEdit={() => setSelectedClient(r)}
                            onDelete={async () => {
                              try {
-                               await localDB.deleteFromCollection('contacts', r.id);
-                               window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+                               const intranetClients = await localDB.getCollection('intranet_clients');
+                               const matchedIntranet = intranetClients.find((ic: any) => areContactsDuplicate(ic, r));
+
+                               if (matchedIntranet || r.intranet === 'Si') {
+                                 const deleteOnlyCartera = window.confirm(
+                                   `El cliente "${r.name}" está vinculado a la plataforma Intranet.\n\n¿Cómo deseas proceder con su eliminación?\n\n[OK / Aceptar] Eliminar SOLO de Cartera Única CIE (mantener registro en Intranet).\n[Cancelar] Eliminar de AMBOS (Cartera Única CIE y también de Intranet).`
+                                 );
+                                 if (deleteOnlyCartera) {
+                                   await localDB.deleteFromCollection('contacts', r.id);
+                                   window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+                                   alert(`El cliente "${r.name}" fue eliminado de Cartera Única CIE (mantenido en Intranet).`);
+                                 } else {
+                                   if (window.confirm(`¿Estás 100% seguro de eliminar al cliente "${r.name}" de AMBAS bases (Cartera Única CIE y Plataforma Intranet)?`)) {
+                                     await localDB.deleteFromCollection('contacts', r.id);
+                                     if (matchedIntranet) {
+                                       await localDB.deleteFromCollection('intranet_clients', matchedIntranet.id);
+                                     }
+                                     window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+                                     window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'intranet_clients' } }));
+                                     alert(`El cliente "${r.name}" fue eliminado completamente de Cartera Única CIE y de Intranet.`);
+                                   }
+                                 }
+                               } else {
+                                 if (window.confirm(`¿Estás seguro de eliminar al cliente "${r.name}" de la Cartera Única CIE?`)) {
+                                   await localDB.deleteFromCollection('contacts', r.id);
+                                   window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+                                 }
+                               }
                              } catch (err) {
                                console.error(err);
                                alert('Error al eliminar');
-                              }
-                            }}
+                             }
+                           }}
                           />
                        </td>
                     </tr>
@@ -2750,12 +2769,6 @@ function CRMIntranetTable({
               };
               await localDB.saveToCollection('intranet_clients', newIntranetClient);
               newLeadsCount++;
-
-              // If approved "Si", they are a veterinarian and must buy -> auto pass to CRM contacts!
-              if (accesoAprobado === 'Si') {
-                await syncIntranetClientToCRM(newIntranetClient, user);
-                crmUpdatedCount++;
-              }
             } else {
               // Exists in intranet clients, update fields if Excel differs
               const updates: any = {};
@@ -2766,10 +2779,6 @@ function CRMIntranetTable({
               }
               if (hasChanges) {
                 await localDB.updateInCollection('intranet_clients', existingIntranetClient.id, updates);
-                if (accesoAprobado === 'Si') {
-                  await syncIntranetClientToCRM({ ...existingIntranetClient, accesoAprobado: 'Si' }, user);
-                  crmUpdatedCount++;
-                }
               }
             }
           }
@@ -2944,11 +2953,7 @@ function CRMIntranetTable({
                               setClients((prev: any[]) => prev.map(c => c.id === client.id ? { ...c, accesoAprobado: newVal } : c));
                             }
                             await localDB.updateInCollection('intranet_clients', client.id, { accesoAprobado: newVal });
-                            if (newVal === 'Si') {
-                              await syncIntranetClientToCRM({ ...client, accesoAprobado: 'Si' }, user);
-                              alert(`Cliente "${client.name}" aprobado como Veterinario. Se traspasó automáticamente a la Cartera Única CIE.`);
-                            }
-                            window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'intranet_clients' } })); window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+                            window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'intranet_clients' } }));
                           } catch (err) {
                             console.error("Error updating acceso aprobado:", err);
                           }

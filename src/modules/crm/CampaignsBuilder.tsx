@@ -133,19 +133,17 @@ export default function CampaignsBuilder({
       // Fallback logic if the campaign doesn't have specific opportunities (e.g. general campaigns)
       if (targeted.length === 0 && camp.targetCategory) {
         clients = clientsList.filter(c => {
-          const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
-          const cat = typeof rawCat === 'string' ? rawCat.toUpperCase() : '';
           const target = typeof camp.targetCategory === 'string' ? camp.targetCategory.toUpperCase() : '';
           const name = typeof camp.name === 'string' ? camp.name.toUpperCase() : '';
           
           if (target === 'SIN COMPRA' || name.includes('PRIMERA COMPRA') || target === 'SIN CATEGORÍA' || target === 'SIN CATEGORIA') {
-            const isSinCompra = cat === 'SIN COMPRA' || cat === 'SIN CATEGORIA' || cat === 'SIN CATEGORÍA';
-            const isInactiveIntranet = (c.intranet === true || c.intranet === 'true') && 
-              (c.estado === 'Inactivo' || c.estadoCrm === 'Inactivo' || !c.compras || c.compras === 0);
-            return isSinCompra || isInactiveIntranet;
+            const isIntranetSource = !c.isCRM || c.intranet === true;
+            return isIntranetSource && !c.hasPurchase;
           }
           
-          return cat.includes(target) || target.includes(cat);
+          const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
+          const cat = typeof rawCat === 'string' ? rawCat.toUpperCase() : '';
+          return c.isCRM && (cat.includes(target) || target.includes(cat));
         });
       } else if (targeted.length > 0) {
         clients = targeted;
@@ -154,12 +152,19 @@ export default function CampaignsBuilder({
 
     if (isExplicitFiltering) {
         clients = clientsList.filter(c => {
-          const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
-          const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
-          
           return filtersArray.some(filter => {
-            const normB = typeof filter === 'string' ? filter.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
-            return normA === normB || normA.includes(normB) || normB.includes(normA);
+            const normFilter = typeof filter === 'string' ? filter.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+            
+            if (normFilter === 'sin compra' || normFilter.includes('sin compra')) {
+              // Comes from 🌐 Clientes de Plataforma Intranet analyzing commercial engine status (Registrado sin Compra)
+              const isIntranetSource = !c.isCRM || c.intranet === true;
+              return isIntranetSource && !c.hasPurchase;
+            } else {
+              // Categories come from 💼 Cartera Única CIE (contacts)
+              const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
+              const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+              return c.isCRM && (normA === normFilter || normA.includes(normFilter) || normFilter.includes(normA));
+            }
           });
         });
     }
@@ -178,9 +183,26 @@ export default function CampaignsBuilder({
         const crmContacts = await localDB.getCollection('contacts');
         const intranetClients = await localDB.getCollection('intranet_clients');
         
+        const hasPurchaseCheck = (client: any) => {
+          if (client.categoria && client.categoria !== 'Sin compra' && client.categoria !== 'Sin categoría' && client.categoria !== 'Sin Categoría') {
+            return true;
+          }
+          const matched = crmContacts.find((c: any) => {
+            const cleanEmail = (e: any) => e ? String(e).toLowerCase().replace(/[,;\s]/g, '').trim() : '';
+            const cleanRut = (r: any) => r ? String(r).toUpperCase().replace(/[^0-9K]/g, '').trim() : '';
+            if (cleanEmail(c.email) && cleanEmail(client.email) && cleanEmail(c.email) === cleanEmail(client.email)) return true;
+            if (cleanRut(c.rut) && cleanRut(client.rut) && cleanRut(c.rut) === cleanRut(client.rut)) return true;
+            const n1 = (c.name || '').toLowerCase().trim();
+            const n2 = (client.name || '').toLowerCase().trim();
+            if (n1 && n2 && (n1 === n2 || n1.includes(n2) || n2.includes(n1))) return true;
+            return false;
+          });
+          return matched && matched.categoria && matched.categoria !== 'Sin compra' && matched.categoria !== 'Sin categoría' && matched.categoria !== 'Sin Categoría';
+        };
+
         const unified = [
-          ...crmContacts.map((c: any) => ({ ...c, isCRM: true, intranet: c.intranet === 'Si' })),
-          ...intranetClients.map((c: any) => ({ ...c, isCRM: false, intranet: true, categoria: c.categoria || 'Sin Categoría' }))
+          ...crmContacts.map((c: any) => ({ ...c, isCRM: true, intranet: c.intranet === 'Si', hasPurchase: hasPurchaseCheck(c) })),
+          ...intranetClients.map((c: any) => ({ ...c, isCRM: false, intranet: true, categoria: c.categoria || 'Sin Categoría', hasPurchase: hasPurchaseCheck(c) }))
         ];
 
         // Deduplicate

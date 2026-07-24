@@ -8,11 +8,13 @@ import {
   RefreshCw, 
   Clock, 
   CheckCircle,
-  FileText
+  FileText,
+  Wrench
 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { cn, formatDate } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { migrateLegacyNotifications } from '../../lib/notifications';
 
 export function TrashBinManager() {
   const { user } = useAuth();
@@ -20,6 +22,7 @@ export function TrashBinManager() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [collectionFilter, setCollectionFilter] = useState('Todos');
+  const [showAdminTools, setShowAdminTools] = useState(false);
 
   const getCollectionFriendlyName = (col: string) => {
     switch (col) {
@@ -313,11 +316,58 @@ export function TrashBinManager() {
         )}
       </div>
 
-      <div className="bg-[#1E293B]/20 p-4 rounded-2xl border border-[#1E293B] flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-[#38BDF8] shrink-0 mt-0.5" />
-        <div className="space-y-1 text-xs text-slate-400 leading-relaxed">
-          <span className="font-bold text-white block">Aviso de Resiliency de Datos CIMASUR</span>
-          Cualquier tipo de documento que haya sido limpiado por purgas automáticas, o borrado manualmente de las pestañas de Administración (como Cotizaciones, Clientes, Facturas u Historial de Ventas) puede ser visualizado y restaurado inmediatamente desde esta consola.
+      <div className="grid grid-cols-1 gap-4">
+        <div className="bg-[#1E293B]/20 p-4 rounded-2xl border border-[#1E293B] flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-[#38BDF8] shrink-0 mt-0.5" />
+          <div className="space-y-1 text-xs text-slate-400 leading-relaxed">
+            <span className="font-bold text-white block">Aviso de Resiliency de Datos CIMASUR</span>
+            Cualquier tipo de documento que haya sido limpiado por purgas automáticas, o borrado manualmente de las pestañas de Administración (como Cotizaciones, Clientes, Facturas u Historial de Ventas) puede ser visualizado y restaurado inmediatamente desde esta consola.
+          </div>
+        </div>
+
+        {/* Hidden / Collapsible Admin Maintenance Tools */}
+        <div className="border border-[#1E293B] rounded-2xl overflow-hidden bg-[#0F172A]/60">
+          <button
+            type="button"
+            onClick={() => setShowAdminTools(prev => !prev)}
+            className="w-full px-4 py-3 flex items-center justify-between text-xs font-bold text-slate-400 hover:text-white transition-colors bg-[#111A2E]/50 cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-sky-400" />
+              <span>🛠️ Herramientas de Administrador (Ocultas / Sistema)</span>
+            </div>
+            <span className="text-[10px] text-sky-400 underline">{showAdminTools ? 'Ocultar' : 'Mostrar'}</span>
+          </button>
+
+          {showAdminTools && (
+            <div className="p-4 border-t border-[#1E293B] bg-[#111A2E] flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in duration-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-bold text-white text-xs block">Herramientas de Mantenimiento</span>
+                  <span className="text-[11px] text-slate-400">Migración de notificaciones legado al nuevo sistema</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm('¿Estás seguro de que deseas ejecutar la migración de notificaciones legado?')) {
+                    try {
+                      await migrateLegacyNotifications();
+                      alert('Migración de notificaciones legado iniciada/ejecutada con éxito.');
+                    } catch (e: any) {
+                      alert('Error en migración: ' + e.message);
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-black transition-all shadow active:scale-95 shrink-0 cursor-pointer"
+              >
+                Ejecutar Migración
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
