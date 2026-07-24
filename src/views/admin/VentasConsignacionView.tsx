@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -46,7 +46,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Upload, Edit2, X
+  Upload, Edit2, Edit3, X
 } from 'lucide-react';
 const PRODUCTOS_CATALOGO: string[] = [];
 
@@ -77,6 +77,16 @@ const parseDateString = (dateVal: any): string => {
     }
   } catch (e) {}
   return '';
+};
+
+const formatDateToDDMMYYYY = (dateVal: any): string => {
+  const yyyymmdd = parseDateString(dateVal);
+  if (!yyyymmdd) return '';
+  const parts = yyyymmdd.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return yyyymmdd;
 };
 
 const formatMonthName = (yearMonth: string): string => {
@@ -197,6 +207,75 @@ const ClientAutocomplete = ({
   );
 };
 
+const ProductSolutionAutocomplete = ({
+  value,
+  onChange,
+  onSelectCombination,
+  placeholder,
+  registeredCombinations,
+  className
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  onSelectCombination: (comb: { productoId: string; solucionLote: string; precioUnitNeto: number }) => void;
+  placeholder: string;
+  registeredCombinations: any[];
+  className?: string;
+}) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (!value) return registeredCombinations;
+    const s = value.toLowerCase();
+    return registeredCombinations.filter(c =>
+      c.productoId.toLowerCase().includes(s) ||
+      (c.solucionLote || '').toLowerCase().includes(s)
+    );
+  }, [value, registeredCombinations]);
+
+  return (
+    <div className="relative w-full">
+      <input
+        type="text"
+        className={className}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setShowDropdown(true);
+        }}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 250)}
+        placeholder={placeholder}
+        required
+      />
+      {showDropdown && filtered.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-[#091122] border border-[#1E293B] rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800/50 custom-scrollbar">
+          {filtered.map((comb, index) => (
+            <div
+              key={index}
+              className="p-2.5 text-xs hover:bg-[#1E293B] cursor-pointer flex flex-col gap-1 transition-colors"
+              onMouseDown={() => {
+                onSelectCombination(comb);
+                setShowDropdown(false);
+              }}
+            >
+              <div className="font-bold text-slate-100 flex justify-between items-center">
+                <span>{comb.productoId}</span>
+                <span className="text-[10px] text-amber-400 font-mono font-normal">
+                  ${comb.precioUnitNeto.toLocaleString('es-CL')}
+                </span>
+              </div>
+              <div className="text-[10px] text-emerald-400 font-medium">
+                Solución: <span className="font-mono">{comb.solucionLote || 'S/L'}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function VentasConsignacionView() {
   const [activeTab, setActiveTab] = useState<'declaraciones' | 'registro_ventas'>('declaraciones');
   const [clientes, setClientes] = useState<any[]>([]);
@@ -214,11 +293,46 @@ export default function VentasConsignacionView() {
   const [isEditingHistory, setIsEditingHistory] = useState(false);
   const [replenishmentFilter, setReplenishmentFilter] = useState<'todos' | 'reposicion' | 'con-stock' | 'agotados'>('todos');
   const [salesInputs, setSalesInputs] = useState<Record<string, number>>({});
+  const lastSyncKeyRef = React.useRef<string>('');
   const [savingAllMovements, setSavingAllMovements] = useState(false);
   const [saveNotification, setSaveNotification] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [fixedDataExpanded, setFixedDataExpanded] = useState(false);
   const [selectedFixedLoteIds, setSelectedFixedLoteIds] = useState<Set<string>>(new Set());
+  const [savedPlanillaMonths, setSavedPlanillaMonths] = useState<Set<string>>(new Set());
+
+  const loadSavedPlanillas = useCallback(async (clienteId: string) => {
+    if (!clienteId) {
+      setSavedPlanillaMonths(new Set());
+      return;
+    }
+    try {
+      const set = new Set<string>();
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const q = query(
+          collection(db, 'planillas_consignacion'),
+          where('clienteId', '==', clienteId)
+        );
+        const snap = await getDocs(q);
+        snap.docs.forEach(d => {
+          const data = d.data();
+          if (data.month) set.add(data.month);
+        });
+      } else {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(`mock_planilla_${clienteId}_`)) {
+            const m = k.replace(`mock_planilla_${clienteId}_`, '');
+            set.add(m);
+          }
+        }
+      }
+      setSavedPlanillaMonths(set);
+    } catch (e) {
+      console.error("Error loading saved planillas:", e);
+    }
+  }, []);
 
   // Additional state variables for managing replenishments and all lotes
   const [todosLosLotes, setTodosLosLotes] = useState<any[]>([]);
@@ -228,6 +342,132 @@ export default function VentasConsignacionView() {
     todosLosLotes.forEach(l => l.productoId && set.add(l.productoId));
     return Array.from(set);
   }, [todosLosLotes]);
+
+  const registeredCombinations = useMemo(() => {
+    const map = new Map<string, { productoId: string; solucionLote: string; precioUnitNeto: number }>();
+    todosLosLotes.forEach(lote => {
+      const prod = (lote.productoId || '').trim();
+      const sol = (lote.solucionLote || '').trim();
+      if (!prod) return;
+      const key = `${prod.toUpperCase()}___${sol.toUpperCase()}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          productoId: prod.toUpperCase(),
+          solucionLote: sol.toUpperCase(),
+          precioUnitNeto: Number(lote.precioUnitNeto) || 0
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.productoId.localeCompare(b.productoId));
+  }, [todosLosLotes]);
+
+  const handleDownloadRegisteredProductsPDF = () => {
+    const filteredLotes = todosLosLotes.filter(lote => {
+      if (adminFilterCliente) {
+        const clientObj = clientes.find(c => c.id === adminFilterCliente);
+        const isMatchingId = lote.clienteId === adminFilterCliente;
+        const isMatchingName = clientObj && (lote.clienteId || '').toLowerCase() === clientObj.name.toLowerCase();
+        if (!isMatchingId && !isMatchingName) return false;
+      }
+      if (adminFilterProducto) {
+        const search = adminFilterProducto.toLowerCase();
+        const pName = (lote.productoId || "").toLowerCase();
+        const sName = (lote.solucionLote || "").toLowerCase();
+        if (!pName.includes(search) && !sName.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const productSolutionMap = new Map<string, {
+      clientName: string;
+      productoId: string;
+      solucionLote: string;
+      precioUnitNeto: number;
+      totalStockActivo: number;
+    }>();
+
+    filteredLotes.forEach(lote => {
+      const clientObj = clientes.find(c => c.id === lote.clienteId || c.name.toLowerCase() === (lote.clienteId || '').toLowerCase());
+      const cName = clientObj?.name || lote.clienteId || 'Cliente';
+      const prodName = (lote.productoId || '').trim().toUpperCase();
+      const solName = (lote.solucionLote || 'S/L').trim().toUpperCase();
+      const groupKey = `${lote.clienteId}___${prodName}___${solName}`;
+
+      let totalVendidas = 0;
+      Object.values(lote.movimientos || {}).forEach((m: any) => {
+        if (!m.hidden) totalVendidas += Number(m.unidadesVendidas || 0);
+      });
+      const remaining = Math.max(0, Number(lote.unidadesIniciales || 0) - totalVendidas);
+
+      if (!productSolutionMap.has(groupKey)) {
+        productSolutionMap.set(groupKey, {
+          clientName: cName,
+          productoId: prodName,
+          solucionLote: solName,
+          precioUnitNeto: Number(lote.precioUnitNeto) || 0,
+          totalStockActivo: remaining,
+        });
+      } else {
+        const existing = productSolutionMap.get(groupKey)!;
+        existing.totalStockActivo += remaining;
+      }
+    });
+
+    const list = Array.from(productSolutionMap.values()).sort((a, b) => {
+      if (a.clientName !== b.clientName) return a.clientName.localeCompare(b.clientName);
+      return a.productoId.localeCompare(b.productoId);
+    });
+
+    const doc = new jsPDF({ orientation: 'p' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text('REGISTRO DE PRODUCTOS EN CONSIGNACIÓN', 14, 18);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 25);
+    if (adminFilterCliente) {
+      const filterClientName = clientes.find(c => c.id === adminFilterCliente)?.name || adminFilterCliente;
+      doc.text(`Filtro Cliente: ${filterClientName.toUpperCase()}`, 14, 30);
+    }
+
+    const headers = ['CLIENTE', 'PRODUCTO', 'SOLUCIÓN', 'PRECIO UNIT. (S/IVA)'];
+    const data = list.map(item => [
+      item.clientName,
+      item.productoId,
+      item.solucionLote,
+      formatCurrency(item.precioUnitNeto)
+    ]);
+
+    autoTable(doc, {
+      startY: adminFilterCliente ? 36 : 30,
+      head: [headers],
+      body: data,
+      theme: 'plain',
+      margin: { left: 14, right: 14 },
+      headStyles: {
+        textColor: [30, 58, 95],
+        fontSize: 9,
+        fontStyle: 'bold',
+        fillColor: [248, 250, 252],
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+        textColor: [51, 65, 85],
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 12;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Generado desde el Módulo de Consignación S&E', 14, finalY);
+
+    doc.save(`Registro_Productos_Consignacion_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
   const [adminFilterCliente, setAdminFilterCliente] = useState('');
   const [adminFilterProducto, setAdminFilterProducto] = useState('');
   const [adminTabStatus, setAdminTabStatus] = useState<'activos' | 'inactivos'>('activos');
@@ -353,6 +593,135 @@ export default function VentasConsignacionView() {
       alert('Error guardando la reposición: ' + err.message);
     } finally {
       setSavingReponer(false);
+    }
+  };
+
+  // Edit Lote Modal State & Handlers
+  const [editLoteModal, setEditLoteModal] = useState<{
+    isOpen: boolean;
+    lote: any;
+  } | null>(null);
+
+  const [editLoteForm, setEditLoteForm] = useState({
+    productoId: '',
+    solucionLote: '',
+    fechaVencimiento: '',
+    unidadesIniciales: 0,
+    precioUnitNeto: 0,
+  });
+  const [savingEditLote, setSavingEditLote] = useState(false);
+
+  const openEditLoteModal = (lote: any) => {
+    setEditLoteForm({
+      productoId: lote.productoId || '',
+      solucionLote: lote.solucionLote || '',
+      fechaVencimiento: parseDateString(lote.fechaVencimiento) || new Date().toISOString().split('T')[0],
+      unidadesIniciales: Number(lote.unidadesIniciales || 0),
+      precioUnitNeto: Number(lote.precioUnitNeto || 0),
+    });
+    setEditLoteModal({ isOpen: true, lote });
+  };
+
+  const handleSaveEditLote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editLoteModal?.lote) return;
+    if (!editLoteForm.productoId.trim()) {
+      alert('Por favor ingrese el nombre del producto.');
+      return;
+    }
+    try {
+      setSavingEditLote(true);
+      const loteId = editLoteModal.lote.id;
+      const uProduct = editLoteForm.productoId.toUpperCase().trim();
+      const uSolucion = editLoteForm.solucionLote.toUpperCase().trim() || 'S/L';
+      const units = Number(editLoteForm.unidadesIniciales);
+      const price = Number(editLoteForm.precioUnitNeto);
+      const totalVal = units * price;
+
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
+        await setDoc(loteRef, {
+          productoId: uProduct,
+          solucionLote: uSolucion,
+          fechaVencimiento: Timestamp.fromDate(new Date(editLoteForm.fechaVencimiento + 'T12:00:00')),
+          unidadesIniciales: units,
+          precioUnitNeto: price,
+          totalVentaOriginal: totalVal
+        }, { merge: true });
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          const allLotes = JSON.parse(existing);
+          const idx = allLotes.findIndex((l: any) => l.id.toString() === loteId.toString());
+          if (idx !== -1) {
+            allLotes[idx].productoId = uProduct;
+            allLotes[idx].solucionLote = uSolucion;
+            allLotes[idx].fechaVencimiento = editLoteForm.fechaVencimiento;
+            allLotes[idx].unidadesIniciales = units;
+            allLotes[idx].precioUnitNeto = price;
+            allLotes[idx].totalVentaOriginal = totalVal;
+            localStorage.setItem(key, JSON.stringify(allLotes));
+          }
+        }
+      }
+      setEditLoteModal(null);
+      const cid = registroVentasCliente || declaracionCliente || adminFilterCliente;
+      if (cid) {
+        await loadLotes(cid, true);
+      }
+      await loadTodosLosLotes(true);
+    } catch (err: any) {
+      alert('Error al actualizar el producto: ' + err.message);
+    } finally {
+      setSavingEditLote(false);
+    }
+  };
+
+  // Delete Lote Modal State & Handlers
+  const [deleteLoteModal, setDeleteLoteModal] = useState<{
+    isOpen: boolean;
+    loteId: string;
+    productoName: string;
+  } | null>(null);
+  const [deletingLote, setDeletingLote] = useState(false);
+
+  const openDeleteLoteModal = (lote: any) => {
+    setDeleteLoteModal({
+      isOpen: true,
+      loteId: lote.id,
+      productoName: lote.productoId || 'Producto',
+    });
+  };
+
+  const handleConfirmDeleteLote = async () => {
+    if (!deleteLoteModal?.loteId) return;
+    try {
+      setDeletingLote(true);
+      const loteId = deleteLoteModal.loteId;
+      if (isFirebaseReady()) {
+        const db = getDb();
+        await deleteDoc(doc(db, 'crm_consignacion_lotes', loteId));
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          let allLotes = JSON.parse(existing);
+          allLotes = allLotes.filter((l: any) => l.id.toString() !== loteId.toString());
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
+      }
+      setDeleteLoteModal(null);
+      const cid = registroVentasCliente || declaracionCliente || adminFilterCliente;
+      if (cid) {
+        await loadLotes(cid, true);
+      }
+      await loadTodosLosLotes(true);
+    } catch (err: any) {
+      alert('Error al eliminar producto: ' + err.message);
+    } finally {
+      setDeletingLote(false);
     }
   };
 
@@ -621,22 +990,45 @@ export default function VentasConsignacionView() {
 
     const timer = setTimeout(() => {
       loadLotes(declaracionCliente);
+      loadSavedPlanillas(declaracionCliente);
     }, 400); // 400ms debounce
 
     return () => clearTimeout(timer);
-  }, [declaracionCliente, selectedMonth]);
+  }, [declaracionCliente, selectedMonth, loadSavedPlanillas]);
 
-  // Sync salesInputs with saved movements when selectedMonth or lotesActivos changes
   useEffect(() => {
-    const initial: Record<string, number> = {};
-    lotesActivos.forEach(lote => {
-      const mov = lote.movimientos?.[selectedMonth];
-      if (mov && mov.unidadesVendidas !== undefined) {
-        initial[lote.id] = Number(mov.unidadesVendidas) || 0;
-      }
+    if (registroVentasCliente) {
+      loadSavedPlanillas(registroVentasCliente);
+    }
+  }, [registroVentasCliente, loadSavedPlanillas]);
+
+  // Sync salesInputs with saved movements when selectedMonth, declaracionCliente or lotesActivos changes
+  useEffect(() => {
+    const syncKey = `${declaracionCliente}_${selectedMonth}`;
+    const isNewKey = lastSyncKeyRef.current !== syncKey;
+    if (isNewKey) {
+      lastSyncKeyRef.current = syncKey;
+    }
+
+    setSalesInputs(prev => {
+      const next: Record<string, number> = {};
+      lotesActivos.forEach(lote => {
+        const savedVal = lote.movimientos?.[selectedMonth]?.unidadesVendidas;
+        if (isNewKey) {
+          if (savedVal !== undefined) {
+            next[lote.id] = Number(savedVal) || 0;
+          }
+        } else {
+          if (prev[lote.id] !== undefined) {
+            next[lote.id] = prev[lote.id];
+          } else if (savedVal !== undefined) {
+            next[lote.id] = Number(savedVal) || 0;
+          }
+        }
+      });
+      return next;
     });
-    setSalesInputs(initial);
-  }, [selectedMonth, lotesActivos]);
+  }, [declaracionCliente, selectedMonth, lotesActivos]);
 
   // Only load all lotes when specifically needed (e.g., Tab 2 or Fixed Data list)
   useEffect(() => {
@@ -650,14 +1042,6 @@ export default function VentasConsignacionView() {
     }
     return () => { active = false; };
   }, [activeTab, fixedDataExpanded]);
-
-  useEffect(() => {
-    const inputs: Record<string, number> = {};
-    lotesActivos.forEach(lote => {
-      inputs[lote.id] = Number(lote.movimientos?.[selectedMonth]?.unidadesVendidas || 0);
-    });
-    setSalesInputs(inputs);
-  }, [lotesActivos, selectedMonth]);
 
   const handleImportExcel = async (file: File, cid: string) => {
     if (!cid) {
@@ -1255,6 +1639,11 @@ export default function VentasConsignacionView() {
         
         alert("Planilla borrada exitosamente.");
       }
+      setSavedPlanillaMonths(prev => {
+        const next = new Set(prev);
+        next.delete(monthToDelete);
+        return next;
+      });
       await loadLotes(declaracionCliente, true);
       await loadTodosLosLotes(true);
       setIsEditingHistory(false);
@@ -1296,19 +1685,22 @@ export default function VentasConsignacionView() {
           const traj = getLoteTrajectoryUpToMonth(lote, selectedMonth, currentSales);
           if (!traj) continue;
 
-          const loteRef = doc(db, 'crm_consignacion_lotes', lote.id);
-          await setDoc(loteRef, {
-            activo: true,
-            movimientos: {
-              [selectedMonth]: {
-                unidadesVendidas: currentSales,
-                saldoAnterior: Number(traj.stockDisponible),
-                saldoResultante: Number(traj.frascosRestantes),
-                montoVentaNeto: Number(traj.montoVentaNeto),
-                fechaRegistro: Timestamp.now()
+          const hadMovement = !!lote.movimientos?.[selectedMonth];
+          if (currentSales > 0 || hadMovement) {
+            const loteRef = doc(db, 'crm_consignacion_lotes', lote.id);
+            await setDoc(loteRef, {
+              activo: true,
+              movimientos: {
+                [selectedMonth]: {
+                  unidadesVendidas: currentSales,
+                  saldoAnterior: Number(traj.stockDisponible),
+                  saldoResultante: Number(traj.frascosRestantes),
+                  montoVentaNeto: Number(traj.montoVentaNeto),
+                  fechaRegistro: Timestamp.now()
+                }
               }
-            }
-          }, { merge: true });
+            }, { merge: true });
+          }
         }
         
         const planillaRef = doc(db, 'planillas_consignacion', `${declaracionCliente}_${selectedMonth}`);
@@ -1319,6 +1711,7 @@ export default function VentasConsignacionView() {
         });
         
         setSalesInputs({});
+        setSavedPlanillaMonths(prev => new Set(prev).add(selectedMonth));
         setSaveNotification("Plantilla guardada exitosamente en Ventas en Consignación");
         setTimeout(() => setSaveNotification(null), 5000);
       } else {
@@ -1334,15 +1727,18 @@ export default function VentasConsignacionView() {
               const currentSales = Number(salesInputs[l.id] ?? l.movimientos?.[selectedMonth]?.unidadesVendidas ?? 0);
               const traj = getLoteTrajectoryUpToMonth(l, selectedMonth, currentSales);
               if (traj) {
-                if (!l.movimientos) l.movimientos = {};
-                l.movimientos[selectedMonth] = {
-                  unidadesVendidas: currentSales,
-                  saldoAnterior: Number(traj.stockDisponible),
-                  saldoResultante: Number(traj.frascosRestantes),
-                  montoVentaNeto: Number(traj.montoVentaNeto),
-                  fechaRegistro: new Date().toISOString()
-                };
-                l.activo = true;
+                const hadMovement = !!l.movimientos?.[selectedMonth];
+                if (currentSales > 0 || hadMovement) {
+                  if (!l.movimientos) l.movimientos = {};
+                  l.movimientos[selectedMonth] = {
+                    unidadesVendidas: currentSales,
+                    saldoAnterior: Number(traj.stockDisponible),
+                    saldoResultante: Number(traj.frascosRestantes),
+                    montoVentaNeto: Number(traj.montoVentaNeto),
+                    fechaRegistro: new Date().toISOString()
+                  };
+                  l.activo = true;
+                }
               }
             }
           });
@@ -1356,6 +1752,7 @@ export default function VentasConsignacionView() {
           }));
           
           setSalesInputs({});
+          setSavedPlanillaMonths(prev => new Set(prev).add(selectedMonth));
           setSaveNotification("Plantilla guardada exitosamente en Ventas en Consignación");
           setTimeout(() => setSaveNotification(null), 5000);
         }
@@ -1456,11 +1853,11 @@ export default function VentasConsignacionView() {
                           <Settings size={20} className="animate-spin-slow text-sky-400" />
                         </div>
                         <div>
-                          <h4 className="text-sm font-black text-slate-200 uppercase tracking-widest">
-                            ⚙️ Administración de Datos Fijos
+                          <h4 className="text-sm font-black text-slate-200 uppercase tracking-widest flex items-center gap-2">
+                            📦 Registro de Productos en Consignación
                           </h4>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            Visualice, edite y guarde los datos originales de todos los lotes del sistema sin espacio.
+                            Listado de productos en consignación junto con su solución. Use el botón para agregar nuevos productos.
                           </p>
                         </div>
                       </div>
@@ -1474,14 +1871,14 @@ export default function VentasConsignacionView() {
                             setShowImportForm(false);
                           }}
                           className={cn(
-                            "px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
+                            "px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg active:scale-95",
                             showAddLoteForm 
-                              ? "bg-emerald-500 text-[#050914]" 
-                              : "bg-[#050914] text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-[#050914]"
+                              ? "bg-emerald-500 text-[#050914] shadow-emerald-500/20" 
+                              : "bg-emerald-500 hover:bg-emerald-400 text-[#050914] shadow-emerald-500/20"
                           )}
                         >
-                          <Plus size={14} />
-                          Ingreso de Producto
+                          <Plus size={16} className="stroke-[3]" />
+                          + Agregar Producto en Consignación
                         </button>
                         <button
                           onClick={() => {
@@ -1490,7 +1887,7 @@ export default function VentasConsignacionView() {
                             setShowImportForm(false);
                           }}
                           className={cn(
-                            "px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
+                            "px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
                             showAddClientForm 
                               ? "bg-sky-500 text-[#050914]" 
                               : "bg-[#050914] text-sky-400 border border-sky-500/20 hover:bg-sky-500 hover:text-[#050914]"
@@ -1506,7 +1903,7 @@ export default function VentasConsignacionView() {
                             setShowAddClientForm(false);
                           }}
                           className={cn(
-                            "px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
+                            "px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
                             showImportForm 
                               ? "bg-purple-500 text-[#050914]" 
                               : "bg-[#050914] text-purple-400 border border-purple-500/20 hover:bg-purple-500 hover:text-[#050914]"
@@ -1514,6 +1911,14 @@ export default function VentasConsignacionView() {
                         >
                           <Upload size={14} />
                           Importar Productos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDownloadRegisteredProductsPDF}
+                          className="px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md bg-[#050914] text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white"
+                        >
+                          <Download size={14} />
+                          Descargar Registro (PDF)
                         </button>
                       </div>
 
@@ -1568,16 +1973,22 @@ export default function VentasConsignacionView() {
                                 placeholder="Escriba para buscar cliente..."
                               />
                             </div>
-                            <div>
+                             <div>
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Producto</label>
-                              <input
-                                type="text"
-                                list="productos-datalist"
-                                placeholder="Escribe o selecciona producto..."
-                                className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-semibold outline-none focus:border-emerald-500"
+                              <ProductSolutionAutocomplete
                                 value={formEntrega.producto_id}
-                                onChange={e => setFormEntrega({ ...formEntrega, producto_id: e.target.value })}
-                                required
+                                onChange={(val) => setFormEntrega({ ...formEntrega, producto_id: val })}
+                                onSelectCombination={(comb) => {
+                                  setFormEntrega({
+                                    ...formEntrega,
+                                    producto_id: comb.productoId,
+                                    solucion_lote: comb.solucionLote,
+                                    precio_unit_neto: comb.precioUnitNeto
+                                  });
+                                }}
+                                placeholder="Escribe o selecciona producto..."
+                                registeredCombinations={registeredCombinations}
+                                className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-semibold outline-none focus:border-emerald-500 uppercase"
                               />
                             </div>
                             <div>
@@ -1804,206 +2215,162 @@ export default function VentasConsignacionView() {
 
                       <div className="text-xs text-slate-400 bg-sky-500/5 border border-sky-500/10 p-3.5 rounded-xl flex items-center gap-2 mb-2 font-medium">
                         <Info size={14} className="text-sky-400 flex-shrink-0" />
-                        Edite los datos originales de cada producto en consignación. Los cambios actualizarán secuencialmente el stock remanente para los meses posteriores.
+                        Visualice los productos registrados en consignación junto con su solución. Presione "+ Agregar Producto" para incluir nuevos productos.
                       </div>
                       {(() => {
                         const filteredLotes = todosLosLotes.filter(lote => {
-                          if (adminFilterCliente && lote.clienteId !== adminFilterCliente) return false;
-                          if (adminFilterProducto && !(lote.productoId || "").toLowerCase().includes(adminFilterProducto.toLowerCase())) return false;
+                          if (adminFilterCliente) {
+                            const clientObj = clientes.find(c => c.id === adminFilterCliente);
+                            const isMatchingId = lote.clienteId === adminFilterCliente;
+                            const isMatchingName = clientObj && (lote.clienteId || '').toLowerCase() === clientObj.name.toLowerCase();
+                            if (!isMatchingId && !isMatchingName) return false;
+                          }
+                          if (adminFilterProducto) {
+                            const search = adminFilterProducto.toLowerCase();
+                            const pName = (lote.productoId || "").toLowerCase();
+                            const sName = (lote.solucionLote || "").toLowerCase();
+                            if (!pName.includes(search) && !sName.includes(search)) return false;
+                          }
                           return true;
                         });
 
-                        const flattenedItems: any[] = [];
-                        filteredLotes.forEach(l => {
-                          const cName = clientes.find(c => c.id === l.clienteId)?.name || 'Cliente';
+                        const productSolutionMap = new Map<string, {
+                          key: string;
+                          sampleLoteId: string;
+                          clienteId: string;
+                          clientName: string;
+                          productoId: string;
+                          solucionLote: string;
+                          precioUnitNeto: number;
+                          totalLotes: number;
+                          totalStockActivo: number;
+                          sampleLote: any;
+                        }>();
+
+                        filteredLotes.forEach(lote => {
+                          const clientObj = clientes.find(c => c.id === lote.clienteId || c.name.toLowerCase() === (lote.clienteId || '').toLowerCase());
+                          const cName = clientObj?.name || lote.clienteId || 'Cliente';
+                          const prodName = (lote.productoId || '').trim().toUpperCase();
+                          const solName = (lote.solucionLote || 'S/L').trim().toUpperCase();
+                          const groupKey = `${lote.clienteId}___${prodName}___${solName}`;
+
                           let totalVendidas = 0;
-                          Object.values(l.movimientos || {}).forEach((m: any) => {
-                            if (!m.hidden) {
-                               totalVendidas += Number(m.unidadesVendidas || 0);
-                            }
+                          Object.values(lote.movimientos || {}).forEach((m: any) => {
+                            if (!m.hidden) totalVendidas += Number(m.unidadesVendidas || 0);
                           });
-                          let remainingOriginal = Math.max(0, Number(l.unidadesIniciales || 0) - totalVendidas);
-                          let remainingVentasForReps = Math.max(0, totalVendidas - Number(l.unidadesIniciales || 0));
+                          const remaining = Math.max(0, Number(lote.unidadesIniciales || 0) - totalVendidas);
 
-                          // Lote original
-                          flattenedItems.push({
-                            ...l,
-                            displayId: l.id,
-                            type: 'ORIGINAL',
-                            sortDate: parseDateString(l.fechaVencimiento),
-                            displayUnidades: remainingOriginal,
-                            originalUnidades: l.unidadesIniciales,
-                            clientName: cName
-                          });
-                          
-                          // Reposiciones como filas separadas
-                          l.reposiciones?.forEach((rep: any, idx: number) => {
-                            const currentRepUnits = Number(rep.unidades || 0);
-                            const remainingRep = Math.max(0, currentRepUnits - remainingVentasForReps);
-                            remainingVentasForReps = Math.max(0, remainingVentasForReps - currentRepUnits);
-                            flattenedItems.push({
-                              ...l,
-                              displayId: `${l.id}_rep_${idx}`,
-                              type: 'REP',
-                              sortDate: parseDateString(l.fechaVencimiento),
-                              displayUnidades: remainingRep,
-                              originalUnidades: currentRepUnits,
-                              fechaRep: rep.fecha,
+                          if (!productSolutionMap.has(groupKey)) {
+                            productSolutionMap.set(groupKey, {
+                              key: groupKey,
+                              sampleLoteId: lote.id,
+                              clienteId: lote.clienteId,
                               clientName: cName,
-                              repIndex: idx
+                              productoId: prodName,
+                              solucionLote: solName,
+                              precioUnitNeto: Number(lote.precioUnitNeto) || 0,
+                              totalLotes: 1,
+                              totalStockActivo: remaining,
+                              sampleLote: lote
                             });
-                          });
-                        });
-
-                        const sortedItems = [...flattenedItems].sort((a, b) => {
-                          const nameA = (a.productoId || "").toString().toLowerCase();
-                          const nameB = (b.productoId || "").toString().toLowerCase();
-                          if (nameA !== nameB) return nameA.localeCompare(nameB);
-                          
-                          // Safe date comparison
-                          const dateA = a.sortDate ? new Date(a.sortDate).getTime() : 0;
-                          const dateB = b.sortDate ? new Date(b.sortDate).getTime() : 0;
-                          return dateA - dateB;
-                        });
-
-                        const earliestMap: Record<string, string> = {};
-                        sortedItems.forEach(item => {
-                          if (!earliestMap[item.productoId]) {
-                            earliestMap[item.productoId] = item.displayId;
+                          } else {
+                            const existing = productSolutionMap.get(groupKey)!;
+                            existing.totalLotes += 1;
+                            existing.totalStockActivo += remaining;
                           }
                         });
 
-                        const activosItems = sortedItems.filter(item => item.displayUnidades > 0);
-                        const inactivosItems = sortedItems.filter(item => item.displayUnidades <= 0);
-                        const displaySortedItems = adminTabStatus === 'activos' ? activosItems : inactivosItems;
+                        const productSolutionList = Array.from(productSolutionMap.values()).sort((a, b) => {
+                          if (a.clientName !== b.clientName) return a.clientName.localeCompare(b.clientName);
+                          if (a.productoId !== b.productoId) return a.productoId.localeCompare(b.productoId);
+                          return a.solucionLote.localeCompare(b.solucionLote);
+                        });
 
                         return (
-                          <div className="space-y-3">
-                            {/* Activos / Inactivos Tab Switcher */}
-                            <div className="flex items-center justify-between bg-[#0B1220] p-2 rounded-xl border border-[#1E293B]">
-                              <div className="flex items-center gap-2">
+                          <div className="space-y-4">
+                            {productSolutionList.length === 0 ? (
+                              <div className="text-center py-12 bg-[#050914] border border-dashed border-[#1E293B] rounded-2xl text-slate-500 font-semibold text-xs space-y-3">
+                                <p>No hay productos registrados en consignación para los filtros seleccionados.</p>
                                 <button
                                   type="button"
-                                  onClick={() => setAdminTabStatus('activos')}
-                                  className={cn(
-                                    "px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
-                                    adminTabStatus === 'activos'
-                                      ? "bg-emerald-500 text-[#050914] shadow-lg shadow-emerald-500/20"
-                                      : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
-                                  )}
+                                  onClick={() => setShowAddLoteForm(true)}
+                                  className="px-4 py-2 bg-emerald-500 text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-lg"
                                 >
-                                  🟢 Activos ({activosItems.length})
+                                  <Plus size={14} /> Registrar Primer Producto
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setAdminTabStatus('inactivos')}
-                                  className={cn(
-                                    "px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
-                                    adminTabStatus === 'inactivos'
-                                      ? "bg-slate-700 text-white shadow-lg shadow-slate-700/20"
-                                      : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
-                                  )}
-                                >
-                                  ⚪ Inactivos / Stock 0 ({inactivosItems.length})
-                                </button>
-                              </div>
-                              <div className="text-[11px] text-slate-400 font-medium px-2">
-                                Mostrando lotes {adminTabStatus === 'activos' ? 'con stock activo (> 0)' : 'sin stock (0 o agotados)'}
-                              </div>
-                            </div>
-
-                            {displaySortedItems.length === 0 ? (
-                              <div className="text-center py-10 bg-[#050914] border border-[#1E293B] rounded-xl text-slate-500 font-semibold text-xs">
-                                No se encontraron lotes {adminTabStatus === 'activos' ? 'activos con stock' : 'inactivos (stock 0)'} para los filtros seleccionados.
                               </div>
                             ) : (
-                              <div className="relative">
-                            {/* Floating Action Bar */}
-                            {selectedFixedLoteIds.size > 0 && (
-                              <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-[#0F172A] border border-sky-500/30 px-6 py-4 rounded-2xl shadow-2xl shadow-sky-500/10 animate-in fade-in slide-in-from-bottom-4">
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest">
-                                    {selectedFixedLoteIds.size} registros seleccionados
-                                  </span>
-                                  <span className="text-[9px] text-slate-500 font-medium">Lotes y reposiciones marcados para acción</span>
-                                </div>
-                                <div className="h-8 w-px bg-slate-800 mx-2"></div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => setSelectedFixedLoteIds(new Set())}
-                                    className="px-4 py-2 text-slate-400 hover:text-white text-[10px] font-black uppercase tracking-wider transition-colors"
-                                  >
-                                    Cancelar
-                                  </button>
-                                  <button
-                                    onClick={handleBulkDeleteFixedLotes}
-                                    disabled={savingAllMovements}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-800 disabled:text-slate-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider transition-all shadow-lg shadow-rose-500/20 active:scale-95"
-                                  >
-                                    {savingAllMovements ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                                    Eliminar de forma masiva
-                                  </button>
-                                </div>
+                              <div className="border border-[#1E293B] rounded-2xl bg-[#050914] overflow-hidden shadow-xl">
+                                <table className="w-full text-left text-xs">
+                                  <thead className="bg-[#0D1627] text-slate-400 uppercase font-black text-[10px] tracking-wider border-b border-[#1E293B]">
+                                    <tr>
+                                      <th className="p-3.5 pl-5">Cliente</th>
+                                      <th className="p-3.5">Producto</th>
+                                      <th className="p-3.5">Solución</th>
+                                      <th className="p-3.5 text-right pr-6">Precio Unit. (s/IVA)</th>
+                                      <th className="p-3.5 text-center">Acción</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[#1E293B]/60">
+                                    {productSolutionList.map((item) => (
+                                      <tr key={item.key} className="hover:bg-[#111A2E]/60 transition-colors">
+                                        <td className="p-3.5 pl-5 font-bold text-slate-300">
+                                          {item.clientName}
+                                        </td>
+                                        <td className="p-3.5">
+                                          <div className="font-black text-white text-xs">{item.productoId}</div>
+                                        </td>
+                                        <td className="p-3.5">
+                                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                            {item.solucionLote}
+                                          </span>
+                                        </td>
+                                        <td className="p-3.5 text-right pr-6 font-mono font-bold text-amber-400 text-xs">
+                                          {formatCurrency(item.precioUnitNeto)}
+                                        </td>
+                                        <td className="p-3.5 text-center">
+                                          <div className="flex items-center justify-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                if (item.sampleLote) {
+                                                  openEditLoteModal(item.sampleLote);
+                                                }
+                                              }}
+                                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                                              title="Editar producto"
+                                            >
+                                              <Edit2 size={14} />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                if (confirm(`¿Está seguro de eliminar el producto ${item.productoId} (${item.solucionLote})?`)) {
+                                                  try {
+                                                    const db = getDb();
+                                                    await deleteDoc(doc(db, 'consignacion_lotes', item.sampleLoteId));
+                                                    await loadTodosLosLotes();
+                                                  } catch (e: any) {
+                                                    alert('Error al eliminar: ' + e.message);
+                                                  }
+                                                }
+                                              }}
+                                              className="p-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg transition-colors"
+                                              title="Eliminar producto"
+                                            >
+                                              <Trash2 size={14} />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </div>
                             )}
-
-                            <div className="max-h-[450px] overflow-y-auto border border-[#1E293B] rounded-xl bg-[#050914] shadow-inner relative">
-                            <table className="w-full text-left text-[10px]">
-                              <thead className="bg-[#0D1627] text-slate-400 uppercase font-black text-[9px] sticky top-0 z-10 shadow-sm">
-                                <tr>
-                                  <th className="p-3 border-b border-[#1E293B] w-10 text-center">
-                                    <div className="flex justify-center">
-                                      <input 
-                                        type="checkbox" 
-                                        checked={selectedFixedLoteIds.size === displaySortedItems.length && displaySortedItems.length > 0}
-                                        onChange={() => {
-                                          if (selectedFixedLoteIds.size === displaySortedItems.length) {
-                                            setSelectedFixedLoteIds(new Set());
-                                          } else {
-                                            setSelectedFixedLoteIds(new Set(displaySortedItems.map(l => l.displayId)));
-                                          }
-                                        }}
-                                        className="w-4 h-4 accent-sky-500 rounded border-slate-600 bg-slate-800 cursor-pointer hover:border-sky-500/50 transition-colors"
-                                      />
-                                    </div>
-                                  </th>
-                                  <th className="p-3 border-b border-[#1E293B]">Cliente</th>
-                                  <th className="p-3 border-b border-[#1E293B]">Producto</th>
-                                  <th className="p-3 border-b border-[#1E293B] text-center">Stock</th>
-                                  <th className="p-3 border-b border-[#1E293B]">Solución</th>
-                                  <th className="p-3 border-b border-[#1E293B]">Venc.</th>
-                                  <th className="p-3 border-b border-[#1E293B] text-right">Precio</th>
-                                  <th className="p-3 border-b border-[#1E293B] text-center">Acción</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-[#1E293B]">
-                                {displaySortedItems.map(l => {
-                                  const isFIFO = earliestMap[l.productoId] === l.displayId;
-                                  return (
-                                    <LoteFixedDataRow 
-                                      key={l.displayId} 
-                                      item={l} 
-                                      isFIFO={isFIFO} 
-                                      isSelected={selectedFixedLoteIds.has(l.displayId)}
-                                      onToggle={toggleFixedLoteSelection}
-                                      onReponer={(item) => {
-                                        openReponerModal(item.clienteId, item.productoId, item.solucionLote, item.precioUnitNeto);
-                                      }}
-                                      onRefresh={async () => {
-                                        if (declaracionCliente) await loadLotes(declaracionCliente, true);
-                                        await loadTodosLosLotes();
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </tbody>
-                            </table>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                        );
+                      })()}
               </div>
             </div>
           )}
@@ -2089,11 +2456,7 @@ export default function VentasConsignacionView() {
                         if (!item.traj || !item.traj.delivered) return false;
                         const mov = item.lote.movimientos?.[selectedMonth];
                         if (mov && mov.hidden) return false;
-                        
-                        const hasMov = mov !== undefined && !mov.hidden;
-                        
-                        // Lote appears in monthly declaration if it has a recorded movement or was added to month
-                        return hasMov;
+                        return mov !== undefined && !mov.hidden;
                       }).sort((a, b) => {
                         const nameA = (a.lote.productoId || '').toString().toLowerCase();
                         const nameB = (b.lote.productoId || '').toString().toLowerCase();
@@ -2149,17 +2512,24 @@ export default function VentasConsignacionView() {
                                   </button>
                                 )}
                                 {(() => {
-                                  const isCurrentMonthSaved = activeLotesForMonth.some(item => {
-                                    const mov = item.lote.movimientos?.[selectedMonth];
-                                    return mov && (mov.fechaRegistro || mov.unidadesVendidas !== undefined);
-                                  });
+                                  const isCurrentMonthSaved = savedPlanillaMonths.has(selectedMonth);
                                   return isCurrentMonthSaved ? (
-                                    <span className="bg-emerald-500/15 text-emerald-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-500/30 shadow-lg flex items-center gap-1.5">
-                                      <CheckCircle size={14} /> Planilla Guardada ({formatMonthName(selectedMonth)})
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="bg-emerald-500/15 text-emerald-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-500/30 shadow-lg flex items-center gap-1.5">
+                                        <CheckCircle size={14} /> Planilla Guardada ({formatMonthName(selectedMonth)})
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsEditingHistory(!isEditingHistory)}
+                                        className="bg-amber-500/15 text-amber-400 hover:bg-amber-500 hover:text-[#050914] px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-amber-500/30 shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                                      >
+                                        <Edit3 size={14} />
+                                        {isEditingHistory ? "Cancelar Edición" : "Editar Planilla"}
+                                      </button>
+                                    </div>
                                   ) : (
                                     <span className="bg-sky-500/15 text-sky-400 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border border-sky-500/20 shadow-lg">
-                                      📅 {formatMonthName(selectedMonth)}
+                                      📅 {formatMonthName(selectedMonth)} (Borrador)
                                     </span>
                                   );
                                 })()}
@@ -2198,7 +2568,8 @@ export default function VentasConsignacionView() {
                                        const savedSales = lote.movimientos?.[selectedMonth]?.unidadesVendidas;
                                        const currentSales = salesInputs[lote.id] !== undefined ? salesInputs[lote.id] : (savedSales ?? 0);
                                        const isSelected = selectedMonthlyLoteIds.has(lote.id);
-                                       const isSaved = !!lote.movimientos?.[selectedMonth] && savedSales !== undefined && !isEditingHistory;
+                                       const isCurrentMonthSaved = savedPlanillaMonths.has(selectedMonth);
+                                       const isSaved = isCurrentMonthSaved && !isEditingHistory;
                                        return (
                                          <tr key={lote.id} className={cn("hover:bg-[#1E293B]/10 transition-colors", isSelected ? "bg-sky-500/5" : "")}>
                                            <td className="p-4 pl-6 w-12 text-center">
@@ -2235,7 +2606,7 @@ export default function VentasConsignacionView() {
                                                    Solución: {lote.solucionLote || 'S/L'}
                                                  </span>
                                                  <span className="bg-[#0A1120] border border-rose-500/10 text-rose-400 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
-                                                   F. Venc: {parseDateString(lote.fechaVencimiento)}
+                                                   F. Venc: {formatDateToDDMMYYYY(lote.fechaVencimiento)}
                                                  </span>
                                                </div>
                                                
@@ -2473,7 +2844,7 @@ export default function VentasConsignacionView() {
                                                               </td>
                                                               <td className="p-2 text-emerald-400 font-mono text-[10px]">{l.solucionLote || 'S/L'}</td>
                                                               <td className="p-2 text-slate-300 text-[10px]">
-                                                                <span className={isFIFO ? "text-rose-300 font-black" : "font-medium"}>{parseDateString(l.fechaVencimiento)}</span>
+                                                                <span className={isFIFO ? "text-rose-300 font-black" : "font-medium"}>{formatDateToDDMMYYYY(l.fechaVencimiento)}</span>
                                                               </td>
                                                               <td className="p-2 text-right text-amber-400 font-mono text-[10px]">{formatCurrency(Number(l.precioUnitNeto) || 0)}</td>
                                                               <td className="p-2 text-center">
@@ -2613,16 +2984,20 @@ export default function VentasConsignacionView() {
                     // Summarize saved month templates
                     // Let's gather all months that have any saved movimientos
                     const monthSummaryMap: Record<string, { unidadesVendidas: number, montoVendido: number, count: number }> = {};
+                    savedPlanillaMonths.forEach(m => {
+                      monthSummaryMap[m] = { unidadesVendidas: 0, montoVendido: 0, count: 0 };
+                    });
                     clientLotes.forEach(lote => {
                       if (lote.movimientos) {
                         Object.keys(lote.movimientos).forEach(m => {
                           const mov = lote.movimientos[m];
-                          if (mov && !mov.hidden && (mov.fechaRegistro || mov.unidadesVendidas !== undefined)) {
+                          const sales = Number(mov?.unidadesVendidas || 0);
+                          if (mov && !mov.hidden && sales > 0) {
                             if (!monthSummaryMap[m]) {
                               monthSummaryMap[m] = { unidadesVendidas: 0, montoVendido: 0, count: 0 };
                             }
-                            monthSummaryMap[m].unidadesVendidas += Number(mov.unidadesVendidas || 0);
-                            monthSummaryMap[m].montoVendido += Number(mov.unidadesVendidas || 0) * (Number(lote.precioUnitNeto) || 0);
+                            monthSummaryMap[m].unidadesVendidas += sales;
+                            monthSummaryMap[m].montoVendido += sales * (Number(lote.precioUnitNeto) || 0);
                             monthSummaryMap[m].count += 1;
                           }
                         });
@@ -2652,7 +3027,7 @@ export default function VentasConsignacionView() {
                       
                       const headers = ['PRODUCTO', 'SOLUCIÓN', 'P. UNITARIO', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
                       const data = inventoryStatus.map(({ lote, traj }) => {
-                        const venc = parseDateString(lote.fechaVencimiento);
+                        const venc = formatDateToDDMMYYYY(lote.fechaVencimiento);
                         return [
                           lote.productoId,
                           lote.solucionLote || 'S/S',
@@ -2708,7 +3083,7 @@ export default function VentasConsignacionView() {
                         lote.productoId,
                         lote.solucionLote || 'S/S',
                         formatCurrency(lote.precioUnitNeto || 0),
-                        parseDateString(lote.fechaVencimiento),
+                        formatDateToDDMMYYYY(lote.fechaVencimiento),
                         `${traj?.frascosRestantes || 0} unidades`
                       ]);
 
@@ -2742,7 +3117,7 @@ export default function VentasConsignacionView() {
                         lote.productoId,
                         lote.solucionLote || 'S/S',
                         formatCurrency(lote.precioUnitNeto || 0),
-                        parseDateString(lote.fechaVencimiento),
+                        formatDateToDDMMYYYY(lote.fechaVencimiento),
                         'Agotado (0 u.)'
                       ]);
 
@@ -2921,7 +3296,7 @@ export default function VentasConsignacionView() {
                                 className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                               >
                                 <Plus size={13} />
-                                Reponer / Ingresar Stock
+                                Ingresar Nuevo Stock
                               </button>
                             </div>
                           </div>
@@ -2979,7 +3354,7 @@ export default function VentasConsignacionView() {
                                           <div className="font-bold text-slate-200">{lote.productoId}</div>
                                           <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
                                         </td>
-                                        <td className="p-4 text-center text-slate-400 font-semibold font-mono">{parseDateString(lote.fechaVencimiento)}</td>
+                                        <td className="p-4 text-center text-slate-400 font-semibold font-mono">{formatDateToDDMMYYYY(lote.fechaVencimiento)}</td>
                                         <td className="p-4 text-center font-mono font-bold text-amber-400">
                                           {formatCurrency(lote.precioUnitNeto || 0)}
                                         </td>
@@ -2989,14 +3364,24 @@ export default function VentasConsignacionView() {
                                           </span>
                                         </td>
                                         <td className="p-4 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => openReponerModal(lote.clienteId || registroVentasCliente, lote.productoId, lote.solucionLote, lote.precioUnitNeto)}
-                                            title="Reponer stock o agregar nuevo lote para este producto"
-                                            className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-[#050914] border border-emerald-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 mx-auto"
-                                          >
-                                            <Plus size={12} /> Reponer
-                                          </button>
+                                          <div className="flex items-center justify-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => openEditLoteModal(lote)}
+                                              title="Editar producto"
+                                              className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-[#050914] border border-sky-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <Edit2 size={12} /> Editar
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => openDeleteLoteModal(lote)}
+                                              title="Eliminar producto"
+                                              className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <Trash2 size={12} /> Eliminar
+                                            </button>
+                                          </div>
                                         </td>
                                       </tr>
                                     ))
@@ -3015,7 +3400,7 @@ export default function VentasConsignacionView() {
                                           <div className="font-bold text-slate-400 line-through">{lote.productoId}</div>
                                           <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
                                         </td>
-                                        <td className="p-4 text-center text-slate-500 font-semibold font-mono">{parseDateString(lote.fechaVencimiento)}</td>
+                                        <td className="p-4 text-center text-slate-500 font-semibold font-mono">{formatDateToDDMMYYYY(lote.fechaVencimiento)}</td>
                                         <td className="p-4 text-center font-mono font-bold text-amber-400/70">
                                           {formatCurrency(lote.precioUnitNeto || 0)}
                                         </td>
@@ -3025,14 +3410,24 @@ export default function VentasConsignacionView() {
                                           </span>
                                         </td>
                                         <td className="p-4 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => openReponerModal(lote.clienteId || registroVentasCliente, lote.productoId, lote.solucionLote, lote.precioUnitNeto)}
-                                            title="Reponer stock agotado para este producto"
-                                            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-[#050914] font-black rounded-lg text-[10px] uppercase transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1 mx-auto"
-                                          >
-                                            <Plus size={12} /> Reponer Stock
-                                          </button>
+                                          <div className="flex items-center justify-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => openEditLoteModal(lote)}
+                                              title="Editar producto"
+                                              className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-[#050914] border border-sky-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <Edit2 size={12} /> Editar
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => openDeleteLoteModal(lote)}
+                                              title="Eliminar producto"
+                                              className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <Trash2 size={12} /> Eliminar
+                                            </button>
+                                          </div>
                                         </td>
                                       </tr>
                                     ))
@@ -3080,13 +3475,15 @@ export default function VentasConsignacionView() {
                                 // Get details of products sold in this saved month
                                 const itemsInMonth = clientLotes.map(lote => {
                                   const mov = lote.movimientos?.[m.month];
-                                  if (mov && !mov.hidden && (mov.unidadesVendidas !== undefined || mov.fechaRegistro)) {
+                                  const sales = Number(mov?.unidadesVendidas || 0);
+                                  if (mov && !mov.hidden && sales > 0) {
                                     return {
                                       productoId: lote.productoId,
                                       solucionLote: lote.solucionLote,
-                                      unidadesVendidas: Number(mov.unidadesVendidas || 0),
+                                      fechaVencimiento: lote.fechaVencimiento,
+                                      unidadesVendidas: sales,
                                       precioUnitNeto: Number(lote.precioUnitNeto) || 0,
-                                      montoVendido: Number(mov.unidadesVendidas || 0) * (Number(lote.precioUnitNeto) || 0)
+                                      montoVendido: sales * (Number(lote.precioUnitNeto) || 0)
                                     };
                                   }
                                   return null;
@@ -3145,7 +3542,12 @@ export default function VentasConsignacionView() {
                                                 <tr key={idx} className="text-slate-300 hover:bg-slate-800/10">
                                                   <td className="p-3 pl-4">
                                                     <div className="font-bold text-slate-100">{item.productoId}</div>
-                                                    <div className="text-[9px] text-slate-500 font-mono">Solución: {item.solucionLote || 'S/S'}</div>
+                                                    <div className="flex flex-wrap gap-x-2 text-[9px] text-slate-500 font-mono">
+                                                      <span>Solución: {item.solucionLote || 'S/S'}</span>
+                                                      {item.fechaVencimiento && (
+                                                        <span className="text-rose-400 font-bold">| F. Venc: {formatDateToDDMMYYYY(item.fechaVencimiento)}</span>
+                                                      )}
+                                                    </div>
                                                   </td>
                                                   <td className="p-3 text-center font-black font-mono text-slate-300">
                                                     {item.unidadesVendidas} u.
@@ -3227,7 +3629,7 @@ export default function VentasConsignacionView() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                    Reponer Stock / Nuevo Registro Lote
+                    Ingresar Nuevo Stock / Reposición
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     Ingrese el nuevo stock o reposición de producto en consignación.
@@ -3257,18 +3659,24 @@ export default function VentasConsignacionView() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
                     Producto
                   </label>
-                  <input
-                    type="text"
-                    list="productos-datalist"
-                    required
-                    className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500"
+                  <ProductSolutionAutocomplete
                     value={reponerForm.productoId}
-                    onChange={(e) => setReponerForm({ ...reponerForm, productoId: e.target.value })}
+                    onChange={(val) => setReponerForm({ ...reponerForm, productoId: val })}
+                    onSelectCombination={(comb) => {
+                      setReponerForm({
+                        ...reponerForm,
+                        productoId: comb.productoId,
+                        solucionLote: comb.solucionLote,
+                        precioUnitNeto: comb.precioUnitNeto
+                      });
+                    }}
                     placeholder="Ej: ARNICA CS"
+                    registeredCombinations={registeredCombinations}
+                    className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500 uppercase"
                   />
                 </div>
 
@@ -3286,10 +3694,10 @@ export default function VentasConsignacionView() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                    Stock a Reponer (u.)
+                    Stock a Ingresar (u.)
                   </label>
                   <input
                     type="number"
@@ -3298,19 +3706,6 @@ export default function VentasConsignacionView() {
                     className="w-full bg-[#050914] text-sky-400 font-mono border border-[#1E293B] rounded-xl p-2.5 text-xs font-black outline-none focus:border-emerald-500"
                     value={reponerForm.unidadesIniciales}
                     onChange={(e) => setReponerForm({ ...reponerForm, unidadesIniciales: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                    F. Registro
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    className="w-full bg-[#050914] text-slate-200 border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500"
-                    value={reponerForm.fechaEntrega}
-                    onChange={(e) => setReponerForm({ ...reponerForm, fechaEntrega: e.target.value })}
                   />
                 </div>
 
@@ -3359,6 +3754,198 @@ export default function VentasConsignacionView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT LOTE MODAL */}
+      {editLoteModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0D1627] border border-sky-500/30 rounded-3xl p-6 w-full max-w-lg shadow-2xl shadow-sky-500/10 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-sky-500/10 rounded-2xl text-sky-400">
+                  <Edit2 size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                    Editar Producto / Lote
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Modifique la información original de este producto en consignación.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditLoteModal(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditLote} className="space-y-4">
+               <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Producto
+                </label>
+                <ProductSolutionAutocomplete
+                  value={editLoteForm.productoId}
+                  onChange={(val) => setEditLoteForm({ ...editLoteForm, productoId: val })}
+                  onSelectCombination={(comb) => {
+                    setEditLoteForm({
+                      ...editLoteForm,
+                      productoId: comb.productoId,
+                      solucionLote: comb.solucionLote,
+                      precioUnitNeto: comb.precioUnitNeto
+                    });
+                  }}
+                  placeholder="Ej: ARNICA CS"
+                  registeredCombinations={registeredCombinations}
+                  className="w-full bg-[#050914] text-slate-200 border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-sky-500 uppercase"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    Solución
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: SALINA, CS-01"
+                    className="w-full bg-[#050914] text-slate-200 border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-sky-500 uppercase"
+                    value={editLoteForm.solucionLote}
+                    onChange={(e) => setEditLoteForm({ ...editLoteForm, solucionLote: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    F. Vencimiento
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full bg-[#050914] text-slate-200 border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-sky-500"
+                    value={editLoteForm.fechaVencimiento}
+                    onChange={(e) => setEditLoteForm({ ...editLoteForm, fechaVencimiento: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    Unidades Iniciales
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    className="w-full bg-[#050914] text-sky-400 border border-[#1E293B] rounded-xl p-2.5 text-xs font-mono font-bold outline-none focus:border-sky-500"
+                    value={editLoteForm.unidadesIniciales}
+                    onChange={(e) => setEditLoteForm({ ...editLoteForm, unidadesIniciales: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    $ Unit s/IVA ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    className="w-full bg-[#050914] text-amber-400 border border-[#1E293B] rounded-xl p-2.5 text-xs font-mono font-bold outline-none focus:border-sky-500"
+                    value={editLoteForm.precioUnitNeto}
+                    onChange={(e) => setEditLoteForm({ ...editLoteForm, precioUnitNeto: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[#1E293B] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditLoteModal(null)}
+                  className="px-4 py-2.5 bg-[#050914] hover:bg-slate-800 text-slate-400 font-black rounded-xl text-xs uppercase tracking-wider border border-[#1E293B] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEditLote}
+                  className="px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-sky-500/20 active:scale-95 flex items-center gap-2"
+                >
+                  {savingEditLote ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={14} />
+                      Guardar Cambios
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE LOTE CONFIRMATION MODAL */}
+      {deleteLoteModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0D1627] border border-rose-500/30 rounded-3xl p-6 w-full max-w-md shadow-2xl shadow-rose-500/10 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-4">
+              <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-400">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                  Confirmar Eliminación
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  ¿Eliminar <strong className="text-rose-400">{deleteLoteModal.productoName}</strong> permanentemente?
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Esta acción eliminará el producto en consignación de la base de datos de forma irreversible.
+            </p>
+
+            <div className="pt-3 border-t border-[#1E293B] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteLoteModal(null)}
+                className="px-4 py-2.5 bg-[#050914] hover:bg-slate-800 text-slate-400 font-black rounded-xl text-xs uppercase tracking-wider border border-[#1E293B] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deletingLote}
+                onClick={handleConfirmDeleteLote}
+                className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-rose-500/20 active:scale-95 flex items-center gap-2"
+              >
+                {deletingLote ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    Sí, Eliminar Producto
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

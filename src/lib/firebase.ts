@@ -24,7 +24,12 @@ function initFirebase() {
 
   const getEnv = (key: string) => {
     if (typeof process !== 'undefined' && process.env && process.env[key]) return process.env[key];
-    if (typeof import.meta !== 'undefined' && (import.meta as any).env) return (import.meta as any).env[key];
+    try {
+      const metaObj = (globalThis as any).importMetaEnv || (import.meta as any)?.env;
+      if (metaObj && metaObj[key]) return metaObj[key];
+    } catch (e) {
+      // ignore in CJS
+    }
     return undefined;
   };
 
