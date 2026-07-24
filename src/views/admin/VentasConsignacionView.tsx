@@ -507,6 +507,18 @@ export default function VentasConsignacionView() {
     return () => clearTimeout(timer);
   }, [declaracionCliente, selectedMonth]);
 
+  // Sync salesInputs with saved movements when selectedMonth or lotesActivos changes
+  useEffect(() => {
+    const initial: Record<string, number> = {};
+    lotesActivos.forEach(lote => {
+      const mov = lote.movimientos?.[selectedMonth];
+      if (mov && mov.unidadesVendidas !== undefined) {
+        initial[lote.id] = Number(mov.unidadesVendidas) || 0;
+      }
+    });
+    setSalesInputs(initial);
+  }, [selectedMonth, lotesActivos]);
+
   // Only load all lotes when specifically needed (e.g., Tab 2 or Fixed Data list)
   useEffect(() => {
     let active = true;
@@ -1970,10 +1982,10 @@ export default function VentasConsignacionView() {
                         
                         const stockDisponible = item.traj.stockDisponible ?? 0;
                         const frascosRestantes = item.traj.frascosRestantes ?? 0;
-                        const hasMov = mov !== undefined;
+                        const hasMov = mov !== undefined && mov.unidadesVendidas !== undefined;
                         
-                        // Lote delivered to client appears if it has available stock, remaining frascos, or a recorded movement
-                        return stockDisponible > 0 || frascosRestantes > 0 || hasMov;
+                        // Lote delivered to client appears if it has available stock at start of month or a recorded movement
+                        return stockDisponible > 0 || hasMov;
                       }).sort((a, b) => {
                         const nameA = (a.lote.productoId || '').toString().toLowerCase();
                         const nameB = (b.lote.productoId || '').toString().toLowerCase();
@@ -2075,8 +2087,10 @@ export default function VentasConsignacionView() {
                                 <tbody className="divide-y divide-[#1E293B]/20 text-xs">
                                    {filteredLotes.length > 0 ? (
                                      filteredLotes.map(({ lote, traj }) => {
-                                       const currentSales = salesInputs[lote.id] ?? 0;
-                                       const isSelected = selectedMonthlyLoteIds.has(lote.id); const isSaved = !!lote.movimientos?.[selectedMonth] && !lote.movimientos?.[selectedMonth]?.added && !isEditingHistory;
+                                       const savedSales = lote.movimientos?.[selectedMonth]?.unidadesVendidas;
+                                       const currentSales = salesInputs[lote.id] !== undefined ? salesInputs[lote.id] : (savedSales ?? 0);
+                                       const isSelected = selectedMonthlyLoteIds.has(lote.id);
+                                       const isSaved = !!lote.movimientos?.[selectedMonth] && savedSales !== undefined && !isEditingHistory;
                                        return (
                                          <tr key={lote.id} className={cn("hover:bg-[#1E293B]/10 transition-colors", isSelected ? "bg-sky-500/5" : "")}>
                                            <td className="p-4 pl-6 w-12 text-center">
