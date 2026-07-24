@@ -2518,16 +2518,14 @@ export default function VentasConsignacionView() {
                       const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
                       const doc = new jsPDF({ orientation: 'p' });
                       
-                      // Title
                       doc.setFont('helvetica', 'bold');
                       doc.setFontSize(14);
-                      doc.setTextColor(30, 41, 59); // Slate 800
+                      doc.setTextColor(30, 41, 59);
                       doc.text('REPORTE DE STOCK RESTANTE - CONSIGNACIÓN', 14, 18);
                       
-                      // Metadata
                       doc.setFont('helvetica', 'normal');
                       doc.setFontSize(9);
-                      doc.setTextColor(100, 116, 139); // Slate 500
+                      doc.setTextColor(100, 116, 139);
                       doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
                       doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
                       
@@ -2549,32 +2547,91 @@ export default function VentasConsignacionView() {
                         theme: 'plain',
                         margin: { left: 14, right: 14 },
                         headStyles: {
-                          textColor: [30, 58, 95], // PRIMARY_COLOR
+                          textColor: [30, 58, 95],
                           fontSize: 9,
                           fontStyle: 'bold',
-                          fillColor: [248, 250, 252], // Slate 50
+                          fillColor: [248, 250, 252],
                         },
                         styles: {
                           fontSize: 9,
                           cellPadding: 4,
-                          textColor: [51, 65, 85], // Slate 700
-                        },
-                        didDrawCell: (cellData) => {
-                           if (cellData.row.section === 'head' || cellData.row.section === 'body') {
-                              doc.setDrawColor(226, 232, 240); // Slate 200 border
-                              doc.setLineWidth(0.1);
-                              doc.line(cellData.cell.x, cellData.cell.y + cellData.cell.height, cellData.cell.x + cellData.cell.width, cellData.cell.y + cellData.cell.height);
-                           }
+                          textColor: [51, 65, 85],
                         }
                       });
                       
                       const finalY = (doc as any).lastAutoTable.finalY + 12;
                       doc.setFont('helvetica', 'italic');
                       doc.setFontSize(8);
-                      doc.setTextColor(148, 163, 184); // Slate 400
+                      doc.setTextColor(148, 163, 184);
                       doc.text('Generado desde el Módulo de Consignación S&E', 14, finalY);
                       
                       doc.save(`Reporte_Stock_Restante_${clientName.replace(/\s+/g, '_')}.pdf`);
+                    };
+
+                    const handleExportActiveStockPDF = () => {
+                      const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
+                      const doc = new jsPDF({ orientation: 'p' });
+                      doc.setFont('helvetica', 'bold');
+                      doc.setFontSize(14);
+                      doc.setTextColor(30, 41, 59);
+                      doc.text('REPORTE DE STOCK ACTIVO - CONSIGNACIÓN', 14, 18);
+                      doc.setFont('helvetica', 'normal');
+                      doc.setFontSize(9);
+                      doc.setTextColor(100, 116, 139);
+                      doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
+                      doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
+
+                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
+                      const data = activeItems.map(({ lote, traj }) => [
+                        lote.productoId,
+                        lote.solucionLote || 'S/S',
+                        parseDateString(lote.fechaVencimiento),
+                        `${traj?.frascosRestantes || 0} unidades`
+                      ]);
+
+                      autoTable(doc, {
+                        startY: 36,
+                        head: [headers],
+                        body: data,
+                        theme: 'plain',
+                        margin: { left: 14, right: 14 },
+                        headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] }
+                      });
+                      doc.save(`Stock_Activo_${clientName.replace(/\s+/g, '_')}.pdf`);
+                    };
+
+                    const handleExportInactiveStockPDF = () => {
+                      const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
+                      const doc = new jsPDF({ orientation: 'p' });
+                      doc.setFont('helvetica', 'bold');
+                      doc.setFontSize(14);
+                      doc.setTextColor(30, 41, 59);
+                      doc.text('REPORTE DE STOCK INACTIVO / AGOTADO - CONSIGNACIÓN', 14, 18);
+                      doc.setFont('helvetica', 'normal');
+                      doc.setFontSize(9);
+                      doc.setTextColor(100, 116, 139);
+                      doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
+                      doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
+
+                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'FECHA VENCIMIENTO', 'ESTADO'];
+                      const data = inactiveItems.map(({ lote, traj }) => [
+                        lote.productoId,
+                        lote.solucionLote || 'S/S',
+                        parseDateString(lote.fechaVencimiento),
+                        'Agotado (0 u.)'
+                      ]);
+
+                      autoTable(doc, {
+                        startY: 36,
+                        head: [headers],
+                        body: data,
+                        theme: 'plain',
+                        margin: { left: 14, right: 14 },
+                        headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] }
+                      });
+                      doc.save(`Stock_Inactivo_${clientName.replace(/\s+/g, '_')}.pdf`);
                     };
 
                     // Function to download a quote-style sales report in PDF
@@ -2689,7 +2746,7 @@ export default function VentasConsignacionView() {
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                         {/* 1. Inventory remaining stock list with export capabilities */}
                         <div className="bg-[#111A2E] rounded-3xl border border-[#1E293B] overflow-hidden shadow-xl">
-                          <div className="p-5 border-b border-[#1E293B]/40 flex justify-between items-center bg-[#15233C]/10">
+                          <div className="p-5 border-b border-[#1E293B]/40 flex flex-wrap justify-between items-center gap-3 bg-[#15233C]/10">
                             <div className="flex items-center gap-2">
                               <Package className="text-emerald-400" size={18} />
                               <div>
@@ -2698,14 +2755,36 @@ export default function VentasConsignacionView() {
                                 </h4>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={handleExportStockPDF}
-                              className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg active:scale-95"
-                            >
-                              <Download size={12} />
-                              Exportar Stock (PDF)
-                            </button>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {activeItems.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={handleExportActiveStockPDF}
+                                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95"
+                                >
+                                  <Download size={11} />
+                                  Activos (PDF)
+                                </button>
+                              )}
+                              {inactiveItems.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={handleExportInactiveStockPDF}
+                                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95"
+                                >
+                                  <Download size={11} />
+                                  Inactivos (PDF)
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={handleExportStockPDF}
+                                className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95"
+                              >
+                                <Download size={11} />
+                                Todo (PDF)
+                              </button>
+                            </div>
                           </div>
 
                           <div className="overflow-x-auto">
