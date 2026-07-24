@@ -209,7 +209,7 @@ export default function VentasConsignacionView() {
   const [lotesActivos, setLotesActivos] = useState<any[]>([]);
 
   // Tab 1 UI states for Unified Excel Layout
-  const [selectedMonth, setSelectedMonth] = useState('2026-07');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
   const [selectedMonthlyLoteIds, setSelectedMonthlyLoteIds] = useState<Set<string>>(new Set());
   const [isEditingHistory, setIsEditingHistory] = useState(false);
   const [replenishmentFilter, setReplenishmentFilter] = useState<'todos' | 'reposicion' | 'con-stock' | 'agotados'>('todos');

@@ -263,7 +263,7 @@ export default function SalesTiendaMLManager() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterMonth, setFilterMonth] = useState('Todos');
+  const [filterMonth, setFilterMonth] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()).toLowerCase());
   const [filterYear, setFilterYear] = useState('Todos');
   const [filterVendedor, setFilterVendedor] = useState('Todos');
   const [filterProducto, setFilterProducto] = useState('Todos');

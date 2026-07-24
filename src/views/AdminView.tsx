@@ -110,20 +110,56 @@ export default function AdminView() {
   }, [location.state]);
 
   const [loadRange, setLoadRange] = useState<'ultimos_30_dias' | 'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
-    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'ultimos_30_dias';
+    return (localStorage.getItem('cimasur_admin_data_range_v2') as any) || 'anio_actual';
   });
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleLoadRangeChange = (range: 'ultimos_30_dias' | 'mes_actual' | 'anio_actual' | 'historico_completo') => {
     setLoadRange(range);
-    localStorage.setItem('cimasur_admin_load_range', range);
+    localStorage.setItem('cimasur_admin_data_range_v2', range);
   };
 
   const getQueryOptions = (colName: string) => {
-    // Return undefined to always load the full history,
-    // allowing the local filters in each submodule to function correctly.
-    return undefined;
+    if (loadRange === 'historico_completo') return { limitCount: 10000 };
+    
+    let dateField = 'fecha';
+    if (colName === 'quotes') {
+      dateField = 'fechaElab';
+    } else if (colName === 'school_payments') {
+      dateField = 'fechaPago';
+    }
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+    
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    
+    if (loadRange === 'ultimos_30_dias') {
+      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return {
+        dateField,
+        startDate: `${past30.getFullYear()}-${pad(past30.getMonth() + 1)}-${pad(past30.getDate())}`,
+        endDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+        limitCount: 5000
+      };
+    } else if (loadRange === 'mes_actual') {
+      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      return {
+        dateField,
+        startDate: `${currentYear}-${pad(currentMonth + 1)}-01`,
+        endDate: `${currentYear}-${pad(currentMonth + 1)}-${pad(lastDay)}`,
+        limitCount: 5000
+      };
+    } else { // anio_actual
+      return {
+        dateField,
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`,
+        limitCount: 10000
+      };
+    }
   };
 
   const VIEWS_WITH_DB_LOAD: Record<string, string> = {
@@ -328,8 +364,20 @@ export default function AdminView() {
           <span>Volver al Menú de Administración</span>
         </button>
 
-        {/* Sync control */}
+        {/* Sync & Range control */}
         <div className="flex items-center gap-2 bg-[#0F172A]/80 border border-[#1E293B] px-3 py-1.5 rounded-2xl shadow-inner shrink-0">
+          <select 
+            value={loadRange}
+            onChange={(e) => handleLoadRangeChange(e.target.value as any)}
+            className="bg-[#152035] text-slate-300 text-[10px] font-bold uppercase border-none outline-none rounded p-1 cursor-pointer hover:bg-[#1E293B] transition-colors"
+            title="Selecciona el rango de datos a cargar desde el servidor"
+          >
+            <option value="ultimos_30_dias">Últimos 30 días</option>
+            <option value="mes_actual">Mes Actual</option>
+            <option value="anio_actual">Año Actual</option>
+            <option value="historico_completo">Histórico Completo</option>
+          </select>
+          <div className="w-px h-4 bg-slate-700 mx-1"></div>
           <button
             type="button"
             onClick={() => loadData(true)}
@@ -864,8 +912,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
-  const [yearFilter, setYearFilter] = useState('Todos');
-  const [monthFilter, setMonthFilter] = useState('Todos');
+  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
+  const [monthFilter, setMonthFilter] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()).toLowerCase());
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
@@ -1432,41 +1480,71 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         let importedCount = 0;
+        let updatedCount = 0;
         const currentRecords = await localDB.getCollection('sales_gestion');
+        
+        const aggregated = new Map<string, any>();
 
         for (const row of data) {
           const docRaw = findRowValue(row, ["Documento", "N° Documento", "Boleta", "Factura", "N° Factura", "N° Boleta", "Nro Documento", "Dcto", "N° Dcto"]);
           const doc = safe(docRaw);
           if (!doc) continue;
 
-          // Check if already exists
-          if (currentRecords.some(r => safe(r.documento) === doc)) continue;
-
-          const rawAnio = findRowValue(row, ["Año", "Anio", "Year"]);
-          const rawMes = findRowValue(row, ["Mes", "Month"]);
-          const rawFecha = findRowValue(row, ["Fecha", "Date", "Fecha Venta"]);
-          const rawCliente = findRowValue(row, ["Cliente", "Razón Social", "Nombre", "Empresa"]);
           const rawFrascos = findRowValue(row, ["Frascos", "Frasco", "N° Frascos", "Nro Frascos", "Cantidad", "Cant"]);
           const rawDetalle = findRowValue(row, ["Detalle Productos", "Detalle", "Productos", "Producto", "Descripción"]);
           const rawValor = findRowValue(row, ["Valor Cotización", "Valor Cotizacion", "Cotización", "Valor", "Monto"]);
+          
+          const nroFrascos = parseCurrency(rawFrascos);
+          const valorCotizacion = parseCurrency(rawValor);
+          const detalle = safe(rawDetalle) || '';
 
-          const newSale = {
-            anio: safe(rawAnio) || new Date().getFullYear().toString(),
-            mes: safe(rawMes) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
-            fecha: parseExcelDate(rawFecha),
-            documento: doc,
-            cliente: safe(rawCliente),
-            nroFrascos: parseCurrency(rawFrascos),
-            detalleProductos: safe(rawDetalle) || '',
-            valorCotizacion: parseCurrency(rawValor)
-          };
-
-          await localDB.saveToCollection('sales_gestion', newSale);
-          importedCount++;
+          if (aggregated.has(doc)) {
+            const existing = aggregated.get(doc);
+            existing.nroFrascos += nroFrascos;
+            existing.valorCotizacion += valorCotizacion;
+            if (detalle && !existing.detalleProductos.includes(detalle)) {
+              existing.detalleProductos += (existing.detalleProductos ? ', ' : '') + detalle;
+            }
+          } else {
+            const rawAnio = findRowValue(row, ["Año", "Anio", "Year"]);
+            const rawMes = findRowValue(row, ["Mes", "Month"]);
+            const rawFecha = findRowValue(row, ["Fecha", "Date", "Fecha Venta"]);
+            const rawCliente = findRowValue(row, ["Cliente", "Razón Social", "Nombre", "Empresa"]);
+            
+            aggregated.set(doc, {
+              anio: safe(rawAnio) || new Date().getFullYear().toString(),
+              mes: safe(rawMes) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+              fecha: parseExcelDate(rawFecha),
+              documento: doc,
+              cliente: safe(rawCliente),
+              nroFrascos,
+              detalleProductos: detalle,
+              valorCotizacion
+            });
+          }
         }
 
-        await addAuditLog(user, `Importó ${importedCount} ventas gestión desde Excel`, 'Administración');
-        alert(`Éxito: Se importaron ${importedCount} ventas gestión correctamente.`);
+        // Save or update
+        for (const [doc, newSale] of Array.from(aggregated.entries())) {
+          const existingRecord = currentRecords.find(r => safe(r.documento) === doc);
+          
+          if (existingRecord) {
+            await localDB.updateInCollection('sales_gestion', existingRecord.id, {
+              ...existingRecord,
+              nroFrascos: newSale.nroFrascos,
+              valorCotizacion: newSale.valorCotizacion,
+              detalleProductos: newSale.detalleProductos,
+              cliente: newSale.cliente || existingRecord.cliente
+            });
+            updatedCount++;
+          } else {
+            await localDB.saveToCollection('sales_gestion', newSale);
+            importedCount++;
+          }
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} y actualizó ${updatedCount} ventas gestión desde Excel`, 'Administración');
+        alert(`Éxito: Se importaron ${importedCount} ventas nuevas y se actualizaron ${updatedCount} existentes.`);
         window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'sales_gestion' } }));
       } catch (error) {
         console.error("Import Error:", error);
@@ -1992,46 +2070,72 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         let importedCount = 0;
+        let updatedCount = 0;
         const currentRecords = await localDB.getCollection('sales');
-
+        
+        // Aggregate rows by document
+        const aggregated = new Map<string, any>();
+        
         for (const row of data) {
           const docRaw = findRowValue(row, ["Documento", "N° Documento", "Boleta", "Factura", "N° Factura", "N° Boleta", "Nro Documento", "Dcto", "N° Dcto"]);
           const doc = safe(docRaw);
           if (!doc) continue;
 
-          // Check if already exists
-          if (currentRecords.some(r => safe(r.documento) === doc)) continue;
-
-          const rawAnio = findRowValue(row, ["Año", "Anio", "Year"]);
-          const rawMes = findRowValue(row, ["Mes", "Month"]);
-          const rawFecha = findRowValue(row, ["Fecha", "Date", "Fecha Venta"]);
-          const rawCliente = findRowValue(row, ["Cliente", "Razón Social", "Nombre", "Empresa"]);
           const rawFrascos = findRowValue(row, ["Frascos", "Frasco", "N° Frascos", "Nro Frascos", "Cantidad", "Cant"]);
           const rawMontoTotal = findRowValue(row, ["Monto Total", "Total", "Monto", "Valor", "Monto Total ($)", "Valor total", "Valor Venta"]);
-          const rawTipoPago = findRowValue(row, ["Tipo Pago", "Método Pago", "Forma Pago", "Método de Pago", "Tipo de Pago", "Condición", "Condición de Pago"]);
-          const rawFechaPago = findRowValue(row, ["Fecha Pago", "Fecha de Pago", "Fecha Límite", "Plazo Pago"]);
-          const rawMontoAbonado = findRowValue(row, ["Monto Abonado", "Abonado", "Abono", "Monto Abonado ($)", "Abonado ($)"]);
+          const nroFrascos = parseCurrency(rawFrascos);
+          const montoTotal = parseCurrency(rawMontoTotal);
 
-          const newSale = {
-            anio: safe(rawAnio) || new Date().getFullYear().toString(),
-            mes: safe(rawMes) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
-            fecha: parseExcelDate(rawFecha),
-            documento: doc,
-            cliente: safe(rawCliente),
-            nroFrascos: parseCurrency(rawFrascos),
-            montoTotal: parseCurrency(rawMontoTotal),
-            tipoPago: safe(rawTipoPago) || 'Contado',
-            fechaPago: safe(rawFechaPago) || '',
-            montoAbonado: parseCurrency(rawMontoAbonado),
-            abonos: []
-          };
+          if (aggregated.has(doc)) {
+            const existing = aggregated.get(doc);
+            existing.nroFrascos += nroFrascos;
+            existing.montoTotal += montoTotal;
+          } else {
+            const rawAnio = findRowValue(row, ["Año", "Anio", "Year"]);
+            const rawMes = findRowValue(row, ["Mes", "Month"]);
+            const rawFecha = findRowValue(row, ["Fecha", "Date", "Fecha Venta"]);
+            const rawCliente = findRowValue(row, ["Cliente", "Razón Social", "Nombre", "Empresa"]);
+            const rawTipoPago = findRowValue(row, ["Tipo Pago", "Método Pago", "Forma Pago", "Método de Pago", "Tipo de Pago", "Condición", "Condición de Pago"]);
+            const rawFechaPago = findRowValue(row, ["Fecha Pago", "Fecha de Pago", "Fecha Límite", "Plazo Pago"]);
+            const rawMontoAbonado = findRowValue(row, ["Monto Abonado", "Abonado", "Abono", "Monto Abonado ($)", "Abonado ($)"]);
 
-          await localDB.saveToCollection('sales', newSale);
-          importedCount++;
+            aggregated.set(doc, {
+              anio: safe(rawAnio) || new Date().getFullYear().toString(),
+              mes: safe(rawMes) || new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
+              fecha: parseExcelDate(rawFecha),
+              documento: doc,
+              cliente: safe(rawCliente),
+              nroFrascos,
+              montoTotal,
+              tipoPago: safe(rawTipoPago) || 'Contado',
+              fechaPago: safe(rawFechaPago) || '',
+              montoAbonado: parseCurrency(rawMontoAbonado),
+              abonos: []
+            });
+          }
         }
 
-        await addAuditLog(user, `Importó ${importedCount} ventas desde Excel`, 'Administración');
-        alert(`Éxito: Se importaron ${importedCount} ventas correctamente.`);
+        // Now save or update the aggregated records
+        for (const [doc, newSale] of Array.from(aggregated.entries())) {
+          const existingRecord = currentRecords.find(r => safe(r.documento) === doc);
+          
+          if (existingRecord) {
+            // Update existing record with the aggregated values to fix missing frascos
+            await localDB.updateInCollection('sales', existingRecord.id, {
+              ...existingRecord,
+              nroFrascos: newSale.nroFrascos,
+              montoTotal: newSale.montoTotal,
+              cliente: newSale.cliente || existingRecord.cliente // Update client name if provided
+            });
+            updatedCount++;
+          } else {
+            await localDB.saveToCollection('sales', newSale);
+            importedCount++;
+          }
+        }
+
+        await addAuditLog(user, `Importó ${importedCount} y actualizó ${updatedCount} ventas desde Excel`, 'Administración');
+        alert(`Éxito: Se importaron ${importedCount} ventas nuevas y se actualizaron ${updatedCount} existentes.`);
         window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'sales' } }));
       } catch (error) {
         console.error("Import Error:", error);
@@ -2633,7 +2737,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
 function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [monthFilter, setMonthFilter] = useState('Todos');
+  const [monthFilter, setMonthFilter] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()).toLowerCase());
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -3503,8 +3607,8 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [yearFilter, setYearFilter] = useState('Todos');
-  const [monthFilter, setMonthFilter] = useState('Todos');
+  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
+  const [monthFilter, setMonthFilter] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()).toLowerCase());
 
   const filteredRecords = records.filter(r => {
     let match = true;
