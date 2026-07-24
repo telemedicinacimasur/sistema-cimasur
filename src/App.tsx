@@ -5,14 +5,14 @@ import { ModalProvider } from './contexts/ModalContext';
 import MainLayout from './views/components/MainLayout';
 import LoginView from './views/LoginView';
 
-const DashboardView = React.lazy(() => import('./views/DashboardView'));
-const PizarraView = React.lazy(() => import('./views/PizarraView'));
-const SchoolView = React.lazy(() => import('./views/SchoolView'));
-const LabView = React.lazy(() => import('./views/LabView'));
-const AdminView = React.lazy(() => import('./views/AdminView'));
-const CRMView = React.lazy(() => import('./views/CRMView'));
-const GestionView = React.lazy(() => import('./views/GestionView'));
-const CPanelView = React.lazy(() => import('./views/CPanelView'));
+import DashboardView from './views/DashboardView';
+import PizarraView from './views/PizarraView';
+import SchoolView from './views/SchoolView';
+import LabView from './views/LabView';
+import AdminView from './views/AdminView';
+import CRMView from './views/CRMView';
+import GestionView from './views/GestionView';
+import CPanelView from './views/CPanelView';
 
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {

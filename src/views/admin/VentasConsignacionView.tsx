@@ -236,6 +236,125 @@ export default function VentasConsignacionView() {
 
   // Tab 2: Registro de Ventas (Select Cliente)
   const [registroVentasCliente, setRegistroVentasCliente] = useState('');
+  const [registroVentasStockTab, setRegistroVentasStockTab] = useState<'activos' | 'inactivos'>('activos');
+
+  // Reposición / Quick Add Modal state
+  const [reponerModal, setReponerModal] = useState<{
+    isOpen: boolean;
+    clienteId: string;
+    productoId: string;
+    solucionLote: string;
+    precioUnitNeto: number;
+  } | null>(null);
+
+  const [reponerForm, setReponerForm] = useState({
+    clienteId: '',
+    productoId: '',
+    solucionLote: '',
+    fechaEntrega: new Date().toISOString().split('T')[0],
+    fechaVencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+    unidadesIniciales: 100,
+    precioUnitNeto: 0,
+  });
+  const [savingReponer, setSavingReponer] = useState(false);
+
+  const openReponerModal = (clienteId: string = '', productoId: string = '', solucionLote: string = '', precioUnitNeto: number = 0) => {
+    const cid = clienteId || registroVentasCliente || adminFilterCliente || declaracionCliente || '';
+    const finalPrice = precioUnitNeto || PRECIOS_BASE[productoId] || 0;
+    setReponerForm({
+      clienteId: cid,
+      productoId: productoId,
+      solucionLote: solucionLote,
+      fechaEntrega: new Date().toISOString().split('T')[0],
+      fechaVencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+      unidadesIniciales: 100,
+      precioUnitNeto: finalPrice,
+    });
+    setReponerModal({
+      isOpen: true,
+      clienteId: cid,
+      productoId,
+      solucionLote,
+      precioUnitNeto: finalPrice,
+    });
+  };
+
+  const handleSaveQuickReponer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reponerForm.clienteId) {
+      alert('Por favor seleccione un cliente.');
+      return;
+    }
+    if (!reponerForm.productoId.trim()) {
+      alert('Por favor ingrese o seleccione un producto.');
+      return;
+    }
+    if (!reponerForm.unidadesIniciales || reponerForm.unidadesIniciales <= 0) {
+      alert('Por favor ingrese una cantidad de stock válida.');
+      return;
+    }
+
+    try {
+      setSavingReponer(true);
+      const uProduct = reponerForm.productoId.toUpperCase().trim();
+      const units = Number(reponerForm.unidadesIniciales);
+      const price = Number(reponerForm.precioUnitNeto);
+      const totalVal = units * price;
+
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const loteData = {
+          clienteId: reponerForm.clienteId,
+          productoId: uProduct,
+          solucionLote: reponerForm.solucionLote.toUpperCase().trim() || 'S/L',
+          fechaEntrega: Timestamp.fromDate(new Date(reponerForm.fechaEntrega + 'T12:00:00')),
+          fechaVencimiento: Timestamp.fromDate(new Date(reponerForm.fechaVencimiento + 'T12:00:00')),
+          unidadesIniciales: units,
+          precioUnitNeto: price,
+          totalVentaOriginal: totalVal,
+          activo: true,
+          createdAt: Timestamp.now()
+        };
+        await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        let allLotes = existing ? JSON.parse(existing) : [];
+
+        const newLote = {
+          id: `lote_${Date.now()}`,
+          clienteId: reponerForm.clienteId,
+          productoId: uProduct,
+          solucionLote: reponerForm.solucionLote.toUpperCase().trim() || 'S/L',
+          fechaEntrega: reponerForm.fechaEntrega,
+          fechaVencimiento: reponerForm.fechaVencimiento,
+          unidadesIniciales: units,
+          precioUnitNeto: price,
+          totalVentaOriginal: totalVal,
+          activo: true,
+          createdAt: new Date().toISOString(),
+          movimientos: {}
+        };
+        allLotes.push(newLote);
+        localStorage.setItem(key, JSON.stringify(allLotes));
+      }
+
+      setSaveNotification(`✅ Reposición de stock guardada: ${units} u. de ${uProduct} registradas exitosamente.`);
+      setTimeout(() => setSaveNotification(null), 5000);
+
+      setReponerModal(null);
+
+      await loadTodosLosLotes(true);
+      if (declaracionCliente === reponerForm.clienteId) {
+        await loadLotes(declaracionCliente, true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Error guardando la reposición: ' + err.message);
+    } finally {
+      setSavingReponer(false);
+    }
+  };
 
   // Dropdown / Collapsible details states
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
@@ -1868,16 +1987,7 @@ export default function VentasConsignacionView() {
                                       isSelected={selectedFixedLoteIds.has(l.displayId)}
                                       onToggle={toggleFixedLoteSelection}
                                       onReponer={(item) => {
-                                        setShowAddLoteForm(true);
-                                        setShowAddClientForm(false);
-                                        setShowImportForm(false);
-                                        setFormEntrega({
-                                          ...formEntrega,
-                                          cliente_id: item.clienteId,
-                                          producto_id: item.productoId,
-                                          solucion_lote: item.solucionLote || ''
-                                        });
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                        openReponerModal(item.clienteId, item.productoId, item.solucionLote, item.precioUnitNeto);
                                       }}
                                       onRefresh={async () => {
                                         if (declaracionCliente) await loadLotes(declaracionCliente, true);
@@ -1980,12 +2090,10 @@ export default function VentasConsignacionView() {
                         const mov = item.lote.movimientos?.[selectedMonth];
                         if (mov && mov.hidden) return false;
                         
-                        const stockDisponible = item.traj.stockDisponible ?? 0;
-                        const frascosRestantes = item.traj.frascosRestantes ?? 0;
-                        const hasMov = mov !== undefined && mov.unidadesVendidas !== undefined;
+                        const hasMov = mov !== undefined && !mov.hidden;
                         
-                        // Lote delivered to client appears if it has available stock at start of month or a recorded movement
-                        return stockDisponible > 0 || hasMov;
+                        // Lote appears in monthly declaration if it has a recorded movement or was added to month
+                        return hasMov;
                       }).sort((a, b) => {
                         const nameA = (a.lote.productoId || '').toString().toLowerCase();
                         const nameB = (b.lote.productoId || '').toString().toLowerCase();
@@ -2479,12 +2587,25 @@ export default function VentasConsignacionView() {
                   (() => {
                     const clientLotes = todosLosLotes.filter(l => l.clienteId === registroVentasCliente);
                     
-                    // Compute current stock inventory to export
-                    const currentMonth = new Date().toISOString().substring(0, 7);
+                    // Compute current stock inventory taking into account all saved movements up to latest month
+                    let maxMonth = new Date().toISOString().substring(0, 7);
+                    clientLotes.forEach(lote => {
+                      if (lote.movimientos) {
+                        Object.keys(lote.movimientos).forEach(m => {
+                          if (m > maxMonth) maxMonth = m;
+                        });
+                      }
+                    });
+
                     const inventoryStatus = clientLotes.map(lote => {
-                      const traj = getLoteTrajectoryUpToMonth(lote, currentMonth, undefined);
+                      const traj = getLoteTrajectoryUpToMonth(lote, maxMonth, undefined);
                       return { lote, traj };
-                    }).filter(item => item.traj);
+                    }).filter(item => item.traj)
+                    .sort((a, b) => {
+                      const keyA = `${a.lote.productoId || ''} ${a.lote.solucionLote || ''}`.toLowerCase();
+                      const keyB = `${b.lote.productoId || ''} ${b.lote.solucionLote || ''}`.toLowerCase();
+                      return keyA.localeCompare(keyB);
+                    });
 
                     const activeItems = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) > 0);
                     const inactiveItems = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) <= 0);
@@ -2529,12 +2650,13 @@ export default function VentasConsignacionView() {
                       doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
                       doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
                       
-                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
+                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'P. UNITARIO', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
                       const data = inventoryStatus.map(({ lote, traj }) => {
                         const venc = parseDateString(lote.fechaVencimiento);
                         return [
                           lote.productoId,
                           lote.solucionLote || 'S/S',
+                          formatCurrency(lote.precioUnitNeto || 0),
                           venc,
                           `${traj?.frascosRestantes || 0} unidades`
                         ];
@@ -2581,10 +2703,11 @@ export default function VentasConsignacionView() {
                       doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
                       doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
 
-                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
+                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'P. UNITARIO', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
                       const data = activeItems.map(({ lote, traj }) => [
                         lote.productoId,
                         lote.solucionLote || 'S/S',
+                        formatCurrency(lote.precioUnitNeto || 0),
                         parseDateString(lote.fechaVencimiento),
                         `${traj?.frascosRestantes || 0} unidades`
                       ]);
@@ -2614,10 +2737,11 @@ export default function VentasConsignacionView() {
                       doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
                       doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
 
-                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'FECHA VENCIMIENTO', 'ESTADO'];
+                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'P. UNITARIO', 'FECHA VENCIMIENTO', 'ESTADO'];
                       const data = inactiveItems.map(({ lote, traj }) => [
                         lote.productoId,
                         lote.solucionLote || 'S/S',
+                        formatCurrency(lote.precioUnitNeto || 0),
                         parseDateString(lote.fechaVencimiento),
                         'Agotado (0 u.)'
                       ]);
@@ -2657,7 +2781,14 @@ export default function VentasConsignacionView() {
                       const headers = ['PRODUCTO', 'SOLUCIÓN', 'CANTIDAD', 'P. UNITARIO', 'TOTAL'];
                       let grandTotal = 0;
                       let totalUnits = 0;
-                      const data = items.map(item => {
+
+                      const sortedItems = [...items].sort((a, b) => {
+                        const keyA = `${a.productoId || ''} ${a.solucionLote || ''}`.toLowerCase();
+                        const keyB = `${b.productoId || ''} ${b.solucionLote || ''}`.toLowerCase();
+                        return keyA.localeCompare(keyB);
+                      });
+
+                      const data = sortedItems.map(item => {
                         grandTotal += item.montoVendido;
                         totalUnits += item.unidadesVendidas;
                         return [
@@ -2784,6 +2915,47 @@ export default function VentasConsignacionView() {
                                 <Download size={11} />
                                 Todo (PDF)
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => openReponerModal(registroVentasCliente)}
+                                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                              >
+                                <Plus size={13} />
+                                Reponer / Ingresar Stock
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Activos / Inactivos Tab Switcher */}
+                          <div className="p-3 bg-[#0B1220] border-b border-[#1E293B] flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setRegistroVentasStockTab('activos')}
+                                className={cn(
+                                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5",
+                                  registroVentasStockTab === 'activos'
+                                    ? "bg-emerald-500 text-[#050914] shadow-lg shadow-emerald-500/20"
+                                    : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
+                                )}
+                              >
+                                🟢 Activos ({activeItems.length})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRegistroVentasStockTab('inactivos')}
+                                className={cn(
+                                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5",
+                                  registroVentasStockTab === 'inactivos'
+                                    ? "bg-slate-700 text-white shadow-lg shadow-slate-700/20"
+                                    : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
+                                )}
+                              >
+                                ⚪ Inactivos / Stock 0 ({inactiveItems.length})
+                              </button>
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-medium">
+                              Mostrando lotes {registroVentasStockTab === 'activos' ? 'con stock activo (> 0)' : 'sin stock (0 o agotados)'}
                             </div>
                           </div>
 
@@ -2793,61 +2965,88 @@ export default function VentasConsignacionView() {
                                 <tr>
                                   <th className="p-4 pl-6">Producto</th>
                                   <th className="p-4 text-center">F. Venc.</th>
+                                  <th className="p-4 text-center">Valor Unitario</th>
                                   <th className="p-4 text-center">Stock Disponible</th>
+                                  <th className="p-4 text-center">Acción</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-[#1E293B]/10 text-xs">
-                                {activeItems.length > 0 && (
-                                  <>
-                                    <tr className="bg-[#15233C]/50">
-                                      <td colSpan={3} className="p-2 pl-6 font-black text-emerald-400 uppercase text-[10px]">Stock Activos</td>
-                                    </tr>
-                                    {activeItems.map(({ lote, traj }) => (
+                                {registroVentasStockTab === 'activos' ? (
+                                  activeItems.length > 0 ? (
+                                    activeItems.map(({ lote, traj }) => (
                                       <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors">
                                         <td className="p-4 pl-6">
                                           <div className="font-bold text-slate-200">{lote.productoId}</div>
                                           <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
                                         </td>
                                         <td className="p-4 text-center text-slate-400 font-semibold font-mono">{parseDateString(lote.fechaVencimiento)}</td>
+                                        <td className="p-4 text-center font-mono font-bold text-amber-400">
+                                          {formatCurrency(lote.precioUnitNeto || 0)}
+                                        </td>
                                         <td className="p-4 text-center">
                                           <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-sky-500/10 text-sky-400 border border-sky-500/20">
                                             {traj?.frascosRestantes || 0} u.
                                           </span>
                                         </td>
+                                        <td className="p-4 text-center">
+                                          <button
+                                            type="button"
+                                            onClick={() => openReponerModal(lote.clienteId || registroVentasCliente, lote.productoId, lote.solucionLote, lote.precioUnitNeto)}
+                                            title="Reponer stock o agregar nuevo lote para este producto"
+                                            className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-[#050914] border border-emerald-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 mx-auto"
+                                          >
+                                            <Plus size={12} /> Reponer
+                                          </button>
+                                        </td>
                                       </tr>
-                                    ))}
-                                  </>
-                                )}
-                                {inactiveItems.length > 0 && (
-                                  <>
-                                    <tr 
-                                      className="bg-[#15233C]/50 cursor-pointer hover:bg-[#15233C]/70"
-                                      onClick={() => setShowInactive(!showInactive)}
-                                    >
-                                      <td colSpan={3} className="p-2 pl-6 font-black text-rose-400 uppercase text-[10px] flex items-center justify-between">
-                                        <span>Stock Inactivos (Agotados)</span>
-                                        {showInactive ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
+                                        No hay productos con stock activo para este cliente.
                                       </td>
                                     </tr>
-                                    {showInactive && inactiveItems.map(({ lote, traj }) => (
-                                      <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors opacity-50 grayscale">
+                                  )
+                                ) : (
+                                  inactiveItems.length > 0 ? (
+                                    inactiveItems.map(({ lote, traj }) => (
+                                      <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors opacity-90">
                                         <td className="p-4 pl-6">
-                                          <div className="font-bold text-slate-500 line-through">{lote.productoId}</div>
+                                          <div className="font-bold text-slate-400 line-through">{lote.productoId}</div>
                                           <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
                                         </td>
                                         <td className="p-4 text-center text-slate-500 font-semibold font-mono">{parseDateString(lote.fechaVencimiento)}</td>
+                                        <td className="p-4 text-center font-mono font-bold text-amber-400/70">
+                                          {formatCurrency(lote.precioUnitNeto || 0)}
+                                        </td>
                                         <td className="p-4 text-center">
-                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-slate-500/10 text-slate-500 border border-slate-500/20">
-                                            Agotado
+                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                            0 u. (Agotado)
                                           </span>
                                         </td>
+                                        <td className="p-4 text-center">
+                                          <button
+                                            type="button"
+                                            onClick={() => openReponerModal(lote.clienteId || registroVentasCliente, lote.productoId, lote.solucionLote, lote.precioUnitNeto)}
+                                            title="Reponer stock agotado para este producto"
+                                            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-[#050914] font-black rounded-lg text-[10px] uppercase transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1 mx-auto"
+                                          >
+                                            <Plus size={12} /> Reponer Stock
+                                          </button>
+                                        </td>
                                       </tr>
-                                    ))}
-                                  </>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
+                                        No hay productos inactivos o sin stock para este cliente.
+                                      </td>
+                                    </tr>
+                                  )
                                 )}
                                 {inventoryStatus.length === 0 && (
                                   <tr>
-                                    <td colSpan={3} className="p-12 text-center text-slate-500 font-bold">
+                                    <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
                                       Este cliente no posee ningún producto registrado en consignación.
                                     </td>
                                   </tr>
@@ -3016,6 +3215,153 @@ export default function VentasConsignacionView() {
           </>
         )}
       </div>
+
+      {/* QUICK REPOSICION / INGRESO DE STOCK MODAL */}
+      {reponerModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0D1627] border border-emerald-500/30 rounded-3xl p-6 w-full max-w-lg shadow-2xl shadow-emerald-500/10 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/10 rounded-2xl text-emerald-400">
+                  <PlusCircle size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                    Reponer Stock / Nuevo Registro Lote
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Ingrese el nuevo stock o reposición de producto en consignación.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReponerModal(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickReponer} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Cliente Destinatario
+                </label>
+                <ClientAutocomplete
+                  clientes={clientes}
+                  value={reponerForm.clienteId}
+                  onChange={(cid) => setReponerForm({ ...reponerForm, clienteId: cid })}
+                  placeholder="Escriba o seleccione cliente..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    Producto
+                  </label>
+                  <input
+                    type="text"
+                    list="productos-datalist"
+                    required
+                    className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500"
+                    value={reponerForm.productoId}
+                    onChange={(e) => setReponerForm({ ...reponerForm, productoId: e.target.value })}
+                    placeholder="Ej: ARNICA CS"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    Solución / Lote
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-[#050914] text-emerald-400 font-mono border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500"
+                    value={reponerForm.solucionLote}
+                    onChange={(e) => setReponerForm({ ...reponerForm, solucionLote: e.target.value })}
+                    placeholder="Ej: SALINA"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    Stock a Reponer (u.)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    className="w-full bg-[#050914] text-sky-400 font-mono border border-[#1E293B] rounded-xl p-2.5 text-xs font-black outline-none focus:border-emerald-500"
+                    value={reponerForm.unidadesIniciales}
+                    onChange={(e) => setReponerForm({ ...reponerForm, unidadesIniciales: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    F. Registro
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full bg-[#050914] text-slate-200 border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500"
+                    value={reponerForm.fechaEntrega}
+                    onChange={(e) => setReponerForm({ ...reponerForm, fechaEntrega: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    F. Vencimiento
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full bg-[#050914] text-rose-400 border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-emerald-500"
+                    value={reponerForm.fechaVencimiento}
+                    onChange={(e) => setReponerForm({ ...reponerForm, fechaVencimiento: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Precio Unitario Neto ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-full bg-[#050914] text-amber-400 font-black border border-[#1E293B] rounded-xl p-2.5 text-xs outline-none focus:border-emerald-500"
+                  value={reponerForm.precioUnitNeto}
+                  onChange={(e) => setReponerForm({ ...reponerForm, precioUnitNeto: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => setReponerModal(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingReponer}
+                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-600 text-[#050914] font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+                >
+                  {savingReponer ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                  Guardar Reposición
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

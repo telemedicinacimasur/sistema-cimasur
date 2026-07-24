@@ -364,20 +364,8 @@ export default function AdminView() {
           <span>Volver al Menú de Administración</span>
         </button>
 
-        {/* Sync & Range control */}
+        {/* Sync control */}
         <div className="flex items-center gap-2 bg-[#0F172A]/80 border border-[#1E293B] px-3 py-1.5 rounded-2xl shadow-inner shrink-0">
-          <select 
-            value={loadRange}
-            onChange={(e) => handleLoadRangeChange(e.target.value as any)}
-            className="bg-[#152035] text-slate-300 text-[10px] font-bold uppercase border-none outline-none rounded p-1 cursor-pointer hover:bg-[#1E293B] transition-colors"
-            title="Selecciona el rango de datos a cargar desde el servidor"
-          >
-            <option value="ultimos_30_dias">Últimos 30 días</option>
-            <option value="mes_actual">Mes Actual</option>
-            <option value="anio_actual">Año Actual</option>
-            <option value="historico_completo">Histórico Completo</option>
-          </select>
-          <div className="w-px h-4 bg-slate-700 mx-1"></div>
           <button
             type="button"
             onClick={() => loadData(true)}
@@ -386,7 +374,7 @@ export default function AdminView() {
             title="Actualizar datos (limpia caché local y recarga desde servidor de forma fresca)"
           >
             <RefreshCw className={cn("w-3 h-3", isRefreshing ? "animate-spin text-[#38BDF8]" : "")} />
-            Sincronizar Datos
+            Actualizar Datos
           </button>
         </div>
       </div>
