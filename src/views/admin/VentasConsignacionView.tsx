@@ -3986,8 +3986,22 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
   const actualStartMonth = parseDateString(rawDate).substring(0, 7);
   if (!actualStartMonth || actualStartMonth.length < 7) return null;
   
-  // Allow registration and calculation from targetMonth even if earlier than actualStartMonth
-  const startMonth = targetMonth < actualStartMonth ? targetMonth : actualStartMonth;
+  // Find the absolute earliest month that we should start tracking from, 
+  // considering the batch delivery date AND any historical movements registered on it.
+  let startMonth = actualStartMonth;
+  if (lote.movimientos) {
+    Object.keys(lote.movimientos).forEach(m => {
+      if (/^\d{4}-\d{2}$/.test(m)) {
+        if (m < startMonth) {
+          startMonth = m;
+        }
+      }
+    });
+  }
+  // Allow registration and calculation from targetMonth even if earlier than startMonth
+  if (targetMonth < startMonth) {
+    startMonth = targetMonth;
+  }
 
   // Generate sequence of months from startMonth up to targetMonth
   const months: string[] = [];
