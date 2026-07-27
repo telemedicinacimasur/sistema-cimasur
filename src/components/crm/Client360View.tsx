@@ -782,15 +782,15 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   <div className="pt-2 space-y-5">
                     <button 
                       onClick={handleAddBitacora}
-                      className="w-full bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-xs py-4 rounded-2xl transition-all shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2"
+                      className="w-full bg-[#0284C7] hover:bg-[#0369a1] text-white font-black text-xs py-4 rounded-2xl transition-all shadow-lg hover:shadow-sky-950/20 flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Save size={16} />
-                      REGISTRAR EN HISTORIAL DETALLADO
+                      GUARDAR CAMBIOS Y REGISTRAR EN HISTORIAL
                     </button>
                   </div>
 
-                  <p className="text-[9px] text-slate-600 italic text-center pt-2 uppercase font-bold tracking-tight">
-                    Utilice el botón superior para guardar el historial.
+                  <p className="text-[10px] text-sky-400 italic text-center pt-2 uppercase font-black tracking-tight">
+                    ¡Use el botón azul superior para guardar su gestión, categoría, compras y demás datos modificados!
                   </p>
                 </div>
               </div>
@@ -883,6 +883,29 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                     />
                   </div>
                 </div>
+
+                {isEditing && (
+                  <div className="pt-5 border-t border-slate-800/60 flex justify-end gap-3 animate-in fade-in duration-350">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setEditForm(client);
+                        setIsEditing(false);
+                      }}
+                      className="px-5 py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleSaveGeneral}
+                      className="px-6 py-2.5 bg-[#0284C7] hover:bg-[#0369a1] text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-sky-950/25 cursor-pointer"
+                    >
+                      <Save size={14} />
+                      Guardar Cambios
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* CONTACTOS Y VETERINARIOS */}

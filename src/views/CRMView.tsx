@@ -2017,8 +2017,15 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                   })()}
                 </div>
 
-                <div className="pt-4 border-t border-[#1E293B]">
-                  <p className="text-[10px] text-slate-400 text-center italic">Utilice el botón "Registrar" junto a los datos para guardar los cambios.</p>
+                <div className="pt-6 border-t border-[#1E293B] space-y-3">
+                  <button
+                    onClick={handleUpdate}
+                    className="w-full bg-[#0284C7] hover:bg-[#0369a1] text-white font-black text-xs py-4 rounded-2xl transition-all shadow-lg hover:shadow-sky-950/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>GUARDAR CAMBIOS EN EXPEDIENTE</span>
+                  </button>
+                  <p className="text-[10px] text-slate-400 text-center italic uppercase tracking-wider font-bold">Guarda todos los datos modificados arriba en la base de datos.</p>
                 </div>
               </div>
            </div>
