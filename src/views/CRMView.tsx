@@ -1290,6 +1290,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
   const [crmCampaignTargetTier, setCrmCampaignTargetTier] = useState<string | null>(null);
   const [crmCopiedMessageId, setCrmCopiedMessageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const clientDatabaseFileInputRef = useRef<HTMLInputElement>(null);
   
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importCycleYear, setImportCycleYear] = useState('2026');
@@ -1326,6 +1327,243 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
       ];
     });
     exportTableToExcel("Reporte Avance de Categorías", headers, data, "avance_categorias_cimasur");
+  };
+
+  const downloadClientDatabaseTemplate = () => {
+    const headers = [
+      [
+        "RUT",
+        "Nombre / Razón Social",
+        "Nombre de Fantasía",
+        "Giro",
+        "Email",
+        "Teléfono",
+        "Dirección",
+        "Comuna",
+        "Ciudad",
+        "Región",
+        "Sitio Web",
+        "Ejecutivo Comercial",
+        "Tipo de Cliente",
+        "Categoría",
+        "Compra Anual Acumulada (CLP)",
+        "Inscrito en Intranet (Si/No)",
+        "Es Cliente de Gestión (Si/No)",
+        "Cómo Llegó (Canal)",
+        "Estado (Activo/Inactivo)",
+        "Observaciones Iniciales"
+      ]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = headers[0].map(() => ({ wch: 22 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Clientes");
+    XLSX.writeFile(wb, "plantilla_importacion_cartera_cie.xlsx");
+  };
+
+  const handleClientesImportUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const contacts = await localDB.getCollection('contacts');
+        let importedCount = 0;
+        let synchronizedCount = 0;
+
+        for (const row of data) {
+          const rut = safe(row["RUT"]) || safe(row["Rut"]) || safe(row["RUT / ID"]) || safe(row["rut"]) || 'Sin RUT';
+          const name = safe(row["Nombre / Razón Social"]) || safe(row["Nombre"]) || safe(row["Nombre Completo"]) || safe(row["name"]) || "Contacto Sin Nombre";
+          const nombreFantasia = safe(row["Nombre de Fantasía"]) || safe(row["Nombre Fantasia"]) || '';
+          const giro = safe(row["Giro"]) || '';
+          const email = safe(row["Email"]) || safe(row["email"]) || safe(row["Correo"]) || '';
+          const phone = safe(row["Teléfono"]) || safe(row["telefono"]) || safe(row["phone"]) || '';
+          const direccion = safe(row["Dirección"]) || safe(row["direccion"]) || '';
+          const comuna = safe(row["Comuna"]) || safe(row["comuna"]) || '';
+          const ciudad = safe(row["Ciudad"]) || safe(row["ciudad"]) || '';
+          const region = safe(row["Región"]) || safe(row["region"]) || 'Metropolitana';
+          const sitioWeb = safe(row["Sitio Web"]) || '';
+          const ejecutivoComercial = safe(row["Ejecutivo Comercial"]) || '';
+          const type = safe(row["Tipo de Cliente"]) || safe(row["Tipo"]) || 'Farmacia';
+          const rawVentas = row["Compra Anual Acumulada (CLP)"] || row["Compra Anual"] || row["Ventas"] || row["ventas"] || 0;
+          const compraAnual = parseNumericValue(rawVentas);
+          
+          const rawIntranet = safe(row["Inscrito en Intranet (Si/No)"]) || safe(row["Intranet"]) || 'No';
+          const intranet = (rawIntranet.toLowerCase().trim() === 'si' || rawIntranet.toLowerCase().trim() === 'sí') ? 'Si' : 'No';
+
+          const rawGestion = safe(row["Es Cliente de Gestión (Si/No)"]) || safe(row["Gestión"]) || 'No';
+          const isGestionCustomer = (rawGestion.toLowerCase().trim() === 'si' || rawGestion.toLowerCase().trim() === 'sí' || rawGestion.toLowerCase().trim() === 'true');
+
+          const comoLlego = safe(row["Cómo Llegó (Canal)"]) || safe(row["Canal de Origen"]) || 'Campañas / Ads';
+          const estado = safe(row["Estado (Activo/Inactivo)"]) || safe(row["Estado"]) || 'Activo';
+          const observaciones = safe(row["Observaciones Iniciales"]) || safe(row["Observaciones"]) || '';
+
+          if (name === "Contacto Sin Nombre" && rut === "Sin RUT" && !email) continue;
+
+          // Smart deduplication check using existing helper
+          const existingContact = contacts.find((c: any) => 
+            areContactsDuplicate(c, { name, rut, email, phone })
+          );
+
+          const calculatedCategory = getTierForSales(compraAnual).name;
+
+          if (existingContact) {
+            // Update details
+            const updates: any = {};
+            let hasChanges = false;
+
+            if (name !== "Contacto Sin Nombre" && existingContact.name !== name) { updates.name = name; hasChanges = true; }
+            if (rut !== "Sin RUT" && existingContact.rut !== rut) { updates.rut = rut; hasChanges = true; }
+            if (email && existingContact.email !== email) { updates.email = email; hasChanges = true; }
+            if (phone && existingContact.phone !== phone) { updates.phone = phone; hasChanges = true; }
+            if (nombreFantasia && existingContact.nombreFantasia !== nombreFantasia) { updates.nombreFantasia = nombreFantasia; hasChanges = true; }
+            if (giro && existingContact.giro !== giro) { updates.giro = giro; hasChanges = true; }
+            if (direccion && existingContact.direccion !== direccion) { updates.direccion = direccion; hasChanges = true; }
+            if (comuna && existingContact.comuna !== comuna) { updates.comuna = comuna; hasChanges = true; }
+            if (ciudad && existingContact.ciudad !== ciudad) { updates.ciudad = ciudad; hasChanges = true; }
+            if (region && region !== 'Metropolitana' && existingContact.region !== region) { updates.region = region; hasChanges = true; }
+            if (sitioWeb && existingContact.sitioWeb !== sitioWeb) { updates.sitioWeb = sitioWeb; hasChanges = true; }
+            if (ejecutivoComercial && existingContact.ejecutivoComercial !== ejecutivoComercial) { updates.ejecutivoComercial = ejecutivoComercial; hasChanges = true; }
+            if (type && existingContact.type !== type) { updates.type = type; hasChanges = true; }
+            if (intranet && existingContact.intranet !== intranet) { updates.intranet = intranet; hasChanges = true; }
+            if (isGestionCustomer && existingContact.isGestionCustomer !== isGestionCustomer) { updates.isGestionCustomer = isGestionCustomer; hasChanges = true; }
+            if (comoLlego && existingContact.comoLlego !== comoLlego) { updates.comoLlego = comoLlego; hasChanges = true; }
+            if (estado && existingContact.estado !== estado) { updates.estado = estado; hasChanges = true; }
+
+            if (compraAnual > 0) {
+              updates.compraAnual = compraAnual;
+              updates.categoria = calculatedCategory;
+              let existingDetails: any = {};
+              if (existingContact.clubVentasDetail) {
+                try {
+                  existingDetails = typeof existingContact.clubVentasDetail === 'string' ? JSON.parse(existingContact.clubVentasDetail) : existingContact.clubVentasDetail;
+                } catch (e) {
+                  console.error(e);
+                }
+              }
+              existingDetails['v2026'] = compraAnual;
+              existingDetails['cat2026'] = calculatedCategory;
+              updates.clubVentasDetail = JSON.stringify(existingDetails);
+              hasChanges = true;
+            }
+
+            if (hasChanges) {
+              const currentObs = existingContact.historialUnificado || '';
+              updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
+                `[Carga Completa Excel] Registro de cliente actualizado y sincronizado vía carga masiva Excel el ${new Date().toLocaleDateString('es-CL')}.`;
+              await localDB.updateInCollection('contacts', existingContact.id, updates);
+              synchronizedCount++;
+            }
+          } else {
+            // Save a new record
+            const newContact = {
+              id: `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+              fechaIngreso: new Date().toISOString().split('T')[0],
+              name,
+              rut,
+              nombreFantasia,
+              giro,
+              email,
+              phone,
+              direccion,
+              comuna,
+              ciudad,
+              region,
+              sitioWeb,
+              ejecutivoComercial,
+              type,
+              categoria: calculatedCategory,
+              compraAnual,
+              intranet,
+              isGestionCustomer,
+              comoLlego,
+              estado,
+              clubVentasDetail: JSON.stringify({ v2026: compraAnual, cat2026: calculatedCategory }),
+              historialUnificado: observaciones || `Importado vía base de datos Excel el ${new Date().toLocaleDateString('es-CL')}`,
+              responsable: user?.displayName || user?.email || 'Sistema'
+            };
+            
+            await localDB.saveToCollection('contacts', newContact);
+
+            if (isGestionCustomer) {
+              const gestionRecord = {
+                fechaIngreso: newContact.fechaIngreso,
+                nombre: newContact.name,
+                rut: newContact.rut,
+                tipoEmpresa: newContact.type,
+                comuna: newContact.region,
+                celular: newContact.phone,
+                email: newContact.email,
+                categoria: newContact.categoria,
+                estado: 'En proceso',
+                consultora: newContact.responsable,
+                observaciones: `Registro inicial importado desde CRM\nObservaciones: ${newContact.historialUnificado}`
+              };
+              await localDB.saveToCollection('gestion_records', gestionRecord);
+            }
+
+            importedCount++;
+          }
+        }
+
+        await addAuditLog(user, `Importó base completa Excel: ${importedCount} creados, ${synchronizedCount} actualizados`, 'CRM');
+        alert(`Éxito: Se procesó la importación masiva de la Cartera Única correctamente.\n\n- ${importedCount} Nuevos clientes creados.\n- ${synchronizedCount} Clientes existentes actualizados.`);
+        setRecords(await localDB.getCollection('contacts'));
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+        if (e.target) e.target.value = '';
+      } catch (error) {
+        console.error(error);
+        alert(`Error al procesar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const exportClientesDatabase = () => {
+    const dataToExport = filtered.map(c => {
+      let salesObj: any = {};
+      if (c.clubVentasDetail) {
+        try {
+          salesObj = typeof c.clubVentasDetail === 'string' ? JSON.parse(c.clubVentasDetail) : c.clubVentasDetail;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      return {
+        "RUT": c.rut || 'Sin RUT',
+        "Nombre / Razón Social": c.name || 'Sin Nombre',
+        "Nombre de Fantasía": c.nombreFantasia || '',
+        "Giro": c.giro || '',
+        "Email": c.email || '',
+        "Teléfono": c.phone || '',
+        "Dirección": c.direccion || '',
+        "Comuna": c.comuna || '',
+        "Ciudad": c.ciudad || '',
+        "Región": c.region || 'Metropolitana',
+        "Sitio Web": c.sitioWeb || '',
+        "Ejecutivo Comercial": c.ejecutivoComercial || '',
+        "Tipo de Cliente": c.type || 'Farmacia',
+        "Categoría": c.categoria || 'Sin categoría',
+        "Compra Anual Acumulada (CLP)": c.compraAnual || salesObj.v2026 || salesObj.v2025 || 0,
+        "Inscrito en Intranet (Si/No)": c.intranet || 'No',
+        "Es Cliente de Gestión (Si/No)": c.isGestionCustomer ? 'Si' : 'No',
+        "Cómo Llegó (Canal)": c.comoLlego || 'Campañas / Ads',
+        "Estado (Activo/Inactivo)": c.estado || 'Activo',
+        "Historial / Observaciones": c.historialUnificado || ''
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Base_Clientes");
+    XLSX.writeFile(workbook, "Base_Clientes_Cartera_CIE.xlsx");
   };
 
   const processPastedImport = async () => {
@@ -2376,18 +2614,81 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
       )}
 
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
-        <div className="p-4 flex justify-end gap-2">
-            <button 
-              onClick={exportCategoryProgress}
-              className="bg-sky-700 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-lg transition-colors"
-              title="Descarga el historial de avance de categorías de los clientes"
-            >
-              <TrendingUp size={14}/>
-              Exportar Avance de Categorías
-            </button>
-            <button onClick={handleExport} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Download size={14}/>Exportar Plantilla</button>
-            <button onClick={handleImportClick} className="bg-emerald-600 hover:bg-emerald-700 transition-colors text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><Upload size={14}/>Importar Ventas Masivas</button>
-            <input type="file" ref={fileInputRef} onChange={processImport} className="hidden" accept=".xlsx, .xls" />
+        <div className="p-4 bg-[#0D1527] border-b border-[#1E293B] flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+              Gestión Masiva de Cartera CIE
+            </h3>
+            <p className="text-[10px] text-slate-400">Descarga plantillas de importación, carga bases de clientes completos y gestiona ventas anuales en lote.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* GRUPO 1: BASE DE DATOS DE CLIENTES */}
+            <div className="flex items-center gap-1.5 bg-[#152035] border border-[#1E293B] p-1.5 rounded-xl">
+              <span className="text-[9px] font-black uppercase text-[#38BDF8] px-2">Clientes CIE:</span>
+              <button 
+                onClick={downloadClientDatabaseTemplate}
+                className="text-[10px] bg-sky-950/40 text-[#38BDF8] hover:bg-sky-950/60 border border-sky-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all font-bold cursor-pointer"
+                title="Descargar Plantilla Excel para Cargar Clientes Nuevos en Lote"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" /> Plantilla
+              </button>
+              <button 
+                onClick={() => clientDatabaseFileInputRef.current?.click()}
+                className="text-[10px] bg-emerald-950/40 text-emerald-400 hover:bg-emerald-950/60 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all font-bold cursor-pointer"
+                title="Subir Archivo Excel con Nuevos Clientes / Actualizaciones"
+              >
+                <Upload className="w-3.5 h-3.5" /> Importar Base
+              </button>
+              <button 
+                onClick={exportClientesDatabase}
+                className="text-[10px] bg-amber-950/40 text-amber-400 hover:bg-amber-950/60 border border-amber-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all font-bold cursor-pointer"
+                title="Exportar Base de Datos Completa de Clientes Actuales a Excel"
+              >
+                <Download className="w-3.5 h-3.5" /> Exportar Base
+              </button>
+              <input 
+                type="file" 
+                ref={clientDatabaseFileInputRef} 
+                onChange={handleClientesImportUpload} 
+                className="hidden" 
+                accept=".xlsx, .xls" 
+              />
+            </div>
+
+            {/* GRUPO 2: VENTAS & CATEGORÍAS */}
+            <div className="flex items-center gap-1.5 bg-[#152035] border border-[#1E293B] p-1.5 rounded-xl">
+              <span className="text-[9px] font-black uppercase text-slate-400 px-2">Ventas & Club:</span>
+              <button 
+                onClick={exportCategoryProgress}
+                className="text-[10px] bg-slate-800 text-slate-200 hover:bg-slate-750 border border-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all font-bold cursor-pointer"
+                title="Descarga el historial de avance de categorías de los clientes"
+              >
+                <TrendingUp className="w-3.5 h-3.5" /> Avance Cat.
+              </button>
+              <button 
+                onClick={handleExport} 
+                className="text-[10px] bg-slate-800 text-slate-200 hover:bg-slate-750 border border-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all font-bold cursor-pointer"
+                title="Descargar plantilla para actualización de ventas de clientes existentes"
+              >
+                <Download className="w-3.5 h-3.5" /> Plantilla Ventas
+              </button>
+              <button 
+                onClick={handleImportClick} 
+                className="text-[10px] bg-emerald-600 text-white hover:bg-emerald-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all font-bold cursor-pointer animate-pulse"
+                title="Importar Ventas Masivas de Clientes para auto-actualizar su Categoría"
+              >
+                <Upload className="w-3.5 h-3.5" /> Importar Ventas
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={processImport} 
+                className="hidden" 
+                accept=".xlsx, .xls" 
+              />
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
            <table className="w-full text-xs">
