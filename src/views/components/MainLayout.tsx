@@ -14,7 +14,8 @@ import {
   Activity,
   Volume2,
   VolumeX,
-  X
+  X,
+  Menu
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
@@ -28,6 +29,12 @@ interface MainLayoutProps {
 }
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
   const [notifications, setNotifications] = React.useState<NotificationRecord[]>([]);
@@ -167,47 +174,71 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex h-screen bg-[#0D1527] text-white font-[Inter,sans-serif] antialiased overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 bg-[#0D1527] border-r border-[#1E293B] flex flex-col py-6 px-4 z-40 relative shadow-xl">
+      <aside className={cn(
+        "flex-shrink-0 bg-[#0D1527] border-r border-[#1E293B] flex flex-col py-6 z-40 relative shadow-xl transition-all duration-300 ease-in-out",
+        isSidebarCollapsed ? "w-20 px-2" : "w-64 px-4"
+      )}>
         <div className="px-2 mb-8 flex flex-col items-center flex-shrink-0">
           <div className="flex flex-col items-center justify-center w-full relative">
-            <div className="w-16 h-16 bg-[#1a2e59] rounded-2xl flex items-center justify-center mb-3 border border-[#334155] shadow-lg group hover:border-[#38BDF8] transition-colors">
-              <span className="text-white font-sans text-3xl font-black italic">C</span>
+            <div className={cn(
+              "bg-[#1a2e59] rounded-2xl flex items-center justify-center border border-[#334155] shadow-lg group hover:border-[#38BDF8] transition-all duration-300",
+              isSidebarCollapsed ? "w-12 h-12 mb-0" : "w-16 h-16 mb-3"
+            )}>
+              <span className={cn(
+                "text-white font-sans font-black italic transition-all duration-300",
+                isSidebarCollapsed ? "text-2xl" : "text-3xl"
+              )}>C</span>
             </div>
-            <div className="text-white font-sans text-xl tracking-widest z-10 font-black uppercase">
-              Cimasur
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="text-white font-sans text-xl tracking-widest z-10 font-black uppercase transition-all duration-300">
+                Cimasur
+              </div>
+            )}
           </div>
         </div>
 
-        <nav className="flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-2">
+        <nav className="flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-1">
           {filteredMenuItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group text-[12px] font-black uppercase",
+                "flex items-center gap-3 py-3 rounded-xl transition-all duration-300 group text-[12px] font-black uppercase whitespace-nowrap overflow-hidden",
+                isSidebarCollapsed ? "justify-center px-2" : "px-4",
                 location.pathname === item.path 
                   ? "bg-[#38BDF8] text-black shadow-[0_4px_20px_rgba(56,189,248,0.2)]" 
                   : "text-slate-400 hover:text-white hover:bg-[#1E293B]"
               )}
+              title={isSidebarCollapsed ? item.name : undefined}
             >
-              <item.icon className={cn("w-5 h-5", location.pathname === item.path ? "text-black" : "text-slate-400 group-hover:text-white")} />
-              <span>{item.name}</span>
+              <item.icon className={cn("w-5 h-5 flex-shrink-0", location.pathname === item.path ? "text-black" : "text-slate-400 group-hover:text-white")} />
+              {!isSidebarCollapsed && <span className="truncate">{item.name}</span>}
             </Link>
           ))}
         </nav>
 
         <div className="mt-auto pt-6 border-t border-[#1E293B] flex flex-col gap-2 flex-shrink-0">
-          <a href="mailto:formacion@cimasur.cl" className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-[12px] font-black border border-transparent">
-            <HelpCircle className="w-5 h-5" />
-            <span>Soporte</span>
+          <a 
+            href="mailto:formacion@cimasur.cl" 
+            className={cn(
+              "flex items-center gap-3 text-slate-400 hover:text-white py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-[12px] font-black border border-transparent whitespace-nowrap overflow-hidden",
+              isSidebarCollapsed ? "justify-center px-2" : "px-4"
+            )}
+            title={isSidebarCollapsed ? "Soporte" : undefined}
+          >
+            <HelpCircle className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && <span>Soporte</span>}
           </a>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 text-slate-400 hover:text-white px-4 py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-[12px] font-black border border-transparent"
+            className={cn(
+              "flex items-center gap-3 text-slate-400 hover:text-white py-3 hover:bg-[#1E293B] transition-all rounded-xl text-left text-[12px] font-black border border-transparent whitespace-nowrap overflow-hidden",
+              isSidebarCollapsed ? "justify-center px-2" : "px-4"
+            )}
+            title={isSidebarCollapsed ? "Cerrar Sesión" : undefined}
           >
-            <LogOut className="w-5 h-5" />
-            <span>Cerrar Sesión</span>
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && <span>Cerrar Sesión</span>}
           </button>
         </div>
       </aside>
@@ -217,13 +248,25 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {/* Header */}
         <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 h-20 flex-shrink-0 z-50 flex justify-between items-center px-8 sticky top-0 shadow-sm">
           <div className="flex items-center gap-6">
+            <button
+              onClick={() => {
+                const next = !isSidebarCollapsed;
+                setIsSidebarCollapsed(next);
+                localStorage.setItem('sidebar_collapsed', String(next));
+              }}
+              className="p-2 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+              title={isSidebarCollapsed ? "Mostrar barra lateral" : "Ocultar barra lateral"}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="h-8 w-px bg-slate-200" />
             <Link
               to="/"
               className="flex items-center gap-2 p-2 text-slate-500 hover:text-[#1E293B] hover:bg-slate-100 rounded-xl transition-all"
             >
               <Home className="w-5 h-5" />
             </Link>
-            <div className="h-8 w-px bg-slate-200 mx-1" />
+            <div className="h-8 w-px bg-slate-200" />
             <h2 className="text-xl font-bold tracking-wider text-[#1E293B] uppercase">{getPageTitle()}</h2>
           </div>
 
