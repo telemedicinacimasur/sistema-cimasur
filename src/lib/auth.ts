@@ -506,7 +506,7 @@ export const localDB = {
       }
     }
   },
-  deleteFromCollection: async (name: string, id: string) => {
+  deleteFromCollection: async (name: string, id: string, skipBackup = false) => {
     if (name === 'trash_bin') {
       invalidateCollectionCache(name);
       if (isFirebaseReady && db) {
@@ -519,28 +519,30 @@ export const localDB = {
 
     try {
       let recordToDelete: any = null;
-      if (isFirebaseReady && db) {
-        const docSnap = await getDoc(doc(db, name, id));
-        if (docSnap.exists()) {
-          recordToDelete = { id: docSnap.id, ...docSnap.data() };
-        }
-      } else {
-        const res = await fetch(`/api/records/${name}`);
-        if (!res.ok) {
-          if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
-             // Basic retry
-             console.warn('Rate limit exceeded, retrying in 2 seconds...');
-             await new Promise(resolve => setTimeout(resolve, 2000));
-             const retryRes = await fetch(`/api/records/${name}`);
-             if (!retryRes.ok) throw new Error(await retryRes.text());
-             const list = await retryRes.json();
-             recordToDelete = list.find((item: any) => item.id === id);
-          } else {
-             throw new Error(await res.text());
+      if (!skipBackup) {
+        if (isFirebaseReady && db) {
+          const docSnap = await getDoc(doc(db, name, id));
+          if (docSnap.exists()) {
+            recordToDelete = { id: docSnap.id, ...docSnap.data() };
           }
         } else {
-          const list = await res.json();
-          recordToDelete = list.find((item: any) => item.id === id);
+          const res = await fetch(`/api/records/${name}`);
+          if (!res.ok) {
+            if (res.status === 429 || (await res.clone().text()) === 'Rate exceeded.') {
+               // Basic retry
+               console.warn('Rate limit exceeded, retrying in 2 seconds...');
+               await new Promise(resolve => setTimeout(resolve, 2000));
+               const retryRes = await fetch(`/api/records/${name}`);
+               if (!retryRes.ok) throw new Error(await retryRes.text());
+               const list = await retryRes.json();
+               recordToDelete = list.find((item: any) => item.id === id);
+            } else {
+               throw new Error(await res.text());
+            }
+          } else {
+            const list = await res.json();
+            recordToDelete = list.find((item: any) => item.id === id);
+          }
         }
       }
 

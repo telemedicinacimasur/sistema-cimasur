@@ -531,18 +531,50 @@ export default function CRMView() {
           needsUpdate = true;
         }
 
-        if (!existingContact.categoria || existingContact.categoria === 'Sin compra') {
+        if (!existingContact.categoria || existingContact.categoria === 'Sin compra' || existingContact.categoria === 'Sin categoría') {
           updates.categoria = 'Bronce';
+          needsUpdate = true;
+        }
+
+        const phoneVal = ic.telefono || ic.phone || '';
+        const rutVal = (ic.rut && ic.rut !== 'Sin RUT') ? ic.rut : undefined;
+
+        if (ic.name && ic.name !== 'Contacto de Intranet' && existingContact.name !== ic.name) {
+          updates.name = ic.name;
+          needsUpdate = true;
+        }
+        if (rutVal && existingContact.rut !== rutVal) {
+          updates.rut = rutVal;
+          needsUpdate = true;
+        }
+        if (phoneVal && existingContact.phone !== phoneVal) {
+          updates.phone = phoneVal;
+          needsUpdate = true;
+        }
+        if (ic.email && existingContact.email !== ic.email) {
+          updates.email = ic.email;
+          needsUpdate = true;
+        }
+        if (ic.region && ic.region !== 'Metropolitana' && existingContact.region !== ic.region) {
+          updates.region = ic.region;
+          needsUpdate = true;
+        }
+        if (ic.comuna && existingContact.comuna !== ic.comuna) {
+          updates.comuna = ic.comuna;
+          needsUpdate = true;
+        }
+        if (ic.direccion && existingContact.direccion !== ic.direccion) {
+          updates.direccion = ic.direccion;
           needsUpdate = true;
         }
 
         if (needsUpdate) {
           const currentObs = existingContact.historialUnificado || '';
           updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
-            `[Sincronización Intranet] Estado de Intranet actualizado a 'Si' y Motor Comercial a 'Con Compra' el ${new Date().toLocaleDateString('es-CL')}.`;
+            `[Sincronización Intranet] Datos completos actualizados desde Intranet el ${new Date().toLocaleDateString('es-CL')}.`;
           await localDB.updateInCollection('contacts', existingContact.id, updates);
         }
-        alert(`El cliente "${ic.name}" ya está en la Cartera Única CIE.\n\nAl estar en Cartera CIE puedes modificar libremente su Categoría ("Sin categoría", "Bronce", etc.), su Compra Anual Acumulada ($) y sus datos generales.\n\nSe abrirá su Expediente 360° a continuación.`);
+        alert(`El cliente "${ic.name}" ya estaba en la Cartera Única CIE.\n\nSe han actualizado sus datos de contacto completos con la información de Intranet (RUT, Teléfono, Comuna, Dirección, etc.).\n\nSe abrirá su Expediente 360° a continuación.`);
       } else {
         const newContact = {
           fechaIngreso: ic.fechaIngreso || new Date().toISOString().split('T')[0],
@@ -988,42 +1020,128 @@ function CRMRegister() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
+        const contacts = await localDB.getCollection('contacts');
         let importedCount = 0;
-        for (const row of data) {
-          const rut = safe(row["RUT (llave primaria)"]) || safe(row["RUT"]) || safe(row["RUT / ID"]);
-          if (!rut || rut.trim() === '') continue; // RUT is primary key and required
+        let synchronizedCount = 0;
 
-          let name = safe(row["Nombre / Razón Social"]) || "Contacto Sin Nombre";
+        for (const row of data) {
+          const rut = safe(row["RUT (llave primaria)"]) || safe(row["RUT"]) || safe(row["RUT / ID"]) || safe(row["rut"]);
+          const name = safe(row["Nombre / Razón Social"]) || safe(row["Nombre"]) || safe(row["name"]);
+          const email = safe(row["Email"]) || safe(row["email"]) || safe(row["Correo"]);
+          const phone = safe(row["Teléfono"]) || safe(row["telefono"]) || safe(row["phone"]);
+          const region = safe(row["Región"]) || safe(row["region"]) || 'Metropolitana';
+          const comuna = safe(row["Comuna"]) || safe(row["comuna"]) || '';
+          const direccion = safe(row["Dirección"]) || safe(row["direccion"]) || '';
+
+          if (!rut && !name && !email) continue; // Must have at least name or RUT or email
+
+          // Smart deduplication check using existing helper
+          const existingContact = contacts.find((c: any) => 
+            areContactsDuplicate(c, { name, rut, email, phone })
+          );
+
           const estado = safe(row["Estado (Activo/Inactivo)"]) || safe(row["Estado"]) || "Activo";
           
           const rawVentas = row["Ventas Anuales 2025 (CLP)"] || row["Ventas Anuales"] || row["Ventas"] || row["ventas"];
           const ventasAnuales = parseNumericValue(rawVentas);
           
           const promedioMensual = ventasAnuales / 12;
-          const precioPromedioFrasco = 12000; // Assumed fixed price for calculating frascos if needed, though getTierForSales uses Sales directly usually?
-          
-          // Let's use getTierForSales which usually takes annual sales, or is it monthly?
+          const precioPromedioFrasco = 12000;
           const calculatedCategory = getTierForSales(ventasAnuales).name;
 
-          const newContact = {
-            fechaIngreso: new Date().toISOString().split('T')[0],
-            name: name,
-            rut: rut,
-            estado: estado,
-            categoria: calculatedCategory,
-            clubVentasDetail: JSON.stringify({ v2024: 0, v2025: ventasAnuales, v2026: 0, pMensual: promedioMensual }),
-            promedioMensual: promedioMensual,
-            frascosMensualesEstimados: Math.round(promedioMensual / precioPromedioFrasco),
-            historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')} (Ventas 2025: $${ventasAnuales.toLocaleString('es-CL')}, Categoría: ${calculatedCategory})`,
-            responsable: user.displayName || user.email || 'Sistema'
-          };
+          if (existingContact) {
+            // Update/Sincronizar existing contact with full details instead of duplicating
+            const updates: any = {};
+            let hasChanges = false;
 
-          await localDB.saveToCollection('contacts', newContact);
-          importedCount++;
+            if (name && name !== "Contacto Sin Nombre" && existingContact.name !== name) {
+              updates.name = name;
+              hasChanges = true;
+            }
+            if (rut && rut !== "Sin RUT" && existingContact.rut !== rut) {
+              updates.rut = rut;
+              hasChanges = true;
+            }
+            if (email && existingContact.email !== email) {
+              updates.email = email;
+              hasChanges = true;
+            }
+            if (phone && existingContact.phone !== phone) {
+              updates.phone = phone;
+              hasChanges = true;
+            }
+            if (region && region !== 'Metropolitana' && existingContact.region !== region) {
+              updates.region = region;
+              hasChanges = true;
+            }
+            if (comuna && existingContact.comuna !== comuna) {
+              updates.comuna = comuna;
+              hasChanges = true;
+            }
+            if (direccion && existingContact.direccion !== direccion) {
+              updates.direccion = direccion;
+              hasChanges = true;
+            }
+            if (estado && existingContact.estado !== estado) {
+              updates.estado = estado;
+              hasChanges = true;
+            }
+            if (calculatedCategory && existingContact.categoria !== calculatedCategory && calculatedCategory !== 'Sin categoría') {
+              updates.categoria = calculatedCategory;
+              hasChanges = true;
+            }
+
+            if (ventasAnuales > 0) {
+              let existingDetails: any = {};
+              if (existingContact.clubVentasDetail) {
+                try {
+                  existingDetails = JSON.parse(existingContact.clubVentasDetail);
+                } catch (e) {
+                  console.error(e);
+                }
+              }
+              existingDetails[`v2025`] = ventasAnuales;
+              existingDetails[`cat2025`] = calculatedCategory;
+              updates.clubVentasDetail = JSON.stringify(existingDetails);
+              updates.promedioMensual = promedioMensual;
+              updates.frascosMensualesEstimados = Math.round(promedioMensual / precioPromedioFrasco);
+              hasChanges = true;
+            }
+
+            if (hasChanges) {
+              const currentObs = existingContact.historialUnificado || '';
+              updates.historialUnificado = (currentObs ? currentObs + '\n\n' : '') + 
+                `[Sincronización Excel] Registro de cliente actualizado y sincronizado vía carga masiva Excel el ${new Date().toLocaleDateString('es-CL')}.`;
+              await localDB.updateInCollection('contacts', existingContact.id, updates);
+              synchronizedCount++;
+            }
+          } else {
+            // Create New Contact
+            const newContact = {
+              fechaIngreso: new Date().toISOString().split('T')[0],
+              name: name || "Contacto Sin Nombre",
+              rut: rut || 'Sin RUT',
+              estado: estado,
+              categoria: calculatedCategory,
+              email: email,
+              phone: phone,
+              region: region,
+              comuna: comuna,
+              direccion: direccion,
+              clubVentasDetail: JSON.stringify({ v2024: 0, v2025: ventasAnuales, v2026: 0, pMensual: promedioMensual }),
+              promedioMensual: promedioMensual,
+              frascosMensualesEstimados: Math.round(promedioMensual / precioPromedioFrasco),
+              historialUnificado: `Importado mediante Excel el ${new Date().toLocaleDateString('es-CL')} (Ventas 2025: $${ventasAnuales.toLocaleString('es-CL')}, Categoría: ${calculatedCategory})`,
+              responsable: user.displayName || user.email || 'Sistema'
+            };
+
+            await localDB.saveToCollection('contacts', newContact);
+            importedCount++;
+          }
         }
 
-        await addAuditLog(user, `Importó ${importedCount} clientes desde Excel`, 'CRM');
-        alert(`Éxito: Se importaron ${importedCount} clientes correctamente.`);
+        await addAuditLog(user, `Importó Excel: ${importedCount} nuevos, ${synchronizedCount} sincronizados`, 'CRM');
+        alert(`Éxito: Se procesaron los clientes desde Excel correctamente.\n\n- ${importedCount} Nuevos clientes creados.\n- ${synchronizedCount} Clientes existentes actualizados/sincronizados sin duplicar.`);
         window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       } catch (error) {
         console.error("Import Error:", error);
@@ -1498,10 +1616,25 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
     }
 
     try {
+      // Backup all items being deleted to trash_bin first
+      const contactsToDelete = records.filter(r => selectedIds.includes(r.id));
+      for (const item of contactsToDelete) {
+        const trashRecord = {
+          id: `trash_${Date.now()}_${item.id}_${Math.random().toString(36).substr(2, 4)}`,
+          originalCollection: 'contacts',
+          originalId: item.id,
+          deletedAt: new Date().toISOString(),
+          recordData: item
+        };
+        await localDB.saveToCollection('trash_bin', trashRecord);
+      }
+
+      // Delete each with skipBackup = true to bypass individual collection queries
       for (const id of selectedIds) {
         console.log(`Debug: Deleting record ${id}`);
-        await localDB.deleteFromCollection('contacts', id);
+        await localDB.deleteFromCollection('contacts', id, true);
       }
+
       setSelectedIds([]);
       window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
       alert(`Se han eliminado ${selectedIds.length} registros correctamente.`);
@@ -2611,6 +2744,53 @@ function CRMIntranetTable({
   const [crmContacts, setCrmContacts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('Todos');
+  const [selectedIntranetIds, setSelectedIntranetIds] = useState<string[]>([]);
+
+  const toggleSelectIntranet = (id: string) => {
+    setSelectedIntranetIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllIntranet = () => {
+    if (selectedIntranetIds.length === filteredClients.length) {
+      setSelectedIntranetIds([]);
+    } else {
+      setSelectedIntranetIds(filteredClients.map(c => c.id));
+    }
+  };
+
+  const handleIntranetBulkDelete = async () => {
+    if (selectedIntranetIds.length === 0) return;
+    if (!window.confirm(`¿Está seguro que desea eliminar masivamente ${selectedIntranetIds.length} clientes de la base de Intranet? Esta acción no se puede deshacer y respaldará los registros en la Papelera.`)) {
+      return;
+    }
+    try {
+      // Backup to trash_bin first
+      const itemsToDelete = clients.filter(c => selectedIntranetIds.includes(c.id));
+      for (const item of itemsToDelete) {
+        const trashRecord = {
+          id: `trash_${Date.now()}_${item.id}_${Math.random().toString(36).substr(2, 4)}`,
+          originalCollection: 'intranet_clients',
+          originalId: item.id,
+          deletedAt: new Date().toISOString(),
+          recordData: item
+        };
+        await localDB.saveToCollection('trash_bin', trashRecord);
+      }
+      // Delete using skipBackup = true to prevent performance issues
+      for (const id of selectedIntranetIds) {
+        await localDB.deleteFromCollection('intranet_clients', id, true);
+      }
+      if (setClients) {
+        setClients((prev: any[]) => prev.filter(c => !selectedIntranetIds.includes(c.id)));
+      }
+      setSelectedIntranetIds([]);
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'intranet_clients' } }));
+      alert(`Se han eliminado ${itemsToDelete.length} registros de Intranet correctamente.`);
+    } catch (err) {
+      console.error('Error during bulk delete Intranet:', err);
+      alert('Hubo un problema al eliminar algunos registros de la Intranet.');
+    }
+  };
 
   const getAutomaticMotorStatus = (client: any) => {
     if (client.accesoAprobado !== 'Si') {
@@ -2927,10 +3107,40 @@ function CRMIntranetTable({
         </div>
       </div>
 
+      {selectedIntranetIds.length > 0 && (
+        <div className="bg-gradient-to-r from-red-950/40 to-slate-900 border border-red-500/30 p-4 rounded-xl mx-4 my-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-red-500/20 rounded-lg text-red-400">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white">
+                Eliminar Clientes en Lote ({selectedIntranetIds.length} seleccionados)
+              </h4>
+              <p className="text-[11px] text-slate-400">Esta acción eliminará masivamente los registros seleccionados de la Intranet y los respaldará en la Papelera.</p>
+            </div>
+          </div>
+          <button
+            onClick={handleIntranetBulkDelete}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-xs font-black transition-colors cursor-pointer self-start sm:self-center"
+          >
+            CONFIRMAR ELIMINACIÓN MASIVA
+          </button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead>
             <tr className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] border-b text-[10px] font-black uppercase tracking-widest text-[#94A3B8]">
+              <th className="p-5 w-[50px] text-center bg-[#1E3A5F]">
+                 <input 
+                   type="checkbox" 
+                   className="rounded cursor-pointer"
+                   checked={selectedIntranetIds.length > 0 && selectedIntranetIds.length === filteredClients.length}
+                   onChange={toggleSelectAllIntranet}
+                 />
+              </th>
               <th className="p-5">Nombre / Razón Social</th>
               <th className="p-5">Email</th>
               <th className="p-5">Fecha Registro</th>
@@ -2946,6 +3156,14 @@ function CRMIntranetTable({
               const autoStatus = getAutomaticMotorStatus(client);
               return (
                 <tr key={client.id} className="hover:bg-[#1E293B]/50 transition-colors">
+                  <td className="p-5 w-[50px] text-center">
+                    <input 
+                      type="checkbox" 
+                      className="rounded cursor-pointer"
+                      checked={selectedIntranetIds.includes(client.id)}
+                      onChange={() => toggleSelectIntranet(client.id)}
+                    />
+                  </td>
                   <td className="p-5 font-bold text-white">{ client.name }</td>
                   <td className="p-5 text-slate-300">{ client.email || '---' }</td>
                   <td className="p-5 text-slate-400">{ formatDate(client.fechaIngreso) }</td>
