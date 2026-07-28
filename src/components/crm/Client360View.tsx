@@ -17,10 +17,11 @@ interface Client360Props {
 }
 
 export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onSave }) => {
+  const activeCrmYear = String(new Date().getFullYear() - 1);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('general');
-  const [selectedClubYear, setSelectedClubYear] = useState<string>('2026');
+  const [selectedClubYear, setSelectedClubYear] = useState<string>(activeCrmYear);
   const [targetCategory, setTargetCategory] = useState<string>('Plata');
 
   const CATEGORY_THRESHOLDS: Record<string, number> = {
@@ -44,10 +45,10 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const catKey = `cat${selectedClubYear}`;
   const salesKey = `v${selectedClubYear}`;
   
-  const dynamicCategory = (clubDetails[catKey] || (selectedClubYear === '2026' ? client?.categoria : null) || 'Sin categoría').toString().trim();
+  const dynamicCategory = (clubDetails[catKey] || (selectedClubYear === activeCrmYear ? client?.categoria : null) || 'Sin categoría').toString().trim();
   const dynamicSales = Number(clubDetails[salesKey]) !== undefined && !isNaN(Number(clubDetails[salesKey]))
     ? Number(clubDetails[salesKey])
-    : (selectedClubYear === '2026' ? (Number(client?.compraAnual) || 0) : 0);
+    : (selectedClubYear === activeCrmYear ? (Number(client?.compraAnual) || 0) : 0);
   
   useEffect(() => {
     let tCat = 'Plata';
@@ -83,6 +84,23 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [newCompraAnual, setNewCompraAnual] = useState<string>('0');
   const [activityType, setActivityType] = useState<string>('Nota de Seguimiento');
   const [gestionStatus, setGestionStatus] = useState<string>('En proceso');
+
+  useEffect(() => {
+    if (client) {
+      const clubDetails = client.clubVentasDetail ? (typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail) : {};
+      const salesKey = `v${selectedClubYear}`;
+      const catKey = `cat${selectedClubYear}`;
+      
+      const dynamicSalesVal = clubDetails[salesKey] !== undefined && !isNaN(Number(clubDetails[salesKey]))
+        ? Number(clubDetails[salesKey])
+        : (selectedClubYear === activeCrmYear ? (Number(client.compraAnual) || 0) : 0);
+        
+      const dynamicCategoryVal = (clubDetails[catKey] || (selectedClubYear === activeCrmYear ? client.categoria : null) || 'Sin categoría').toString().trim();
+      
+      setNewCompraAnual(String(dynamicSalesVal));
+      setNewCategory(dynamicCategoryVal);
+    }
+  }, [selectedClubYear, client?.id, client?.clubVentasDetail, client?.compraAnual, client?.categoria]);
 
   const clientService = new ClientService(
     (col) => localDB.getCollection(col),
@@ -252,14 +270,19 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
         existingClubDetails = {};
       }
     }
-    existingClubDetails['v2026'] = amount;
-    existingClubDetails['cat2026'] = catToSave;
+    existingClubDetails[`v${selectedClubYear}`] = amount;
+    existingClubDetails[`cat${selectedClubYear}`] = catToSave;
 
-    await clientService.updateClient(client.id, {
-      compraAnual: amount,
-      categoria: catToSave,
+    const quickUpdates: any = {
       clubVentasDetail: JSON.stringify(existingClubDetails)
-    });
+    };
+
+    if (selectedClubYear === activeCrmYear) {
+      quickUpdates.compraAnual = amount;
+      quickUpdates.categoria = catToSave;
+    }
+
+    await clientService.updateClient(client.id, quickUpdates);
 
     await localDB.saveToCollection('crm_activities', {
       fecha: new Date().toISOString(),
@@ -300,15 +323,18 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
         existingClubDetails = {};
       }
     }
-    existingClubDetails['v2026'] = amount;
-    existingClubDetails['cat2026'] = catToSave;
+    existingClubDetails[`v${selectedClubYear}`] = amount;
+    existingClubDetails[`cat${selectedClubYear}`] = catToSave;
 
     const updates: any = { 
       bitacora: updated,
-      compraAnual: amount,
-      categoria: catToSave,
       clubVentasDetail: JSON.stringify(existingClubDetails)
     };
+
+    if (selectedClubYear === activeCrmYear) {
+      updates.compraAnual = amount;
+      updates.categoria = catToSave;
+    }
 
     if (newPhone && newPhone !== (client.telefono || client.phone || client.celular)) updates.telefono = newPhone;
     if (newEmail && newEmail !== client.email) updates.email = newEmail;

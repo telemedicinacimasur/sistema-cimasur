@@ -118,8 +118,6 @@ export function areContactsDuplicate(c1: any, c2: any): boolean {
   const email1 = cleanEmail(c1.email || c1.Email);
   const email2 = cleanEmail(c2.email || c2.Email);
 
-  if (email1 && email2 && email1 === email2) return true;
-
   // Clean RUT helper
   const cleanRut = (r: any) => {
     if (!r) return '';
@@ -131,7 +129,15 @@ export function areContactsDuplicate(c1: any, c2: any): boolean {
   const rut1 = cleanRut(c1.rut || c1.RUT || c1["RUT / ID"]);
   const rut2 = cleanRut(c2.rut || c2.RUT || c2["RUT / ID"]);
 
+  // If they have different valid RUTs, they are NOT duplicates
+  if (rut1 && rut2 && rut1 !== rut2) return false;
+
+  // If they have different valid emails, they are NOT duplicates
+  if (email1 && email2 && email1 !== email2) return false;
+
+  // If they share same RUT or same email, they are duplicates
   if (rut1 && rut2 && rut1 === rut2) return true;
+  if (email1 && email2 && email1 === email2) return true;
 
   // Smart Name check
   const name1 = c1.name || c1.Nombre || c1["Nombre / Razón Social"] || c1["Nombre Completo"] || c1.name;
@@ -877,16 +883,40 @@ const getClientAnnualSales = (client: any, year: string): number => {
   if (client.ventas && typeof client.ventas[`v${year}`] === 'number') {
     return client.ventas[`v${year}`];
   }
-  if (year === '2026' && client.compraAnual !== undefined && client.compraAnual !== null && client.compraAnual !== '') {
+  const currentYear = new Date().getFullYear();
+  const activeCrmYear = String(currentYear - 1); // e.g. 2025
+  
+  if ((year === '2026' || year === '2025' || year === activeCrmYear) && client.compraAnual !== undefined && client.compraAnual !== null && client.compraAnual !== '') {
     return Number(client.compraAnual) || 0;
   }
   // Fallback based on category
   const cat = normalizeCat(client.categoria || 'Sin categoría');
   if (cat.includes('platinum')) return 12000000;
-  if (cat.includes('oro')) return 5000000;
-  if (cat.includes('plata')) return 2000000;
-  if (cat.includes('bronce')) return 500000;
+  if (cat.includes('oro')) return 6600000;
+  if (cat.includes('plata')) return 2760000;
+  if (cat.includes('bronce')) return 684000;
   return 0;
+};
+
+const getClientCrmCategory = (client: any): string => {
+  if (!client) return 'Sin categoría';
+  const targetYear = String(new Date().getFullYear() - 1);
+  if (client.clubVentasDetail) {
+    try {
+      const parsed = typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail;
+      if (parsed) {
+        if (parsed[`cat${targetYear}`]) {
+          return parsed[`cat${targetYear}`];
+        }
+        if (typeof parsed[`v${targetYear}`] === 'number') {
+          return getTierForSales(parsed[`v${targetYear}`]).name;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return client.categoria || 'Sin categoría';
 };
 
 function CRMRegister() {
@@ -1437,7 +1467,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
             if (comoLlego && existingContact.comoLlego !== comoLlego) { updates.comoLlego = comoLlego; hasChanges = true; }
             if (estado && existingContact.estado !== estado) { updates.estado = estado; hasChanges = true; }
 
-            if (compraAnual > 0) {
+            if (compraAnual >= 0) {
               updates.compraAnual = compraAnual;
               updates.categoria = calculatedCategory;
               let existingDetails: any = {};
@@ -1573,7 +1603,6 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
     }
 
     const lines = pastedData.split('\n');
-    const prevYear = Number(importCycleYear) - 1;
     let processedCount = 0;
     let notFoundRuts: string[] = [];
 
@@ -1601,9 +1630,9 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
         const cleanAmountStr = amountRaw.replace(/[^0-9]/g, '');
         const ventasTotalesAnteriores = Number(cleanAmountStr) || 0;
 
-        // REGLA: Promedio Mensual = Suma Ventas Año Anterior / 12
+        // REGLA: Promedio Mensual = Suma Ventas Año / 12
         const promedioMensual = ventasTotalesAnteriores / 12;
-        const calculatedTier = getTierForSales(promedioMensual);
+        const calculatedTier = getTierForSales(ventasTotalesAnteriores); // Evaluado contra total anual (límites 684k, 2.76M, etc.)
 
         let existingDetails: any = {};
         if (client.clubVentasDetail) {
@@ -1623,17 +1652,21 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
         const bitacoraEntry = {
           id: Date.now().toString() + Math.random(),
           fecha: new Date().toISOString(),
-          comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Promedio mensual: $${promedioMensual.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
+          comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${importCycleYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Promedio mensual: $${promedioMensual.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
           creador: user?.displayName || user?.email || 'Sistema'
         };
         const newBitacora = [bitacoraEntry, ...currentBitacora];
 
         // Update local DB
-        await localDB.updateInCollection('contacts', client.id, { 
-            categoria: calculatedTier.name,
+        const pastedUpdates: any = {
             clubVentasDetail: JSON.stringify(existingDetails),
             bitacora: JSON.stringify(newBitacora)
-        });
+        };
+        if (importCycleYear === '2026') {
+            pastedUpdates.categoria = calculatedTier.name;
+            pastedUpdates.compraAnual = ventasTotalesAnteriores;
+        }
+        await localDB.updateInCollection('contacts', client.id, pastedUpdates);
 
         // Call API to update backend JSON file (Cascade)
         try {
@@ -1642,7 +1675,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     id: client.id, 
-                    category: calculatedTier.name, 
+                    category: importCycleYear === '2026' ? calculatedTier.name : client.categoria, 
                     year: importCycleYear,
                     clubVentasDetail: JSON.stringify(existingDetails),
                     bitacora: JSON.stringify(newBitacora)
@@ -1655,7 +1688,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
       }
     }
 
-    let reportMsg = `Se procesaron y actualizaron exitosamente ${processedCount} registros para el ciclo ${importCycleYear} (evaluando promedio mensual de ventas de ${prevYear}).`;
+    let reportMsg = `Se procesaron y actualizaron exitosamente ${processedCount} registros para el ciclo ${importCycleYear} (evaluando ventas del año ${importCycleYear}).`;
     if (notFoundRuts.length > 0) {
       reportMsg += `\n\nNo se encontraron clientes para los siguientes ${notFoundRuts.length} RUTs:\n${notFoundRuts.slice(0, 10).join(', ')}${notFoundRuts.length > 10 ? '...' : ''}`;
     }
@@ -1685,23 +1718,31 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
         const data = XLSX.utils.sheet_to_json<any>(ws);
         
         console.log(`Importing data for Cycle ${importCycleYear}...`, data);
-        const prevYear = Number(importCycleYear) - 1;
         let processed = 0;
         
         // Dynamic search for sales value function
-        const getSalesFromRow = (row: any, targetYear: number): number => {
+        const getSalesFromRow = (row: any, cycleYear: number): number => {
           const keys = Object.keys(row);
-          // Try exact matches first (case insensitive, space/underscore removed)
+          // Try exact matches first for cycle year (e.g. Ventas2026, v2026)
           for (const k of keys) {
             const kLower = k.toLowerCase().replace(/[\s_]/g, '');
-            if (kLower === `ventas${targetYear}` || kLower === `venta${targetYear}` || kLower === `v${targetYear}`) {
+            if (kLower === `ventas${cycleYear}` || kLower === `venta${cycleYear}` || kLower === `v${cycleYear}`) {
               return parseNumericValue(row[k]);
+            }
+          }
+          // Try keys containing the cycle year with a generic term
+          for (const k of keys) {
+            const kLower = k.toLowerCase().replace(/[\s_]/g, '');
+            if (kLower.includes(String(cycleYear))) {
+              if (kLower.includes('venta') || kLower.includes('compra') || kLower.includes('total') || kLower.includes('monto')) {
+                return parseNumericValue(row[k]);
+              }
             }
           }
           // Try generic sales indicators
           for (const k of keys) {
             const kLower = k.toLowerCase().replace(/[\s_]/g, '');
-            if (kLower === 'ventas' || kLower === 'venta' || kLower === 'ventasanuales' || kLower === 'total') {
+            if (kLower === 'ventas' || kLower === 'venta' || kLower === 'ventasanuales' || kLower === 'total' || kLower === 'monto' || kLower === 'compras' || kLower === 'compra') {
               return parseNumericValue(row[k]);
             }
           }
@@ -1718,14 +1759,23 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
             const client = records.find(c => cleanRutString(c.rut) === cleanRutRaw);
             if (!client) continue;
 
-            const ventasTotalesAnteriores = getSalesFromRow(item, prevYear);
+            const ventasTotalesAnteriores = getSalesFromRow(item, Number(importCycleYear));
             
-            // REGLA: Promedio Mensual = Suma Ventas Año Anterior / 12
+            // REGLA: Promedio Mensual = Suma Ventas Año / 12
             const promedioMensual = ventasTotalesAnteriores / 12;
-            const calculatedTier = getTierForSales(promedioMensual);
+            const calculatedTier = getTierForSales(ventasTotalesAnteriores); // Evaluado contra total anual (límites 684k, 2.76M, etc.)
             
             // Update local DB
-            const existingDetails = JSON.parse(client.clubVentasDetail || '{}');
+            let existingDetails: any = {};
+            if (client.clubVentasDetail) {
+              try {
+                existingDetails = typeof client.clubVentasDetail === 'string'
+                  ? JSON.parse(client.clubVentasDetail)
+                  : client.clubVentasDetail;
+              } catch (e) {
+                existingDetails = {};
+              }
+            }
             existingDetails[`v${importCycleYear}`] = ventasTotalesAnteriores;
             existingDetails[`cat${importCycleYear}`] = calculatedTier.name;
             
@@ -1734,16 +1784,20 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
             const bitacoraEntry = {
               id: Date.now().toString() + Math.random(),
               fecha: new Date().toISOString(),
-              comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${prevYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Promedio mensual: $${promedioMensual.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
+              comentario: `Importación Histórico Ventas Ciclo ${importCycleYear}: Registro de venta anual año ${importCycleYear} por $${ventasTotalesAnteriores.toLocaleString('es-CL')}. Promedio mensual: $${promedioMensual.toLocaleString('es-CL')}. Categoría actualizada a ${calculatedTier.name}.`,
               creador: user?.displayName || user?.email || 'Sistema'
             };
             const newBitacora = [bitacoraEntry, ...currentBitacora];
 
-            await localDB.updateInCollection('contacts', client.id, { 
-                categoria: calculatedTier.name,
+            const excelUpdates: any = {
                 clubVentasDetail: JSON.stringify(existingDetails),
                 bitacora: JSON.stringify(newBitacora)
-            });
+            };
+            if (importCycleYear === '2026') {
+                excelUpdates.categoria = calculatedTier.name;
+                excelUpdates.compraAnual = ventasTotalesAnteriores;
+            }
+            await localDB.updateInCollection('contacts', client.id, excelUpdates);
             
             // Call Render API to update SQL database in cascade
             try {
@@ -1752,7 +1806,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         id: client.id, 
-                        category: calculatedTier.name, 
+                        category: importCycleYear === '2026' ? calculatedTier.name : client.categoria, 
                         year: importCycleYear,
                         clubVentasDetail: JSON.stringify(existingDetails),
                         bitacora: JSON.stringify(newBitacora)
@@ -1764,7 +1818,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
             processed++;
         }
         
-        alert(`Se procesaron ${processed} registros. Las categorías fueron actualizadas evaluando el promedio mensual de ventas de ${prevYear} para el ciclo comercial ${importCycleYear}.`);
+        alert(`Se procesaron ${processed} registros. Las categorías fueron actualizadas evaluando las ventas del año ${importCycleYear} para el ciclo comercial ${importCycleYear}.`);
         window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -1824,7 +1878,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
       const matchesSearch = name.includes(search) || rut.includes(search);
       const matchesRegion = filters.region === 'Todas' || safe(r.region) === filters.region;
       const matchesType = filters.type === 'Todos' || safe(r.type) === filters.type;
-      const matchesCategoria = filters.categoria === 'Todas' || normalizeCat(r.categoria) === normalizeCat(filters.categoria);
+      const matchesCategoria = filters.categoria === 'Todas' || normalizeCat(getClientCrmCategory(r)) === normalizeCat(filters.categoria);
       const matchesIntranet = filters.intranet === 'Todos' || safe(r.intranet) === filters.intranet;
       return matchesSearch && matchesRegion && matchesType && matchesCategoria && matchesIntranet;
     })
@@ -2459,12 +2513,12 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                   r.name,
                   r.rut,
                   r.region,
-                  r.categoria,
+                  getClientCrmCategory(r),
                   r.type,
                   r.phone || '---',
                   r.email || '---',
                   r.comoLlego || 'Campañas / Ads',
-                  `$${getClientAnnualSales(r, '2026').toLocaleString('es-CL')}`
+                  `$${getClientAnnualSales(r, String(new Date().getFullYear() - 1)).toLocaleString('es-CL')}`
                 ]);
                 exportTableToPDF(
                   'Reporte: Cartera de Clientes (CRM Comercial)',
@@ -2616,9 +2670,15 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
         <div className="p-4 bg-[#0D1527] border-b border-[#1E293B] flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
-            <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex flex-wrap items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
               Gestión Masiva de Cartera CIE
+              <span className="ml-2 px-2.5 py-1 text-[10px] bg-sky-950 text-[#38BDF8] border border-sky-800 rounded-lg font-mono font-bold">
+                Total Registrados: {records.length}
+              </span>
+              <span className="px-2.5 py-1 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-lg font-mono font-bold">
+                Filtrados: {filtered.length}
+              </span>
             </h3>
             <p className="text-[10px] text-slate-400">Descarga plantillas de importación, carga bases de clientes completos y gestiona ventas anuales en lote.</p>
           </div>
@@ -2737,7 +2797,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                            )}
                            {r.fechaPago && (
                              <span className="text-[9px] bg-[#0284C7]/20 text-[#38BDF8] font-black px-1.5 py-0.5 rounded border border-[#0284C7]/20" title="Frecuencia / Ciclo de Compra">
-                               💰 Compra Anual: ${getClientAnnualSales(r, '2026').toLocaleString('es-CL')}
+                               💰 Compra Anual: ${getClientAnnualSales(r, String(new Date().getFullYear() - 1)).toLocaleString('es-CL')}
                              </span>
                             )}
                           </div>
@@ -2747,14 +2807,26 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                        <td className="p-5 text-slate-300">{formatDate(r.fechaIngreso) || "---"}</td>
                        <td className="p-5">
                          <select
-                           value={CATEGORIAS.find(c => c.toLowerCase() === String(r.categoria || 'Sin categoría').toLowerCase()) || 'Sin categoría'}
+                           value={CATEGORIAS.find(c => c.toLowerCase() === String(getClientCrmCategory(r) || 'Sin categoría').toLowerCase()) || 'Sin categoría'}
                            disabled={!canEdit}
                            onChange={async (e) => {
                              const newVal = e.target.value;
                              try {
                                // 1. Eliminar estado volátil anterior y actualizar localDB
-                               setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, categoria: newVal } : rec));
-                                await localDB.updateInCollection('contacts', r.id, { categoria: newVal });
+                               // Moved downstream
+                                const targetYear = String(new Date().getFullYear() - 1);
+                                let existingDetails: any = {};
+                                if (r.clubVentasDetail) {
+                                  try {
+                                    existingDetails = typeof r.clubVentasDetail === 'string' ? JSON.parse(r.clubVentasDetail) : r.clubVentasDetail;
+                                  } catch (err) {
+                                    existingDetails = {};
+                                  }
+                                }
+                                existingDetails[`cat${targetYear}`] = newVal;
+                                const clubVentasDetailStr = JSON.stringify(existingDetails);
+                                setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, categoria: newVal, clubVentasDetail: clubVentasDetailStr } : rec));
+                                await localDB.updateInCollection('contacts', r.id, { categoria: newVal, clubVentasDetail: clubVentasDetailStr });
                                
                                // 2. Disparar fetch PUT directo a /api/crm/clients/category
                                await fetch('/api/crm/clients/category', {
@@ -2763,7 +2835,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                                  body: JSON.stringify({ 
                                    id: r.id, 
                                    category: newVal,
-                                   year: '2026'
+                                   year: String(new Date().getFullYear() - 1)
                                  })
                                });
 
@@ -2969,7 +3041,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                     className="w-full bg-[#050914] border border-slate-800 p-3 rounded-lg text-sm font-bold text-white outline-none focus:border-sky-500"
                   />
                   <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                    <strong>Regla de congelamiento:</strong> Se evaluarán las ventas del <strong className="text-sky-400">año comercial {Number(importCycleYear) - 1}</strong> y se actualizará la categoría y la bitácora de los clientes en la ficha de 360 de inmediato.
+                    <strong>Regla de congelamiento:</strong> Se evaluarán las ventas del <strong className="text-sky-400">año comercial {importCycleYear}</strong> y se actualizará la categoría y la bitácora de los clientes en la ficha de 360 de inmediato.
                   </p>
                 </div>
 

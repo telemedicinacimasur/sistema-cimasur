@@ -186,19 +186,22 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
 
   // Club Cimasur targets
   const CATEGORY_THRESHOLDS: Record<string, number> = {
-    'Bronce': 0,
-    'Plata': 1000000,
-    'Oro': 3000000,
-    'Platinum': 5000000
+    'Sin categoría': 0,
+    'Bronce': 684000,
+    'Plata': 2760000,
+    'Oro': 6600000,
+    'Platinum': 12000000
   };
   
   const currentSales = Number(client.compraAnual) || 0;
-  const currentCategory = client.categoria || 'Bronce';
+  const currentCategory = client.categoria || 'Sin categoría';
   
   let defaultTarget = 'Plata';
-  if (currentSales >= 5000000) defaultTarget = 'Platinum';
-  else if (currentSales >= 3000000) defaultTarget = 'Platinum';
-  else if (currentSales >= 1000000) defaultTarget = 'Oro';
+  if (currentSales >= 12000000) defaultTarget = 'Platinum';
+  else if (currentSales >= 6600000) defaultTarget = 'Platinum';
+  else if (currentSales >= 2760000) defaultTarget = 'Oro';
+  else if (currentSales >= 684000) defaultTarget = 'Plata';
+  else defaultTarget = 'Bronce';
   
   const [targetCategory, setTargetCategory] = useState<string>(defaultTarget);
   const [selectedYear, setSelectedYear] = useState<string>('2026');
@@ -208,13 +211,17 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
   const catKey = `cat${selectedYear}`;
   const salesKey = `v${selectedYear}`;
   
-  const dynamicCategory = (details[catKey] || (selectedYear === '2026' ? client.categoria : null) || 'Bronce').toString().trim();
-  const dynamicSales = Number(details[salesKey]) || (selectedYear === '2026' ? Number(client.compraAnual) : 0) || 0;
+  const dynamicCategory = (details[catKey] || (selectedYear === '2026' ? client.categoria : null) || 'Sin categoría').toString().trim();
+  const dynamicSales = Number(details[salesKey]) !== undefined && !isNaN(Number(details[salesKey]))
+    ? Number(details[salesKey])
+    : (selectedYear === '2026' ? (Number(client.compraAnual) || 0) : 0);
   
   let dynamicTarget = 'Plata';
-  if (dynamicSales >= 5000000) dynamicTarget = 'Platinum';
-  else if (dynamicSales >= 3000000) dynamicTarget = 'Platinum';
-  else if (dynamicSales >= 1000000) dynamicTarget = 'Oro';
+  if (dynamicSales >= 12000000) dynamicTarget = 'Platinum';
+  else if (dynamicSales >= 6600000) dynamicTarget = 'Platinum';
+  else if (dynamicSales >= 2760000) dynamicTarget = 'Oro';
+  else if (dynamicSales >= 684000) dynamicTarget = 'Plata';
+  else dynamicTarget = 'Bronce';
   
   useEffect(() => {
     setTargetCategory(dynamicTarget);
