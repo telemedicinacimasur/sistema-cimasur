@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Client } from '../../services/crm/types';
 import { ClientService } from '../../services/crm/ClientService';
 import { localDB } from '../../lib/auth';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   X, User, Building2, MapPin, Phone, Mail, Globe, Briefcase, 
   Calendar, Award, TrendingUp, Bot, FileText, Plus, Trash2, 
@@ -10,6 +11,39 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+const TIER_COLORS: Record<string, string> = {
+  'Platinum': '#A855F7',
+  'Oro': '#EAB308',
+  'Plata': '#94A3B8',
+  'Bronce': '#D97706',
+  'Sin categoría': '#64748B',
+  'Sin Compra': '#475569'
+};
+
+const DEFAULT_BENEFITS: Record<string, string[]> = {
+  'Platinum': [
+    'Despacho Gratis Ilimitado: Envíos a todo Chile sin costo.',
+    'Soporte Prioritario: Atención 24/7 con línea directa.',
+    'Regalo Aniversario: Set de productos premium una vez al año.'
+  ],
+  'Oro': [
+    'Despacho Gratis (5/mes): Hasta 5 envíos gratis por mes.',
+    'Soporte Preferencial: Atención en menos de 2 horas.'
+  ],
+  'Plata': [
+    'Despacho Gratis (1/mes): 1 envío gratis al mes.'
+  ],
+  'Bronce': [
+    'Boletín Exclusivo: Acceso a noticias y ofertas antes que todos.'
+  ],
+  'Sin categoría': [
+    'Acceso al Club: Información de novedades y catálogo.'
+  ],
+  'Sin Compra': [
+    'Acceso al Club: Información de novedades y catálogo.'
+  ]
+};
+
 interface Client360Props {
   clientId: string;
   onClose: () => void;
@@ -17,12 +51,14 @@ interface Client360Props {
 }
 
 export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onSave }) => {
+  const { user } = useAuth();
   const activeCrmYear = String(new Date().getFullYear() - 1);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('general');
   const [selectedClubYear, setSelectedClubYear] = useState<string>(activeCrmYear);
   const [targetCategory, setTargetCategory] = useState<string>('Plata');
+  const [benefitsPorCategoria, setBenefitsPorCategoria] = useState<Record<string, string[]>>(DEFAULT_BENEFITS);
 
   const CATEGORY_THRESHOLDS: Record<string, number> = {
     'Sin categoría': 0,
@@ -84,6 +120,91 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [newCompraAnual, setNewCompraAnual] = useState<string>('0');
   const [activityType, setActivityType] = useState<string>('Nota de Seguimiento');
   const [gestionStatus, setGestionStatus] = useState<string>('En proceso');
+
+  // Fetch benefits dynamically from configuration or fallback to DEFAULT_BENEFITS
+  useEffect(() => {
+    const fetchBenefits = async () => {
+      try {
+        const response = await fetch(`/api/crm/config/categories/${selectedClubYear}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.benefits) {
+            setBenefitsPorCategoria(data.benefits);
+          } else {
+            setBenefitsPorCategoria(DEFAULT_BENEFITS);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading benefits config:", err);
+      }
+    };
+    fetchBenefits();
+  }, [selectedClubYear]);
+
+  const normalizedCategoryKey = useMemo(() => {
+    const cat = dynamicCategory.toLowerCase().trim();
+    if (cat.includes('platinum')) return 'Platinum';
+    if (cat.includes('oro')) return 'Oro';
+    if (cat.includes('plata')) return 'Plata';
+    if (cat.includes('bronce')) return 'Bronce';
+    if (cat.includes('sin compra')) return 'Sin Compra';
+    return 'Sin categoría';
+  }, [dynamicCategory]);
+
+  const getBenefitRedemptionCount = (benefit: string) => {
+    return bitacora.filter((item: any) => {
+      const text = item.comentario || item.detalle || '';
+      return text.includes(`Uso de Beneficio: ${benefit}`);
+    }).length;
+  };
+
+  const handleRedeemBenefitIn360 = async (benefitName: string) => {
+    if (!client) return;
+    
+    const confirmMessage = `¿Registrar el canje del beneficio "${benefitName}" para ${client.name}?`;
+    if (!window.confirm(confirmMessage)) return;
+
+    const userName = user?.name || user?.email || 'Usuario CRM';
+    
+    const bitacoraEntry = {
+      id: crypto.randomUUID(),
+      fecha: new Date().toISOString(),
+      usuario: userName,
+      comentario: `Uso de Beneficio: ${benefitName}`,
+      tipo: 'beneficio'
+    };
+
+    // 1. Register global activity
+    try {
+      await localDB.saveToCollection('crm_activities', {
+        fecha: new Date().toISOString(),
+        campania: 'Club Comercial',
+        tipo: 'Uso de Beneficio',
+        observaciones: `Uso de Beneficio: ${benefitName}`,
+        responsable: userName,
+        clientId: client.id
+      });
+    } catch (err) {
+      console.error("Error logging global activity", err);
+    }
+
+    // 2. Register in client's bitacora
+    const updatedBitacora = [bitacoraEntry, ...bitacora];
+    setBitacora(updatedBitacora);
+
+    try {
+      await localDB.updateInCollection('contacts', client.id, {
+        bitacora: JSON.stringify(updatedBitacora)
+      });
+      alert('Uso de beneficio registrado con éxito.');
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+      if (onSave) onSave();
+      loadData();
+    } catch (err) {
+      console.error("Error updating client's bitacora", err);
+      alert('Error al registrar el uso de beneficio.');
+    }
+  };
 
   useEffect(() => {
     if (client) {
@@ -528,6 +649,61 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                       </p>
                     )}
                   </div>
+                </div>
+
+                {/* BENEFICIOS DISPONIBLES DE LA CATEGORÍA */}
+                <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+                  <div className="flex justify-between items-center border-b border-slate-800/60 pb-3">
+                    <h4 className="text-[10px] font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
+                      <Gift size={14} className="text-sky-400" /> BENEFICIOS DE CATEGORÍA ({selectedClubYear})
+                    </h4>
+                    <span 
+                      className="px-2.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider" 
+                      style={{ 
+                        color: TIER_COLORS[normalizedCategoryKey] || '#fff', 
+                        backgroundColor: `${TIER_COLORS[normalizedCategoryKey]}15` || 'rgba(255,255,255,0.1)',
+                        border: `1px solid ${TIER_COLORS[normalizedCategoryKey]}30` || '1px solid rgba(255,255,255,0.2)'
+                      }}
+                    >
+                      {dynamicCategory}
+                    </span>
+                  </div>
+
+                  {(!benefitsPorCategoria[normalizedCategoryKey] || benefitsPorCategoria[normalizedCategoryKey].length === 0) ? (
+                    <p className="text-[11px] text-slate-500 italic py-2">
+                      No hay beneficios configurados para la categoría {dynamicCategory} en el año {selectedClubYear}.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {benefitsPorCategoria[normalizedCategoryKey].map((benefit, index) => {
+                        const count = getBenefitRedemptionCount(benefit);
+                        return (
+                          <div 
+                            key={index} 
+                            className="bg-[#050914] border border-slate-850 rounded-xl p-3 flex flex-col justify-between hover:border-slate-700 transition-all group"
+                          >
+                            <div className="space-y-1">
+                              <p className="text-[11px] font-bold text-slate-200 leading-snug group-hover:text-white transition-colors">
+                                {benefit}
+                              </p>
+                              <div className="text-[9px] text-slate-500 font-medium">
+                                {count} canjes registrados para este cliente
+                              </div>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-slate-800/40 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleRedeemBenefitIn360(benefit)}
+                                className="px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-slate-950 border border-sky-500/20 hover:border-transparent text-[9px] font-black rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-sm uppercase tracking-wider"
+                              >
+                                <Check size={10} className="stroke-[3]" /> Registrar Canje
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
               <div className="flex justify-between items-center px-1">
