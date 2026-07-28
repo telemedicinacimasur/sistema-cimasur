@@ -4744,35 +4744,33 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
   const handleSyncFromQuotes = async () => {
     try {
-      if (!isFirebaseReady()) {
-        alert('Firebase no está configurado.');
-        return;
-      }
+      console.log('Sync: Fetching quotes via localDB...');
+      // Fetch all quotes using localDB (works in both Firebase and Local environments transparently)
+      const allQuotes = await localDB.getCollection('quotes', { limitCount: 2000 });
       
-      const db = getDb();
-      const { collection, getDocs, query, where, doc, setDoc } = await import('firebase/firestore');
-
-      console.log('Sync: Fetching approved quotes...');
-      const quotesQuery = query(collection(db, 'quotes'), where('estado', '==', 'APROBADA'));
-      const quotesSnapshot = await getDocs(quotesQuery);
-      const approvedQuotes: any[] = quotesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Filter quotes where state is approved (case-insensitive check for 'Aprobada' or 'APROBADA')
+      const approvedQuotes = allQuotes.filter(q => {
+        const estadoStr = String(q.estado || '').toUpperCase().trim();
+        return estadoStr === 'APROBADA';
+      });
       console.log(`Sync: Found ${approvedQuotes.length} approved quotes.`);
 
       // 2. Fetch Existing Tracking IDs
-      console.log('Sync: Fetching existing tracking IDs...');
-      const trackingSnapshot = await getDocs(collection(db, 'order_tracking'));
-      const existingTrackingIds = new Set(trackingSnapshot.docs.map(d => safe(d.data().nroCotiz).trim()));
+      console.log('Sync: Fetching existing tracking records...');
+      const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 2000 });
+      const existingTrackingIds = new Set(existingTracking.map(d => String(d.nroCotiz || '').trim()));
       console.log(`Sync: Found ${existingTrackingIds.size} existing tracking records.`);
 
       let addedCount = 0;
       for (const quote of approvedQuotes) {
-        const numCotiz = safe(quote.nroCotiz).trim();
+        const numCotiz = String(quote.nroCotiz || '').trim();
         if (!numCotiz) continue;
 
         if (!existingTrackingIds.has(numCotiz)) {
           console.log(`Sync: Adding new record for ${numCotiz}...`);
           // 3. Save new using numCotiz as ID
-          await setDoc(doc(db, "order_tracking", numCotiz), {
+          const newTrackingRecord = {
+            id: numCotiz,
             nroCotiz: numCotiz,
             ot: '',
             cliente: safe(quote.cliente),
@@ -4788,11 +4786,13 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
               user: 'Sistema (Sync)',
               action: 'Pedido sincronizado desde Administración'
             }]
-          });
+          };
+
+          await localDB.saveToCollection('order_tracking', newTrackingRecord);
           addedCount++;
           existingTrackingIds.add(numCotiz); // Keep local set updated
         } else {
-            console.log(`Sync: Skipping existing ${numCotiz}.`);
+          console.log(`Sync: Skipping existing ${numCotiz}.`);
         }
       }
       
