@@ -32,15 +32,12 @@ const GENERIC_CATEGORIES = [
   'Esencia Floral',
   'Producto Simple',
   'Nosode Simple',
-  'Complejo Base',
-  'Complejo Avanzado',
-  'Especialidad',
-  'Sales de Schussler',
-  'Exóticos',
-  'productos a Solicitud',
-  'Paquetes Terapeuticos (KIT)',
+  'Oftálmica',
   'Esencias florales',
-  'Oftálmica'
+  'PROD. SIMPLE',
+  'NOSODE SIMPLE',
+  'FÓRMULAS MAGISTRALES',
+  'Fórmulas Magistrales'
 ];
 
 const PREFIX_MAP: Record<string, string> = {
@@ -74,11 +71,13 @@ export default function CimasurInventoryManager() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterIncomplete, setFilterIncomplete] = useState(false);
+  const [isBarcodeGeneric, setIsBarcodeGeneric] = useState(false);
   
   const [form, setForm] = useState<any>({
       codigo_barras: '',
       nombre_producto: '',
       solucion: '',
+      gp: '',
       categoria_tipo: 'Oftálmica',
       fecha: '',
       doctor: '',
@@ -128,7 +127,8 @@ export default function CimasurInventoryManager() {
       filtered = filtered.filter(r => 
         safe(r.codigo_barras).toLowerCase().includes(s) ||
         safe(r.nombre_producto).toLowerCase().includes(s) ||
-        safe(r.solucion).toLowerCase().includes(s)
+        safe(r.solucion).toLowerCase().includes(s) ||
+        safe(r.gp).toLowerCase().includes(s)
       );
     }
 
@@ -136,7 +136,7 @@ export default function CimasurInventoryManager() {
       filtered = filtered.filter(r => 
         !safe(r.codigo_barras).trim() || 
         !safe(r.nombre_producto).trim() ||
-        (r.base_master ? !['GOTAS PURAS'].includes(r.base_master) : true) && !safe(r.solucion).trim()
+        (['SALINA CS', 'ETANOL CS', 'ADE CS', 'DILUCIONES CIMASUR', 'ALTAS DILUCIONES'].includes(r.base_master) && !safe(r.solucion).trim())
       );
     }
 
@@ -213,12 +213,6 @@ export default function CimasurInventoryManager() {
     return { nextCode: formatCode(nextNum), missingCodes: missing.map(formatCode).slice(0, 10) };
   };
 
-  useEffect(() => {
-    if (showModal && !editingId) {
-       setForm(prev => ({ ...prev, codigo_barras: '' }));
-    }
-  }, [showModal, form.categoria_tipo, activeTab]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.codigo_barras || !form.codigo_barras.trim()) {
@@ -233,25 +227,26 @@ export default function CimasurInventoryManager() {
     const currentBase = activeTab === 'MATRIZ COMPLETA' ? form.base_master : activeTab;
     
     // Validar duplicados
-    const isGeneric = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(currentBase) && GENERIC_CATEGORIES.includes(form.categoria_tipo);
     const codeToCheck = form.codigo_barras.trim();
+    const isGenericCode = codeToCheck.toUpperCase() === 'GENÉRICO' || codeToCheck.toUpperCase() === 'GENERICO';
     
-    // Si NO es genérico (debe ser único) o si intentan usar un código de otra cosa
-    if (!isGeneric) {
-       const existingWithCode = records.find(r => r.codigo_barras === codeToCheck && r.id !== editingId);
+    // Si NO es genérico (debe ser único)
+    if (!isGenericCode) {
+       const existingWithCode = records.find(r => {
+         if (!r.codigo_barras) return false;
+         const existingCode = String(r.codigo_barras).trim().toUpperCase();
+         if (existingCode === 'GENÉRICO' || existingCode === 'GENERICO') return false;
+         return existingCode === codeToCheck.toUpperCase() && r.id !== editingId;
+       });
        if (existingWithCode) {
-          const isExistingGeneric = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(existingWithCode.base_master) 
-                                     && GENERIC_CATEGORIES.includes(existingWithCode.categoria_tipo);
-          if (!isExistingGeneric) {
-             alert(`¡Error! El código ${codeToCheck} ya está en uso por "${existingWithCode.nombre_producto}". Use otro correlativo.`);
-             return;
-          }
+          alert(`¡Error! El código ${codeToCheck} ya está en uso por "${existingWithCode.nombre_producto}". Use otro correlativo.`);
+          return;
        }
     }
 
     const finalData = {
       ...form,
-      codigo_barras: isGeneric ? 'GENÉRICO' : form.codigo_barras,
+      codigo_barras: isGenericCode ? 'GENÉRICO' : form.codigo_barras,
       base_master: currentBase,
       type: 'inventory',
       precio: form.precio !== undefined ? Number(form.precio) : 0,
@@ -271,6 +266,7 @@ export default function CimasurInventoryManager() {
       codigo_barras: '', 
       nombre_producto: '', 
       solucion: '', 
+      gp: '',
       categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory, 
       fecha: '', 
       doctor: '',
@@ -282,10 +278,13 @@ export default function CimasurInventoryManager() {
 
   const handleEdit = (r: any) => {
     setEditingId(r.id);
+    const isGen = r.codigo_barras && (String(r.codigo_barras).trim().toUpperCase() === 'GENÉRICO' || String(r.codigo_barras).trim().toUpperCase() === 'GENERICO');
+    setIsBarcodeGeneric(!!isGen);
     setForm({
       codigo_barras: r.codigo_barras || '',
       nombre_producto: r.nombre_producto || '',
       solucion: r.solucion || '',
+      gp: r.gp || '',
       categoria_tipo: r.categoria_tipo || 'Oftálmica',
       fecha: r.fecha || '',
       doctor: r.doctor || '',
@@ -349,8 +348,8 @@ export default function CimasurInventoryManager() {
       case 'GOTAS PURAS': return ['CÓDIGO', 'PRODUCTO']; // Removed SOLUCIÓN
       case 'ALTAS DILUCIONES': return ['CÓDIGO', 'PRODUCTO', 'DILUCIÓN'];
       case 'NOSODES CLIENTES': return ['CÓDIGO NC', 'MUESTRA Y POTENCIA', 'FECHA', 'DOCTOR(A)'];
-      case 'FÓRMULAS MAGISTRALES': return ['CÓDIGO FM', 'FÓRMULA', 'OBSERVACIÓN'];
-      case 'EC DR. CONEJEROS': return ['CÓDIGO EC', 'PRODUCTO', 'DILUCIÓN'];
+      case 'FÓRMULAS MAGISTRALES': return ['CÓDIGO FM', 'G.P', 'NOMBRE PRODUCTO', 'FECHA', 'DOCTOR(A)'];
+      case 'EC DR. CONEJEROS': return ['CÓDIGO EC', 'G.P', 'PRODUCTO', 'DILUCIÓN'];
       default: return ['CÓDIGO BARRA', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA', 'PRECIO'];
     }
   };
@@ -375,9 +374,9 @@ export default function CimasurInventoryManager() {
       case 'NOSODES CLIENTES': 
         return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.fecha), safe(r.doctor)];
       case 'FÓRMULAS MAGISTRALES':
-        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
+        return [safe(r.codigo_barras), safe(r.solucion), safe(r.nombre_producto), safe(r.fecha), safe(r.doctor)];
       case 'EC DR. CONEJEROS':
-        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
+        return [safe(r.codigo_barras), safe(r.gp), safe(r.nombre_producto), safe(r.solucion)];
       default: 
          return [
           safe(r.codigo_barras),
@@ -436,24 +435,46 @@ export default function CimasurInventoryManager() {
         let emptyMissing = 0;
 
         for (const row of data as any[]) {
-          const cd = safe(row['CÓDIGO'] || row['CÓDIGO BARRA'] || row['CODIGO GP'] || row['CÓDIGO NC'] || row['CODIGO FM'] || row['CÓDIGO EC'] || row['CODIGO'] || row['codigo'] || row['Código']);
-          const nm = safe(row['IDENTIFICACIÓN'] || row['PRODUCTO'] || row['MUESTRA Y POTENCIA'] || row['NOMBRE'] || row['FÓRMULA'] || row['producto'] || row['Producto']);
+          const cd = safe(row['CÓDIGO'] || row['CÓDIGO BARRA'] || row['CODIGO GP'] || row['CÓDIGO NC'] || row['CODIGO FM'] || row['CÓDIGO EC'] || row['CODIGO'] || row['codigo'] || row['Código'] || row['CÓDIGO NC'] || row['Código FM']);
+          const nm = safe(row['IDENTIFICACIÓN'] || row['PRODUCTO'] || row['NOMBRE PRODUCTO'] || row['MUESTRA Y POTENCIA'] || row['NOMBRE'] || row['FÓRMULA'] || row['producto'] || row['Producto']);
           
           if (!cd || !nm) {
             emptyMissing++;
             continue;
           }
 
-          const isGeneric = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(activeTab) && GENERIC_CATEGORIES.includes(safe(row['CATEGORÍA'] || activeCategory));
+          const isGeneric = cd.trim().toUpperCase() === 'GENÉRICO' || cd.trim().toUpperCase() === 'GENERICO';
 
           if (!isGeneric) {
-            const hasDuplicateInRecords = records.some(r => r.codigo_barras === cd.trim());
-            const hasDuplicateInCurrentImport = validRows.some(r => r.cd === cd.trim());
+            const hasDuplicateInRecords = records.some(r => {
+              if (!r.codigo_barras) return false;
+              const existingCode = String(r.codigo_barras).trim().toUpperCase();
+              if (existingCode === 'GENÉRICO' || existingCode === 'GENERICO') return false;
+              return existingCode === cd.trim().toUpperCase();
+            });
+            const hasDuplicateInCurrentImport = validRows.some(r => {
+              if (!r.cd) return false;
+              const existingCode = String(r.cd).trim().toUpperCase();
+              if (existingCode === 'GENÉRICO' || existingCode === 'GENERICO') return false;
+              return existingCode === cd.trim().toUpperCase();
+            });
             
             if (hasDuplicateInRecords || hasDuplicateInCurrentImport) {
                duplicates++;
                continue;
             }
+          }
+
+          let solVal = '';
+          let gpVal = '';
+          
+          if (activeTab === 'EC DR. CONEJEROS') {
+            gpVal = safe(row['G.P'] || row['GP'] || '');
+            solVal = safe(row['DILUCIÓN'] || row['DILUCION'] || row['SOLUCIÓN'] || row['SOLUCION'] || '');
+          } else if (activeTab === 'FÓRMULAS MAGISTRALES') {
+            solVal = safe(row['G.P'] || row['GP'] || row['SOLUCIÓN'] || row['SOLUCION'] || '');
+          } else {
+            solVal = safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['OBSERVACIÓN'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || '');
           }
 
           let importedCat = safe(row['CATEGORÍA'] || row['CATEGORIA'] || activeCategory);
@@ -466,7 +487,8 @@ export default function CimasurInventoryManager() {
           validRows.push({
             cd: cd.trim(),
             nm: nm.trim(),
-            sol: safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['OBSERVACIÓN'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || ''),
+            sol: solVal,
+            gp: gpVal,
             cat: importedCat,
             fec: safe(row['FECHA']),
             doc: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR']),
@@ -487,6 +509,7 @@ export default function CimasurInventoryManager() {
              codigo_barras: r.cd,
              nombre_producto: r.nm,
              solucion: r.sol,
+             gp: r.gp || '',
              categoria_tipo: r.cat,
              fecha: r.fec,
              doctor: r.doc,
@@ -525,13 +548,12 @@ export default function CimasurInventoryManager() {
   };
 
   const filtered = getFilteredRecords();
-  const isGeneric = isBaseModule && GENERIC_CATEGORIES.includes(form.categoria_tipo);
 
   const incompleteCount = useMemo(() => {
     return records.filter(r => 
       !safe(r.codigo_barras).trim() || 
       !safe(r.nombre_producto).trim() ||
-      (r.base_master ? !['GOTAS PURAS'].includes(r.base_master) : true) && !safe(r.solucion).trim()
+      (['SALINA CS', 'ETANOL CS', 'ADE CS', 'DILUCIONES CIMASUR', 'ALTAS DILUCIONES'].includes(r.base_master) && !safe(r.solucion).trim())
     ).length;
   }, [records]);
 
@@ -545,6 +567,14 @@ export default function CimasurInventoryManager() {
     { id: 'EC DR. CONEJEROS' as SubModule, label: 'Fórmulas EC', desc: 'Dr. Eduardo Conejeros', icon: FlaskConical, bg: 'bg-[#1E293B]', text: 'text-orange-400' },
   ];
 
+  const currentModuleInfo = modules.find(m => m.id === activeModule);
+  const headerTitle = activeModule === 'dashboard' 
+    ? 'Gestión de Códigos y Diluciones' 
+    : (currentModuleInfo?.label || 'Gestión de Códigos y Diluciones');
+  const headerDesc = activeModule === 'dashboard' 
+    ? 'Gestión de Códigos y Diluciones.' 
+    : (currentModuleInfo?.desc || 'Bases correlativas y catálogos de diluciones');
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300 h-full flex flex-col">
       <div className="flex items-center gap-4">
@@ -557,11 +587,11 @@ export default function CimasurInventoryManager() {
             <ArrowLeft className="w-5 h-5" />
           </button>
         )}
-        <Database className="w-8 h-8 text-white" />
+        <Database className="w-8 h-8 text-[#0B2545]" />
         <div>
-          <h2 className="text-xl font-black text-white uppercase tracking-tighter">Gestión de Códigos y Diluciones</h2>
-          <p className="text-sm text-slate-400 font-medium">
-            {activeModule === 'dashboard' ? 'Gestión de Códigos y Diluciones.' : 'Bases correlativas y catálogos de diluciones'}
+          <h2 className="text-xl font-black text-[#0B2545] uppercase tracking-tighter">{headerTitle}</h2>
+          <p className="text-sm text-[#153B68] font-semibold">
+            {headerDesc}
           </p>
         </div>
       </div>
@@ -699,11 +729,14 @@ export default function CimasurInventoryManager() {
                 <button 
                   onClick={() => { 
                       setEditingId(null); 
+                      const initialCat = activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory;
+                      const nextIsGeneric = GENERIC_CATEGORIES.includes(initialCat);
+                      setIsBarcodeGeneric(nextIsGeneric);
                       setForm({ 
-                        codigo_barras: '', 
+                        codigo_barras: nextIsGeneric ? 'GENÉRICO' : '', 
                         nombre_producto: '', 
                         solucion: '', 
-                        categoria_tipo: activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory, 
+                        categoria_tipo: initialCat, 
                         fecha: '', 
                         doctor: '',
                         base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab,
@@ -719,50 +752,69 @@ export default function CimasurInventoryManager() {
             </div>
 
             {/* Acciones Masivas Sub-Bar */}
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-red-950/20 border border-red-500/20 rounded-2xl shadow-inner">
-              <div className="flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-red-400" />
-                <div>
-                  <span className="text-xs font-black text-red-200 uppercase tracking-widest block leading-none">Acciones Masivas</span>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 block">
-                    {selectedIds.length} seleccionados de {filtered.length} visibles
-                  </span>
+            {selectedIds.length > 0 && (
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-red-950/20 border border-red-500/20 rounded-2xl shadow-inner animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                  <div>
+                    <span className="text-xs font-black text-red-200 uppercase tracking-widest block leading-none">Acciones Masivas</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 block">
+                      {selectedIds.length} seleccionados de {filtered.length} visibles
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    disabled={selectedIds.length === 0}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5",
+                      selectedIds.length > 0
+                        ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20"
+                        : "bg-red-500/10 text-red-500/30 border border-red-500/10 cursor-not-allowed"
+                    )}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Eliminar Seleccionados ({selectedIds.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllFiltered}
+                    disabled={filtered.length === 0}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5",
+                      filtered.length > 0
+                        ? "bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30"
+                        : "bg-[#152035] text-slate-500 border border-[#1E293B]/60 cursor-not-allowed"
+                    )}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Eliminar Todo ({filtered.length})
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedIds.length === 0}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5",
-                    selectedIds.length > 0
-                      ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20"
-                      : "bg-red-500/10 text-red-500/30 border border-red-500/10 cursor-not-allowed"
-                  )}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Eliminar Seleccionados ({selectedIds.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteAllFiltered}
-                  disabled={filtered.length === 0}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5",
-                    filtered.length > 0
-                      ? "bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30"
-                      : "bg-[#152035] text-slate-500 border border-[#1E293B]/60 cursor-not-allowed"
-                  )}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Eliminar Todo ({filtered.length})
-                </button>
-              </div>
-            </div>
+            )}
           </div>
  
           <div className="flex flex-col flex-1 min-h-0">
+            {filterIncomplete && (
+              <div className="mb-4 bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-200">
+                <div className="flex items-center gap-2.5">
+                  <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
+                  <div className="text-left">
+                    <p className="font-bold uppercase tracking-wider text-xs">Filtro de Registros Incompletos Activo</p>
+                    <p className="text-[10px] text-slate-400">Sólo se muestran los registros con campos vacíos o sin generar. ¡Tus registros completos no se han borrado, están ocultos temporalmente bajo este filtro!</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setFilterIncomplete(false)}
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer shrink-0"
+                >
+                  Desactivar Filtro y Ver Todo
+                </button>
+              </div>
+            )}
             <div className="bg-[#152035] border border-[#1E293B] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex-1 overflow-hidden flex flex-col">
             <div className="overflow-y-auto max-h-[550px] scrollbar-thin">
               <table className="w-full text-left">
@@ -789,7 +841,7 @@ export default function CimasurInventoryManager() {
                       />
                     </th>
                     {getHeadersForTab(activeTab).map((h, i) => (
-                      <th key={i} className={`p-4 border-r border-[#1E293B] bg-[#111A2E] sticky top-0 ${i === 0 ? 'w-32' : ''}`}>{h}</th>
+                      <th key={i} className={`p-4 border-r border-[#1E293B] bg-[#111A2E] sticky top-0 ${h === 'G.P' ? 'w-20 text-center' : i === 0 ? 'w-32' : ''}`}>{h}</th>
                     ))}
                     <th className="p-5 w-24 text-center bg-[#111A2E] sticky top-0">ACCIONES</th>
                   </tr>
@@ -816,12 +868,16 @@ export default function CimasurInventoryManager() {
                         </td>
                         {rowVals.map((val, idx) => {
                           const isPrice = (isBaseModule || isMatrixView) && idx === rowVals.length - 1;
+                          const isProductName = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS') ? idx === 2 : idx === 1;
+                          const isGP = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS') && idx === 1;
                           return (
                             <td key={idx} className={`p-4 text-xs border-r border-[#1E293B] ${
                               idx === 0 
                                 ? 'font-mono font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' 
-                                : idx === 1 
+                                : isProductName 
                                 ? 'font-bold text-sm text-white' 
+                                : isGP
+                                ? 'text-slate-300 text-center w-20'
                                 : isPrice 
                                 ? 'font-mono font-extrabold text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-black'
                                 : 'text-slate-300'
@@ -895,7 +951,18 @@ export default function CimasurInventoryManager() {
                   <select 
                     className="w-full bg-[#152035] border-b border-[#1E293B] focus:border-[#38BDF8] p-2 text-sm font-bold text-white outline-none cursor-pointer"
                     value={form.categoria_tipo || 'Oftálmica'}
-                    onChange={e => setForm({...form, categoria_tipo: e.target.value})}
+                    onChange={e => {
+                      const newCat = e.target.value;
+                      setForm(prev => {
+                        const updates: any = { categoria_tipo: newCat };
+                        if (!editingId) {
+                          const nextIsGeneric = GENERIC_CATEGORIES.includes(newCat);
+                          setIsBarcodeGeneric(nextIsGeneric);
+                          updates.codigo_barras = nextIsGeneric ? 'GENÉRICO' : (prev.codigo_barras === 'GENÉRICO' ? '' : prev.codigo_barras);
+                        }
+                        return { ...prev, ...updates };
+                      });
+                    }}
                   >
                     {BASE_CATEGORIES.filter(c => c !== 'TODOS').map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -915,23 +982,46 @@ export default function CimasurInventoryManager() {
               )}
 
               <div className="flex flex-col gap-1">
+                {/* Checkbox para alternar código genérico */}
+                {isBaseModule && (
+                  <div className="flex items-center gap-2 mb-2 bg-[#1A253E] p-2.5 rounded-xl border border-amber-500/20">
+                    <input
+                      type="checkbox"
+                      id="checkbox-es-generico"
+                      checked={isBarcodeGeneric}
+                      onChange={e => {
+                        const checked = e.target.checked;
+                        setIsBarcodeGeneric(checked);
+                        setForm(prev => ({
+                          ...prev,
+                          codigo_barras: checked ? 'GENÉRICO' : (prev.codigo_barras === 'GENÉRICO' ? '' : prev.codigo_barras)
+                        }));
+                      }}
+                      className="w-4 h-4 rounded border-[#1E293B] text-amber-500 focus:ring-amber-500/30 accent-amber-500 cursor-pointer"
+                    />
+                    <label htmlFor="checkbox-es-generico" className="text-[10px] font-black uppercase text-amber-400 cursor-pointer select-none tracking-wider">
+                      ¿CÓDIGO GENÉRICO FIJO? (MARCAR SÓLO PARA FAMILIAS SIN CORRELATIVO)
+                    </label>
+                  </div>
+                )}
+
                 <FormField label={getHeadersForTab(activeTab)[0] || "CÓDIGO"}>
                   <input
                     type="text"
                     required
-                    readOnly={isGeneric}
+                    readOnly={isBarcodeGeneric}
                     className={cn(
                         "w-full border-b p-2 text-sm font-mono font-bold outline-none",
-                        isGeneric ? "border-amber-200 bg-amber-500/10 text-amber-500 cursor-not-allowed" : "border-[#1E293B] focus:border-[#001736] text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]"
+                        isBarcodeGeneric ? "border-amber-200 bg-amber-500/10 text-amber-500 cursor-not-allowed" : "border-[#1E293B] focus:border-[#001736] text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]"
                     )}
-                    value={isGeneric ? 'GENÉRICO' : (form.codigo_barras || '')}
+                    value={isBarcodeGeneric ? 'GENÉRICO' : (form.codigo_barras || '')}
                     onChange={e => setForm({...form, codigo_barras: e.target.value})}
                   />
-                  {isGeneric && <span className="text-[10px] text-amber-500 font-black uppercase mt-1">GENÉRICO FIJO (NO CORRELATIVO)</span>}
-                  {!isGeneric && !editingId && <span className="text-[9px] text-[#38BDF8] font-black uppercase mt-1">CÓDIGO ÚNICO CORRELATIVO</span>}
+                  {isBarcodeGeneric && <span className="text-[10px] text-amber-500 font-black uppercase mt-1">GENÉRICO FIJO (NO CORRELATIVO)</span>}
+                  {!isBarcodeGeneric && !editingId && <span className="text-[9px] text-[#38BDF8] font-black uppercase mt-1">CÓDIGO ÚNICO CORRELATIVO</span>}
                 </FormField>
                 
-                {!editingId && !isGeneric && (() => {
+                {!editingId && !isBarcodeGeneric && (() => {
                    const stats = getCodeStats();
                    return (
                      <div className="mt-2 bg-[#0F172A] p-3 rounded-xl border border-[#1E293B]">
@@ -960,20 +1050,38 @@ export default function CimasurInventoryManager() {
                 })()}
               </div>
 
-              <FormField label={getHeadersForTab(activeTab)[1] || "PRODUCTO"}>
+              <FormField label={activeTab === 'FÓRMULAS MAGISTRALES' ? "NOMBRE PRODUCTO" : (getHeadersForTab(activeTab)[1] || "PRODUCTO")}>
                 <input
                   type="text"
                   required
                   className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm font-bold text-white outline-none uppercase"
-                  placeholder="Ej. Echinacea, Tumor Paladar, C-100"
+                  placeholder={activeTab === 'FÓRMULAS MAGISTRALES' ? "Ej. Echinacea, Tumor Paladar" : "Ej. Echinacea, Tumor Paladar, C-100"}
                   value={form.nombre_producto || ''}
                   onChange={e => setForm({...form, nombre_producto: e.target.value})}
                 />
               </FormField>
 
-              {activeTab === 'NOSODES CLIENTES' ? (
+              {(activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS') && (
+                <FormField label="G.P">
+                  <input
+                    type="text"
+                    className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
+                    placeholder="Ej. G.P, R3, etc."
+                    value={activeTab === 'FÓRMULAS MAGISTRALES' ? (form.solucion || '') : (form.gp || '')}
+                    onChange={e => {
+                      if (activeTab === 'FÓRMULAS MAGISTRALES') {
+                        setForm({...form, solucion: e.target.value});
+                      } else {
+                        setForm({...form, gp: e.target.value});
+                      }
+                    }}
+                  />
+                </FormField>
+              )}
+
+              {['NOSODES CLIENTES', 'FÓRMULAS MAGISTRALES'].includes(activeTab) ? (
                  <div className="grid grid-cols-2 gap-4">
-                   <FormField label={getHeadersForTab(activeTab)[2] || "FECHA"}>
+                   <FormField label="FECHA">
                      <input
                        type="date"
                        className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
@@ -981,7 +1089,7 @@ export default function CimasurInventoryManager() {
                        onChange={e => setForm({...form, fecha: e.target.value})}
                      />
                    </FormField>
-                   <FormField label={getHeadersForTab(activeTab)[3] || "DOCTOR(A)"}>
+                   <FormField label="DOCTOR(A)">
                      <input
                        type="text"
                        className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
@@ -992,7 +1100,7 @@ export default function CimasurInventoryManager() {
                    </FormField>
                  </div>
               ) : activeTab !== 'GOTAS PURAS' ? (
-                <FormField label={getHeadersForTab(activeTab)[2] || "SOLUCIÓN"}>
+                <FormField label={activeTab === 'EC DR. CONEJEROS' ? "DILUCIÓN" : (getHeadersForTab(activeTab)[2] || "SOLUCIÓN")}>
                   <input
                     type="text"
                     className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
