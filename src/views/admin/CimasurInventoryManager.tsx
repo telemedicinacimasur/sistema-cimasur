@@ -16,7 +16,7 @@ const BASE_CATEGORIES = [
   "Especialidad",
   "Sales de Schussler",
   "Exóticos",
-  "productos a Solicitud",
+  "Productos Simple",
   "Paquetes Terapeuticos (KIT)",
   "Esencias florales",
   "Oftálmica"
@@ -59,6 +59,107 @@ const FormField = ({ label, children }: { label: string, children: React.ReactNo
   </div>
 );
 
+// Date Helpers to handle uniform "fecha corta" format (DD/MM/YYYY) and native HTML date inputs (YYYY-MM-DD)
+const convertToInputDate = (dateVal: any): string => {
+  if (!dateVal) return '';
+  const valStr = String(dateVal).trim();
+  if (!valStr) return '';
+
+  // If already YYYY-MM-DD
+  const ymdRegex = /^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/;
+  const matchYmd = valStr.match(ymdRegex);
+  if (matchYmd) {
+    const year = matchYmd[1];
+    const month = matchYmd[2].padStart(2, '0');
+    const day = matchYmd[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // If DD/MM/YYYY or DD-MM-YYYY
+  const dmyRegex = /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/;
+  const matchDmy = valStr.match(dmyRegex);
+  if (matchDmy) {
+    const day = matchDmy[1].padStart(2, '0');
+    const month = matchDmy[2].padStart(2, '0');
+    const year = matchDmy[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // If Excel number
+  const num = Number(valStr);
+  if (!isNaN(num) && num > 20000 && num < 60000) {
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  // Try standard parse
+  const parsed = new Date(valStr);
+  if (!isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${year}-${month}-${day}`;
+  }
+
+  return '';
+};
+
+const formatShortDate = (dateVal: any): string => {
+  if (!dateVal) return '';
+  const valStr = String(dateVal).trim();
+  if (!valStr) return '';
+
+  // If already DD/MM/YYYY or DD-MM-YYYY
+  const dmyRegex = /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/;
+  const matchDmy = valStr.match(dmyRegex);
+  if (matchDmy) {
+    const day = matchDmy[1].padStart(2, '0');
+    const month = matchDmy[2].padStart(2, '0');
+    const year = matchDmy[3];
+    return `${day}/${month}/${year}`;
+  }
+
+  // If YYYY-MM-DD or YYYY/MM/DD
+  const ymdRegex = /^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/;
+  const matchYmd = valStr.match(ymdRegex);
+  if (matchYmd) {
+    const year = matchYmd[1];
+    const month = matchYmd[2].padStart(2, '0');
+    const day = matchYmd[3].padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+
+  // If Excel number
+  const num = Number(valStr);
+  if (!isNaN(num) && num > 20000 && num < 60000) {
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+  }
+
+  // Try standard parse
+  const parsed = new Date(valStr);
+  if (!isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  return valStr;
+};
+
 export default function CimasurInventoryManager() {
   const { user } = useAuth();
   const [activeModule, setActiveModule] = useState<SubModule>('dashboard');
@@ -70,7 +171,6 @@ export default function CimasurInventoryManager() {
   const [records, setRecords] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [filterIncomplete, setFilterIncomplete] = useState(false);
   const [isBarcodeGeneric, setIsBarcodeGeneric] = useState(false);
   
   const [form, setForm] = useState<any>({
@@ -129,14 +229,6 @@ export default function CimasurInventoryManager() {
         safe(r.nombre_producto).toLowerCase().includes(s) ||
         safe(r.solucion).toLowerCase().includes(s) ||
         safe(r.gp).toLowerCase().includes(s)
-      );
-    }
-
-    if (filterIncomplete) {
-      filtered = filtered.filter(r => 
-        !safe(r.codigo_barras).trim() || 
-        !safe(r.nombre_producto).trim() ||
-        (['SALINA CS', 'ETANOL CS', 'ADE CS', 'DILUCIONES CIMASUR', 'ALTAS DILUCIONES'].includes(r.base_master) && !safe(r.solucion).trim())
       );
     }
 
@@ -247,6 +339,7 @@ export default function CimasurInventoryManager() {
     const finalData = {
       ...form,
       codigo_barras: isGenericCode ? 'GENÉRICO' : form.codigo_barras,
+      fecha: convertToInputDate(form.fecha),
       base_master: currentBase,
       type: 'inventory',
       precio: form.precio !== undefined ? Number(form.precio) : 0,
@@ -286,7 +379,7 @@ export default function CimasurInventoryManager() {
       solucion: r.solucion || '',
       gp: r.gp || '',
       categoria_tipo: r.categoria_tipo || 'Oftálmica',
-      fecha: r.fecha || '',
+      fecha: convertToInputDate(r.fecha),
       doctor: r.doctor || '',
       precio: r.precio !== undefined ? Number(r.precio) : 0
     });
@@ -372,9 +465,9 @@ export default function CimasurInventoryManager() {
       case 'ALTAS DILUCIONES': 
         return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
       case 'NOSODES CLIENTES': 
-        return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.fecha), safe(r.doctor)];
+        return [safe(r.codigo_barras), safe(r.nombre_producto), formatShortDate(r.fecha), safe(r.doctor)];
       case 'FÓRMULAS MAGISTRALES':
-        return [safe(r.codigo_barras), safe(r.solucion), safe(r.nombre_producto), safe(r.fecha), safe(r.doctor)];
+        return [safe(r.codigo_barras), safe(r.solucion), safe(r.nombre_producto), formatShortDate(r.fecha), safe(r.doctor)];
       case 'EC DR. CONEJEROS':
         return [safe(r.codigo_barras), safe(r.gp), safe(r.nombre_producto), safe(r.solucion)];
       default: 
@@ -411,10 +504,59 @@ export default function CimasurInventoryManager() {
 
   const exportTemplate = () => {
     const headers = getHeadersForTab(activeTab);
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    
+    // Generate helpful sample rows based on activeTab
+    const getSampleRowsForTab = (tab: MainTab): any[][] => {
+      switch(tab) {
+        case 'SALINA CS':
+        case 'ETANOL CS':
+        case 'ADE CS':
+          return [
+            ['S-0001', 'Arnica Montana', 'C200', 'Complejo Base', '5000'],
+            ['S-0002', 'Calendula', '10X', 'Complejo Avanzado', '6000']
+          ];
+        case 'DILUCIONES CIMASUR':
+          return [
+            ['D-0001', 'Arnica Montana', 'C200 - 10-02-2026'],
+            ['D-0002', 'Nux Vomica', 'C30 - Actualizado']
+          ];
+        case 'GOTAS PURAS':
+          return [
+            ['GP-0001', 'Hypericum Perforatum'],
+            ['GP-0002', 'Bryonia Alba']
+          ];
+        case 'ALTAS DILUCIONES':
+          return [
+            ['AD-0001', 'Sulphur', 'C1000'],
+            ['AD-0002', 'Lycopodium', 'C200']
+          ];
+        case 'NOSODES CLIENTES':
+          return [
+            ['NC-0001', 'Muestra Sangre 200CH', '15/03/2026', 'Dr. Eduardo Conejeros'],
+            ['NC-0002', 'Muestra Saliva 100CH', '20/03/2026', 'Dra. Marcela Farias']
+          ];
+        case 'FÓRMULAS MAGISTRALES':
+          return [
+            ['FM-0001', 'GP', 'Fórmula Antigripal', '10/04/2026', 'Dra. Marcela Farias'],
+            ['FM-0002', 'R3', 'Fórmula Depurativa', '12/04/2026', 'Dr. Eduardo Conejeros']
+          ];
+        case 'EC DR. CONEJEROS':
+          return [
+            ['EC-0001', 'GP', 'Fórmula Antiacné', 'C30'],
+            ['EC-0002', 'R3', 'Fórmula Inmuno', 'C200']
+          ];
+        default:
+          return [
+            ['S-0001', 'Arnica Montana', 'C200', 'Complejo Base', '5000']
+          ];
+      }
+    };
+
+    const samples = getSampleRowsForTab(activeTab);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
-    XLSX.writeFile(wb, `plantilla_importacion_${activeTab}.xlsx`);
+    XLSX.writeFile(wb, `plantilla_importacion_${activeTab.replace(' CS', '')}.xlsx`);
   };
 
   const importExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -435,17 +577,51 @@ export default function CimasurInventoryManager() {
         let emptyMissing = 0;
 
         for (const row of data as any[]) {
-          const cd = safe(row['CÓDIGO'] || row['CÓDIGO BARRA'] || row['CODIGO GP'] || row['CÓDIGO NC'] || row['CODIGO FM'] || row['CÓDIGO EC'] || row['CODIGO'] || row['codigo'] || row['Código'] || row['CÓDIGO NC'] || row['Código FM']);
-          const nm = safe(row['IDENTIFICACIÓN'] || row['PRODUCTO'] || row['NOMBRE PRODUCTO'] || row['MUESTRA Y POTENCIA'] || row['NOMBRE'] || row['FÓRMULA'] || row['producto'] || row['Producto']);
+          const cd = safe(
+            row['CÓDIGO'] || 
+            row['CÓDIGO BARRA'] || 
+            row['CODIGO GP'] || 
+            row['CÓDIGO NC'] || 
+            row['CODIGO FM'] || 
+            row['CÓDIGO EC'] || 
+            row['CODIGO'] || 
+            row['codigo'] || 
+            row['Código'] || 
+            row['CÓDIGO EC'] || 
+            row['Código EC'] || 
+            row['CÓDIGO FM'] || 
+            row['Código FM'] || 
+            row['CÓDIGO NC'] || 
+            row['Código NC'] || 
+            row['CÓDIGO GP'] || 
+            row['Código GP'] || 
+            row['Correlativo'] || 
+            row['CORRELATIVO'] ||
+            row['Código de barra'] ||
+            row['Código de Barra']
+          );
+          const nm = safe(
+            row['IDENTIFICACIÓN'] || 
+            row['PRODUCTO'] || 
+            row['NOMBRE PRODUCTO'] || 
+            row['MUESTRA Y POTENCIA'] || 
+            row['NOMBRE'] || 
+            row['FÓRMULA'] || 
+            row['producto'] || 
+            row['Producto'] ||
+            row['IDENTIFICACION'] ||
+            row['MUESTRA'] ||
+            row['Muestra']
+          );
           
-          if (!cd || !nm) {
-            emptyMissing++;
+          // Skip ONLY if both fields are completely empty to avoid importing blank spreadsheet rows
+          if (!cd.trim() && !nm.trim()) {
             continue;
           }
 
           const isGeneric = cd.trim().toUpperCase() === 'GENÉRICO' || cd.trim().toUpperCase() === 'GENERICO';
 
-          if (!isGeneric) {
+          if (!isGeneric && cd.trim()) {
             const hasDuplicateInRecords = records.some(r => {
               if (!r.codigo_barras) return false;
               const existingCode = String(r.codigo_barras).trim().toUpperCase();
@@ -490,15 +666,15 @@ export default function CimasurInventoryManager() {
             sol: solVal,
             gp: gpVal,
             cat: importedCat,
-            fec: safe(row['FECHA']),
+            fec: convertToInputDate(row['FECHA']),
             doc: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR']),
             precio: pr !== undefined ? Number(pr) : 0
           });
         }
 
         validRows.sort((a,b) => {
-          const matchA = a.cd.match(/\d+/);
-          const matchB = b.cd.match(/\d+/);
+          const matchA = String(a.cd || '').match(/\d+/);
+          const matchB = String(b.cd || '').match(/\d+/);
           const numA = matchA ? parseInt(matchA[0], 10) : 0;
           const numB = matchB ? parseInt(matchB[0], 10) : 0;
           return numA - numB;
@@ -521,9 +697,8 @@ export default function CimasurInventoryManager() {
            });
         }
         
-        let msg = `Se importaron ${validRows.length} registros (ordenados de menor a mayor).`;
-        if (duplicates > 0) msg += `\nSe omitieron ${duplicates} duplicados.`;
-        if (emptyMissing > 0) msg += `\nSe detectaron ${emptyMissing} filas inválidas o con datos vacíos.`;
+        let msg = `Se importaron ${validRows.length} registros con éxito (ordenados correlativamente).`;
+        if (duplicates > 0) msg += `\nSe omitieron ${duplicates} duplicados con código existente.`;
         
         alert(msg);
         loadData();
@@ -548,14 +723,6 @@ export default function CimasurInventoryManager() {
   };
 
   const filtered = getFilteredRecords();
-
-  const incompleteCount = useMemo(() => {
-    return records.filter(r => 
-      !safe(r.codigo_barras).trim() || 
-      !safe(r.nombre_producto).trim() ||
-      (['SALINA CS', 'ETANOL CS', 'ADE CS', 'DILUCIONES CIMASUR', 'ALTAS DILUCIONES'].includes(r.base_master) && !safe(r.solucion).trim())
-    ).length;
-  }, [records]);
 
   const modules = [
     { id: 'codigos' as SubModule, label: 'Códigos de Barra', desc: 'Módulo Maestro (Salina, Etanol, ADE)', icon: Hash, bg: 'bg-[#1E293B]', text: 'text-[#38BDF8]' },
@@ -595,32 +762,6 @@ export default function CimasurInventoryManager() {
           </p>
         </div>
       </div>
-
-      {incompleteCount > 0 && (
-        <div className="bg-amber-950/20 border border-amber-500/30 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-amber-200">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-            <div>
-              <p className="font-bold uppercase tracking-wide text-xs">Atención: Registros con campos vacíos o códigos sin generar</p>
-              <p className="text-[10px] text-slate-400">Se detectaron {incompleteCount} registros con campos vacíos (código, producto o solución). Haz clic en el botón para verlos y corregirlos.</p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              if (activeModule === 'dashboard') {
-                setActiveModule('codigos');
-              }
-              setFilterIncomplete(!filterIncomplete);
-            }}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-              filterIncomplete ? "bg-amber-500 text-white" : "bg-amber-600/20 hover:bg-amber-600 hover:text-white text-amber-400 border border-amber-600/40"
-            )}
-          >
-            {filterIncomplete ? "Ver todos los registros" : `Ver ${incompleteCount} registros incompletos`}
-          </button>
-        </div>
-      )}
 
       {activeModule === 'dashboard' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -798,23 +939,6 @@ export default function CimasurInventoryManager() {
           </div>
  
           <div className="flex flex-col flex-1 min-h-0">
-            {filterIncomplete && (
-              <div className="mb-4 bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-200">
-                <div className="flex items-center gap-2.5">
-                  <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
-                  <div className="text-left">
-                    <p className="font-bold uppercase tracking-wider text-xs">Filtro de Registros Incompletos Activo</p>
-                    <p className="text-[10px] text-slate-400">Sólo se muestran los registros con campos vacíos o sin generar. ¡Tus registros completos no se han borrado, están ocultos temporalmente bajo este filtro!</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setFilterIncomplete(false)}
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer shrink-0"
-                >
-                  Desactivar Filtro y Ver Todo
-                </button>
-              </div>
-            )}
             <div className="bg-[#152035] border border-[#1E293B] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex-1 overflow-hidden flex flex-col">
             <div className="overflow-y-auto max-h-[550px] scrollbar-thin">
               <table className="w-full text-left">
