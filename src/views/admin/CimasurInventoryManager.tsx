@@ -160,6 +160,55 @@ const formatShortDate = (dateVal: any): string => {
   return valStr;
 };
 
+const normalizeCategory = (cat: any): string => {
+  if (!cat) return "Oftálmica";
+  const c = String(cat).trim().toUpperCase();
+  if (!c) return "Oftálmica";
+
+  if (c === "BASE" || c === "COMPLEJO BASE" || c.includes("COMPLEJO BASE") || c.includes("CS BASE")) {
+    return "Complejo Base";
+  }
+  if (c === "AVANZADO" || c === "COMPLEJO AVANZADO" || c.includes("COMPLEJO AVANZADO") || c.includes("CS AVANZADO")) {
+    return "Complejo Avanzado";
+  }
+  if (c.includes("ESPECIALIDAD")) {
+    return "Especialidad";
+  }
+  if (c.includes("SCHUSSLER") || c.includes("SCHÜSSLER")) {
+    return "Sales de Schussler";
+  }
+  if (c.includes("EXOTIC") || c.includes("EXÓTIC")) {
+    return "Exóticos";
+  }
+  if (c.includes("PRODUCTO SIMPLE") || c.includes("PRODUCTOS SIMPLE") || c.includes("PRODUCTOS SIMPLES") || c.includes("PROD. SIMPLE") || c === "SIMPLE") {
+    return "Productos Simple";
+  }
+  if (c.includes("TERAPEUTICO") || c.includes("TERAPÉUTICO") || c.includes("KIT")) {
+    return "Paquetes Terapeuticos (KIT)";
+  }
+  if (c.includes("FLORAL") || c.includes("FLORALES") || c.includes("ESENCIAS")) {
+    return "Esencias florales";
+  }
+  if (c.includes("OFTALM") || c.includes("OFTÁLM")) {
+    return "Oftálmica";
+  }
+
+  // Exact or close match fallback
+  const match = BASE_CATEGORIES.find(bc => bc.toUpperCase() === c);
+  if (match) return match;
+
+  // Case-insensitive secondary check
+  const fuzzyMatch = BASE_CATEGORIES.find(bc => bc.toLowerCase().replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ú/g, 'u').includes(c.toLowerCase().replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ú/g, 'u')));
+  if (fuzzyMatch) return fuzzyMatch;
+
+  return "Oftálmica";
+};
+
+const checkIsGeneric = (base: string, cat: string) => {
+  const isBase = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(base);
+  return isBase && GENERIC_CATEGORIES.includes(cat);
+};
+
 export default function CimasurInventoryManager() {
   const { user } = useAuth();
   const [activeModule, setActiveModule] = useState<SubModule>('dashboard');
@@ -188,22 +237,136 @@ export default function CimasurInventoryManager() {
   const isMatrixView = activeTab === 'MATRIZ COMPLETA';
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [importReport, setImportReport] = useState<{
+    successCount: number;
+    duplicates: { codigo: string; nombre: string; type: 'system' | 'file'; existingProduct?: string }[];
+    emptyCodesCount: number;
+    emptyRowsCount: number;
+    totalProcessed: number;
+  } | null>(null);
 
   useEffect(() => {
     setSelectedIds([]);
+    setIsBarcodeGeneric(false);
   }, [activeTab, activeModule, activeCategory]);
 
   useEffect(() => {
     loadData();
   }, []);
 
+  const repairGenericRecords = async (allRecords: any[]) => {
+    let changed = false;
+    const nonGenericBases = [
+      'DILUCIONES CIMASUR',
+      'GOTAS PURAS',
+      'ALTAS DILUCIONES',
+      'NOSODES CLIENTES',
+      'FÓRMULAS MAGISTRALES',
+      'EC DR. CONEJEROS'
+    ];
+
+    const copy = [...allRecords];
+
+    for (const base of nonGenericBases) {
+      const baseRecords = copy.filter(r => r.base_master === base);
+      const genericRecords = baseRecords.filter(r => {
+        const code = String(r.codigo_barras || '').trim().toUpperCase();
+        return !code || code === 'GENÉRICO' || code === 'GENERICO' || code === 'CÓDIGO ÚNICO';
+      });
+
+      if (genericRecords.length > 0) {
+        const nums: number[] = [];
+        for (const r of baseRecords) {
+          const code = String(r.codigo_barras || '').trim().toUpperCase();
+          if (code && code !== 'GENÉRICO' && code !== 'GENERICO' && code !== 'CÓDIGO ÚNICO') {
+            const match = code.match(/\d+/);
+            if (match) {
+              nums.push(parseInt(match[0], 10));
+            }
+          }
+        }
+
+        let nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+        const prefix = PREFIX_MAP[base] || '';
+
+        const formatCodeLocal = (n: number) => {
+          return prefix ? `${prefix}-${n.toString().padStart(4, '0')}` : n.toString();
+        };
+
+        for (const r of genericRecords) {
+          const newCode = formatCodeLocal(nextNum);
+          const updatedItem = { ...r, codigo_barras: newCode };
+          await localDB.saveToCollection('inventory_master', updatedItem);
+          
+          const idx = copy.findIndex(item => item.id === r.id);
+          if (idx >= 0) {
+            copy[idx] = updatedItem;
+          }
+          
+          nextNum++;
+          changed = true;
+        }
+      }
+    }
+
+    const baseModules = ['SALINA CS', 'ETANOL CS', 'ADE CS'];
+    for (const base of baseModules) {
+      const baseRecords = copy.filter(r => r.base_master === base);
+      const genericRecords = baseRecords.filter(r => {
+        const code = String(r.codigo_barras || '').trim().toUpperCase();
+        const isGenCode = !code || code === 'GENÉRICO' || code === 'GENERICO';
+        const isGenCat = GENERIC_CATEGORIES.includes(normalizeCategory(r.categoria_tipo));
+        return isGenCode && !isGenCat;
+      });
+
+      if (genericRecords.length > 0) {
+        const nums: number[] = [];
+        for (const r of baseRecords) {
+          const code = String(r.codigo_barras || '').trim();
+          if (code && code !== 'GENÉRICO' && code !== 'GENERICO') {
+            const match = code.match(/\d+/);
+            if (match) {
+              nums.push(parseInt(match[0], 10));
+            }
+          }
+        }
+
+        let nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 8221312003200;
+        const prefix = PREFIX_MAP[base] || '';
+
+        for (const r of genericRecords) {
+          const newCode = nextNum > 999999 
+            ? nextNum.toString() 
+            : (prefix ? `${prefix}-${nextNum.toString().padStart(4, '0')}` : nextNum.toString());
+            
+          const updatedItem = { ...r, codigo_barras: newCode };
+          await localDB.saveToCollection('inventory_master', updatedItem);
+          
+          const idx = copy.findIndex(item => item.id === r.id);
+          if (idx >= 0) {
+            copy[idx] = updatedItem;
+          }
+          
+          nextNum++;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      return await localDB.getCollection('inventory_master');
+    }
+    return allRecords;
+  };
+
   const loadData = async () => {
     const allRecords = await localDB.getCollection('inventory_master');
-    const mapped = allRecords.map((r: any) => {
-      if (r.categoria_tipo === 'Productos CS CIMASUR') {
-        return { ...r, categoria_tipo: 'Productos Base/Avanzado' };
-      }
-      return r;
+    const repaired = await repairGenericRecords(allRecords);
+    const mapped = repaired.map((r: any) => {
+      return {
+        ...r,
+        categoria_tipo: normalizeCategory(r.categoria_tipo)
+      };
     });
     setRecords(mapped);
   };
@@ -297,9 +460,12 @@ export default function CimasurInventoryManager() {
     }
     
     const formatCode = (n: number) => {
-       if (currentBase === 'ALTAS DILUCIONES') return `AD${n.toString().padStart(2, '0')}`;
-       if (currentBase === 'GOTAS PURAS') return n.toString();
-       return prefix ? `${prefix}-${n.toString().padStart(3, '0')}` : n.toString();
+       const isBase = ['SALINA CS', 'ETANOL CS', 'ADE CS'].includes(currentBase);
+       if (isBase) {
+          if (n > 999999) return n.toString();
+          return prefix ? `${prefix}-${n.toString().padStart(4, '0')}` : n.toString();
+       }
+       return prefix ? `${prefix}-${n.toString().padStart(4, '0')}` : n.toString();
     };
 
     return { nextCode: formatCode(nextNum), missingCodes: missing.map(formatCode).slice(0, 10) };
@@ -339,6 +505,7 @@ export default function CimasurInventoryManager() {
     const finalData = {
       ...form,
       codigo_barras: isGenericCode ? 'GENÉRICO' : form.codigo_barras,
+      categoria_tipo: normalizeCategory(form.categoria_tipo),
       fecha: convertToInputDate(form.fecha),
       base_master: currentBase,
       type: 'inventory',
@@ -573,10 +740,13 @@ export default function CimasurInventoryManager() {
         const data = XLSX.utils.sheet_to_json(ws);
         
         let validRows: any[] = [];
-        let duplicates = 0;
-        let emptyMissing = 0;
+        let duplicateItems: { codigo: string; nombre: string; type: 'system' | 'file'; existingProduct?: string }[] = [];
+        let emptyCodesCount = 0;
+        let emptyRowsCount = 0;
+        let totalProcessed = 0;
 
         for (const row of data as any[]) {
+          totalProcessed++;
           const cd = safe(
             row['CÓDIGO'] || 
             row['CÓDIGO BARRA'] || 
@@ -616,27 +786,46 @@ export default function CimasurInventoryManager() {
           
           // Skip ONLY if both fields are completely empty to avoid importing blank spreadsheet rows
           if (!cd.trim() && !nm.trim()) {
+            emptyRowsCount++;
             continue;
+          }
+
+          if (!cd.trim() && nm.trim()) {
+            emptyCodesCount++;
           }
 
           const isGeneric = cd.trim().toUpperCase() === 'GENÉRICO' || cd.trim().toUpperCase() === 'GENERICO';
 
           if (!isGeneric && cd.trim()) {
-            const hasDuplicateInRecords = records.some(r => {
+            const systemDup = records.find(r => {
+              if (r.base_master !== activeTab) return false;
               if (!r.codigo_barras) return false;
               const existingCode = String(r.codigo_barras).trim().toUpperCase();
               if (existingCode === 'GENÉRICO' || existingCode === 'GENERICO') return false;
               return existingCode === cd.trim().toUpperCase();
             });
-            const hasDuplicateInCurrentImport = validRows.some(r => {
+            const fileDup = validRows.find(r => {
               if (!r.cd) return false;
               const existingCode = String(r.cd).trim().toUpperCase();
               if (existingCode === 'GENÉRICO' || existingCode === 'GENERICO') return false;
               return existingCode === cd.trim().toUpperCase();
             });
             
-            if (hasDuplicateInRecords || hasDuplicateInCurrentImport) {
-               duplicates++;
+            if (systemDup) {
+               duplicateItems.push({
+                 codigo: cd.trim(),
+                 nombre: nm.trim(),
+                 type: 'system',
+                 existingProduct: systemDup.nombre_producto
+               });
+               continue;
+            } else if (fileDup) {
+               duplicateItems.push({
+                 codigo: cd.trim(),
+                 nombre: nm.trim(),
+                 type: 'file',
+                 existingProduct: fileDup.nm
+               });
                continue;
             }
           }
@@ -653,10 +842,7 @@ export default function CimasurInventoryManager() {
             solVal = safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['OBSERVACIÓN'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || '');
           }
 
-          let importedCat = safe(row['CATEGORÍA'] || row['CATEGORIA'] || activeCategory);
-          if (importedCat === 'Productos CS CIMASUR') {
-            importedCat = 'Productos Base/Avanzado';
-          }
+          let importedCat = normalizeCategory(row['CATEGORÍA'] || row['CATEGORIA'] || activeCategory);
 
           const pr = row['PRECIO'] || row['Precio'] || row['precio'] || row['VALOR'] || row['valor'];
 
@@ -697,10 +883,14 @@ export default function CimasurInventoryManager() {
            });
         }
         
-        let msg = `Se importaron ${validRows.length} registros con éxito (ordenados correlativamente).`;
-        if (duplicates > 0) msg += `\nSe omitieron ${duplicates} duplicados con código existente.`;
-        
-        alert(msg);
+        setImportReport({
+          successCount: validRows.length,
+          duplicates: duplicateItems,
+          emptyCodesCount,
+          emptyRowsCount,
+          totalProcessed
+        });
+
         loadData();
       } catch (err) {
         console.error(err);
@@ -870,8 +1060,9 @@ export default function CimasurInventoryManager() {
                 <button 
                   onClick={() => { 
                       setEditingId(null); 
+                      const currentBase = activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab;
                       const initialCat = activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory;
-                      const nextIsGeneric = GENERIC_CATEGORIES.includes(initialCat);
+                      const nextIsGeneric = checkIsGeneric(currentBase, initialCat);
                       setIsBarcodeGeneric(nextIsGeneric);
                       setForm({ 
                         codigo_barras: nextIsGeneric ? 'GENÉRICO' : '', 
@@ -880,7 +1071,7 @@ export default function CimasurInventoryManager() {
                         categoria_tipo: initialCat, 
                         fecha: '', 
                         doctor: '',
-                        base_master: activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab,
+                        base_master: currentBase,
                         precio: 0
                       });
                       setShowModal(true); 
@@ -1063,7 +1254,18 @@ export default function CimasurInventoryManager() {
                   <select 
                     className="w-full border-b border-[#1E293B] p-2 text-sm font-bold outline-none"
                     value={form.base_master || 'SALINA CS'}
-                    onChange={e => setForm({...form, base_master: e.target.value})}
+                    onChange={e => {
+                      const newBase = e.target.value;
+                      setForm(prev => {
+                        const updates: any = { base_master: newBase };
+                        if (!editingId) {
+                          const nextIsGeneric = checkIsGeneric(newBase, prev.categoria_tipo);
+                          setIsBarcodeGeneric(nextIsGeneric);
+                          updates.codigo_barras = nextIsGeneric ? 'GENÉRICO' : (prev.codigo_barras === 'GENÉRICO' ? '' : prev.codigo_barras);
+                        }
+                        return { ...prev, ...updates };
+                      });
+                    }}
                   >
                     {Object.keys(PREFIX_MAP).map(bm => <option key={bm} value={bm}>{bm.replace(' CS', '')}</option>)}
                   </select>
@@ -1080,7 +1282,7 @@ export default function CimasurInventoryManager() {
                       setForm(prev => {
                         const updates: any = { categoria_tipo: newCat };
                         if (!editingId) {
-                          const nextIsGeneric = GENERIC_CATEGORIES.includes(newCat);
+                          const nextIsGeneric = checkIsGeneric(prev.base_master || activeTab, newCat);
                           setIsBarcodeGeneric(nextIsGeneric);
                           updates.codigo_barras = nextIsGeneric ? 'GENÉRICO' : (prev.codigo_barras === 'GENÉRICO' ? '' : prev.codigo_barras);
                         }
@@ -1244,6 +1446,129 @@ export default function CimasurInventoryManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reporte de Importación */}
+      {importReport && (
+        <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-[#152035] rounded-3xl border border-[#1E293B] max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-[0_10px_50px_rgba(0,0,0,0.6)]">
+            <div className="p-6 border-b border-[#1E293B] flex justify-between items-center bg-[#1E3A5F] text-white">
+              <h3 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                Reporte de Importación de Inventario
+              </h3>
+              <button onClick={() => setImportReport(null)} className="text-white/50 hover:text-white font-bold text-xl leading-none">×</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Resumen de Métricas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-[#1E293B]">
+                  <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Procesado</div>
+                  <div className="text-2xl font-black text-slate-200 mt-1">{importReport.totalProcessed}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Líneas en el archivo</div>
+                </div>
+
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-emerald-500/20">
+                  <div className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Importado con Éxito</div>
+                  <div className="text-2xl font-black text-emerald-400 mt-1">+{importReport.successCount}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Agregados al inventario</div>
+                </div>
+
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-amber-500/20">
+                  <div className="text-[10px] font-black uppercase text-amber-400 tracking-wider">Duplicados Omitidos</div>
+                  <div className="text-2xl font-black text-amber-400 mt-1">{importReport.duplicates.length}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Códigos repetidos</div>
+                </div>
+
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-blue-500/20">
+                  <div className="text-[10px] font-black uppercase text-blue-400 tracking-wider">Sin Código / Correlativos</div>
+                  <div className="text-2xl font-black text-blue-400 mt-1">{importReport.emptyCodesCount}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Se asignó código auto.</div>
+                </div>
+              </div>
+
+              {/* Advertencias / Información útil */}
+              {(importReport.emptyCodesCount > 0 || importReport.emptyRowsCount > 0) && (
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-blue-500/10 space-y-2">
+                  <h4 className="text-xs font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    Notas de la importación:
+                  </h4>
+                  <ul className="list-disc pl-5 text-xs text-slate-300 space-y-1">
+                    {importReport.emptyCodesCount > 0 && (
+                      <li>
+                        Se detectaron <strong>{importReport.emptyCodesCount} registros sin código</strong> en el archivo Excel. Para asegurar que puedan identificarse, el sistema los guardó y les asignará automáticamente un código correlativo único y seguro del módulo correspondiente.
+                      </li>
+                    )}
+                    {importReport.emptyRowsCount > 0 && (
+                      <li>
+                        Se omitieron <strong>{importReport.emptyRowsCount} filas vacías</strong> detectadas en el archivo para evitar crear registros en blanco.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {/* Sección de Duplicados Omitidos */}
+              <div>
+                <h4 className="text-xs font-black uppercase text-amber-400 tracking-widest mb-3 flex items-center gap-1.5">
+                  <AlertCircle className="w-4.5 h-4.5 text-amber-500" />
+                  Duplicados Omitidos ({importReport.duplicates.length})
+                </h4>
+                
+                {importReport.duplicates.length === 0 ? (
+                  <div className="bg-[#0F172A] p-6 rounded-2xl border border-[#1E293B] text-center text-sm text-slate-400">
+                    🎉 ¡Excelente! No se encontraron códigos duplicados ni inconvenientes en la importación.
+                  </div>
+                ) : (
+                  <div className="bg-[#0F172A] rounded-2xl border border-[#1E293B] overflow-hidden">
+                    <div className="max-h-[300px] overflow-y-auto">
+                      <table className="w-full text-left text-xs text-slate-300 border-collapse">
+                        <thead className="bg-[#1A263F] text-[10px] font-black uppercase tracking-wider text-slate-300 sticky top-0">
+                          <tr>
+                            <th className="p-3">Código</th>
+                            <th className="p-3">Producto en Excel</th>
+                            <th className="p-3 text-amber-400">Inconveniente detectado / Ubicación</th>
+                            <th className="p-3">Producto Coincidente</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#1E293B]">
+                          {importReport.duplicates.map((dup, idx) => (
+                            <tr key={idx} className="hover:bg-[#152035]/50 transition-colors">
+                              <td className="p-3 font-mono font-bold text-amber-400">{dup.codigo}</td>
+                              <td className="p-3 font-bold">{dup.nombre || '---'}</td>
+                              <td className="p-3">
+                                <span className={cn(
+                                  "px-2 py-1 rounded-md text-[10px] font-black uppercase",
+                                  dup.type === 'system' 
+                                    ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" 
+                                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                )}>
+                                  {dup.type === 'system' ? 'Ya existe en el sistema' : 'Repetido en el Excel'}
+                                </span>
+                              </td>
+                              <td className="p-3 text-slate-400 italic font-medium">{dup.existingProduct || '---'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-[#1E293B] bg-[#0F172A] flex justify-end">
+              <button 
+                onClick={() => setImportReport(null)}
+                className="px-6 py-3 bg-[#1E3A5F] hover:bg-[#1D3557] text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-colors shadow-md"
+              >
+                Cerrar Reporte
+              </button>
+            </div>
           </div>
         </div>
       )}
