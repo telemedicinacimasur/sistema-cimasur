@@ -211,6 +211,12 @@ const checkIsGeneric = (base: string, cat: string) => {
 
 export default function CimasurInventoryManager() {
   const { user } = useAuth();
+  
+  const permissions = user?.permissions?.['manager'] || user?.permissions?.['crm'];
+  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager') && !user?.roles?.includes('crm'));
+  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+  
   const [activeModule, setActiveModule] = useState<SubModule>('dashboard');
   const [activeTab, setActiveTab] = useState<MainTab>('SALINA CS');
   const [activeCategory, setActiveCategory] = useState<string>('TODOS');
@@ -635,9 +641,9 @@ export default function CimasurInventoryManager() {
       case 'DILUCIONES CIMASUR': return ['CÓDIGO', 'IDENTIFICACIÓN', 'DILUCIONES / ACTUALIZACIÓN'];
       case 'GOTAS PURAS': return ['CÓDIGO', 'PRODUCTO']; // Removed SOLUCIÓN
       case 'ALTAS DILUCIONES': return ['CÓDIGO', 'PRODUCTO', 'DILUCIÓN'];
-      case 'NOSODES CLIENTES': return ['CÓDIGO NC', 'MUESTRA Y POTENCIA', 'FECHA', 'DOCTOR(A)'];
+      case 'NOSODES CLIENTES': return ['CÓDIGO NC', 'G.P', 'NOMBRE NOSODE', 'FECHA', 'DOCTOR(A)'];
       case 'FÓRMULAS MAGISTRALES': return ['CÓDIGO FM', 'G.P', 'NOMBRE PRODUCTO', 'FECHA', 'DOCTOR(A)'];
-      case 'EC DR. CONEJEROS': return ['CÓDIGO EC', 'G.P', 'PRODUCTO', 'DILUCIÓN'];
+      case 'EC DR. CONEJEROS': return ['CÓDIGO EC', 'G.P', 'PRODUCTO', 'FECHA ELABORACIÓN'];
       default: return ['CÓDIGO BARRA', 'PRODUCTO', 'SOLUCIÓN', 'CATEGORÍA', 'PRECIO'];
     }
   };
@@ -660,11 +666,11 @@ export default function CimasurInventoryManager() {
       case 'ALTAS DILUCIONES': 
         return [safe(r.codigo_barras), safe(r.nombre_producto), safe(r.solucion)];
       case 'NOSODES CLIENTES': 
-        return [safe(r.codigo_barras), safe(r.nombre_producto), formatShortDate(r.fecha), safe(r.doctor)];
+        return [safe(r.codigo_barras), safe(r.gp), safe(r.nombre_producto), formatShortDate(r.fecha), safe(r.doctor)];
       case 'FÓRMULAS MAGISTRALES':
         return [safe(r.codigo_barras), safe(r.solucion), safe(r.nombre_producto), formatShortDate(r.fecha), safe(r.doctor)];
       case 'EC DR. CONEJEROS':
-        return [safe(r.codigo_barras), safe(r.gp), safe(r.nombre_producto), safe(r.solucion)];
+        return [safe(r.codigo_barras), safe(r.gp), safe(r.nombre_producto), formatShortDate(r.fecha) || safe(r.solucion)];
       default: 
          return [
           safe(r.codigo_barras),
@@ -727,8 +733,8 @@ export default function CimasurInventoryManager() {
           ];
         case 'NOSODES CLIENTES':
           return [
-            ['NC-0001', 'Muestra Sangre 200CH', '15/03/2026', 'Dr. Eduardo Conejeros'],
-            ['NC-0002', 'Muestra Saliva 100CH', '20/03/2026', 'Dra. Marcela Farias']
+            ['NC-0001', 'GP', 'Muestra Sangre 200CH', '15/03/2026', 'Dr. Eduardo Conejeros'],
+            ['NC-0002', 'R3', 'Muestra Saliva 100CH', '20/03/2026', 'Dra. Marcela Farias']
           ];
         case 'FÓRMULAS MAGISTRALES':
           return [
@@ -737,8 +743,8 @@ export default function CimasurInventoryManager() {
           ];
         case 'EC DR. CONEJEROS':
           return [
-            ['EC-0001', 'GP', 'Fórmula Antiacné', 'C30'],
-            ['EC-0002', 'R3', 'Fórmula Inmuno', 'C200']
+            ['EC-0001', 'GP', 'Fórmula Antiacné', '29/07/2026'],
+            ['EC-0002', 'R3', 'Fórmula Inmuno', '30/07/2026']
           ];
         default:
           return [
@@ -826,7 +832,7 @@ export default function CimasurInventoryManager() {
           let solVal = '';
           let gpVal = '';
           
-          if (activeTab === 'EC DR. CONEJEROS') {
+          if (activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') {
             gpVal = safe(row['G.P'] || row['GP'] || '');
             solVal = safe(row['DILUCIÓN'] || row['DILUCION'] || row['SOLUCIÓN'] || row['SOLUCION'] || '');
           } else if (activeTab === 'FÓRMULAS MAGISTRALES') {
@@ -845,7 +851,7 @@ export default function CimasurInventoryManager() {
             sol: solVal,
             gp: gpVal,
             cat: importedCat,
-            fec: convertToInputDate(row['FECHA']),
+            fec: convertToInputDate(row['FECHA'] || row['FECHA ELABORACIÓN'] || row['FECHA ELABORACION'] || row['DILUCIÓN'] || row['DILUCION'] || row['SOLUCIÓN'] || row['SOLUCION']),
             doc: safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR']),
             precio: pr !== undefined ? Number(pr) : 0,
             es_duplicado: false
@@ -1168,50 +1174,58 @@ export default function CimasurInventoryManager() {
               </div>
               
               <div className="flex gap-2 w-full md:w-auto flex-wrap">
-                <label className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors cursor-pointer border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Importar Excel">
-                  <Upload className="w-4 h-4" /> Importar
-                  <input type="file" accept=".xlsx, .xls, .csv" onChange={importExcel} className="hidden" />
-                </label>
-                <button onClick={exportTemplate} className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Descargar Plantilla">
-                  <Download className="w-4 h-4" /> Plantilla
-                </button>
+                {canEdit && (
+                  <>
+                    <label className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors cursor-pointer border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Importar Excel">
+                      <Upload className="w-4 h-4" /> Importar
+                      <input type="file" accept=".xlsx, .xls, .csv" onChange={importExcel} className="hidden" />
+                    </label>
+                    <button onClick={exportTemplate} className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Descargar Plantilla">
+                      <Download className="w-4 h-4" /> Plantilla
+                    </button>
+                  </>
+                )}
                 <button onClick={exportExcel} className="flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-emerald-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Exportar Excel">
                   <FileSpreadsheet className="w-4 h-4" /> Excel
                 </button>
                 <button onClick={exportPDF} className="flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-red-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Exportar PDF">
                   <Download className="w-4 h-4" /> PDF
                 </button>
-                <button onClick={() => { loadImportLogs(); setShowHistoryModal(true); }} className="flex items-center justify-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-blue-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Ver Historial de Importaciones">
-                  <History className="w-4 h-4" /> Historial
-                </button>
-                <button 
-                  onClick={() => { 
-                      setEditingId(null); 
-                      const currentBase = activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab;
-                      const initialCat = activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory;
-                      const nextIsGeneric = checkIsGeneric(currentBase, initialCat);
-                      setIsBarcodeGeneric(nextIsGeneric);
-                      setForm({ 
-                        codigo_barras: nextIsGeneric ? 'GENÉRICO' : '', 
-                        nombre_producto: '', 
-                        solucion: '', 
-                        categoria_tipo: initialCat, 
-                        fecha: '', 
-                        doctor: '',
-                        base_master: currentBase,
-                        precio: 0
-                      });
-                      setShowModal(true); 
-                  }} 
-                  className="flex items-center justify-center gap-2 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] border border-[#38BDF8]/50 px-5 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-all shadow-[0_0_15px_rgba(56,189,248,0.2)] ml-2"
-                >
-                  <Plus className="w-4 h-4" /> Agregar Nuevo
-                </button>
+                {canEdit && (
+                  <button onClick={() => { loadImportLogs(); setShowHistoryModal(true); }} className="flex items-center justify-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-blue-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Ver Historial de Importaciones">
+                    <History className="w-4 h-4" /> Historial
+                  </button>
+                )}
+                {canEdit && (
+                  <button 
+                    onClick={() => { 
+                        setEditingId(null); 
+                        const currentBase = activeTab === 'MATRIZ COMPLETA' ? 'SALINA CS' : activeTab;
+                        const initialCat = activeCategory === 'TODOS' ? 'Oftálmica' : activeCategory;
+                        const nextIsGeneric = checkIsGeneric(currentBase, initialCat);
+                        setIsBarcodeGeneric(nextIsGeneric);
+                        setForm({ 
+                          codigo_barras: nextIsGeneric ? 'GENÉRICO' : '', 
+                          nombre_producto: '', 
+                          solucion: '', 
+                          categoria_tipo: initialCat, 
+                          fecha: '', 
+                          doctor: '',
+                          base_master: currentBase,
+                          precio: 0
+                        });
+                        setShowModal(true); 
+                    }} 
+                    className="flex items-center justify-center gap-2 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] border border-[#38BDF8]/50 px-5 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-all shadow-[0_0_15px_rgba(56,189,248,0.2)] ml-2"
+                  >
+                    <Plus className="w-4 h-4" /> Agregar Nuevo
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Acciones Masivas Sub-Bar */}
-            {selectedIds.length > 0 && (
+            {canDelete && selectedIds.length > 0 && (
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-red-950/20 border border-red-500/20 rounded-2xl shadow-inner animate-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center gap-2">
                   <Trash2 className="w-4 h-4 text-red-400" />
@@ -1283,7 +1297,20 @@ export default function CimasurInventoryManager() {
                       />
                     </th>
                     {getHeadersForTab(activeTab).map((h, i) => (
-                      <th key={i} className={`p-4 border-r border-[#1E293B] bg-[#111A2E] sticky top-0 ${h === 'G.P' ? 'w-20 text-center' : i === 0 ? 'w-32' : ''}`}>{h}</th>
+                      <th 
+                        key={i} 
+                        className={cn(
+                          "p-4 border-r border-[#1E293B] bg-[#111A2E] sticky top-0 text-left",
+                          h === 'G.P' && "w-20 text-center",
+                          i === 0 && "min-w-[180px] whitespace-nowrap font-mono",
+                          (h === 'PRODUCTO' || h === 'NOMBRE PRODUCTO' || h === 'IDENTIFICACIÓN' || h === 'MUESTRA Y POTENCIA' || h === 'NOMBRE NOSODE') && "w-full min-w-[320px] md:min-w-[420px]",
+                          (h === 'FECHA' || h === 'FECHA ELABORACIÓN' || h === 'DILUCIÓN' || h === 'DILUCIONES / ACTUALIZACIÓN') && "w-48 text-center",
+                          (h === 'DOCTOR(A)' || h === 'DOCTOR') && "min-w-[220px] w-64 text-center whitespace-nowrap",
+                          h === 'PRECIO' && "w-32 text-center"
+                        )}
+                      >
+                        {h}
+                      </th>
                     ))}
                     <th className="p-5 w-24 text-center bg-[#111A2E] sticky top-0">ACCIONES</th>
                   </tr>
@@ -1314,8 +1341,8 @@ export default function CimasurInventoryManager() {
                         </td>
                         {rowVals.map((val, idx) => {
                           const isPrice = (isBaseModule || isMatrixView) && idx === rowVals.length - 1;
-                          const isProductName = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS') ? idx === 2 : idx === 1;
-                          const isGP = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS') && idx === 1;
+                          const isProductName = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') ? idx === 2 : idx === 1;
+                          const isGP = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') && idx === 1;
                           return (
                             <td key={idx} className={cn(
                               "p-4 text-xs border-r border-[#1E293B]",
@@ -1335,12 +1362,16 @@ export default function CimasurInventoryManager() {
                         })}
                         <td className="p-4 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => handleEdit(r)} className="p-1.5 text-slate-400 hover:text-[#38BDF8] bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border rounded-md hover:border-[#38BDF8]/50 transition-all cursor-pointer" title="Editar">
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleDelete(r.id, r.nombre_producto)} className="p-1.5 text-slate-400 hover:text-red-500 bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-red-500/10 rounded-md hover:border-red-500/50 transition-all cursor-pointer" title="Eliminar">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {canEdit && (
+                              <button onClick={() => handleEdit(r)} className="p-1.5 text-slate-400 hover:text-[#38BDF8] bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border rounded-md hover:border-[#38BDF8]/50 transition-all cursor-pointer" title="Editar">
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button onClick={() => handleDelete(r.id, r.nombre_producto)} className="p-1.5 text-slate-400 hover:text-red-500 bg-[#152035] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-red-500/10 rounded-md hover:border-red-500/50 transition-all cursor-pointer" title="Eliminar">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1508,7 +1539,7 @@ export default function CimasurInventoryManager() {
                 })()}
               </div>
 
-              <FormField label={activeTab === 'FÓRMULAS MAGISTRALES' ? "NOMBRE PRODUCTO" : (getHeadersForTab(activeTab)[1] || "PRODUCTO")}>
+              <FormField label={['FÓRMULAS MAGISTRALES', 'EC DR. CONEJEROS', 'NOSODES CLIENTES'].includes(activeTab) ? getHeadersForTab(activeTab)[2] || "PRODUCTO" : getHeadersForTab(activeTab)[1] || "PRODUCTO"}>
                 <input
                   type="text"
                   required
@@ -1519,7 +1550,7 @@ export default function CimasurInventoryManager() {
                 />
               </FormField>
 
-              {(activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS') && (
+              {(activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') && (
                 <FormField label="G.P">
                   <input
                     type="text"
@@ -1537,28 +1568,39 @@ export default function CimasurInventoryManager() {
                 </FormField>
               )}
 
-              {['NOSODES CLIENTES', 'FÓRMULAS MAGISTRALES'].includes(activeTab) ? (
-                 <div className="grid grid-cols-2 gap-4">
-                   <FormField label="FECHA">
-                     <input
-                       type="date"
-                       className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
-                       value={form.fecha || ''}
-                       onChange={e => setForm({...form, fecha: e.target.value})}
-                     />
-                   </FormField>
-                   <FormField label="DOCTOR(A)">
-                     <input
-                       type="text"
-                       className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
-                       placeholder="Ej. Dra. Marcela Farias"
-                       value={form.doctor || ''}
-                       onChange={e => setForm({...form, doctor: e.target.value})}
-                     />
-                   </FormField>
-                 </div>
+              {['NOSODES CLIENTES', 'FÓRMULAS MAGISTRALES', 'EC DR. CONEJEROS'].includes(activeTab) ? (
+                activeTab === 'EC DR. CONEJEROS' ? (
+                  <FormField label="FECHA ELABORACIÓN">
+                    <input
+                      type="date"
+                      className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
+                      value={form.fecha || ''}
+                      onChange={e => setForm({...form, fecha: e.target.value})}
+                    />
+                  </FormField>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField label="FECHA">
+                      <input
+                        type="date"
+                        className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
+                        value={form.fecha || ''}
+                        onChange={e => setForm({...form, fecha: e.target.value})}
+                      />
+                    </FormField>
+                    <FormField label="DOCTOR(A)">
+                      <input
+                        type="text"
+                        className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
+                        placeholder="Ej. Dra. Marcela Farias"
+                        value={form.doctor || ''}
+                        onChange={e => setForm({...form, doctor: e.target.value})}
+                      />
+                    </FormField>
+                  </div>
+                )
               ) : activeTab !== 'GOTAS PURAS' ? (
-                <FormField label={activeTab === 'EC DR. CONEJEROS' ? "DILUCIÓN" : (getHeadersForTab(activeTab)[2] || "SOLUCIÓN")}>
+                <FormField label={getHeadersForTab(activeTab)[2] || "SOLUCIÓN"}>
                   <input
                     type="text"
                     className="w-full border-b border-[#1E293B] focus:border-[#001736] p-2 text-sm text-slate-200 outline-none uppercase"
@@ -1873,20 +1915,22 @@ export default function CimasurInventoryManager() {
                           Importado el {new Date(selectedLog.fecha).toLocaleString()} por el Administrador
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (confirm('¿Estás seguro de eliminar este registro del historial? (Los registros de inventario importados NO se eliminarán)')) {
-                            await localDB.deleteFromCollection('import_history', selectedLog.id);
-                            setSelectedLog(null);
-                            await loadImportLogs();
-                          }
-                        }}
-                        className="p-2 text-rose-500 hover:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
-                        title="Eliminar Reporte"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Eliminar Log
-                      </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (confirm('¿Estás seguro de eliminar este registro del historial? (Los registros de inventario importados NO se eliminarán)')) {
+                              await localDB.deleteFromCollection('import_history', selectedLog.id);
+                              setSelectedLog(null);
+                              await loadImportLogs();
+                            }
+                          }}
+                          className="p-2 text-rose-500 hover:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+                          title="Eliminar Reporte"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Eliminar Log
+                        </button>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

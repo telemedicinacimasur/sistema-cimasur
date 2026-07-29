@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { localDB } from '../../lib/auth';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getDb, isFirebaseReady } from '../../lib/firebase';
 import { 
@@ -277,6 +278,13 @@ const ProductSolutionAutocomplete = ({
 };
 
 export default function VentasConsignacionView() {
+  const { user } = useAuth();
+  
+  const permissions = user?.permissions?.['manager'] || user?.permissions?.['crm'];
+  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager') && !user?.roles?.includes('crm'));
+  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+  
   const [activeTab, setActiveTab] = useState<'declaraciones' | 'registro_ventas'>('declaraciones');
   const [clientes, setClientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1860,54 +1868,58 @@ export default function VentasConsignacionView() {
 
                       {/* Dropdown action buttons requested in Rule 5 */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => {
-                            setShowAddLoteForm(!showAddLoteForm);
-                            setShowAddClientForm(false);
-                            setShowImportForm(false);
-                          }}
-                          className={cn(
-                            "px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg active:scale-95",
-                            showAddLoteForm 
-                              ? "bg-emerald-500 text-[#050914] shadow-emerald-500/20" 
-                              : "bg-emerald-500 hover:bg-emerald-400 text-[#050914] shadow-emerald-500/20"
-                          )}
-                        >
-                          <Plus size={16} className="stroke-[3]" />
-                          + Agregar Producto en Consignación
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowAddClientForm(!showAddClientForm);
-                            setShowAddLoteForm(false);
-                            setShowImportForm(false);
-                          }}
-                          className={cn(
-                            "px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
-                            showAddClientForm 
-                              ? "bg-sky-500 text-[#050914]" 
-                              : "bg-[#050914] text-sky-400 border border-sky-500/20 hover:bg-sky-500 hover:text-[#050914]"
-                          )}
-                        >
-                          <Plus size={14} />
-                          Crear Cliente
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowImportForm(!showImportForm);
-                            setShowAddLoteForm(false);
-                            setShowAddClientForm(false);
-                          }}
-                          className={cn(
-                            "px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
-                            showImportForm 
-                              ? "bg-purple-500 text-[#050914]" 
-                              : "bg-[#050914] text-purple-400 border border-purple-500/20 hover:bg-purple-500 hover:text-[#050914]"
-                          )}
-                        >
-                          <Upload size={14} />
-                          Importar Productos
-                        </button>
+                        {canEdit && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setShowAddLoteForm(!showAddLoteForm);
+                                setShowAddClientForm(false);
+                                setShowImportForm(false);
+                              }}
+                              className={cn(
+                                "px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg active:scale-95",
+                                showAddLoteForm 
+                                  ? "bg-emerald-500 text-[#050914] shadow-emerald-500/20" 
+                                  : "bg-emerald-500 hover:bg-emerald-400 text-[#050914] shadow-emerald-500/20"
+                              )}
+                            >
+                              <Plus size={16} className="stroke-[3]" />
+                              + Agregar Producto en Consignación
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowAddClientForm(!showAddClientForm);
+                                setShowAddLoteForm(false);
+                                setShowImportForm(false);
+                              }}
+                              className={cn(
+                                "px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
+                                showAddClientForm 
+                                  ? "bg-sky-500 text-[#050914]" 
+                                  : "bg-[#050914] text-sky-400 border border-sky-500/20 hover:bg-sky-500 hover:text-[#050914]"
+                              )}
+                            >
+                              <Plus size={14} />
+                              Crear Cliente
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowImportForm(!showImportForm);
+                                setShowAddLoteForm(false);
+                                setShowAddClientForm(false);
+                              }}
+                              className={cn(
+                                "px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
+                                showImportForm 
+                                  ? "bg-purple-500 text-[#050914]" 
+                                  : "bg-[#050914] text-purple-400 border border-purple-500/20 hover:bg-purple-500 hover:text-[#050914]"
+                              )}
+                            >
+                              <Upload size={14} />
+                              Importar Productos
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           onClick={handleDownloadRegisteredProductsPDF}

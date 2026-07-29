@@ -323,7 +323,7 @@ export default function AdminView() {
               color="purple"
             />
           )}
-          {(isMainAdmin || isManager || isComercial || !user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('consignacion')) && (
+          {((isMainAdmin || isManager || isComercial) && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('consignacion'))) && (
             <ModuleCard 
               title="Ventas en Consignación"
               desc="Gestión de entregas, lotes y declaraciones mensuales."
@@ -339,8 +339,8 @@ export default function AdminView() {
 
   const permissions = user?.permissions?.['manager'] || user?.permissions?.['crm'];
   const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager') && !user?.roles?.includes('crm'));
-  const canEdit = user?.roles?.includes('admin') || user?.roles?.includes('manager') || user?.roles?.includes('crm') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
-  const canDelete = user?.roles?.includes('admin') || user?.roles?.includes('manager') || user?.roles?.includes('crm') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
 
   return (
     <div className="space-y-6 relative font-bold">
