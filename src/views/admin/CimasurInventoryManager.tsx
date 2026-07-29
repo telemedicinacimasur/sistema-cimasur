@@ -518,6 +518,7 @@ export default function CimasurInventoryManager() {
     // Si NO es genérico (debe ser único)
     if (!isGenericCode) {
        const existingWithCode = records.find(r => {
+          if (r.base_master !== currentBase) return false;
          if (!r.codigo_barras) return false;
          const existingCode = String(r.codigo_barras).trim().toUpperCase();
          if (existingCode === 'GENÉRICO' || existingCode === 'GENERICO') return false;
@@ -910,22 +911,22 @@ export default function CimasurInventoryManager() {
             totalProcessed
           });
         } else {
-          for (const r of validRows) {
-             await localDB.saveToCollection('inventory_master', {
-               codigo_barras: r.cd,
-               nombre_producto: r.nm,
-               solucion: r.sol,
-               gp: r.gp || '',
-               categoria_tipo: r.cat,
-               fecha: r.fec,
-               doctor: r.doc,
-               base_master: activeTab,
-               precio: r.precio,
-               type: 'inventory',
-               createdAt: new Date().toISOString(),
-               creadoPor: user?.displayName || 'Admin'
-             });
-          }
+          const itemsToSave = validRows.map(r => ({
+            id: `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 9)}`,
+            codigo_barras: r.cd,
+            nombre_producto: r.nm,
+            solucion: r.sol,
+            gp: r.gp || '',
+            categoria_tipo: r.cat,
+            fecha: r.fec,
+            doctor: r.doc,
+            base_master: activeTab,
+            precio: r.precio,
+            type: 'inventory',
+            createdAt: new Date().toISOString(),
+            creadoPor: user?.displayName || 'Admin'
+          }));
+          await localDB.saveToCollectionBulk('inventory_master', itemsToSave);
 
           // Save report history log
           const reportLog = {
@@ -972,23 +973,23 @@ export default function CimasurInventoryManager() {
         ? [...pendingImport.uniqueRows, ...pendingImport.duplicateRows] 
         : pendingImport.uniqueRows;
 
-      for (const r of rowsToSave) {
-        await localDB.saveToCollection('inventory_master', {
-          codigo_barras: r.cd,
-          nombre_producto: r.nm,
-          solucion: r.sol,
-          gp: r.gp || '',
-          categoria_tipo: r.cat,
-          fecha: r.fec,
-          doctor: r.doc,
-          base_master: activeTab,
-          precio: r.precio,
-          type: 'inventory',
-          es_duplicado: !!r.es_duplicado,
-          createdAt: new Date().toISOString(),
-          creadoPor: user?.displayName || 'Admin'
-        });
-      }
+      const itemsToSave = rowsToSave.map(r => ({
+        id: `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 9)}`,
+        codigo_barras: r.cd,
+        nombre_producto: r.nm,
+        solucion: r.sol,
+        gp: r.gp || '',
+        categoria_tipo: r.cat,
+        fecha: r.fec,
+        doctor: r.doc,
+        base_master: activeTab,
+        precio: r.precio,
+        type: 'inventory',
+        es_duplicado: !!r.es_duplicado,
+        createdAt: new Date().toISOString(),
+        creadoPor: user?.displayName || 'Admin'
+      }));
+      await localDB.saveToCollectionBulk('inventory_master', itemsToSave);
 
       // Save report history log
       const reportLog = {

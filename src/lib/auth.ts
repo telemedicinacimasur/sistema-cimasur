@@ -1,6 +1,6 @@
 import { authInstance as auth, dbInstance as db, isFirebaseReady } from './firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, limit } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, limit, writeBatch } from 'firebase/firestore';
 
 export interface UserProfile {
   uid: string;
@@ -444,6 +444,43 @@ export const localDB = {
         window.dispatchEvent(new CustomEvent('sync-students-trigger'));
       }
       return saved;
+    }
+  },
+  saveToCollectionBulk: async (name: string, items: any[]) => {
+    if (isFirebaseReady && db) {
+      const batchLimit = 500;
+      for (let i = 0; i < items.length; i += batchLimit) {
+        const chunk = items.slice(i, i + batchLimit);
+        const batch = writeBatch(db);
+        for (const item of chunk) {
+          const id = item.id || `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const docRef = doc(db, name, id);
+          const finalItem = {
+            ...item,
+            id,
+            createdAt: item.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          batch.set(docRef, finalItem, { merge: true });
+          updateCachedCollectionItem(name, finalItem);
+        }
+        await batch.commit();
+      }
+    } else {
+      const response = await fetch(`/api/records/${name}/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to save bulk to ${name}: ${response.statusText}`);
+      }
+      for (const item of items) {
+        updateCachedCollectionItem(name, item);
+      }
+    }
+    if (name === 'students') {
+      window.dispatchEvent(new CustomEvent('sync-students-trigger'));
     }
   },
   updateInCollection: async (name: string, id: string, updates: any) => {

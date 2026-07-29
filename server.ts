@@ -911,6 +911,26 @@ const crmTools: FunctionDeclaration[] = [
     res.json({ success: true, id: record.id });
   });
 
+  app.post('/api/records/:collection/bulk', async (req, res) => {
+    console.log(`API call: POST /api/records/${req.params.collection}/bulk`);
+    const { collection } = req.params;
+    const { items } = req.body;
+    if (!items || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'items array is required' });
+    }
+    const records = await readRecords(collection);
+    for (const item of items) {
+      const idx = records.findIndex(r => r.id === item.id);
+      if (idx !== -1) {
+        records[idx] = item;
+      } else {
+        records.push(item);
+      }
+    }
+    await writeRecords(collection, records);
+    res.json({ success: true, count: items.length });
+  });
+
   app.put('/api/records/:collection/:id', async (req, res) => {
     console.log('API call: PUT /api/records/:collection/:id');
     const { collection, id } = req.params;
