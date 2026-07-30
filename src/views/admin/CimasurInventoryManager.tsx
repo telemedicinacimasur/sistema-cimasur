@@ -621,29 +621,80 @@ export default function CimasurInventoryManager() {
 
   const handleSelectDuplicates = () => {
     const currentRecords = getFilteredRecords();
-    const codeCount: Record<string, number> = {};
+
+    // Función para calcular la completitud e importancia de la información de un registro
+    const getRecordScore = (r: any) => {
+      let score = 0;
+      if (r.nombre_producto && String(r.nombre_producto).trim()) score += 10;
+      if (r.solucion && String(r.solucion).trim()) score += 5 + Math.min(String(r.solucion).trim().length, 30);
+      if (r.gp && String(r.gp).trim()) score += 3;
+      if (r.doctor && String(r.doctor).trim()) score += 3;
+      if (r.fecha && String(r.fecha).trim()) score += 2;
+      if (r.precio && Number(r.precio) > 0) score += 2;
+      if (r.categoria_tipo && String(r.categoria_tipo).trim()) score += 2;
+      if (r.es_duplicado !== true) score += 100; // Priorizar mantener el registro principal no marcado
+      return score;
+    };
+
+    // Agrupar registros por su identificador único (código de barras o nombre)
+    const groups: Record<string, any[]> = {};
+
     currentRecords.forEach(r => {
-      const code = (r.codigo_barras || '').trim();
-      if (code && code !== 'GENÉRICO') {
-        codeCount[code] = (codeCount[code] || 0) + 1;
+      const code = (r.codigo_barras || '').trim().toUpperCase();
+      const isGeneric = !code || code === 'GENÉRICO' || code === 'GENERICO';
+      
+      let groupKey = '';
+      if (!isGeneric) {
+        groupKey = `CODE::${code}`;
+      } else {
+        const name = (r.nombre_producto || '').trim().toUpperCase();
+        if (name) {
+          groupKey = `NAME::${name}`;
+        }
+      }
+
+      if (groupKey) {
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(r);
+      } else if (r.es_duplicado === true) {
+        const fallbackKey = `DUPFLAG::${r.id}`;
+        groups[fallbackKey] = [r];
       }
     });
 
-    const duplicateIds = currentRecords
-      .filter(r => {
-        if (r.es_duplicado === true) return true;
-        const code = (r.codigo_barras || '').trim();
-        return code && code !== 'GENÉRICO' && codeCount[code] > 1;
-      })
-      .map(r => r.id);
+    const duplicateIdsToDelete: string[] = [];
+    let totalDuplicateGroups = 0;
 
-    if (duplicateIds.length === 0) {
-      alert('¡No se encontraron registros duplicados en los ítems actualmente visibles!');
+    Object.values(groups).forEach(group => {
+      if (group.length > 1) {
+        totalDuplicateGroups++;
+        // Ordenar de mayor a menor completitud
+        group.sort((a, b) => {
+          const scoreA = getRecordScore(a);
+          const scoreB = getRecordScore(b);
+          if (scoreB !== scoreA) {
+            return scoreB - scoreA; // Registro más completo primero
+          }
+          // En caso de empate, conservar el más antiguo
+          return (a.createdAt || a.id || '').localeCompare(b.createdAt || b.id || '');
+        });
+
+        // El índice 0 es el registro PRINCIPAL (se conserva).
+        // Los registros a partir del índice 1 son los duplicados sobrantes (se marcan para eliminar).
+        const excessDuplicates = group.slice(1);
+        excessDuplicates.forEach(dup => {
+          duplicateIdsToDelete.push(dup.id);
+        });
+      }
+    });
+
+    if (duplicateIdsToDelete.length === 0) {
+      alert('¡No se encontraron registros duplicados redundantes en los ítems actualmente visibles!');
       return;
     }
 
-    setSelectedIds(duplicateIds);
-    alert(`Se identificaron y seleccionaron ${duplicateIds.length} registros duplicados. Puedes eliminarlos haciendo clic en el botón "Eliminar Seleccionados" que ha aparecido en pantalla.`);
+    setSelectedIds(duplicateIdsToDelete);
+    alert(`¡Detección Inteligente Completada!\n\nSe detectaron ${totalDuplicateGroups} grupos de ítems duplicados.\nSe han seleccionado ${duplicateIdsToDelete.length} copia(s) redundante(s) (con menor cantidad de información) para eliminar, garantizando que SIEMPRE quede 1 registro principal conservado en la lista.\n\nPuedes eliminarlos haciendo clic en el botón "Eliminar Seleccionados".`);
   };
 
   const handleDeleteAllFiltered = async () => {
