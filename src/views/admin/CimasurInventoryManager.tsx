@@ -614,9 +614,7 @@ export default function CimasurInventoryManager() {
     if (selectedIds.length === 0) return;
     if (confirm(`¿Está seguro de que desea eliminar los ${selectedIds.length} registros seleccionados de ${activeTab.replace(' CS', '')}? Esta acción no se puede deshacer.`)) {
       try {
-        for (const id of selectedIds) {
-          await localDB.deleteFromCollection('inventory_master', id);
-        }
+        await localDB.deleteBatchFromCollection('inventory_master', selectedIds);
         alert(`Se eliminaron ${selectedIds.length} registros con éxito.`);
         setSelectedIds([]);
         await loadData();
@@ -708,11 +706,10 @@ export default function CimasurInventoryManager() {
   const handleDeleteAllFiltered = async () => {
     const currentFiltered = getFilteredRecords();
     if (currentFiltered.length === 0) return;
-    if (confirm(`¡ADVERTENCIA CRÍTICA! ¿Está completamente seguro de que desea eliminar TODOS los ${currentFiltered.length} registros visibles del módulo/tab ${activeTab.replace(' CS', '')}? Esta acción no se puede deshacer.`)) {
+    if (confirm(`¡ADVERTENCIA CRÍTICA! ¿Está completamente seguro de que desea eliminar TODOS los ${currentFiltered.length} registros visibles del módulo/tab ${activeTab.replace(' CS', '')}? Esta acción no se me puede deshacer.`)) {
       try {
-        for (const r of currentFiltered) {
-          await localDB.deleteFromCollection('inventory_master', r.id);
-        }
+        const idsToDelete = currentFiltered.map(r => r.id);
+        await localDB.deleteBatchFromCollection('inventory_master', idsToDelete);
         alert(`Se eliminaron todos los ${currentFiltered.length} registros con éxito.`);
         setSelectedIds([]);
         await loadData();

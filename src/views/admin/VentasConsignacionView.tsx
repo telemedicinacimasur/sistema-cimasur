@@ -4066,8 +4066,6 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
       ? tempSalesForTargetMonth
       : Number(lote.movimientos?.[m]?.unidadesVendidas || 0);
 
-    console.log(`Debug: Month m=${m}, targetMonth=${targetMonth}, stockDisp=${stockDisp}, ventas=${ventas}`);
-    
     const remaining = Math.max(stockDisp - ventas, 0);
     runningStock = remaining;
 

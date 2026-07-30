@@ -671,5 +671,40 @@ export const localDB = {
         window.dispatchEvent(new CustomEvent('sync-students-trigger'));
       }
     }
+  },
+
+  deleteBatchFromCollection: async (name: string, ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+
+    // 1. Remove items from in-memory cache
+    ids.forEach(id => removeCachedCollectionItem(name, id));
+
+    // 2. Perform batch deletion in Firebase using writeBatch (max 400 per batch)
+    if (isFirebaseReady && db) {
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach(id => {
+          batch.delete(doc(db, name, id));
+        });
+        await batch.commit();
+        console.log(`Debug: Batch deleted ${chunk.length} items from ${name} (${Math.min(i + CHUNK_SIZE, ids.length)}/${ids.length})`);
+      }
+    } else {
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE);
+        await Promise.all(
+          chunk.map(id =>
+            fetch(`/api/records/${name}/${id}`, { method: 'DELETE' }).catch(err => console.error(`Failed to batch delete ${id}:`, err))
+          )
+        );
+      }
+    }
+
+    if (name === 'students') {
+      window.dispatchEvent(new CustomEvent('sync-students-trigger'));
+    }
   }
 };
