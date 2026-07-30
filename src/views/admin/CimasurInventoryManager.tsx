@@ -17,9 +17,11 @@ const BASE_CATEGORIES = [
   "Sales de Schussler",
   "Exóticos",
   "Productos Simple",
+  "Nosode Simple",
   "Paquetes Terapeuticos (KIT)",
   "Esencias florales",
-  "Oftálmica"
+  "Oftálmica",
+  "Fórmula Magistral"
 ];
 
 const GENERIC_CATEGORIES = [
@@ -182,6 +184,12 @@ const normalizeCategory = (cat: any): string => {
   }
   if (c.includes("PRODUCTO SIMPLE") || c.includes("PRODUCTOS SIMPLE") || c.includes("PRODUCTOS SIMPLES") || c.includes("PROD. SIMPLE") || c === "SIMPLE") {
     return "Productos Simple";
+  }
+  if (c.includes("NOSODE") || c.includes("NOSODES")) {
+    return "Nosode Simple";
+  }
+  if (c.includes("MAGISTRAL") || c.includes("MAGISTRALES") || c.includes("FORMULA MAGISTRAL") || c.includes("FÓRMULA MAGISTRAL")) {
+    return "Fórmula Magistral";
   }
   if (c.includes("TERAPEUTICO") || c.includes("TERAPÉUTICO") || c.includes("KIT")) {
     return "Paquetes Terapeuticos (KIT)";
@@ -1389,6 +1397,9 @@ export default function CimasurInventoryManager() {
                           h === 'G.P' && "w-20 text-center",
                           i === 0 && "min-w-[180px] whitespace-nowrap font-mono",
                           (h === 'PRODUCTO' || h === 'NOMBRE PRODUCTO' || h === 'IDENTIFICACIÓN' || h === 'MUESTRA Y POTENCIA' || h === 'NOMBRE NOSODE') && "w-full min-w-[320px] md:min-w-[420px]",
+                          (h === 'SOLUCIÓN' || h === 'SOLUCION') && "min-w-[200px] text-center whitespace-nowrap px-6",
+                          (h === 'BASE MASTER') && "min-w-[180px] text-center whitespace-nowrap px-6",
+                          (h === 'CATEGORÍA' || h === 'CATEGORIA') && "min-w-[160px] text-center whitespace-nowrap px-4",
                           (h === 'FECHA' || h === 'FECHA ELABORACIÓN' || h === 'DILUCIÓN' || h === 'DILUCIONES / ACTUALIZACIÓN') && "w-48 text-center",
                           (h === 'DOCTOR(A)' || h === 'DOCTOR') && "min-w-[220px] w-64 text-center whitespace-nowrap",
                           h === 'PRECIO' && "w-32 text-center"
@@ -1425,6 +1436,11 @@ export default function CimasurInventoryManager() {
                           />
                         </td>
                         {rowVals.map((val, idx) => {
+                          const headers = getHeadersForTab(activeTab);
+                          const headerName = headers[idx] || '';
+                          const isSolucionHeader = headerName === 'SOLUCIÓN' || headerName === 'SOLUCION';
+                          const isBaseMasterHeader = headerName === 'BASE MASTER';
+                          const isCategoriaHeader = headerName === 'CATEGORÍA' || headerName === 'CATEGORIA';
                           const isPrice = (isBaseModule || isMatrixView) && idx === rowVals.length - 1;
                           const isProductName = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') ? idx === 2 : idx === 1;
                           const isGP = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') && idx === 1;
@@ -1436,6 +1452,12 @@ export default function CimasurInventoryManager() {
                                 ? (isDup ? 'font-mono font-bold text-red-400 whitespace-nowrap' : 'font-mono font-bold text-[#38BDF8] whitespace-nowrap drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]') 
                                 : isProductName 
                                 ? (isDup ? 'font-bold text-sm text-red-200' : 'font-bold text-sm text-white') 
+                                : isSolucionHeader
+                                ? (isDup ? 'text-red-300 font-bold text-center min-w-[200px] px-6 text-xs' : 'text-slate-100 font-bold text-center min-w-[200px] px-6 text-xs')
+                                : isBaseMasterHeader
+                                ? (isDup ? 'text-red-300 font-bold text-center min-w-[180px] px-6 text-xs' : 'text-sky-300 font-bold text-center min-w-[180px] px-6 text-xs')
+                                : isCategoriaHeader
+                                ? (isDup ? 'text-red-300 text-center min-w-[160px] px-4' : 'text-slate-200 text-center min-w-[160px] px-4')
                                 : isGP
                                 ? (isDup ? 'text-red-300 text-center w-20' : 'text-slate-300 text-center w-20')
                                 : isDoctor
