@@ -74,7 +74,7 @@ export function isDuplicateName(nameA: string, nameB: string): boolean {
   if (cleanA === cleanB) return true;
 
   // Filter out common noise words in South American business registers and titles
-  const noiseWords = new Set(["ltda", "limitada", "spa", "eirl", "e.i.r.l.", "sociedad", "y", "m.", "de", "del", "la", "las", "los", "dr", "dra", "veterinario", "medico"]);
+  const noiseWords = new Set(["ltda", "limitada", "spa", "eirl", "e.i.r.l.", "sociedad", "y", "m", "de", "del", "la", "las", "los", "dr", "dra", "veterinario", "medico", "clinica", "centro"]);
   const tokensA = cleanA.split(" ").filter(w => w.length > 2 && !noiseWords.has(w));
   const tokensB = cleanB.split(" ").filter(w => w.length > 2 && !noiseWords.has(w));
 
@@ -83,21 +83,20 @@ export function isDuplicateName(nameA: string, nameB: string): boolean {
   const fullA = tokensA.join(" ");
   const fullB = tokensB.join(" ");
   
-  if (fullB.includes(fullA) || fullA.includes(fullB)) {
-    return true;
-  }
+  // Exact match after removing noise words
+  if (fullA === fullB) return true;
 
   // Also check if they share a threshold of substantial tokens
   const setA = new Set(tokensA);
   const setB = new Set(tokensB);
   const intersection = [...setA].filter(x => setB.has(x));
   
-  // If we match 3 or more substantial words
+  // If we match 3 or more substantial words exactly
   if (intersection.length >= 3) {
     return true;
   }
 
-  // Or if the shorter set has >= 2 words and all of them match
+  // If the shorter set has >= 2 words and all of them match
   const minLength = Math.min(setA.size, setB.size);
   if (minLength >= 2 && intersection.length === minLength) {
     return true;
@@ -364,73 +363,12 @@ export default function CRMView() {
       const intranetData = await localDB.getCollection('intranet_clients');
       const importData = await localDB.getCollection('intranet_imports');
 
-      // Proactive cleanup of existing duplicates in contacts list (e.g. Marco Antonio Vilches)
-      let cleanedSomeDuplicates = false;
       const cleanContactsList = data.map((c: any) => ({
         ...c,
         categoria: c.categoria || 'Sin categoría'
       }));
 
-      for (let i = 0; i < cleanContactsList.length; i++) {
-        for (let j = i + 1; j < cleanContactsList.length; j++) {
-          const c1 = cleanContactsList[i];
-          const c2 = cleanContactsList[j];
-          if (c1 && c2 && areContactsDuplicate(c1, c2)) {
-            let keepIndex = i;
-            let removeIndex = j;
-            if ((!c1.rut || c1.rut === 'Sin RUT') && (c2.rut && c2.rut !== 'Sin RUT')) {
-              keepIndex = j;
-              removeIndex = i;
-            } else if (c1.categoria === 'Sin compra' && c2.categoria !== 'Sin compra') {
-              keepIndex = j;
-              removeIndex = i;
-            }
-            
-            const keepContact = cleanContactsList[keepIndex];
-            const removeContact = cleanContactsList[removeIndex];
-            
-            const updates: any = {};
-            let needsUpdate = false;
-            if (removeContact.intranet === 'Si' && keepContact.intranet !== 'Si') {
-              updates.intranet = 'Si';
-              needsUpdate = true;
-            }
-            if (removeContact.phone && !keepContact.phone) {
-              updates.phone = removeContact.phone;
-              needsUpdate = true;
-            }
-            if (removeContact.email && !keepContact.email) {
-              updates.email = removeContact.email;
-              needsUpdate = true;
-            }
-            if (needsUpdate) {
-              await localDB.updateInCollection('contacts', keepContact.id, updates);
-            }
-            
-            await localDB.deleteFromCollection('contacts', removeContact.id);
-            
-            cleanContactsList.splice(removeIndex, 1);
-            if (removeIndex === i) {
-              i--;
-            }
-            cleanedSomeDuplicates = true;
-            break;
-          }
-        }
-      }
-
-
-
-      if (cleanedSomeDuplicates) {
-        const uContacts = await localDB.getCollection('contacts');
-        const processedUContacts = uContacts.map((c: any) => ({
-          ...c,
-          categoria: c.categoria || 'Sin categoría'
-        }));
-        setRecords(processedUContacts);
-      } else {
-        setRecords(cleanContactsList);
-      }
+      setRecords(cleanContactsList);
       setIntranetClients(intranetData);
       setImports(importData);
     };

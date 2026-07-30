@@ -760,8 +760,8 @@ export default function ResumenVentasManager() {
                         </div>
                     </div>
                 </div>
-                <div id="chart-frascos" className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8">
-                    <ResponsiveContainer width="100%" height="100%">
+                <div id="chart-frascos" className="w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8 mt-4">
+                    <ResponsiveContainer width="100%" height={260}>
                         <BarChart data={getChartData(currentYears, frascosScale, 'frascos')} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                             <XAxis dataKey="name" stroke="#64748B" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
@@ -913,8 +913,8 @@ export default function ResumenVentasManager() {
                         </div>
                     </div>
                 </div>
-                <div id="chart-pesos" className="h-64 md:h-72 w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8">
-                    <ResponsiveContainer width="100%" height="100%">
+                <div id="chart-pesos" className="w-full bg-[#0D1527] rounded-xl p-4 border border-slate-700/50 pt-8 mt-4">
+                    <ResponsiveContainer width="100%" height={260}>
                         <BarChart data={getChartData(currentYears, pesosScale, 'pesos')} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} opacity={0.5} />
                             <XAxis dataKey="name" stroke="#64748B" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
