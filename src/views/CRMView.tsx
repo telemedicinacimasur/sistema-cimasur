@@ -291,9 +291,10 @@ export default function CRMView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const crmPerm = user?.permissions?.['crm'];
+  const isReadonly = !hasFullAccess && crmPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.delete !== false : true));
 
 
   
@@ -864,9 +865,10 @@ function CRMRegister() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const crmPerm = user?.permissions?.['crm'];
+  const isReadonly = !hasFullAccess && crmPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.delete !== false : true));
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -1248,9 +1250,10 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const crmPerm = user?.permissions?.['crm'];
+  const isReadonly = !hasFullAccess && crmPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.delete !== false : true));
 
   
   
@@ -3065,9 +3068,10 @@ function CRMIntranetTable({
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const crmPerm = user?.permissions?.['crm'];
+  const isReadonly = !hasFullAccess && crmPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.delete !== false : true));
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [existingCRMEmails, setExistingCRMEmails] = useState<Set<string>>(new Set());
@@ -3665,9 +3669,10 @@ function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const crmPerm = user?.permissions?.['crm'];
+  const isReadonly = !hasFullAccess && crmPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (crmPerm ? crmPerm.delete !== false : true));
 
 
   const [activities, setActivities] = useState<any[]>([]);

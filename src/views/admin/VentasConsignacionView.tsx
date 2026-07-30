@@ -282,15 +282,10 @@ export default function VentasConsignacionView() {
   
   const userRoles = user?.roles || [user?.role || 'viewer'];
   const hasFullAccess = userRoles.includes('admin');
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
-    const p = user.permissions?.[role];
-    return p ? p.edit !== false : true;
-  }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
-    const p = user.permissions?.[role];
-    return p ? p.delete !== false : true;
-  }));
+  const adminPerm = user?.permissions?.['manager'] || user?.permissions?.['admin'];
+  const isReadonly = !hasFullAccess && adminPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (adminPerm ? adminPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (adminPerm ? adminPerm.delete !== false : true));
   
   const [activeTab, setActiveTab] = useState<'declaraciones' | 'registro_ventas'>('declaraciones');
   const [clientes, setClientes] = useState<any[]>([]);

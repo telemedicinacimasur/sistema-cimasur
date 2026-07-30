@@ -101,9 +101,10 @@ export default function SchoolView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const schoolPerm = user?.permissions?.['school'];
+  const isReadonly = !hasFullAccess && schoolPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (schoolPerm ? schoolPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (schoolPerm ? schoolPerm.delete !== false : true));
 
 
   
@@ -188,9 +189,10 @@ function ContactRegister({ records }: { records: any[] }) {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const schoolPerm = user?.permissions?.['school'];
+  const isReadonly = !hasFullAccess && schoolPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (schoolPerm ? schoolPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (schoolPerm ? schoolPerm.delete !== false : true));
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1717,9 +1719,10 @@ function SchoolActivities() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const schoolPerm = user?.permissions?.['school'];
+  const isReadonly = !hasFullAccess && schoolPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (schoolPerm ? schoolPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (schoolPerm ? schoolPerm.delete !== false : true));
 
 
   const [activities, setActivities] = useState<any[]>([]);

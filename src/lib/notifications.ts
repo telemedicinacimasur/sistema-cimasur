@@ -222,16 +222,12 @@ export const subscribeToNotifications = (
       const filtered = data.filter(isRecipient);
       callback(filtered);
     }, (err) => {
-      console.warn("Firestore onSnapshot index error, falling back to basic notifications query:", err);
-      const fallbackQ = query(
-        collection(db, 'notifications'),
-        limit(50)
-      );
-      return onSnapshot(fallbackQ, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        const filtered = data.filter(isRecipient);
+      console.warn("Firestore notifications onSnapshot error, falling back to local cache:", err);
+      localDB.getCollection('notifications', { limitCount: 50 }).then((data) => {
+        const filtered = (data || []).filter(isRecipient);
         callback(filtered);
-      });
+      }).catch(e => console.warn("Failed to fetch fallback notifications", e));
+      return () => {};
     });
   }
   

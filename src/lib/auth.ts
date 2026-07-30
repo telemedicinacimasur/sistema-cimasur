@@ -238,13 +238,8 @@ const pendingRequests: Record<string, Promise<any[]>> = {};
 
 if (typeof window !== 'undefined') {
   window.addEventListener('db-change', (e: Event) => {
-    const detail = (e as CustomEvent)?.detail;
-    if (!detail?.collection) {
-      // Clear all caches on database changes so views always read fresh updated data
-      Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
-    } else {
-      invalidateCollectionCache(detail.collection);
-    }
+    // Memory cache is already updated in-place by updateCachedCollectionItem and removeCachedCollectionItem.
+    // We do not invalidate in-memory caches here to prevent unnecessary repeated Firestore fetch queries.
   });
 }
 
@@ -338,13 +333,17 @@ export const localDB = {
       ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}_${limitStr}` 
       : `${name}_${limitStr}`;
 
+    if (collectionCache[cacheKey]) {
+      return [...collectionCache[cacheKey]];
+    }
+
     const cachedData = getFromLocalStorage(cacheKey);
-    if (cachedData) return cachedData;
+    if (cachedData) {
+      collectionCache[cacheKey] = cachedData;
+      return [...cachedData];
+    }
 
     if (isFirebaseReady && db) {
-      if (collectionCache[cacheKey]) {
-        return [...collectionCache[cacheKey]];
-      }
       if (pendingRequests[cacheKey]) {
         const data = await pendingRequests[cacheKey];
         return [...data];

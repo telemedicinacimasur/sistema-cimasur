@@ -214,15 +214,10 @@ export default function CimasurInventoryManager() {
   
   const userRoles = user?.roles || [user?.role || 'viewer'];
   const hasFullAccess = userRoles.includes('admin');
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
-    const p = user.permissions?.[role];
-    return p ? p.edit !== false : true;
-  }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
-    const p = user.permissions?.[role];
-    return p ? p.delete !== false : true;
-  }));
+  const adminPerm = user?.permissions?.['manager'] || user?.permissions?.['admin'];
+  const isReadonly = !hasFullAccess && adminPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (adminPerm ? adminPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (adminPerm ? adminPerm.delete !== false : true));
   
   const [activeModule, setActiveModule] = useState<SubModule>('dashboard');
   const [activeTab, setActiveTab] = useState<MainTab>('SALINA CS');
@@ -622,6 +617,33 @@ export default function CimasurInventoryManager() {
         alert('Hubo un error al intentar eliminar algunos registros.');
       }
     }
+  };
+
+  const handleSelectDuplicates = () => {
+    const currentRecords = getFilteredRecords();
+    const codeCount: Record<string, number> = {};
+    currentRecords.forEach(r => {
+      const code = (r.codigo_barras || '').trim();
+      if (code && code !== 'GENÉRICO') {
+        codeCount[code] = (codeCount[code] || 0) + 1;
+      }
+    });
+
+    const duplicateIds = currentRecords
+      .filter(r => {
+        if (r.es_duplicado === true) return true;
+        const code = (r.codigo_barras || '').trim();
+        return code && code !== 'GENÉRICO' && codeCount[code] > 1;
+      })
+      .map(r => r.id);
+
+    if (duplicateIds.length === 0) {
+      alert('¡No se encontraron registros duplicados en los ítems actualmente visibles!');
+      return;
+    }
+
+    setSelectedIds(duplicateIds);
+    alert(`Se identificaron y seleccionaron ${duplicateIds.length} registros duplicados. Puedes eliminarlos haciendo clic en el botón "Eliminar Seleccionados" que ha aparecido en pantalla.`);
   };
 
   const handleDeleteAllFiltered = async () => {
@@ -1201,6 +1223,11 @@ export default function CimasurInventoryManager() {
                 {canEdit && (
                   <button onClick={() => { loadImportLogs(); setShowHistoryModal(true); }} className="flex items-center justify-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-blue-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Ver Historial de Importaciones">
                     <History className="w-4 h-4" /> Historial
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={handleSelectDuplicates} className="flex items-center justify-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-amber-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Detectar y seleccionar automáticamente registros duplicados">
+                    <Trash2 className="w-4 h-4" /> Detectar Duplicados
                   </button>
                 )}
                 {canEdit && (

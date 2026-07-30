@@ -53,9 +53,10 @@ export default function GestionView() {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const gestionPerm = user?.permissions?.['gestion'];
+  const isReadonly = !hasFullAccess && gestionPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.delete !== false : true));
 
 
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
@@ -174,9 +175,10 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const gestionPerm = user?.permissions?.['gestion'];
+  const isReadonly = !hasFullAccess && gestionPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.delete !== false : true));
 
 
   const [newNote, setNewNote] = useState('');
@@ -746,9 +748,10 @@ function GestionRegister({ initialData, onCancel }: { initialData?: any, onCance
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const gestionPerm = user?.permissions?.['gestion'];
+  const isReadonly = !hasFullAccess && gestionPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.delete !== false : true));
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1060,9 +1063,10 @@ function GestionList({
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
-  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
-  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
-  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+  const gestionPerm = user?.permissions?.['gestion'];
+  const isReadonly = !hasFullAccess && gestionPerm?.readonly === true;
+  const canEdit = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.edit !== false : true));
+  const canDelete = hasFullAccess || (!isReadonly && (gestionPerm ? gestionPerm.delete !== false : true));
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
