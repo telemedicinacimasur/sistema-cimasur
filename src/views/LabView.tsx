@@ -5768,7 +5768,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                       String(c.lambdas || '').toLowerCase().includes(search)
                     ))
                   );
-                }).sort((a,b) => b.fecha.localeCompare(a.fecha));
+                }).sort((a,b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
 
                 if (filtered.length === 0) {
                   return <tr><td colSpan={6} className="p-10 text-center text-slate-400">Sin registros para "{searchTerm}"...</td></tr>;

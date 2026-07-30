@@ -287,7 +287,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
     // Remove duplicates based on fecha and detalle
     const uniqueUnified = Array.from(new Map(unified.map(item => [item.fecha.substring(0, 10) + item.detalle, item])).values());
     
-    setActivities(uniqueUnified.sort((a, b) => b.fecha.localeCompare(a.fecha)));
+    setActivities(uniqueUnified.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))));
   };
 
   useEffect(() => {
@@ -1268,7 +1268,7 @@ function GestionList({
                                   {
                                     title: 'Historial de Actividades',
                                     headers: ['Fecha', 'Actividad', 'Responsable', 'Detalle'],
-                                    rows: clientActivities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(a => [
+                                    rows: clientActivities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))).map(a => [
                                       formatDate(a.fecha),
                                       a.actividad,
                                       a.responsable,
@@ -1308,7 +1308,7 @@ function GestionList({
                                    {
                                      title: 'Historial de Actividades',
                                      headers: ['Fecha', 'Actividad', 'Responsable', 'Detalle'],
-                                     rows: clientActivities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(a => [
+                                     rows: clientActivities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))).map(a => [
                                        formatDate(a.fecha),
                                        a.actividad,
                                        a.responsable,

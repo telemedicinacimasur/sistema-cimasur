@@ -183,8 +183,54 @@ const getFromLocalStorage = (key: string) => {
   return null;
 };
 
+const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e: any) {
+    if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('quota')) || (e.message && e.message.toLowerCase().includes('exceeded'))) {
+      console.warn('Local storage quota exceeded. Clearing cache to make room.');
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.includes('_limit_') || k.includes('_nolimit') || k.includes('undefined'))) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        localStorage.setItem(key, value);
+      } catch (innerErr) {
+        console.warn('Failed to save to local storage even after clearing cache.', innerErr);
+      }
+    } else {
+      console.error('Error saving to local storage', e);
+    }
+  }
+};
+
 const saveToLocalStorage = (key: string, data: any) => {
-  localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+  try {
+    safeSetLocalStorage(key, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch (e: any) {
+    if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('quota')) || (e.message && e.message.toLowerCase().includes('exceeded'))) {
+      console.warn('Local storage quota exceeded. Clearing cache to make room.');
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.includes('_limit_') || k.includes('_nolimit') || k.includes('undefined'))) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        safeSetLocalStorage(key, JSON.stringify({ data, timestamp: Date.now() }));
+      } catch (innerErr) {
+        console.warn('Failed to save to local storage even after clearing cache.', innerErr);
+      }
+    } else {
+      console.error('Error saving to local storage', e);
+    }
+  }
 };
 
 const collectionCache: Record<string, any[]> = {};
@@ -241,7 +287,7 @@ const updateCachedCollectionItem = (name: string, savedItem: { id: string, [key:
             } else {
               parsed.data.unshift(savedItem);
             }
-            localStorage.setItem(lsKey, JSON.stringify(parsed));
+            safeSetLocalStorage(lsKey, JSON.stringify(parsed));
           }
         } catch (e) {
           // ignore
@@ -270,7 +316,7 @@ const removeCachedCollectionItem = (name: string, id: string) => {
           const parsed = JSON.parse(cached);
           if (parsed && Array.isArray(parsed.data)) {
             parsed.data = parsed.data.filter((r: any) => r.id !== id);
-            localStorage.setItem(lsKey, JSON.stringify(parsed));
+            safeSetLocalStorage(lsKey, JSON.stringify(parsed));
           }
         } catch (e) {
           // ignore

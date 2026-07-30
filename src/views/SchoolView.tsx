@@ -1944,7 +1944,7 @@ function SchoolActivities() {
           <div className="flex gap-2">
             <button 
               onClick={() => {
-                const data = activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => [
+                const data = activities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))).map(act => [
                   formatDate(act.fecha),
                   act.actividad,
                   act.tipo,
@@ -1959,7 +1959,7 @@ function SchoolActivities() {
             </button>
             <button 
               onClick={() => {
-                const data = activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => [
+                const data = activities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))).map(act => [
                   formatDate(act.fecha),
                   act.actividad,
                   act.tipo,
@@ -1986,7 +1986,7 @@ function SchoolActivities() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {activities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
+              {activities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))).map(act => (
                 <tr key={act.id} className="hover:bg-[#1E293B]/50 transition-colors">
                   <td className="p-4">{formatDate(act.fecha)}</td>
                   <td className="p-4 font-bold text-white">{act.actividad}</td>

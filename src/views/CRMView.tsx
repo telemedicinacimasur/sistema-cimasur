@@ -3694,7 +3694,7 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {imports.sort((a, b) => b.fechaImportacion.localeCompare(a.fechaImportacion)).map(imp => (
+            {imports.sort((a, b) => String(b.fechaImportacion || "").localeCompare(String(a.fechaImportacion || ""))).map(imp => (
               <tr key={imp.fechaImportacion + imp.archivoNombre} className="hover:bg-[#1E293B]/50 transition-colors">
                 <td className="p-5">{ formatDate(imp.fechaImportacion) }</td>
                 <td className="p-5 font-medium">{ imp.archivoNombre }</td>
@@ -4069,7 +4069,7 @@ function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredActivities.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(act => (
+              {filteredActivities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))).map(act => (
                 <tr key={act.id} className="hover:bg-[#1E293B]/50 transition-colors">
                   <td className="p-4">{formatDate(act.fecha)}</td>
                   <td className="p-4 font-bold text-white">{act.campania}</td>

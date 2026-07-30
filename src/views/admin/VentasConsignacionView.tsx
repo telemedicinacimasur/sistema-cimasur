@@ -373,7 +373,7 @@ export default function VentasConsignacionView() {
         });
       }
     });
-    return Array.from(map.values()).sort((a, b) => a.productoId.localeCompare(b.productoId));
+    return Array.from(map.values()).sort((a, b) => String(a.productoId || "").localeCompare(String(b.productoId || "")));
   }, [todosLosLotes]);
 
   const handleDownloadRegisteredProductsPDF = () => {
@@ -429,8 +429,8 @@ export default function VentasConsignacionView() {
     });
 
     const list = Array.from(productSolutionMap.values()).sort((a, b) => {
-      if (a.clientName !== b.clientName) return a.clientName.localeCompare(b.clientName);
-      return a.productoId.localeCompare(b.productoId);
+      if (a.clientName !== b.clientName) return String(a.clientName || "").localeCompare(String(b.clientName || ""));
+      return String(a.productoId || "").localeCompare(String(b.productoId || ""));
     });
 
     const doc = new jsPDF({ orientation: 'p' });
@@ -2296,9 +2296,9 @@ export default function VentasConsignacionView() {
                         });
 
                         const productSolutionList = Array.from(productSolutionMap.values()).sort((a, b) => {
-                          if (a.clientName !== b.clientName) return a.clientName.localeCompare(b.clientName);
-                          if (a.productoId !== b.productoId) return a.productoId.localeCompare(b.productoId);
-                          return a.solucionLote.localeCompare(b.solucionLote);
+                          if (a.clientName !== b.clientName) return String(a.clientName || "").localeCompare(String(b.clientName || ""));
+                          if (a.productoId !== b.productoId) return String(a.productoId || "").localeCompare(String(b.productoId || ""));
+                          return String(a.solucionLote || "").localeCompare(String(b.solucionLote || ""));
                         });
 
                         return (
