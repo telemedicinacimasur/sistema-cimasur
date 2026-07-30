@@ -285,8 +285,8 @@ export const localDB = {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
   },
   getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number }): Promise<any[]> => {
-    const rawLimit = options?.limitCount ?? 10000;
-    const shouldLimit = rawLimit > 0 && rawLimit <= 10000;
+    const rawLimit = options?.limitCount ?? -1;
+    const shouldLimit = rawLimit > 0;
     const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
     const cacheKey = options 
       ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}_${limitStr}` 
