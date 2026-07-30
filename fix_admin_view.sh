@@ -1,0 +1,2 @@
+sed -i "s/isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('\([^']*\)'))/hasSubmodule('manager', '\1')/g" src/views/AdminView.tsx
+sed -i "s/((isMainAdmin || isManager || isComercial) && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('consignacion')))/hasSubmodule('manager', 'consignacion') || hasSubmodule('crm', 'consignacion')/g" src/views/AdminView.tsx

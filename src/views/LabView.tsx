@@ -53,13 +53,16 @@ type LabFormType = 'registro' | 'gotas-puras' | 'elaboracion' | 'nosodes' | 'tin
 
 export default function LabView() {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
   const [activeForm, setActiveForm] = useState<LabFormType>('default');
   const [records, setRecords] = useState<any[]>([]);
 
-  const permissions = user?.permissions?.['lab'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
-  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+  
 
   // Generic data fetching for the active form from localDB
   useEffect(() => {
@@ -302,7 +305,12 @@ function ModuleCard({ title, desc, icon: Icon, onClick, featured, color = 'blue'
 
 function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -688,7 +696,12 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
 
 function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1060,7 +1073,12 @@ const initialFormState = {
 
 function NosodesForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1465,7 +1483,12 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
 
 function PreparacionForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -2055,7 +2078,12 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
 
 function TinturasMadresForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -2435,7 +2463,12 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
 
 function InsumosForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -2800,7 +2833,12 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
 
 function VademecumForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -3168,7 +3206,12 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 
 function MantenimientoForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -3686,6 +3729,12 @@ const getRecordAlertaThreshold = (record: any) => {
 
 function StockManager({ records: inventoryRecords, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedArea, setSelectedArea] = useState<string>('Etiquetas salina');
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
@@ -4550,10 +4599,13 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
 
 function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
-  const permissions = user?.permissions?.['lab'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
-  const canEdit = user?.roles?.includes('admin') || user?.roles?.includes('manager') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
+  
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [trackingRecords, setTrackingRecords] = useState<any[]>([]);
@@ -5349,7 +5401,12 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
 function MagistralesForm({ records, setRecords }: { records: any[], setRecords: (data: any[]) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');

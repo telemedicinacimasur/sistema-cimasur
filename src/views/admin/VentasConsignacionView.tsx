@@ -280,10 +280,17 @@ const ProductSolutionAutocomplete = ({
 export default function VentasConsignacionView() {
   const { user } = useAuth();
   
-  const permissions = user?.permissions?.['manager'] || user?.permissions?.['crm'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager') && !user?.roles?.includes('crm'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
-  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+  const userRoles = user?.roles || [user?.role || 'viewer'];
+  const hasFullAccess = userRoles.includes('admin');
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
+    const p = user.permissions?.[role];
+    return p ? p.edit !== false : true;
+  }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
+    const p = user.permissions?.[role];
+    return p ? p.delete !== false : true;
+  }));
   
   const [activeTab, setActiveTab] = useState<'declaraciones' | 'registro_ventas'>('declaraciones');
   const [clientes, setClientes] = useState<any[]>([]);

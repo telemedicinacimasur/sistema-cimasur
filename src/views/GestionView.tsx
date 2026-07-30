@@ -51,7 +51,12 @@ function parseExcelDate(serial: any) {
 
 export default function GestionView() {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
   const [records, setRecords] = useState<any[]>([]);
@@ -86,10 +91,7 @@ export default function GestionView() {
 
   const selectedExpediente = records.find(r => r.id === selectedExpedienteId);
   
-  const permissions = user?.permissions?.['gestion'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
-  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+  
 
   return (
     <div className="space-y-6">
@@ -170,7 +172,12 @@ export default function GestionView() {
 
 function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const [newNote, setNewNote] = useState('');
   const [newCategory, setNewCategory] = useState(client.categoria || 'Sin categoría');
@@ -737,7 +744,12 @@ const TIPOS_EMPRESA = ['Clinica', 'Farmacia', 'Petshop', 'Hospital', 'Independie
 
 function GestionRegister({ initialData, onCancel }: { initialData?: any, onCancel?: () => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -1046,6 +1058,12 @@ function GestionList({
   onEdit: (record: any) => void
 }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);

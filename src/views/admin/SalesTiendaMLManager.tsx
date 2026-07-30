@@ -276,7 +276,7 @@ export default function SalesTiendaMLManager() {
   });
 
   const getQueryOptions = () => {
-    if (loadRange === 'historico_completo') return undefined;
+    if (loadRange === 'historico_completo') return { limitCount: -1 };
     
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -289,13 +289,13 @@ export default function SalesTiendaMLManager() {
       return {
         dateField: 'fecha',
         startDate: `${currentYear}-${pad(currentMonth + 1)}-01`,
-        endDate: `${currentYear}-${pad(currentMonth + 1)}-${pad(lastDay)}`
+        endDate: `${currentYear}-${pad(currentMonth + 1)}-${pad(lastDay)}`, limitCount: -1
       };
     } else { // anio_actual
       return {
         dateField: 'fecha',
         startDate: `${currentYear}-01-01`,
-        endDate: `${currentYear}-12-31`
+        endDate: `${currentYear}-12-31`, limitCount: -1
       };
     }
   };

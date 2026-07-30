@@ -98,6 +98,14 @@ export default function AdminView() {
   const isManager = useMemo(() => userRoles.includes('manager'), [userRoles]);
   const isComercial = useMemo(() => userRoles.includes('crm'), [userRoles]);
   const isManagerOrAdmin = useMemo(() => isMainAdmin || isManager, [isMainAdmin, isManager]);
+
+  const hasSubmodule = useCallback((role: string, submodule: string) => {
+    if (user?.roles?.includes('admin')) return true;
+    if (!user?.roles?.includes(role)) return false;
+    if (!user?.allowedSubmodules || !user.allowedSubmodules[role] || user.allowedSubmodules[role].length === 0) return true;
+    return user.allowedSubmodules[role].includes(submodule);
+  }, [user]);
+
   const location = useLocation();
   const [view, setView] = useState<AdminTab>((location.state as any)?.view || 'menu');
   const [records, setRecords] = useState<any[]>([]);
@@ -121,7 +129,7 @@ export default function AdminView() {
   };
 
   const getQueryOptions = (colName: string) => {
-    if (loadRange === 'historico_completo') return { limitCount: 10000 };
+    if (loadRange === 'historico_completo') return { limitCount: -1 };
     
     let dateField = 'fecha';
     if (colName === 'quotes') {
@@ -157,7 +165,7 @@ export default function AdminView() {
         dateField,
         startDate: `${currentYear}-01-01`,
         endDate: `${currentYear}-12-31`,
-        limitCount: 10000
+        limitCount: -1
       };
     }
   };
@@ -233,7 +241,7 @@ export default function AdminView() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
 
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('quotes')) && (
+          {hasSubmodule('manager', 'quotes') && (
             <ModuleCard 
               title="Seguimiento de Cotizaciones"
               desc="Control de presupuestos, vendedores y estados de aprobación."
@@ -242,7 +250,7 @@ export default function AdminView() {
               color="indigo"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales')) && (
+          {hasSubmodule('manager', 'sales') && (
             <ModuleCard 
               title="Detalle de Ventas"
               desc="Registro diario de facturas y boletas emitidas por cliente."
@@ -251,7 +259,7 @@ export default function AdminView() {
               color="emerald"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('resumen_ventas')) && (
+          {hasSubmodule('manager', 'resumen_ventas') && (
             <ModuleCard 
               title="Resumen de ventas Frascos y Pesos"
               desc="Análisis dinámico de volumen de frascos y recaudación por documentos."
@@ -260,7 +268,7 @@ export default function AdminView() {
               color="indigo"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('dte')) && (
+          {hasSubmodule('manager', 'dte') && (
             <ModuleCard 
               title="Detalle de DTE"
               desc="Control administrativo de documentos tributarios electrónicos."
@@ -269,7 +277,7 @@ export default function AdminView() {
               color="rose"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_gestion')) && (
+          {hasSubmodule('manager', 'sales_gestion') && (
             <ModuleCard 
               title="Detalle de Ventas GESTIÓN"
               desc="Registro diario de ventas con detalle de productos y cotización."
@@ -278,7 +286,7 @@ export default function AdminView() {
               color="amber"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('sales_tienda_ml')) && (
+          {hasSubmodule('manager', 'sales_tienda_ml') && (
             <ModuleCard 
               title="Ventas Tienda y ML"
               desc="Detalle de Ventas para canales Tienda Física y Mercado Libre."
@@ -287,7 +295,7 @@ export default function AdminView() {
               color="orange"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('pet_payments')) && (
+          {hasSubmodule('manager', 'pet_payments') && (
             <ModuleCard 
               title="Control de Pagos Veterinarios"
               desc="Registro de pagos tutor, mail, fono y honorarios veterinarios."
@@ -296,7 +304,7 @@ export default function AdminView() {
               color="indigo"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('school_payments')) && (
+          {hasSubmodule('manager', 'school_payments') && (
             <ModuleCard 
               title="Saldos Escuela Cimasur"
               desc="Control de pagos de alumnos, meta anual y gastos académicos."
@@ -305,7 +313,7 @@ export default function AdminView() {
               color="emerald"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('codigos_y_diluciones')) && (
+          {hasSubmodule('manager', 'codigos_y_diluciones') && (
             <ModuleCard 
               title="Gestión de Códigos y Diluciones"
               desc="Gestión de Códigos y Diluciones."
@@ -314,7 +322,7 @@ export default function AdminView() {
               color="orange"
             />
           )}
-          {isManagerOrAdmin && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('presupuesto_flujo')) && (
+          {hasSubmodule('manager', 'presupuesto_flujo') && (
             <ModuleCard 
               title="Matriz de Presupuesto y Flujo"
               desc="Control detallado de presupuesto anual, proyecciones y gastos mensuales."
@@ -323,7 +331,7 @@ export default function AdminView() {
               color="purple"
             />
           )}
-          {((isMainAdmin || isManager || isComercial) && (!user?.allowedSubmodules?.manager || user.allowedSubmodules.manager.includes('consignacion'))) && (
+          {(hasSubmodule('manager', 'consignacion') || hasSubmodule('crm', 'consignacion')) && (
             <ModuleCard 
               title="Ventas en Consignación"
               desc="Gestión de entregas, lotes y declaraciones mensuales."
@@ -337,10 +345,19 @@ export default function AdminView() {
     );
   }
 
-  const permissions = user?.permissions?.['manager'] || user?.permissions?.['crm'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager') && !user?.roles?.includes('crm'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
-  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+  const hasFullAccess = userRoles.includes('admin');
+  
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
+    const p = user.permissions?.[role];
+    return p ? p.edit !== false : true;
+  }));
+
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => {
+    const p = user.permissions?.[role];
+    return p ? p.delete !== false : true;
+  }));
 
   return (
     <div className="space-y-6 relative font-bold">

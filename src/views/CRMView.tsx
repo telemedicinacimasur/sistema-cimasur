@@ -290,12 +290,15 @@ export async function syncIntranetClientToCRM(ic: any, user?: any) {
 
 export default function CRMView() {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
 
-  const permissions = user?.permissions?.['crm'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
-  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+
+  
+  
 
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -921,6 +924,12 @@ const getClientCrmCategory = (client: any): string => {
 
 function CRMRegister() {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fechaIngreso: new Date().toISOString().split('T')[0],
@@ -1299,9 +1308,14 @@ function CRMRegister() {
 
 function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewClient, onAddClient }: { records: any[], setRecords: any, filters: any, setFilters: any, onComment: (r: any) => void, onViewClient?: (id: string) => void, onAddClient?: () => void }) {
   const { user } = useAuth();
-  const permissions = user?.permissions?.['crm'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
+  
+  
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkCategory, setBulkCategory] = useState<string>('');
@@ -3111,6 +3125,12 @@ function CRMIntranetTable({
   onEditClient?: (client: any) => void
 }) {
   const { user } = useAuth();
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [existingCRMEmails, setExistingCRMEmails] = useState<Set<string>>(new Set());
   const [existingCRMNames, setExistingCRMNames] = useState<Set<string>>(new Set());
@@ -3210,9 +3230,8 @@ function CRMIntranetTable({
     return result;
   }, [clients, searchTerm, estadoFilter, crmContacts]);
 
-  const permissions = user?.permissions?.['crm'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
+  
+  
 
   useEffect(() => {
     const checkCRM = async () => {
@@ -3706,7 +3725,12 @@ function CRMImportsTable({ imports }: { imports: any[] }) {
 
 function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const [activities, setActivities] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);

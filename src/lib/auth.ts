@@ -285,10 +285,12 @@ export const localDB = {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
   },
   getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number }): Promise<any[]> => {
-    const limitVal = options?.limitCount || 50000;
+    const rawLimit = options?.limitCount ?? 10000;
+    const shouldLimit = rawLimit > 0 && rawLimit <= 10000;
+    const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
     const cacheKey = options 
-      ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}_${limitVal}` 
-      : `${name}_limit_${limitVal}`;
+      ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}_${limitStr}` 
+      : `${name}_${limitStr}`;
 
     const cachedData = getFromLocalStorage(cacheKey);
     if (cachedData) return cachedData;
@@ -304,20 +306,15 @@ export const localDB = {
       
       const fetchPromise = (async () => {
         try {
-          let qRef: any;
+          let qParts: any[] = [];
           if (options && options.dateField && options.startDate && options.endDate) {
-            qRef = query(
-              collection(db, name),
-              where(options.dateField, '>=', options.startDate),
-              where(options.dateField, '<=', options.endDate),
-              limit(limitVal)
-            );
-          } else {
-            qRef = query(
-              collection(db, name),
-              limit(limitVal)
-            );
+            qParts.push(where(options.dateField, '>=', options.startDate));
+            qParts.push(where(options.dateField, '<=', options.endDate));
           }
+          if (shouldLimit) {
+            qParts.push(limit(rawLimit));
+          }
+          const qRef = query(collection(db, name), ...qParts);
           const snapshot = await getDocs(qRef);
           const data = snapshot.docs.map(doc => {
             const docData = doc.data() as any;
@@ -373,8 +370,8 @@ export const localDB = {
                   return val >= options.startDate! && val <= options.endDate!;
                 });
               }
-              if (Array.isArray(data) && data.length > limitVal) {
-                data = data.slice(0, limitVal);
+              if (shouldLimit && Array.isArray(data) && data.length > rawLimit) {
+                data = data.slice(0, rawLimit);
               }
               saveToLocalStorage(cacheKey, data);
               return data;

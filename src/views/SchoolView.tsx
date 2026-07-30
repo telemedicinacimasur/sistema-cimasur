@@ -99,12 +99,14 @@ const EstadoAcademicoInput = ({ studentId, initialValue }: EstadoAcademicoInputP
 
 export default function SchoolView() {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
 
-  const permissions = user?.permissions?.['school'];
-  const isReadonly = permissions?.readonly === true || user?.role === 'viewer' || (user?.roles?.includes('viewer') && !user?.roles?.includes('admin') && !user?.roles?.includes('manager'));
-  const canEdit = user?.roles?.includes('admin') || (permissions ? (permissions.edit !== false && !isReadonly) : !isReadonly);
-  const canDelete = user?.roles?.includes('admin') || (permissions ? (permissions.delete !== false && !isReadonly) : !isReadonly);
+
+  
 
   const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities' | 'commercial'>('register');
   const [data, setData] = useState<any[]>([]);
@@ -184,7 +186,12 @@ function TabButton({ active, onClick, icon: Icon, children }: any) {
 
 function ContactRegister({ records }: { records: any[] }) {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -1708,7 +1715,12 @@ function TrackingView() {
 
 function SchoolActivities() {
   const { user } = useAuth();
-  const userRoles = user?.roles || [user?.role || ''];
+  const userRoles = user?.roles || [user?.role || "viewer"];
+  const hasFullAccess = userRoles.includes("admin");
+  const isReadonly = !hasFullAccess && userRoles.some((role: string) => user.permissions?.[role]?.readonly === true);
+  const canEdit = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.edit !== false : true; }));
+  const canDelete = hasFullAccess || (!isReadonly && userRoles.some((role: string) => { const p = user.permissions?.[role]; return p ? p.delete !== false : true; }));
+
 
   const [activities, setActivities] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
