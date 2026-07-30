@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, Plus, Search, FileSpreadsheet, Upload, Download, ArrowLeft, Filter, Hexagon, Droplet, Activity, FlaskConical, TestTube, Layers, Edit, Box, Hash, AlertCircle, Trash2, History } from 'lucide-react';
+import { Database, Plus, Search, FileSpreadsheet, Upload, Download, ArrowLeft, Filter, Hexagon, Droplet, Activity, FlaskConical, TestTube, Layers, Edit, Box, Hash, AlertCircle, Trash2, History, RefreshCw, Sliders, CheckCircle2, Edit3 } from 'lucide-react';
 import { localDB } from '../../lib/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn, safe } from '../../lib/utils';
@@ -259,8 +259,23 @@ export default function CimasurInventoryManager() {
     emptyCodesCount: number;
     emptyRowsCount: number;
     totalProcessed: number;
-    accionDuplicados?: 'importados_en_rojo' | 'omitidos';
+    accionDuplicados?: 'importados_en_rojo' | 'omitidos' | 'actualizados_por_codigo';
   } | null>(null);
+
+  const [updateReport, setUpdateReport] = useState<{
+    updatedCount: number;
+    notFoundCount: number;
+    updatedItems: { codigo: string; nombre: string; prevPrecio?: number; newPrecio?: number }[];
+    notFoundItems: { codigo: string; nombre: string }[];
+    totalProcessed: number;
+  } | null>(null);
+
+  const [showBatchEditModal, setShowBatchEditModal] = useState(false);
+  const [batchEditForm, setBatchEditForm] = useState({
+    fieldToEdit: 'precio', // 'precio', 'precio_porcentaje', 'categoria_tipo', 'doctor', 'solucion', 'fecha'
+    newValue: '',
+    percentage: 0,
+  });
 
   const [pendingImport, setPendingImport] = useState<{
     fileName: string;
@@ -1057,42 +1072,226 @@ export default function CimasurInventoryManager() {
     reader.readAsBinaryString(file);
   };
 
-  const executePendingImport = async (importAllDuplicates: boolean) => {
+  const updateExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        let updatedCount = 0;
+        let notFoundCount = 0;
+        let totalProcessed = 0;
+        const updatedItemsList: { codigo: string; nombre: string; prevPrecio?: number; newPrecio?: number }[] = [];
+        const notFoundItemsList: { codigo: string; nombre: string }[] = [];
+        const itemsToSaveBulk: any[] = [];
+
+        const allRecords = await localDB.getCollection('inventory_master');
+
+        for (const row of data as any[]) {
+          totalProcessed++;
+          const cd = safe(
+            row['CÓDIGO'] || 
+            row['CÓDIGO BARRA'] || 
+            row['CODIGO GP'] || 
+            row['CÓDIGO NC'] || 
+            row['CODIGO FM'] || 
+            row['CÓDIGO EC'] || 
+            row['CODIGO'] || 
+            row['codigo'] || 
+            row['Código'] || 
+            row['CÓDIGO EC'] || 
+            row['Código EC'] || 
+            row['CÓDIGO FM'] || 
+            row['Código FM'] || 
+            row['CÓDIGO NC'] || 
+            row['Código NC'] || 
+            row['CÓDIGO GP'] || 
+            row['Código GP'] || 
+            row['Correlativo'] || 
+            row['CORRELATIVO'] ||
+            row['Código de barra'] ||
+            row['Código de Barra']
+          ).trim();
+
+          const nm = safe(
+            row['IDENTIFICACIÓN'] || 
+            row['PRODUCTO'] || 
+            row['NOMBRE PRODUCTO'] || 
+            row['MUESTRA Y POTENCIA'] || 
+            row['NOMBRE'] || 
+            row['FÓRMULA'] || 
+            row['producto'] || 
+            row['Producto'] ||
+            row['IDENTIFICACION'] ||
+            row['MUESTRA'] ||
+            row['Muestra']
+          ).trim();
+
+          if (!cd && !nm) continue;
+
+          let solVal = '';
+          let gpVal = '';
+          if (activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') {
+            gpVal = safe(row['G.P'] || row['GP'] || '');
+            solVal = safe(row['DILUCIÓN'] || row['DILUCION'] || row['SOLUCIÓN'] || row['SOLUCION'] || '');
+          } else if (activeTab === 'FÓRMULAS MAGISTRALES') {
+            solVal = safe(row['G.P'] || row['GP'] || row['SOLUCIÓN'] || row['SOLUCION'] || '');
+          } else {
+            solVal = safe(row['DILUCIONES / ACTUALIZACIÓN'] || row['DILUCIONES - ACTUALIZACIÓN'] || row['SOLUCIÓN'] || row['SOLUCION'] || row['OBSERVACIÓN'] || row['DILUCIÓN'] || row['DILUCION'] || row['DATOS'] || '');
+          }
+
+          const rawCat = row['CATEGORÍA'] || row['CATEGORIA'];
+          const importedCat = rawCat ? normalizeCategory(rawCat) : undefined;
+          const pr = row['PRECIO'] !== undefined ? row['PRECIO'] : (row['Precio'] !== undefined ? row['Precio'] : (row['precio'] !== undefined ? row['precio'] : (row['VALOR'] !== undefined ? row['VALOR'] : row['valor'])));
+          const doc = safe(row['DOCTOR(A)'] || row['DOCTOR'] || row['DR']);
+          const fecRaw = row['FECHA'] || row['FECHA ELABORACIÓN'] || row['FECHA ELABORACION'] || row['DILUCIÓN'] || row['DILUCION'] || row['SOLUCIÓN'] || row['SOLUCION'];
+          const fec = fecRaw ? convertToInputDate(fecRaw) : undefined;
+
+          let target = allRecords.find((r: any) => {
+            if (activeTab !== 'MATRIZ COMPLETA' && r.base_master !== activeTab) return false;
+            if (cd && cd.toUpperCase() !== 'GENÉRICO' && cd.toUpperCase() !== 'GENERICO') {
+              return String(r.codigo_barras || '').trim().toUpperCase() === cd.toUpperCase();
+            }
+            if (nm) {
+              return String(r.nombre_producto || '').trim().toUpperCase() === nm.toUpperCase();
+            }
+            return false;
+          });
+
+          if (target) {
+            const updated = {
+              ...target,
+              nombre_producto: nm || target.nombre_producto,
+              solucion: solVal || target.solucion,
+              gp: gpVal || target.gp,
+              categoria_tipo: importedCat || target.categoria_tipo,
+              precio: pr !== undefined && pr !== '' && !isNaN(Number(pr)) ? Number(pr) : target.precio,
+              doctor: doc || target.doctor,
+              fecha: fec || target.fecha,
+              updatedAt: new Date().toISOString(),
+              actualizadoPor: user?.displayName || 'Admin'
+            };
+            itemsToSaveBulk.push(updated);
+            updatedCount++;
+            updatedItemsList.push({ 
+              codigo: cd || target.codigo_barras, 
+              nombre: nm || target.nombre_producto, 
+              prevPrecio: target.precio, 
+              newPrecio: updated.precio 
+            });
+          } else {
+            notFoundCount++;
+            notFoundItemsList.push({ codigo: cd || '---', nombre: nm || 'Sin nombre' });
+          }
+        }
+
+        if (itemsToSaveBulk.length > 0) {
+          await localDB.saveToCollectionBulk('inventory_master', itemsToSaveBulk);
+          loadData();
+        }
+
+        setUpdateReport({
+          updatedCount,
+          notFoundCount,
+          updatedItems: updatedItemsList,
+          notFoundItems: notFoundItemsList,
+          totalProcessed
+        });
+
+      } catch (err) {
+        console.error(err);
+        alert('Error al procesar el Excel para actualización masiva.');
+      }
+      e.target.value = '';
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const executePendingImport = async (action: 'omit' | 'red' | 'update') => {
     if (!pendingImport) return;
     try {
-      const rowsToSave = importAllDuplicates 
-        ? [...pendingImport.uniqueRows, ...pendingImport.duplicateRows] 
-        : pendingImport.uniqueRows;
+      let rowsToSave: any[] = [];
+      let updatedCount = 0;
 
-      const itemsToSave = rowsToSave.map(r => ({
-        id: `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 9)}`,
-        codigo_barras: r.cd,
-        nombre_producto: r.nm,
-        solucion: r.sol,
-        gp: r.gp || '',
-        categoria_tipo: r.cat,
-        fecha: r.fec,
-        doctor: r.doc,
-        base_master: activeTab,
-        precio: r.precio,
-        type: 'inventory',
-        es_duplicado: !!r.es_duplicado,
-        createdAt: new Date().toISOString(),
-        creadoPor: user?.displayName || 'Admin'
-      }));
-      await localDB.saveToCollectionBulk('inventory_master', itemsToSave);
+      if (action === 'update') {
+        const allRecords = await localDB.getCollection('inventory_master');
+        const itemsToUpdate: any[] = [];
 
-      // Save report history log
+        for (const dupRow of pendingImport.duplicateRows) {
+          const cd = String(dupRow.cd || '').trim().toUpperCase();
+          const target = allRecords.find((r: any) => {
+            if (r.base_master !== activeTab) return false;
+            return String(r.codigo_barras || '').trim().toUpperCase() === cd;
+          });
+
+          if (target) {
+            const updated = {
+              ...target,
+              nombre_producto: dupRow.nm || target.nombre_producto,
+              solucion: dupRow.sol || target.solucion,
+              gp: dupRow.gp || target.gp,
+              categoria_tipo: dupRow.cat || target.categoria_tipo,
+              precio: dupRow.precio !== undefined && dupRow.precio !== 0 ? dupRow.precio : target.precio,
+              doctor: dupRow.doc || target.doctor,
+              fecha: dupRow.fec || target.fecha,
+              updatedAt: new Date().toISOString(),
+              actualizadoPor: user?.displayName || 'Admin'
+            };
+            itemsToUpdate.push(updated);
+            updatedCount++;
+          } else {
+            rowsToSave.push(dupRow);
+          }
+        }
+
+        if (itemsToUpdate.length > 0) {
+          await localDB.saveToCollectionBulk('inventory_master', itemsToUpdate);
+        }
+
+        rowsToSave = [...rowsToSave, ...pendingImport.uniqueRows];
+      } else if (action === 'red') {
+        rowsToSave = [...pendingImport.uniqueRows, ...pendingImport.duplicateRows];
+      } else {
+        rowsToSave = pendingImport.uniqueRows;
+      }
+
+      if (rowsToSave.length > 0) {
+        const itemsToSave = rowsToSave.map(r => ({
+          id: `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 9)}`,
+          codigo_barras: r.cd,
+          nombre_producto: r.nm,
+          solucion: r.sol,
+          gp: r.gp || '',
+          categoria_tipo: r.cat,
+          fecha: r.fec,
+          doctor: r.doc,
+          base_master: activeTab,
+          precio: r.precio,
+          type: 'inventory',
+          es_duplicado: action === 'red' ? !!r.es_duplicado : false,
+          createdAt: new Date().toISOString(),
+          creadoPor: user?.displayName || 'Admin'
+        }));
+        await localDB.saveToCollectionBulk('inventory_master', itemsToSave);
+      }
+
       const reportLog = {
         id: `import_${Date.now()}`,
         fecha: new Date().toISOString(),
         nombre_archivo: pendingImport.fileName,
         modulo: activeTab,
         total_procesados: pendingImport.totalProcessed,
-        exitosos: rowsToSave.length,
+        exitosos: rowsToSave.length + updatedCount,
         duplicados_count: pendingImport.duplicateItems.length,
         duplicados_detalle: pendingImport.duplicateItems,
-        accion_duplicados: importAllDuplicates ? 'importados_en_rojo' : 'omitidos',
+        accion_duplicados: action === 'update' ? 'actualizados_por_codigo' : (action === 'red' ? 'importados_en_rojo' : 'omitidos'),
         empty_codes: pendingImport.emptyCodesCount,
         empty_rows: pendingImport.emptyRowsCount
       };
@@ -1101,12 +1300,12 @@ export default function CimasurInventoryManager() {
       await loadImportLogs();
 
       setImportReport({
-        successCount: rowsToSave.length,
+        successCount: rowsToSave.length + updatedCount,
         duplicates: pendingImport.duplicateItems,
         emptyCodesCount: pendingImport.emptyCodesCount,
         emptyRowsCount: pendingImport.emptyRowsCount,
         totalProcessed: pendingImport.totalProcessed,
-        accionDuplicados: reportLog.accion_duplicados as 'importados_en_rojo' | 'omitidos'
+        accionDuplicados: reportLog.accion_duplicados as any
       });
 
       setPendingImport(null);
@@ -1114,6 +1313,54 @@ export default function CimasurInventoryManager() {
     } catch (err) {
       console.error(err);
       alert('Error al ejecutar la importación. Intente nuevamente.');
+    }
+  };
+
+  const handleApplyBatchEdit = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      const allRecords = await localDB.getCollection('inventory_master');
+      const updatedList: any[] = [];
+
+      for (const id of selectedIds) {
+        const item = allRecords.find((r: any) => r.id === id);
+        if (!item) continue;
+
+        let newItem = { ...item };
+        if (batchEditForm.fieldToEdit === 'precio') {
+          const val = Number(batchEditForm.newValue);
+          if (!isNaN(val)) newItem.precio = val;
+        } else if (batchEditForm.fieldToEdit === 'precio_porcentaje') {
+          const pct = Number(batchEditForm.percentage);
+          if (!isNaN(pct)) {
+            const currentPr = Number(item.precio || 0);
+            newItem.precio = Math.max(0, Math.round(currentPr * (1 + pct / 100)));
+          }
+        } else if (batchEditForm.fieldToEdit === 'categoria_tipo') {
+          if (batchEditForm.newValue) newItem.categoria_tipo = normalizeCategory(batchEditForm.newValue);
+        } else if (batchEditForm.fieldToEdit === 'doctor') {
+          newItem.doctor = batchEditForm.newValue;
+        } else if (batchEditForm.fieldToEdit === 'solucion') {
+          newItem.solucion = batchEditForm.newValue;
+        } else if (batchEditForm.fieldToEdit === 'fecha') {
+          newItem.fecha = batchEditForm.newValue;
+        }
+
+        newItem.updatedAt = new Date().toISOString();
+        newItem.actualizadoPor = user?.displayName || 'Admin';
+        updatedList.push(newItem);
+      }
+
+      if (updatedList.length > 0) {
+        await localDB.saveToCollectionBulk('inventory_master', updatedList);
+        await loadData();
+        alert(`¡Se actualizaron exitosamente ${updatedList.length} registros!`);
+        setShowBatchEditModal(false);
+        setSelectedIds([]);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al aplicar la edición masiva.');
     }
   };
 
@@ -1261,9 +1508,13 @@ export default function CimasurInventoryManager() {
               <div className="flex gap-2 w-full md:w-auto flex-wrap">
                 {canEdit && (
                   <>
-                    <label className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors cursor-pointer border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Importar Excel">
+                    <label className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors cursor-pointer border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Importar Excel con opción de actualización o creación">
                       <Upload className="w-4 h-4" /> Importar
                       <input type="file" accept=".xlsx, .xls, .csv" onChange={importExcel} className="hidden" />
+                    </label>
+                    <label className="flex items-center justify-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors cursor-pointer border border-amber-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Actualizar precios, nombres o datos masivamente mediante Excel">
+                      <RefreshCw className="w-4 h-4 text-amber-400" /> Actualizar por Excel
+                      <input type="file" accept=".xlsx, .xls, .csv" onChange={updateExcel} className="hidden" />
                     </label>
                     <button onClick={exportTemplate} className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Descargar Plantilla">
                       <Download className="w-4 h-4" /> Plantilla
@@ -1327,6 +1578,19 @@ export default function CimasurInventoryManager() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBatchEditForm({ fieldToEdit: 'precio', newValue: '', percentage: 0 });
+                        setShowBatchEditModal(true);
+                      }}
+                      className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white shadow-lg shadow-sky-500/20"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      Edición Masiva ({selectedIds.length})
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleDeleteSelected}
@@ -1869,14 +2133,14 @@ export default function CimasurInventoryManager() {
       {/* Choice Modal for Pending Import with Duplicates */}
       {pendingImport && (
         <div className="fixed inset-0 bg-[#020617]/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-          <div className="bg-[#152035] rounded-3xl border border-[#1E293B] max-w-2xl w-full overflow-hidden shadow-[0_10px_50px_rgba(0,0,0,0.8)]">
+          <div className="bg-[#152035] rounded-3xl border border-[#1E293B] max-w-3xl w-full overflow-hidden shadow-[0_10px_50px_rgba(0,0,0,0.8)]">
             <div className="p-6 border-b border-[#1E293B] bg-amber-500/10 flex items-center gap-3">
               <div className="p-3 bg-amber-500/20 text-amber-400 rounded-2xl">
                 <AlertCircle className="w-6 h-6 animate-pulse" />
               </div>
               <div>
                 <h3 className="font-bold uppercase tracking-widest text-sm text-amber-400">
-                  ¡Códigos Duplicados Detectados!
+                  ¡Códigos Duplicados / Coincidentes Detectados!
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">Archivo: <span className="font-mono font-bold text-slate-300">{pendingImport.fileName}</span></p>
               </div>
@@ -1884,60 +2148,80 @@ export default function CimasurInventoryManager() {
 
             <div className="p-6 space-y-6">
               <div className="text-slate-300 text-sm leading-relaxed">
-                Se han encontrado <strong className="text-amber-400">{pendingImport.duplicateItems.length} códigos repetidos</strong> (ya sea en el sistema o dentro de las mismas filas del archivo excel).
+                Se han encontrado <strong className="text-amber-400">{pendingImport.duplicateItems.length} códigos coincidentes</strong> entre el archivo Excel y la base de datos de <strong className="text-sky-400">{activeTab}</strong>. Elija cómo desea proceder:
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Opción 1: Omitir duplicados */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Opción 1: Actualizar Datos de Existentes */}
                 <button
                   type="button"
-                  onClick={() => executePendingImport(false)}
-                  className="bg-[#111A2E] hover:bg-[#1C2C4E] p-5 rounded-2xl border border-[#1E293B] text-left transition-all hover:border-sky-500/40 cursor-pointer group flex flex-col justify-between h-40"
+                  onClick={() => executePendingImport('update')}
+                  className="bg-[#111A2E] hover:bg-[#1C2C4E] p-5 rounded-2xl border-2 border-emerald-500/40 text-left transition-all hover:border-emerald-400 cursor-pointer group flex flex-col justify-between h-48 shadow-lg shadow-emerald-500/5"
                 >
                   <div>
-                    <h4 className="font-bold text-sky-400 uppercase text-xs tracking-wider mb-2">Opción 1: Omitir duplicados</h4>
-                    <p className="text-xs text-slate-400 group-hover:text-slate-300">
-                      Importar únicamente los <strong className="text-white">{pendingImport.uniqueRows.length} registros nuevos</strong>. Las {pendingImport.duplicateItems.length} filas duplicadas serán descartadas de forma segura.
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-bold text-emerald-400 uppercase text-xs tracking-wider">Opción 1: Actualizar Datos</h4>
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Sugerido</span>
+                    </div>
+                    <p className="text-xs text-slate-300 group-hover:text-white leading-relaxed">
+                      Actualizar precios, nombres, soluciones, doctor y datos de los <strong className="text-emerald-400">{pendingImport.duplicateItems.length} productos existentes</strong> con la información del Excel, e importar los <strong className="text-white">{pendingImport.uniqueRows.length} nuevos</strong>.
                     </p>
                   </div>
-                  <span className="text-[10px] font-black text-sky-400 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 mt-4 uppercase">
-                    Proceder con únicos →
+                  <span className="text-[10px] font-black text-emerald-400 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 mt-4 uppercase">
+                    Actualizar y Guardar →
                   </span>
                 </button>
 
-                {/* Opción 2: Forzar todo (marcar en rojo) */}
+                {/* Opción 2: Omitir duplicados */}
                 <button
                   type="button"
-                  onClick={() => executePendingImport(true)}
-                  className="bg-[#111A2E] hover:bg-[#1C2C4E] p-5 rounded-2xl border border-red-500/20 text-left transition-all hover:border-red-500/50 cursor-pointer group flex flex-col justify-between h-40"
+                  onClick={() => executePendingImport('omit')}
+                  className="bg-[#111A2E] hover:bg-[#1C2C4E] p-5 rounded-2xl border border-[#1E293B] text-left transition-all hover:border-sky-500/40 cursor-pointer group flex flex-col justify-between h-48"
                 >
                   <div>
-                    <h4 className="font-bold text-red-400 uppercase text-xs tracking-wider mb-2">Opción 2: Incluir todo (En Rojo)</h4>
-                    <p className="text-xs text-slate-400 group-hover:text-slate-300">
-                      Forzar la importación de todos los <strong className="text-white">{pendingImport.uniqueRows.length + pendingImport.duplicateRows.length} registros</strong>. Los duplicados se guardarán y se mostrarán <strong className="text-red-400">en color rojo</strong> en la tabla.
+                    <h4 className="font-bold text-sky-400 uppercase text-xs tracking-wider mb-2">Opción 2: Omitir duplicados</h4>
+                    <p className="text-xs text-slate-400 group-hover:text-slate-300 leading-relaxed">
+                      Importar únicamente los <strong className="text-white">{pendingImport.uniqueRows.length} registros nuevos</strong>. Las {pendingImport.duplicateItems.length} filas con código repetido se ignorarán sin modificar el sistema.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-black text-sky-400 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 mt-4 uppercase">
+                    Proceder con Únicos →
+                  </span>
+                </button>
+
+                {/* Opción 3: Forzar todo (marcar en rojo) */}
+                <button
+                  type="button"
+                  onClick={() => executePendingImport('red')}
+                  className="bg-[#111A2E] hover:bg-[#1C2C4E] p-5 rounded-2xl border border-red-500/20 text-left transition-all hover:border-red-500/50 cursor-pointer group flex flex-col justify-between h-48"
+                >
+                  <div>
+                    <h4 className="font-bold text-red-400 uppercase text-xs tracking-wider mb-2">Opción 3: Incluir Todo (Rojo)</h4>
+                    <p className="text-xs text-slate-400 group-hover:text-slate-300 leading-relaxed">
+                      Forzar la creación de todos los <strong className="text-white">{pendingImport.uniqueRows.length + pendingImport.duplicateRows.length} registros</strong>. Los duplicados se agregarán como nuevos y se resaltarán <strong className="text-red-400">en rojo</strong>.
                     </p>
                   </div>
                   <span className="text-[10px] font-black text-red-400 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 mt-4 uppercase">
-                    Proceder con todos (Rojo) →
+                    Crear Duplicados →
                   </span>
                 </button>
               </div>
 
               {/* Lista compacta de duplicados para revisión rápida */}
               <div className="bg-[#0F172A] rounded-2xl border border-[#1E293B] p-4">
-                <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Vista previa de algunos duplicados:</h5>
+                <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Vista previa de coincidencia por código:</h5>
                 <div className="max-h-[120px] overflow-y-auto space-y-1.5 scrollbar-thin text-xs">
                   {pendingImport.duplicateItems.slice(0, 5).map((dup, idx) => (
                     <div key={idx} className="flex justify-between items-center text-slate-300 py-1 border-b border-[#1E293B]/60 font-mono">
                       <span>{dup.codigo} - {dup.nombre}</span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase font-black">
-                        {dup.type === 'system' ? 'Sistema' : 'Archivo'}
+                        {dup.type === 'system' ? 'Existe en Sistema' : 'Repetido en Archivo'}
                       </span>
                     </div>
                   ))}
                   {pendingImport.duplicateItems.length > 5 && (
                     <div className="text-[10px] text-slate-400 italic text-center mt-2">
-                      ...y otros {pendingImport.duplicateItems.length - 5} duplicados más.
+                      ...y otros {pendingImport.duplicateItems.length - 5} productos más.
                     </div>
                   )}
                 </div>
@@ -1953,8 +2237,267 @@ export default function CimasurInventoryManager() {
                 Cancelar Importación
               </button>
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                {pendingImport.totalProcessed} Líneas totales procesadas
+                {pendingImport.totalProcessed} Líneas procesadas
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reporte de Actualización Masiva por Excel */}
+      {updateReport && (
+        <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-[#152035] rounded-3xl border border-[#1E293B] max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-[0_10px_50px_rgba(0,0,0,0.8)]">
+            <div className="p-6 border-b border-[#1E293B] flex justify-between items-center bg-amber-500/20 text-amber-300">
+              <h3 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-amber-400 animate-spin" style={{ animationDuration: '4s' }} />
+                Reporte de Actualización Masiva de Datos
+              </h3>
+              <button onClick={() => setUpdateReport(null)} className="text-white/50 hover:text-white font-bold text-xl leading-none">×</button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-emerald-500/20">
+                  <div className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Actualizados Con Éxito</div>
+                  <div className="text-3xl font-black text-emerald-400 mt-1">{updateReport.updatedCount}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Registros del sistema modificados</div>
+                </div>
+
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-amber-500/20">
+                  <div className="text-[10px] font-black uppercase text-amber-400 tracking-wider">No Encontrados</div>
+                  <div className="text-3xl font-black text-amber-400 mt-1">{updateReport.notFoundCount}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Códigos no hallados en {activeTab}</div>
+                </div>
+
+                <div className="bg-[#0F172A] p-4 rounded-2xl border border-[#1E293B]">
+                  <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total en Excel</div>
+                  <div className="text-3xl font-black text-slate-200 mt-1">{updateReport.totalProcessed}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Líneas analizadas</div>
+                </div>
+              </div>
+
+              {updateReport.updatedItems.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    Detalle de Productos Actualizados ({updateReport.updatedItems.length}):
+                  </h4>
+                  <div className="bg-[#0F172A] rounded-2xl border border-[#1E293B] max-h-56 overflow-y-auto p-2 scrollbar-thin">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-[#1A263F] text-[10px] font-black uppercase tracking-wider text-slate-400 sticky top-0">
+                        <tr>
+                          <th className="p-2">Código</th>
+                          <th className="p-2">Producto</th>
+                          <th className="p-2 text-right">Precio Previo</th>
+                          <th className="p-2 text-right text-emerald-400">Nuevo Precio</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#1E293B]">
+                        {updateReport.updatedItems.map((item, i) => (
+                          <tr key={i} className="hover:bg-[#152035]">
+                            <td className="p-2 font-mono font-bold text-amber-400">{item.codigo}</td>
+                            <td className="p-2 font-semibold text-white">{item.nombre}</td>
+                            <td className="p-2 text-right text-slate-400">${Number(item.prevPrecio || 0).toLocaleString('es-CL')}</td>
+                            <td className="p-2 text-right font-bold text-emerald-400">${Number(item.newPrecio || 0).toLocaleString('es-CL')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {updateReport.notFoundItems.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider mb-2 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    Códigos no encontrados en la base actual ({updateReport.notFoundItems.length}):
+                  </h4>
+                  <div className="bg-[#0F172A] rounded-2xl border border-[#1E293B] max-h-40 overflow-y-auto p-3 text-xs text-slate-400 font-mono space-y-1">
+                    {updateReport.notFoundItems.slice(0, 10).map((nf, i) => (
+                      <div key={i} className="flex justify-between border-b border-[#1E293B]/50 pb-1">
+                        <span>{nf.codigo}</span>
+                        <span className="text-slate-500">{nf.nombre}</span>
+                      </div>
+                    ))}
+                    {updateReport.notFoundItems.length > 10 && (
+                      <div className="text-[10px] text-center text-slate-500 italic pt-1">
+                        ...y {updateReport.notFoundItems.length - 10} más.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-[#1E293B] bg-[#0F172A] flex justify-end">
+              <button
+                onClick={() => setUpdateReport(null)}
+                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs uppercase tracking-widest transition-colors shadow-lg shadow-amber-500/20 cursor-pointer"
+              >
+                Entendido / Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edición Masiva de Seleccionados */}
+      {showBatchEditModal && (
+        <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-[#152035] rounded-3xl border border-[#1E293B] max-w-lg w-full overflow-hidden shadow-[0_10px_50px_rgba(0,0,0,0.8)]">
+            <div className="p-6 border-b border-[#1E293B] bg-sky-500/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-sky-500/20 text-sky-400 rounded-2xl">
+                  <Sliders className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold uppercase tracking-widest text-sm text-sky-400">
+                    Edición Masiva
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Modificar <strong className="text-white">{selectedIds.length} registros</strong> seleccionados en <strong className="text-sky-300">{activeTab}</strong>
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowBatchEditModal(false)} className="text-white/50 hover:text-white font-bold text-xl leading-none">×</button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">
+                  Selecciona el campo que deseas actualizar:
+                </label>
+                <select
+                  value={batchEditForm.fieldToEdit}
+                  onChange={e => setBatchEditForm({ ...batchEditForm, fieldToEdit: e.target.value })}
+                  className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-sm font-semibold text-white outline-none focus:border-sky-500"
+                >
+                  <option value="precio">Precio Exacto ($)</option>
+                  <option value="precio_porcentaje">Ajuste Porcentual de Precio (%)</option>
+                  <option value="categoria_tipo">Categoría</option>
+                  <option value="doctor">Doctor(a)</option>
+                  <option value="solucion">Solución / Dilución</option>
+                  <option value="fecha">Fecha Elaboración</option>
+                </select>
+              </div>
+
+              {batchEditForm.fieldToEdit === 'precio' && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
+                    Nuevo Precio ($ CLP) para todos los seleccionados:
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Ej. 12500"
+                    value={batchEditForm.newValue}
+                    onChange={e => setBatchEditForm({ ...batchEditForm, newValue: e.target.value })}
+                    className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-sm font-bold text-emerald-400 outline-none focus:border-emerald-500"
+                  />
+                </div>
+              )}
+
+              {batchEditForm.fieldToEdit === 'precio_porcentaje' && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
+                    Porcentaje de variación (+ o -):
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      placeholder="Ej. 10 para +10%, -5 para descuento de 5%"
+                      value={batchEditForm.percentage}
+                      onChange={e => setBatchEditForm({ ...batchEditForm, percentage: Number(e.target.value) })}
+                      className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-sm font-bold text-sky-400 outline-none focus:border-sky-500"
+                    />
+                    <span className="text-lg font-black text-slate-400">%</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Ejemplo: Ingrese <strong>10</strong> para aumentar los precios un 10%, o <strong>-10</strong> para reducirlos un 10%.
+                  </p>
+                </div>
+              )}
+
+              {batchEditForm.fieldToEdit === 'categoria_tipo' && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
+                    Nueva Categoría:
+                  </label>
+                  <select
+                    value={batchEditForm.newValue}
+                    onChange={e => setBatchEditForm({ ...batchEditForm, newValue: e.target.value })}
+                    className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-sm font-semibold text-white outline-none focus:border-sky-500"
+                  >
+                    <option value="">-- Seleccionar Categoría --</option>
+                    {BASE_CATEGORIES.filter(c => c !== 'TODOS').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {batchEditForm.fieldToEdit === 'doctor' && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
+                    Nuevo Doctor(a):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Dr. Eduardo Conejeros"
+                    value={batchEditForm.newValue}
+                    onChange={e => setBatchEditForm({ ...batchEditForm, newValue: e.target.value })}
+                    className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-sm font-bold text-white outline-none focus:border-sky-500 uppercase"
+                  />
+                </div>
+              )}
+
+              {batchEditForm.fieldToEdit === 'solucion' && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
+                    Nueva Solución / Dilución:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. R3 1:3"
+                    value={batchEditForm.newValue}
+                    onChange={e => setBatchEditForm({ ...batchEditForm, newValue: e.target.value })}
+                    className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-sm font-bold text-white outline-none focus:border-sky-500 uppercase"
+                  />
+                </div>
+              )}
+
+              {batchEditForm.fieldToEdit === 'fecha' && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">
+                    Nueva Fecha:
+                  </label>
+                  <input
+                    type="date"
+                    value={batchEditForm.newValue}
+                    onChange={e => setBatchEditForm({ ...batchEditForm, newValue: e.target.value })}
+                    className="w-full bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 text-sm font-bold text-white outline-none focus:border-sky-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-[#1E293B] bg-[#0F172A] flex justify-between items-center">
+              <button
+                type="button"
+                onClick={() => setShowBatchEditModal(false)}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-black uppercase tracking-widest cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyBatchEdit}
+                className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-black rounded-xl text-xs uppercase tracking-widest transition-colors shadow-lg shadow-sky-500/20 cursor-pointer flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Aplicar a {selectedIds.length} Registros
+              </button>
             </div>
           </div>
         </div>
