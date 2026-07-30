@@ -1343,15 +1343,18 @@ export default function CimasurInventoryManager() {
                           const isPrice = (isBaseModule || isMatrixView) && idx === rowVals.length - 1;
                           const isProductName = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') ? idx === 2 : idx === 1;
                           const isGP = (activeTab === 'FÓRMULAS MAGISTRALES' || activeTab === 'EC DR. CONEJEROS' || activeTab === 'NOSODES CLIENTES') && idx === 1;
+                          const isDoctor = (activeTab === 'NOSODES CLIENTES' || activeTab === 'FÓRMULAS MAGISTRALES') && idx === 4;
                           return (
                             <td key={idx} className={cn(
                               "p-4 text-xs border-r border-[#1E293B]",
                               idx === 0 
-                                ? (isDup ? 'font-mono font-bold text-red-400 group-hover:text-red-300 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]' : 'font-mono font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]') 
+                                ? (isDup ? 'font-mono font-bold text-red-400 whitespace-nowrap' : 'font-mono font-bold text-[#38BDF8] whitespace-nowrap drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]') 
                                 : isProductName 
                                 ? (isDup ? 'font-bold text-sm text-red-200' : 'font-bold text-sm text-white') 
                                 : isGP
                                 ? (isDup ? 'text-red-300 text-center w-20' : 'text-slate-300 text-center w-20')
+                                : isDoctor
+                                ? (isDup ? 'text-red-300 text-sm whitespace-nowrap font-medium' : 'text-slate-200 text-sm whitespace-nowrap font-medium')
                                 : isPrice 
                                 ? 'font-mono font-extrabold text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-black'
                                 : (isDup ? 'text-red-300/80' : 'text-slate-300')
