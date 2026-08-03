@@ -1770,9 +1770,9 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
               </div>
               <button 
                 onClick={() => {
-                  const data = filteredRecords.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0, formatCurrency(r.valorCotizacion || 0)]);
-                  data.push(['', '', 'TOTAL', totalFrascos, formatCurrency(totalCotizacion)]);
-                  exportTableToPDF('Reporte: Ventas Gestión', ['Fecha', 'Documento', 'Cliente', 'Frascos', 'Valor Cotiz'], data, 'reporte_ventas_gestion', 'l');
+                  const data = filteredRecords.map(r => [formatDate(r.fecha), r.documento || '', r.cliente || '', r.nroFrascos || 0]);
+                  data.push(['', '', 'TOTAL', totalFrascos]);
+                  exportTableToPDF('Reporte: Ventas Gestión', ['Fecha', 'Documento', 'Cliente', 'Frascos'], data, 'reporte_ventas_gestion', 'l');
                 }}
                 className="text-white bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-[#38BDF8]/30 flex items-center gap-1" 
                 title="Descargar PDF"
