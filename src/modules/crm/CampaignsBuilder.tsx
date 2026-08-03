@@ -4,6 +4,7 @@ import { SuggestedCampaign } from '../../services/crm/CampaignStrategyService';
 import { ClientService } from '../../services/crm/ClientService';
 import { localDB } from '../../lib/auth';
 import { Client } from '../../services/crm/types';
+import { areContactsDuplicate } from '../../views/CRMView';
 import { Users, Mail, Send, CheckSquare, Square, Trash2, MessageSquare, Laptop, Copy, Image as ImageIcon, ExternalLink, X, Check, Download, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function CampaignsBuilder({ 
@@ -137,13 +138,12 @@ export default function CampaignsBuilder({
           const name = typeof camp.name === 'string' ? camp.name.toUpperCase() : '';
           
           if (target === 'SIN COMPRA' || name.includes('PRIMERA COMPRA') || target === 'SIN CATEGORÍA' || target === 'SIN CATEGORIA') {
-            const isIntranetSource = !c.isCRM || c.intranet === true;
-            return isIntranetSource && !c.hasPurchase;
+            return !c.inCarteraCIE && !c.hasPurchase;
           }
           
           const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
           const cat = typeof rawCat === 'string' ? rawCat.toUpperCase() : '';
-          return c.isCRM && (cat.includes(target) || target.includes(cat));
+          return (c.inCarteraCIE || c.isCRM) && (cat.includes(target) || target.includes(cat));
         });
       } else if (targeted.length > 0) {
         clients = targeted;
@@ -156,14 +156,13 @@ export default function CampaignsBuilder({
             const normFilter = typeof filter === 'string' ? filter.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
             
             if (normFilter === 'sin compra' || normFilter.includes('sin compra')) {
-              // Comes from 🌐 Clientes de Plataforma Intranet analyzing commercial engine status (Registrado sin Compra)
-              const isIntranetSource = !c.isCRM || c.intranet === true;
-              return isIntranetSource && !c.hasPurchase;
+              // Clientes realmente SIN COMPRA: están en Intranet pero NO están en Cartera Única CIE
+              return !c.inCarteraCIE && !c.hasPurchase;
             } else {
-              // Categories come from 💼 Cartera Única CIE (contacts)
+              // Categorías del Club Comercial que vienen de Cartera Única CIE (contacts)
               const rawCat = c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría';
               const normA = typeof rawCat === 'string' ? rawCat.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
-              return c.isCRM && (normA === normFilter || normA.includes(normFilter) || normFilter.includes(normA));
+              return (c.inCarteraCIE || c.isCRM) && (normA === normFilter || normA.includes(normFilter) || normFilter.includes(normA));
             }
           });
         });
@@ -183,42 +182,60 @@ export default function CampaignsBuilder({
         const crmContacts = await localDB.getCollection('contacts');
         const intranetClients = await localDB.getCollection('intranet_clients');
         
-        const hasPurchaseCheck = (client: any) => {
-          if (client.categoria && client.categoria !== 'Sin compra' && client.categoria !== 'Sin categoría' && client.categoria !== 'Sin Categoría') {
-            return true;
-          }
-          const matched = crmContacts.find((c: any) => {
-            const cleanEmail = (e: any) => e ? String(e).toLowerCase().replace(/[,;\s]/g, '').trim() : '';
-            const cleanRut = (r: any) => r ? String(r).toUpperCase().replace(/[^0-9K]/g, '').trim() : '';
-            if (cleanEmail(c.email) && cleanEmail(client.email) && cleanEmail(c.email) === cleanEmail(client.email)) return true;
-            if (cleanRut(c.rut) && cleanRut(client.rut) && cleanRut(c.rut) === cleanRut(client.rut)) return true;
-            const n1 = (c.name || '').toLowerCase().trim();
-            const n2 = (client.name || '').toLowerCase().trim();
-            if (n1 && n2 && (n1 === n2 || n1.includes(n2) || n2.includes(n1))) return true;
-            return false;
-          });
-          return matched && matched.categoria && matched.categoria !== 'Sin compra' && matched.categoria !== 'Sin categoría' && matched.categoria !== 'Sin Categoría';
-        };
+        const unifiedList: any[] = [];
 
-        const unified = [
-          ...crmContacts.map((c: any) => ({ ...c, isCRM: true, intranet: c.intranet === 'Si', hasPurchase: hasPurchaseCheck(c) })),
-          ...intranetClients.map((c: any) => ({ ...c, isCRM: false, intranet: true, categoria: c.categoria || 'Sin Categoría', hasPurchase: hasPurchaseCheck(c) }))
-        ];
-
-        // Deduplicate
-        const uniqueClients = new Map();
-        unified.forEach((c: any) => {
-          const key = c.rut || c.id || c.email;
-          if (key) {
-            if (!uniqueClients.has(key)) {
-              uniqueClients.set(key, c);
-            } else if (c.isCRM) {
-              uniqueClients.set(key, { ...uniqueClients.get(key), isCRM: true, ...c });
+        // 1. Agregar todos los contactos de la Cartera Única CIE desduplicando
+        crmContacts.forEach((c: any) => {
+          const existing = unifiedList.find((item: any) => areContactsDuplicate(item, c));
+          if (existing) {
+            // Unificar información del contacto duplicado
+            if (c.email && (!existing.email || !existing.email.toLowerCase().includes(c.email.toLowerCase()))) {
+              existing.email = `${existing.email || ''} ${c.email}`.trim();
             }
+            if (c.rut && !existing.rut) existing.rut = c.rut;
+            if (c.categoria && c.categoria !== 'Sin Categoría' && c.categoria !== 'Sin compra') {
+              existing.categoria = c.categoria;
+            }
+            if (c.montoVentasAcumuladas) {
+              existing.montoVentasAcumuladas = (existing.montoVentasAcumuladas || 0) + (c.montoVentasAcumuladas || 0);
+            }
+          } else {
+            unifiedList.push({
+              ...c,
+              isCRM: true,
+              inCarteraCIE: true,
+              hasPurchase: true,
+              categoria: c.categoria || c.clubCategory || c.clubComercial?.categoria || 'Sin Categoría'
+            });
           }
         });
-        
-        const clientsList = Array.from(uniqueClients.values());
+
+        // 2. Procesar clientes de la Plataforma Intranet desduplicando con Cartera CIE
+        intranetClients.forEach((ic: any) => {
+          const existing = unifiedList.find((item: any) => areContactsDuplicate(item, ic));
+
+          if (existing) {
+            // El cliente ya pertenece a la Cartera Única CIE o ya fue agregado
+            existing.intranet = true;
+            if (ic.accesoAprobado) existing.accesoAprobado = ic.accesoAprobado;
+            if (ic.email && (!existing.email || !existing.email.toLowerCase().includes(ic.email.toLowerCase()))) {
+              existing.email = `${existing.email || ''} ${ic.email}`.trim();
+            }
+            if (ic.rut && !existing.rut) existing.rut = ic.rut;
+          } else {
+            // El cliente está SOLO en Intranet (Sin coincidencia en CIE -> Realmente SIN COMPRA)
+            unifiedList.push({
+              ...ic,
+              isCRM: false,
+              inCarteraCIE: false,
+              hasPurchase: false,
+              categoria: 'Sin Compra',
+              estadoMotor: ic.accesoAprobado === 'Si' ? 'Registrado sin Compra' : 'Esperando Confirmación'
+            });
+          }
+        });
+
+        const clientsList = unifiedList;
         setAllClients(clientsList);
 
         // Preload template check or default suggested campaign selection

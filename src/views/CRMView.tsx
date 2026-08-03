@@ -108,15 +108,6 @@ export function isDuplicateName(nameA: string, nameB: string): boolean {
 export function areContactsDuplicate(c1: any, c2: any): boolean {
   if (!c1 || !c2) return false;
   
-  // Clean email check helper
-  const cleanEmail = (e: any) => {
-    if (!e) return '';
-    return String(e).toLowerCase().replace(/[,;\s]/g, '').trim();
-  };
-
-  const email1 = cleanEmail(c1.email || c1.Email);
-  const email2 = cleanEmail(c2.email || c2.Email);
-
   // Clean RUT helper
   const cleanRut = (r: any) => {
     if (!r) return '';
@@ -128,19 +119,28 @@ export function areContactsDuplicate(c1: any, c2: any): boolean {
   const rut1 = cleanRut(c1.rut || c1.RUT || c1["RUT / ID"]);
   const rut2 = cleanRut(c2.rut || c2.RUT || c2["RUT / ID"]);
 
-  // If they have different valid RUTs, they are NOT duplicates
+  // If both have valid non-empty RUTs, and they are different, they are definitely different entities
   if (rut1 && rut2 && rut1 !== rut2) return false;
 
-  // If they have different valid emails, they are NOT duplicates
-  if (email1 && email2 && email1 !== email2) return false;
-
-  // If they share same RUT or same email, they are duplicates
+  // 1. Same valid RUT -> Duplicates!
   if (rut1 && rut2 && rut1 === rut2) return true;
-  if (email1 && email2 && email1 === email2) return true;
 
-  // Smart Name check
-  const name1 = c1.name || c1.Nombre || c1["Nombre / Razón Social"] || c1["Nombre Completo"] || c1.name;
-  const name2 = c2.name || c2.Nombre || c2["Nombre / Razón Social"] || c2["Nombre Completo"] || c2.name;
+  // Helper to extract all valid emails from a string/field
+  const extractEmails = (e: any): string[] => {
+    if (!e) return [];
+    return String(e).toLowerCase().split(/[,;\s]+/).map(s => s.trim()).filter(s => s.includes('@'));
+  };
+
+  const emails1 = extractEmails(c1.email || c1.Email);
+  const emails2 = extractEmails(c2.email || c2.Email);
+
+  // 2. Any shared/overlapping email -> Duplicates!
+  const hasSharedEmail = emails1.some(e1 => emails2.some(e2 => e1 === e2 || e1.includes(e2) || e2.includes(e1)));
+  if (hasSharedEmail) return true;
+
+  // 3. Smart Name & Apellido check
+  const name1 = c1.name || c1.Nombre || c1["Nombre / Razón Social"] || c1["Nombre Completo"] || '';
+  const name2 = c2.name || c2.Nombre || c2["Nombre / Razón Social"] || c2["Nombre Completo"] || '';
 
   if (isDuplicateName(name1, name2)) return true;
 
@@ -3135,9 +3135,8 @@ function CRMIntranetTable({
       };
     }
     const matchedContact = crmContacts.find(c => areContactsDuplicate(c, client));
-    const hasPurchase = matchedContact && matchedContact.categoria && matchedContact.categoria !== 'Sin compra' && matchedContact.categoria !== 'Sin categoría';
 
-    if (hasPurchase) {
+    if (matchedContact) {
       return {
         label: 'Con Compra',
         badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
