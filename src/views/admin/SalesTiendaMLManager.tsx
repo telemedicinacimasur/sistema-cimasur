@@ -263,7 +263,7 @@ export default function SalesTiendaMLManager() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterMonth, setFilterMonth] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()).toLowerCase());
+  const [filterMonth, setFilterMonth] = useState('Todos');
   const [filterYear, setFilterYear] = useState('Todos');
   const [filterVendedor, setFilterVendedor] = useState('Todos');
   const [filterProducto, setFilterProducto] = useState('Todos');
@@ -271,39 +271,73 @@ export default function SalesTiendaMLManager() {
   const [showProductSummary, setShowProductSummary] = useState(false);
   const [showMontoConsolidado, setShowMontoConsolidado] = useState(true);
 
-  const [loadRange, setLoadRange] = useState<'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
-    return (localStorage.getItem('cimasur_admin_load_range') as any) || 'mes_actual';
-  });
+  const SPANISH_MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-  const getQueryOptions = () => {
-    if (loadRange === 'historico_completo') return { limitCount: -1 };
-    
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-indexed
-    
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    
-    if (loadRange === 'mes_actual') {
-      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
-      return {
-        dateField: 'fecha',
-        startDate: `${currentYear}-${pad(currentMonth + 1)}-01`,
-        endDate: `${currentYear}-${pad(currentMonth + 1)}-${pad(lastDay)}`, limitCount: -1
-      };
-    } else { // anio_actual
-      return {
-        dateField: 'fecha',
-        startDate: `${currentYear}-01-01`,
-        endDate: `${currentYear}-12-31`, limitCount: -1
-      };
+  const matchesMonth = (r: SaleRecord, targetMonthName: string): boolean => {
+    if (!targetMonthName || targetMonthName === 'Todos') return true;
+    const targetLower = targetMonthName.trim().toLowerCase();
+    const targetIndex = SPANISH_MONTHS.indexOf(targetLower);
+
+    if (r.mes) {
+      const rMesLower = String(r.mes).trim().toLowerCase();
+      if (rMesLower === targetLower || rMesLower.includes(targetLower) || targetLower.includes(rMesLower)) {
+        return true;
+      }
+      const parsedMesNum = parseInt(rMesLower, 10);
+      if (!isNaN(parsedMesNum) && targetIndex >= 0 && parsedMesNum === targetIndex + 1) {
+        return true;
+      }
     }
+
+    if (r.fecha) {
+      const parts = r.fecha.split('-');
+      if (parts.length >= 2) {
+        const monthNum = parseInt(parts[1], 10);
+        if (!isNaN(monthNum) && targetIndex >= 0 && monthNum === targetIndex + 1) {
+          return true;
+        }
+      }
+    }
+
+    if ((r as any).createdAt) {
+      try {
+        const d = new Date((r as any).createdAt);
+        if (!isNaN(d.getTime())) {
+          if (targetIndex >= 0 && d.getMonth() === targetIndex) {
+            return true;
+          }
+        }
+      } catch (e) {}
+    }
+
+    return false;
+  };
+
+  const matchesYear = (r: SaleRecord, targetYear: string): boolean => {
+    if (!targetYear || targetYear === 'Todos') return true;
+    const targetStr = String(targetYear).trim();
+
+    if (r.anio && String(r.anio).trim() === targetStr) {
+      return true;
+    }
+    if (r.fecha) {
+      const parts = r.fecha.split('-');
+      if (parts[0] === targetStr) return true;
+    }
+    if ((r as any).createdAt) {
+      try {
+        const d = new Date((r as any).createdAt);
+        if (!isNaN(d.getTime()) && d.getFullYear().toString() === targetStr) {
+          return true;
+        }
+      } catch (e) {}
+    }
+    return false;
   };
 
   const loadData = async () => {
     try {
-      const options = getQueryOptions();
-      const sales = await localDB.getCollection('sales_tienda_ml', options);
+      const sales = await localDB.getCollection('sales_tienda_ml');
       
       const normalizedSales = sales.map((sale: any) => {
         if (sale.productos && Array.isArray(sale.productos)) {
@@ -340,7 +374,7 @@ export default function SalesTiendaMLManager() {
     
     const handleRefresh = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
-      if (!detail?.collection || ['sales', 'tienda_sales'].includes(detail.collection)) {
+      if (!detail?.collection || ['sales', 'tienda_sales', 'sales_tienda_ml'].includes(detail.collection)) {
         loadData();
       }
     };
@@ -352,18 +386,7 @@ export default function SalesTiendaMLManager() {
       window.removeEventListener('db-change', handleRefresh);
       window.removeEventListener('cimasur-refresh-underdemand', handleRefresh);
     };
-  }, [loadRange]);
-
-  useEffect(() => {
-    const handleStoreChange = () => {
-      const r = (localStorage.getItem('cimasur_admin_load_range') as any) || 'mes_actual';
-      if (r !== loadRange) {
-        setLoadRange(r);
-      }
-    };
-    const interval = setInterval(handleStoreChange, 1000);
-    return () => clearInterval(interval);
-  }, [loadRange]);
+  }, []);
 
   // Merge built-in + custom products based on channel
   const getProductOptions = (vendedor: 'Mercado Libre' | 'Tienda') => {
@@ -649,24 +672,29 @@ export default function SalesTiendaMLManager() {
     reader.readAsBinaryString(file);
   };
 
+  // Available years for filter dropdown
+  const availableYears = Array.from(new Set([
+    new Date().getFullYear().toString(),
+    ...records.map(r => r.anio || (r.fecha ? r.fecha.split('-')[0] : '')).filter(Boolean)
+  ])).sort((a,b) => b.localeCompare(a));
+
   // Filters application
   const filteredRecords = records.filter(r => {
     let match = true;
     if (dateFrom && r.fecha < dateFrom) match = false;
     if (dateTo && r.fecha > dateTo) match = false;
     
-    if (filterMonth !== 'Todos') {
-      const formattedMonth = filterMonth.trim().toLowerCase();
-      const matchMonth = (r.mes || '').trim().toLowerCase();
-      if (matchMonth !== formattedMonth) match = false;
-    }
+    if (!matchesMonth(r, filterMonth)) match = false;
+    if (!matchesYear(r, filterYear)) match = false;
 
-    if (filterYear !== 'Todos' && r.anio !== filterYear) match = false;
     if (filterVendedor !== 'Todos' && r.vendedor !== filterVendedor) match = false;
 
     // Filter by specific product inside array
     if (filterProducto !== 'Todos') {
-      const hasProduct = (r.productos || []).some(item => item.nombre === filterProducto);
+      const hasProduct = (r.productos || []).some(item => 
+        item.nombre === filterProducto || 
+        normalizeProductName(item.nombre) === normalizeProductName(filterProducto)
+      );
       if (!hasProduct) match = false;
     }
 
@@ -1143,66 +1171,92 @@ export default function SalesTiendaMLManager() {
               </div>
 
               {/* Filtering Controls */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                
-                {/* Search Quick filter */}
-                <div>
-                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Búsqueda rápida</label>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                    <input 
-                      placeholder="Doc, cliente..." 
-                      className="pl-8 pr-3 py-2 w-full bg-[#111C31] border border-[#1E3A5F]/40 outline-none text-[10px] rounded-lg text-white font-bold placeholder:text-slate-500"
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                    />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1 border-b border-[#1E3A5F]/30">
+                  <span className="text-[10px] font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
+                    <Filter className="w-3.5 h-3.5 text-sky-400" /> Filtros de Histórico de Ventas
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-400 bg-[#111C31] px-2.5 py-1 rounded-lg border border-[#1E3A5F]/40">
+                    Mostrando <strong className="text-sky-400">{filteredRecords.length}</strong> de <strong className="text-white">{records.length}</strong> ventas
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  
+                  {/* Search Quick filter */}
+                  <div>
+                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Búsqueda rápida</label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                      <input 
+                        placeholder="Doc, cliente..." 
+                        className="pl-8 pr-3 py-2 w-full bg-[#111C31] border border-[#1E3A5F]/40 outline-none text-[10px] rounded-lg text-white font-bold placeholder:text-slate-500"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Vendedor Filter */}
-                <div>
-                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Filtrar Canal</label>
-                  <select 
-                    className="w-full bg-[#111C31] text-sky-400 border border-[#1E3A5F]/40 p-2 text-[10px] rounded-lg outline-none font-bold"
-                    value={filterVendedor}
-                    onChange={e => setFilterVendedor(e.target.value)}
-                  >
-                    <option value="Todos">Todos los canales</option>
-                    <option value="Tienda">🏪 Tienda Física</option>
-                    <option value="Mercado Libre">📦 Mercado Libre</option>
-                  </select>
-                </div>
+                  {/* Vendedor Filter */}
+                  <div>
+                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Filtrar Canal</label>
+                    <select 
+                      className="w-full bg-[#111C31] text-sky-400 border border-[#1E3A5F]/40 p-2 text-[10px] rounded-lg outline-none font-bold"
+                      value={filterVendedor}
+                      onChange={e => setFilterVendedor(e.target.value)}
+                    >
+                      <option value="Todos">Todos los canales</option>
+                      <option value="Tienda">🏪 Tienda Física</option>
+                      <option value="Mercado Libre">📦 Mercado Libre</option>
+                    </select>
+                  </div>
 
-                {/* Month Filter */}
-                <div>
-                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Mes</label>
-                  <select 
-                    className="w-full bg-[#111C31] text-slate-200 border border-[#1E3A5F]/40 p-2 text-[10px] rounded-lg outline-none font-bold uppercase"
-                    value={filterMonth}
-                    onChange={e => setFilterMonth(e.target.value)}
-                  >
-                    <option value="Todos">Todos los meses</option>
-                    {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Month Filter */}
+                  <div>
+                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Mes</label>
+                    <select 
+                      className="w-full bg-[#111C31] text-slate-200 border border-[#1E3A5F]/40 p-2 text-[10px] rounded-lg outline-none font-bold uppercase"
+                      value={filterMonth}
+                      onChange={e => setFilterMonth(e.target.value)}
+                    >
+                      <option value="Todos">Todos los meses</option>
+                      {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                {/* Product filter */}
-                <div>
-                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Filtrar por Producto</label>
-                  <select 
-                    className="w-full bg-[#111C31] text-amber-400 border border-[#1E3A5F]/40 p-2 text-[10px] rounded-lg outline-none font-bold"
-                    value={filterProducto}
-                    onChange={e => setFilterProducto(e.target.value)}
-                  >
-                    <option value="Todos">Cualquier producto</option>
-                    {allAvailableProducts.map((p, idx) => (
-                      <option key={idx} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Year Filter */}
+                  <div>
+                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Año</label>
+                    <select 
+                      className="w-full bg-[#111C31] text-emerald-400 border border-[#1E3A5F]/40 p-2 text-[10px] rounded-lg outline-none font-bold uppercase"
+                      value={filterYear}
+                      onChange={e => setFilterYear(e.target.value)}
+                    >
+                      <option value="Todos">Todos los años</option>
+                      {availableYears.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
 
+                  {/* Product filter */}
+                  <div>
+                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Filtrar por Producto</label>
+                    <select 
+                      className="w-full bg-[#111C31] text-amber-400 border border-[#1E3A5F]/40 p-2 text-[10px] rounded-lg outline-none font-bold"
+                      value={filterProducto}
+                      onChange={e => setFilterProducto(e.target.value)}
+                    >
+                      <option value="Todos">Cualquier producto</option>
+                      {allAvailableProducts.map((p, idx) => (
+                        <option key={idx} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                </div>
               </div>
 
               {/* Exact Date range filters */}

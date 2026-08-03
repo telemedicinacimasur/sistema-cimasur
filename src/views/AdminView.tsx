@@ -100,8 +100,9 @@ export default function AdminView() {
   const isManagerOrAdmin = useMemo(() => isMainAdmin || isManager, [isMainAdmin, isManager]);
 
   const hasSubmodule = useCallback((role: string, submodule: string) => {
-    if (user?.roles?.includes('admin')) return true;
-    if (!user?.roles?.includes(role)) return false;
+    const roles = user?.roles || (user?.role ? [user.role] : []);
+    if (roles.includes('admin') || user?.role === 'admin') return true;
+    if (!roles.includes(role) && user?.role !== role) return false;
     if (!user?.allowedSubmodules || !user.allowedSubmodules[role] || user.allowedSubmodules[role].length === 0) return true;
     return user.allowedSubmodules[role].includes(submodule);
   }, [user]);
@@ -118,7 +119,7 @@ export default function AdminView() {
   }, [location.state]);
 
   const [loadRange, setLoadRange] = useState<'ultimos_30_dias' | 'mes_actual' | 'anio_actual' | 'historico_completo'>(() => {
-    return (localStorage.getItem('cimasur_admin_data_range_v2') as any) || 'anio_actual';
+    return 'historico_completo';
   });
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);

@@ -168,6 +168,64 @@ export async function addAuditLog(user: UserProfile, action: string, module: str
 // Cache TTL in milliseconds (12 hours to prevent quota exhaustion)
 const CACHE_TTL = 12 * 60 * 60 * 1000;
 
+const idbGet = (key: string): Promise<any | null> => {
+  if (typeof window === 'undefined' || !window.indexedDB) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('cimasur_app_db', 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('collections')) {
+          req.result.createObjectStore('collections');
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('collections')) {
+          resolve(null);
+          return;
+        }
+        const tx = db.transaction('collections', 'readonly');
+        const store = tx.objectStore('collections');
+        const getReq = store.get(key);
+        getReq.onsuccess = () => resolve(getReq.result || null);
+        getReq.onerror = () => resolve(null);
+      };
+      req.onerror = () => resolve(null);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+};
+
+const idbSet = (key: string, data: any): Promise<void> => {
+  if (typeof window === 'undefined' || !window.indexedDB) return Promise.resolve();
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('cimasur_app_db', 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('collections')) {
+          req.result.createObjectStore('collections');
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('collections')) {
+          resolve();
+          return;
+        }
+        const tx = db.transaction('collections', 'readwrite');
+        const store = tx.objectStore('collections');
+        store.put({ data, timestamp: Date.now() }, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      };
+      req.onerror = () => resolve();
+    } catch (e) {
+      resolve();
+    }
+  });
+};
+
 const getFromLocalStorage = (key: string) => {
   const cached = localStorage.getItem(key);
   if (!cached) return null;
@@ -267,6 +325,15 @@ const updateCachedCollectionItem = (name: string, savedItem: { id: string, [key:
     }
   });
 
+  // Also update IndexedDB cache for base collection and limit variants
+  Object.keys(collectionCache).forEach(cacheKey => {
+    if (cacheKey === name || cacheKey.startsWith(`${name}_`)) {
+      if (collectionCache[cacheKey]) {
+        idbSet(cacheKey, collectionCache[cacheKey]);
+      }
+    }
+  });
+
   // Also update localStorage keys
   for (let i = 0; i < localStorage.length; i++) {
     const lsKey = localStorage.key(i);
@@ -298,6 +365,7 @@ const removeCachedCollectionItem = (name: string, id: string) => {
       const list = collectionCache[cacheKey];
       if (list) {
         collectionCache[cacheKey] = list.filter(r => r.id !== id);
+        idbSet(cacheKey, collectionCache[cacheKey]);
       }
     }
   });
@@ -329,8 +397,9 @@ export const localDB = {
     const rawLimit = options?.limitCount ?? -1;
     const shouldLimit = rawLimit > 0;
     const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
-    const cacheKey = options 
-      ? `${name}_${options.dateField}_${options.startDate}_${options.endDate}_${limitStr}` 
+    const hasDateFilter = Boolean(options && options.dateField && options.startDate && options.endDate);
+    const cacheKey = hasDateFilter
+      ? `${name}_${options!.dateField}_${options!.startDate}_${options!.endDate}_${limitStr}`
       : `${name}_${limitStr}`;
 
     if (collectionCache[cacheKey]) {
@@ -341,6 +410,12 @@ export const localDB = {
     if (cachedData) {
       collectionCache[cacheKey] = cachedData;
       return [...cachedData];
+    }
+
+    const idbCached = await idbGet(cacheKey);
+    if (idbCached && idbCached.data) {
+      collectionCache[cacheKey] = idbCached.data;
+      return [...idbCached.data];
     }
 
     if (isFirebaseReady && db) {
@@ -367,7 +442,39 @@ export const localDB = {
           });
           collectionCache[cacheKey] = data;
           saveToLocalStorage(cacheKey, data);
+          idbSet(cacheKey, data);
           return data;
+        } catch (err: any) {
+          console.warn(`Firestore getCollection(${name}) failed or quota exceeded:`, err);
+          
+          // Try loading base collection from memory or indexedDB or localStorage fallback
+          const idbData = await idbGet(cacheKey) || await idbGet(name) || await idbGet(`${name}_nolimit`);
+          if (idbData && idbData.data) {
+            collectionCache[cacheKey] = idbData.data;
+            return [...idbData.data];
+          }
+          
+          const localData = getFromLocalStorage(cacheKey) || getFromLocalStorage(name) || getFromLocalStorage(`${name}_nolimit`);
+          if (localData) {
+            collectionCache[cacheKey] = localData;
+            return [...localData];
+          }
+
+          // Fallback to local server API if present
+          try {
+            const res = await fetch(`/api/records/${name}`);
+            if (res.ok) {
+              const apiData = await res.json();
+              if (Array.isArray(apiData) && apiData.length > 0) {
+                collectionCache[cacheKey] = apiData;
+                saveToLocalStorage(cacheKey, apiData);
+                idbSet(cacheKey, apiData);
+                return [...apiData];
+              }
+            }
+          } catch (apiErr) {}
+
+          return [];
         } finally {
           delete pendingRequests[cacheKey];
         }

@@ -1478,22 +1478,25 @@ export default function CimasurInventoryManager() {
             )}
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#152035] p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]">
-              <div className="flex gap-4 w-full md:w-auto flex-1">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <div className="flex flex-col gap-2 w-full md:w-80 lg:w-96">
+                {/* Buscador Arriba */}
+                <div className="relative w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sky-400" />
                   <input 
                     type="text" 
                     placeholder="Buscar por código, producto o solución..."
-                    className="w-full pl-10 pr-4 py-2 text-sm bg-[#152035] border-b border-[#1E293B] focus:outline-none focus:border-[#38BDF8] text-white transition-colors"
+                    className="w-full pl-10 pr-4 py-2 text-xs font-semibold bg-[#0D1527] border border-[#1E293B] focus:border-[#38BDF8] rounded-xl text-white outline-none transition-colors shadow-inner"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <div className="relative">
+                {/* Filtro Orden Abajo del Buscador */}
+                <div className="relative w-full flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">Orden:</span>
                   <select
                     value={sortOrder}
                     onChange={e => setSortOrder(e.target.value)}
-                    className="pl-4 pr-8 py-2 text-sm border-b border-[#1E293B] outline-none text-slate-300 font-medium bg-[#111A2E]"
+                    className="w-full px-3 py-1.5 text-xs border border-[#1E293B] rounded-xl outline-none text-sky-300 font-bold bg-[#0D1527] focus:border-[#38BDF8] cursor-pointer"
                   >
                     <option value="menor_mayor">N° Menor a Mayor</option>
                     <option value="mayor_menor">N° Mayor a Menor</option>
@@ -1505,7 +1508,7 @@ export default function CimasurInventoryManager() {
                 </div>
               </div>
               
-              <div className="flex gap-2 w-full md:w-auto flex-wrap">
+              <div className="flex gap-2 w-full md:w-auto flex-wrap items-center">
                 {canEdit && (
                   <>
                     <label className="flex items-center justify-center gap-2 bg-[#111A2E] hover:bg-[#1E293B] text-slate-200 px-4 py-2 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-colors cursor-pointer border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]" title="Importar Excel con opción de actualización o creación">
@@ -1661,7 +1664,8 @@ export default function CimasurInventoryManager() {
                           (h === 'SOLUCIÓN' || h === 'SOLUCION') && "min-w-[200px] text-center whitespace-nowrap px-6",
                           (h === 'BASE MASTER') && "min-w-[180px] text-center whitespace-nowrap px-6",
                           (h === 'CATEGORÍA' || h === 'CATEGORIA') && "min-w-[160px] text-center whitespace-nowrap px-4",
-                          (h === 'FECHA' || h === 'FECHA ELABORACIÓN' || h === 'DILUCIÓN' || h === 'DILUCIONES / ACTUALIZACIÓN') && "w-48 text-center",
+                          (h === 'DILUCIONES / ACTUALIZACIÓN') && "min-w-[450px] md:min-w-[550px] text-left px-6 text-sky-300 font-extrabold tracking-wider",
+                          (h === 'FECHA' || h === 'FECHA ELABORACIÓN' || h === 'DILUCIÓN') && "w-48 text-center",
                           (h === 'DOCTOR(A)' || h === 'DOCTOR') && "min-w-[220px] w-64 text-center whitespace-nowrap",
                           h === 'PRECIO' && "w-32 text-center"
                         )}
@@ -1700,6 +1704,7 @@ export default function CimasurInventoryManager() {
                           const headers = getHeadersForTab(activeTab);
                           const headerName = headers[idx] || '';
                           const isSolucionHeader = headerName === 'SOLUCIÓN' || headerName === 'SOLUCION';
+                          const isDilucionesHeader = headerName === 'DILUCIONES / ACTUALIZACIÓN';
                           const isBaseMasterHeader = headerName === 'BASE MASTER';
                           const isCategoriaHeader = headerName === 'CATEGORÍA' || headerName === 'CATEGORIA';
                           const isPrice = (isBaseModule || isMatrixView) && idx === rowVals.length - 1;
@@ -1713,6 +1718,8 @@ export default function CimasurInventoryManager() {
                                 ? (isDup ? 'font-mono font-bold text-red-400 whitespace-nowrap' : 'font-mono font-bold text-[#38BDF8] whitespace-nowrap drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]') 
                                 : isProductName 
                                 ? (isDup ? 'font-bold text-sm text-red-200' : 'font-bold text-sm text-white') 
+                                : isDilucionesHeader
+                                ? (isDup ? 'text-red-300 font-bold min-w-[450px] md:min-w-[550px] px-6 text-xs text-left leading-relaxed' : 'text-slate-100 font-bold min-w-[450px] md:min-w-[550px] px-6 text-xs text-left leading-relaxed')
                                 : isSolucionHeader
                                 ? (isDup ? 'text-red-300 font-bold text-center min-w-[200px] px-6 text-xs' : 'text-slate-100 font-bold text-center min-w-[200px] px-6 text-xs')
                                 : isBaseMasterHeader
