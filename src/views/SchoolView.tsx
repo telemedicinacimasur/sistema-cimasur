@@ -235,7 +235,20 @@ function ContactRegister({ records }: { records: any[] }) {
   const [filterEstado, setFilterEstado] = useState('Todos');
   const [filterRegion, setFilterRegion] = useState('');
   const [filterEstadoPago, setFilterEstadoPago] = useState('Todos');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [importLogs, setImportLogs] = useState<any[]>([]);
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+
+  const loadImportLogs = async () => {
+    const logs = await localDB.getCollection('import_history');
+    setImportLogs(logs.filter(l => l.modulo === 'ESCUELA').sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
+  };
+
+  useEffect(() => {
+    loadImportLogs();
+  }, []);
 
   useEffect(() => {
     if (form.phone && form.phone.length >= 7) {
@@ -358,12 +371,43 @@ function ContactRegister({ records }: { records: any[] }) {
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         let importedCount = 0;
+        let dupsCount = 0;
+        const currentLeads = await localDB.getCollection('school_leads');
+        const currentStudents = await localDB.getCollection('students');
+
         for (const row of data) {
+          const rawName = safe(row["Nombre Apellido"]);
+          const rawRut = safe(row["RUT Escrito"]);
+          const rawEmail = safe(row["Email"]);
+          
+          if (!rawName && !rawRut && !rawEmail) continue;
+
+          const isLeadDup = currentLeads.some(l => 
+            (l.rut && l.rut === rawRut) || 
+            (l.name && l.name.toLowerCase() === rawName.toLowerCase()) || 
+            (l.email && l.email.toLowerCase() === rawEmail.toLowerCase())
+          );
+          
+          const isStudentDup = currentStudents.some(s => 
+            (s.rut && s.rut === rawRut) || 
+            (s.name && s.name.toLowerCase() === rawName.toLowerCase()) || 
+            (s.email && s.email.toLowerCase() === rawEmail.toLowerCase())
+          );
+
+          let shouldImport = true;
+          if (isLeadDup || isStudentDup) {
+             dupsCount++;
+             const loc = isStudentDup ? 'ALUMNOS' : 'LEADS';
+             shouldImport = window.confirm(`El contacto "${rawName}" (${rawRut || rawEmail}) ya existe en ${loc}.\n¿Deseas registrarlo de todas formas como Potencial Alumno (Lead)?`);
+          }
+
+          if (!shouldImport) continue;
+
           const newLead = {
             fecha: parseExcelDate(row["Fecha Registro"]),
-            name: safe(row["Nombre Apellido"]),
-            rut: safe(row["RUT Escrito"]),
-            email: safe(row["Email"]),
+            name: rawName,
+            rut: rawRut,
+            email: rawEmail,
             phone: safe(row["Teléfono / WhatsApp"]),
             clasificacion: safe(row["CLASIFICACIÓN PROFESIONAL"]) || 'Sin información',
             interes: safe(row["Programa de Interés"]) || 'Otro',
@@ -378,14 +422,27 @@ function ContactRegister({ records }: { records: any[] }) {
             responsable: user.displayName || user.email || 'Sistema'
           };
 
-          if (newLead.name && newLead.rut) {
+          if (newLead.name || newLead.rut || newLead.email) {
             await localDB.saveToCollection('school_leads', newLead);
             importedCount++;
           }
         }
 
+        const logData = {
+          fecha: new Date().toISOString(),
+          modulo: 'ESCUELA',
+          nombre_archivo: file.name,
+          total_procesados: data.length,
+          exitosos: importedCount,
+          duplicados_count: dupsCount,
+          errores: [],
+          registros_omitidos: data.length - importedCount
+        };
+        await localDB.saveToCollection('import_history', logData);
+        await loadImportLogs();
+
         await addAuditLog(user, `Importó ${importedCount} leads académicos desde Excel`, 'SCHOOL');
-        alert(`Éxito: Se importaron ${importedCount} leads académicos correctamente.`);
+        alert(`Éxito: Se importaron ${importedCount} leads académicos correctamente. ${dupsCount} duplicados detectados.`);
         window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
       } catch (error) {
         console.error("Import Error:", error);
@@ -483,17 +540,20 @@ function ContactRegister({ records }: { records: any[] }) {
     <>
       <div className="flex flex-col gap-8 w-full">
         <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-x-auto">
-          <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4 font-bold flex items-center justify-between">
+          <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4 font-bold flex items-center justify-between transition-colors">
                <button 
                  type="button"
-                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                 className="flex items-center gap-2 text-white hover:text-[#38BDF8] transition-colors font-bold outline-none cursor-pointer"
-                 title="Haga clic para alternar filtros avanzados"
+                 onClick={() => setShowForm(!showForm)}
+                 className="flex items-center gap-2 text-white hover:text-[#38BDF8] transition-colors font-bold outline-none cursor-pointer flex-1 text-left"
+                 title="Haga clic para expandir o contraer la ficha"
                >
                  <span>Registro de Potenciales Alumnos</span>
-                 {showAdvancedFilters ? <ChevronUp className="w-4 h-4 text-[#38BDF8]" /> : <ChevronDown className="w-4 h-4 text-slate-300" />}
+                 {showForm ? <ChevronUp className="w-4 h-4 text-[#38BDF8]" /> : <ChevronDown className="w-4 h-4 text-slate-300" />}
                </button>
                <div className="flex gap-2">
+                 <button onClick={() => { loadImportLogs(); setShowHistoryModal(true); }} className="flex items-center justify-center gap-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-lg text-[10px] uppercase font-black tracking-widest transition-colors border border-blue-500/30" title="Ver Historial de Importaciones">
+                   <History className="w-3.5 h-3.5" /> Historial
+                 </button>
                  <input 
                    type="file" 
                    ref={fileInputRef} 
@@ -518,102 +578,23 @@ function ContactRegister({ records }: { records: any[] }) {
                  </button>
                </div>
             </div>
-            <div className="bg-[#152035] p-6 border-b flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    className="w-full pl-10 pr-4 py-2 border border-[#1E293B] bg-[#111A2E] text-white rounded-full text-xs outline-none focus:ring-1 focus:ring-blue-500" 
-                    placeholder="Buscar por nombre, RUT o email..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div>
-              
-              {showAdvancedFilters && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-[#111A2E] rounded-2xl border border-[#1E293B] animate-in fade-in duration-300">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Canal de Origen</label>
-                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterCanal} onChange={e => setFilterCanal(e.target.value)}>
-                      <option value="Todos">Todos</option>
-                      <option value="📢 Campañas / Ads">📢 Campañas / Ads</option>
-                      <option value="📸 Instagram">📸 Instagram</option>
-                      <option value="👥 Facebook">👥 Facebook</option>
-                      <option value="💬 WhatsApp">💬 WhatsApp</option>
-                      <option value="📞 Llamada Directa">📞 Llamada Directa</option>
-                      <option value="🤝 Recomendación">🤝 Recomendación</option>
-                      <option value="🌐 Página Web">🌐 Página Web</option>
-                      <option value="✏️ Otro">✏️ Otro</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Programa de Interés</label>
-                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterInteres} onChange={e => setFilterInteres(e.target.value)}>
-                      <option value="Todos">Todos</option>
-                      <option value="Diplomado Homeopatía">Diplomado Homeopatía</option>
-                      <option value="Diplomado en Homeopatía Veterinaria">Diplomado en Homeopatía Veterinaria</option>
-                      {PROGRAMAS.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Clasificación Profesional</label>
-                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}>
-                      <option value="Todos">Todos</option>
-                      {CLASIFICACIONES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Estado Seguimiento</label>
-                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
-                      <option value="Todos">Todos</option>
-                      <option value="Nuevo">Nuevo</option>
-                      <option value="Contactado">Contactado</option>
-                      <option value="En reunión">En reunión</option>
-                      <option value="Matriculado">Matriculado</option>
-                      <option value="No interesado">No interesado</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Región / Comuna</label>
-                    <input 
-                      className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white outline-none" 
-                      placeholder="Filtrar por región o comuna..." 
-                      value={filterRegion} 
-                      onChange={e => setFilterRegion(e.target.value)} 
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Estado de Pago</label>
-                    <select className="w-full bg-[#152035] border border-[#1E293B] rounded-xl p-2 text-xs text-white" value={filterEstadoPago} onChange={e => setFilterEstadoPago(e.target.value)}>
-                      <option value="Todos">Todos</option>
-                      <option value="Pendiente">Pendiente</option>
-                      <option value="Pagado">Pagado</option>
-                      <option value="En cuotas">En cuotas</option>
-                      <option value="Por mensualidad">Por mensualidad</option>
-                    </select>
-                  </div>
-                  <div className="col-span-full flex justify-end">
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setFilterCanal('Todos');
-                        setFilterInteres('Todos');
-                        setFilterClasificacion('Todos');
-                        setFilterEstado('Todos');
-                        setFilterRegion('');
-                        setFilterEstadoPago('Todos');
-                        setSearchTerm('');
-                      }}
-                      className="text-[10px] font-black text-red-400 hover:underline uppercase tracking-wider"
-                    >
-                      Limpiar Filtros
-                    </button>
+            
+            {showForm && (
+              <>
+                <div className="bg-[#152035] p-6 border-b border-[#1E293B] flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="relative w-full">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sky-400" />
+                      <input 
+                        className="w-full pl-10 pr-4 py-2 border border-[#1E293B] bg-[#0D1527] text-white rounded-xl text-xs font-semibold outline-none focus:border-[#38BDF8] transition-colors shadow-inner" 
+                        placeholder="Buscar por nombre, RUT o email..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-            <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
+                <form className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-300" onSubmit={handleSubmit}>
                 <FormGroup label="Fecha Registro">
                    <input type="date" className="w-full border-b p-2 bg-[#152035] text-white outline-none" value={form.fecha || ''} onChange={e => setForm({...form, fecha: e.target.value})} />
                  </FormGroup>
@@ -731,6 +712,8 @@ function ContactRegister({ records }: { records: any[] }) {
                  )}
                </div>
             </form>
+            </>
+           )}
           </div>
 
         {selectedLead && (
@@ -962,9 +945,118 @@ function ContactRegister({ records }: { records: any[] }) {
                  </div>
                ))}
                {records.length === 0 && <p className="text-[10px] text-slate-400 italic text-center py-8">No hay captaciones activas.</p>}
-            </div>
-         </div>
+             </div>
+          </div>
       </div>
+      
+      {/* Modal de Historial de Importaciones */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
+          <div className="bg-[#152035] rounded-3xl border border-[#1E293B] max-w-5xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-[0_10px_50px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom-4 duration-300">
+            <div className="p-6 border-b border-[#1E293B] flex justify-between items-center bg-[#111A2E] text-white">
+              <h3 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
+                <History className="w-5 h-5 text-blue-400" />
+                Historial y Reportes de Importación Guardados
+              </h3>
+              <button onClick={() => { setShowHistoryModal(false); setSelectedLog(null); }} className="text-white/50 hover:text-white font-bold text-xl leading-none cursor-pointer">×</button>
+            </div>
+
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
+              {/* Sidebar: Lista de Importaciones */}
+              <div className="w-full md:w-80 border-r border-[#1E293B] overflow-y-auto p-4 space-y-2 bg-[#111A2E]/50 custom-scrollbar">
+                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-3">Registros de Importación</h4>
+                {importLogs.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic p-4 text-center">No hay importaciones registradas.</p>
+                ) : (
+                  importLogs.map((log) => (
+                    <button
+                      key={log.id}
+                      type="button"
+                      onClick={() => setSelectedLog(log)}
+                      className={cn(
+                        "w-full p-3.5 rounded-xl text-left border transition-all cursor-pointer flex flex-col gap-1.5 group",
+                        selectedLog?.id === log.id 
+                          ? "bg-blue-500/10 border-blue-500/50 text-white" 
+                          : "bg-[#152035]/60 border-[#1E293B]/60 text-slate-300 hover:bg-[#1E293B] hover:text-white"
+                      )}
+                    >
+                      <div className="text-xs font-bold truncate group-hover:text-blue-400 transition-colors">
+                        {log.nombre_archivo}
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex justify-between items-center font-mono">
+                        <span>{new Date(log.fecha).toLocaleString()}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex gap-2 mt-1">
+                        <span>Éxito: <strong className="text-emerald-400">+{log.exitosos || 0}</strong></span>
+                        <span>Dups: <strong className={log.duplicados_count > 0 ? "text-amber-400" : "text-slate-500"}>{log.duplicados_count || 0}</strong></span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {/* Contenido Principal: Detalle de la Importación Seleccionada */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#152035] custom-scrollbar">
+                {selectedLog ? (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <h4 className="text-base font-bold text-white uppercase tracking-wide">
+                          Detalle: {selectedLog.nombre_archivo}
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-1 font-mono">
+                          Importado el {new Date(selectedLog.fecha).toLocaleString()} por el Administrador
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm('¿Estás seguro de eliminar este registro del historial? (Los leads importados NO se eliminarán)')) {
+                            await localDB.deleteFromCollection('import_history', selectedLog.id);
+                            setSelectedLog(null);
+                            await loadImportLogs();
+                          }
+                        }}
+                        className="p-2 text-rose-500 hover:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Eliminar Reporte"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Eliminar Log
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="bg-[#0F172A] p-4 rounded-xl border border-[#1E293B]">
+                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Métricas del Reporte</div>
+                        <div className="text-sm text-slate-300 mt-2 space-y-1">
+                          <div>Procesados: <strong className="text-white">{selectedLog.total_procesados || 0}</strong></div>
+                          <div>Nuevos Leads: <strong className="text-emerald-400">+{selectedLog.exitosos || 0}</strong></div>
+                          <div>Dups Detectados: <strong className="text-amber-400">{selectedLog.duplicados_count || 0}</strong></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-60">
+                    <History className="w-16 h-16 mb-4 text-slate-600" />
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400">SELECCIONA UNA IMPORTACIÓN</h4>
+                    <p className="text-xs text-center max-w-sm mt-2">Selecciona un registro de importación de la lista de la izquierda para revisar el reporte detallado y métricas.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-[#1E293B] bg-[#111A2E] flex justify-end">
+              <button 
+                type="button" 
+                onClick={() => { setShowHistoryModal(false); setSelectedLog(null); }}
+                className="px-6 py-2.5 bg-[#1E3A5F] hover:bg-[#1D3557] border border-[#1E293B] text-white font-black rounded-xl text-xs uppercase tracking-widest transition-colors cursor-pointer"
+              >
+                Cerrar Historial
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
