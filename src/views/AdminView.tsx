@@ -913,6 +913,8 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
   const [monthFilter, setMonthFilter] = useState(new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()).toLowerCase());
 
+  const [vendedorFilter, setVendedorFilter] = useState('Todos');
+
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     records.forEach(r => {
@@ -1053,6 +1055,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
         r.cliente?.toLowerCase().includes(searchFilter.toLowerCase()) || 
         r.nroCotiz?.toString().includes(searchFilter);
       const matchesStatus = statusFilter === 'Todos' || (r.estado && r.estado.toLowerCase() === statusFilter.toLowerCase());
+      const matchesVendedor = vendedorFilter === 'Todos' || (r.vendedor && r.vendedor === vendedorFilter);
       
       let matchesYear = true;
       let matchesMonth = true;
@@ -1061,7 +1064,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
         matchesMonth = monthFilter === 'Todos' || String(r.mes || '').trim().toLowerCase() === monthFilter.toLowerCase();
       }
       
-      return matchesSearch && matchesDate && matchesStatus && matchesYear && matchesMonth;
+      return matchesSearch && matchesDate && matchesStatus && matchesVendedor && matchesYear && matchesMonth;
     })
     .sort((a, b) => {
       return (Number(b.nroCotiz) || 0) - (Number(a.nroCotiz) || 0);
@@ -1284,6 +1287,17 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
                 <option value="Todos" className="bg-[#152035] text-white font-bold">Todos los Meses</option>
                 {availableMonths.map(m => (
                   <option key={m} value={m} className="bg-[#152035] text-white">{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                ))}
+              </select>
+
+              <select 
+                className="text-[10px] border border-slate-705 rounded p-1 outline-none font-bold bg-[#0F172A] text-white cursor-pointer"
+                value={vendedorFilter}
+                onChange={e => setVendedorFilter(e.target.value)}
+              >
+                <option value="Todos" className="bg-[#152035] text-white font-bold">Todos los Vendedores</option>
+                {sellers.map(s => (
+                  <option key={s} value={s} className="bg-[#152035] text-white">{s}</option>
                 ))}
               </select>
             </div>
