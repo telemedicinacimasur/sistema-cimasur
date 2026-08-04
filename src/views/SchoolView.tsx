@@ -1590,6 +1590,15 @@ function TrackingView() {
       setStudents(s);
     };
     loadTrackingData();
+    
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || ['students', 'school_leads'].includes(detail.collection)) {
+        loadTrackingData();
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+    return () => window.removeEventListener('db-change', handleDbChange);
   }, []);
 
   const combined = [
@@ -1598,19 +1607,20 @@ function TrackingView() {
   ].filter(item => {
     const name = safe(item.name).toLowerCase();
     const rut = safe(item.rut).toLowerCase();
+    const email = safe(item.email).toLowerCase();
     const term = search.toLowerCase();
     const matchesFilter = filter === 'all' || (filter === 'leads' && item.type === 'Lead') || (filter === 'students' && item.type === 'Alumno');
-    const matchesSearch = name.includes(term) || rut.includes(term);
+    const matchesSearch = name.includes(term) || rut.includes(term) || email.includes(term);
     return matchesFilter && matchesSearch;
   });
 
   return (
     <div className="space-y-6">
-      <div className="bg-[#152035] p-6 rounded-2xl border shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col md:flex-row justify-between items-center gap-4">
-         <div className="flex gap-2 p-1 bg-[#111A2E] rounded-2xl">
+      <div className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col md:flex-row justify-between items-center gap-4">
+         <div className="flex gap-2 p-1 bg-[#111A2E] rounded-2xl border border-[#1E293B]">
             <button 
               onClick={() => setFilter('all')}
-              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'all' ? "bg-[#152035] text-blue-900 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "text-slate-400")}
+              className={cn("px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all", filter === 'all' ? "bg-[#152035] text-[#38BDF8] shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B]" : "text-slate-400")}
             >Detalle de clientes</button>
             <button 
               onClick={() => setFilter('leads')}
@@ -1622,6 +1632,18 @@ function TrackingView() {
             >Alumnos</button>
          </div>
          <div className="flex items-center gap-4 w-full md:w-auto">
+           <button 
+             onClick={async () => {
+               const l = await localDB.getCollection('school_leads');
+               const s = await localDB.getCollection('students');
+               setLeads(l);
+               setStudents(s);
+             }}
+             className="bg-[#152035] border border-[#1E293B] p-2 rounded-2xl hover:bg-[#111A2E] transition-colors"
+             title="Recargar datos manualmente"
+           >
+             <LineChart className="w-4 h-4 text-amber-500" />
+           </button>
            <button 
              onClick={() => {
                const tableData = combined.map(item => [
@@ -1683,17 +1705,17 @@ function TrackingView() {
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] overflow-hidden min-h-[400px]">
         <table className="w-full text-xs">
            <thead>
-              <tr className="bg-[#152035] border-b text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
+              <tr className="bg-[#152035] border-b text-[10px] font-black text-slate-400 uppercase tracking-widest text-left border-[#1E293B]">
                  <th className="p-5">Entidad / Nombre</th>
                  <th className="p-5">Tipo / Estado</th>
                  <th className="p-5">Clasificación / Programa</th>
                  <th className="p-5 text-right">Contacto</th>
               </tr>
            </thead>
-           <tbody className="divide-y divide-slate-200">
+           <tbody className="divide-y divide-[#1E293B]">
               {combined.map((item: any) => (
-                <tr key={item.id} className="hover:bg-[#152035] transition-colors">
-                   <td className="p-5 font-bold text-blue-900">{safe(item.name)} <span className="block text-[9px] text-slate-400 font-mono mt-1">{safe(item.rut)}</span></td>
+                <tr key={item.id} className="hover:bg-[#1E293B]/50 transition-colors">
+                   <td className="p-5 font-bold text-slate-200">{safe(item.name)} <span className="block text-[9px] text-slate-400 font-mono mt-1">{safe(item.rut)}</span></td>
                    <td className="p-5">
                       <span className={cn(
                         "px-2 py-0.5 rounded text-[9px] font-black uppercase",
