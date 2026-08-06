@@ -637,6 +637,42 @@ export function CampaignsMotor() {
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full bg-[#111A2E] text-white border border-[#1E293B] rounded-xl px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500"
             />
+            
+            {/* Mass Actions */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const emails = filteredLeads.map(l => l.email).filter(Boolean);
+                  if (emails.length > 0) {
+                    window.location.href = `mailto:?bcc=${emails.join(',')}`;
+                  } else {
+                    alert('No hay correos electrónicos válidos en la lista actual.');
+                  }
+                }}
+                className="flex-1 bg-[#1E3A5F] border border-[#1E293B] hover:bg-[#284B7A] text-white py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                title="Enviar correo a todos los contactos filtrados (BCC)"
+              >
+                <Mail className="w-3 h-3" /> Mail Masivo
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  const phones = filteredLeads.map(l => l.phone).filter(Boolean).map(p => p.replace(/[^\d+]/g, ''));
+                  if (phones.length > 0) {
+                    navigator.clipboard.writeText(phones.join(', '));
+                    alert(`¡Copiado! Se han copiado ${phones.length} números al portapapeles. (WhatsApp Web no permite enviar a múltiples números distintos a la vez sin API, pega estos números en tu sistema de difusión).`);
+                  } else {
+                    alert('No hay números de teléfono válidos en la lista actual.');
+                  }
+                }}
+                className="flex-1 bg-emerald-900/40 border border-emerald-900 hover:bg-emerald-900/70 text-emerald-400 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                title="Copiar números de teléfono para envíos masivos"
+              >
+                <Phone className="w-3 h-3" /> N°s WhatsApp
+              </button>
+            </div>
           </div>
 
           {/* List Content */}
