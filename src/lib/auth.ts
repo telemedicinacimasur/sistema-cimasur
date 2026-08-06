@@ -393,7 +393,7 @@ export const localDB = {
   clearCache: () => {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
   },
-  getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number }): Promise<any[]> => {
+  getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number; forceRefresh?: boolean }): Promise<any[]> => {
     const rawLimit = options?.limitCount ?? -1;
     const shouldLimit = rawLimit > 0;
     const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
@@ -402,20 +402,22 @@ export const localDB = {
       ? `${name}_${options!.dateField}_${options!.startDate}_${options!.endDate}_${limitStr}`
       : `${name}_${limitStr}`;
 
-    if (collectionCache[cacheKey]) {
-      return [...collectionCache[cacheKey]];
-    }
+    if (!options?.forceRefresh) {
+      if (collectionCache[cacheKey]) {
+        return [...collectionCache[cacheKey]];
+      }
 
-    const cachedData = getFromLocalStorage(cacheKey);
-    if (cachedData) {
-      collectionCache[cacheKey] = cachedData;
-      return [...cachedData];
-    }
+      const cachedData = getFromLocalStorage(cacheKey);
+      if (cachedData) {
+        collectionCache[cacheKey] = cachedData;
+        return [...cachedData];
+      }
 
-    const idbCached = await idbGet(cacheKey);
-    if (idbCached && idbCached.data) {
-      collectionCache[cacheKey] = idbCached.data;
-      return [...idbCached.data];
+      const idbCached = await idbGet(cacheKey);
+      if (idbCached && idbCached.data) {
+        collectionCache[cacheKey] = idbCached.data;
+        return [...idbCached.data];
+      }
     }
 
     if (isFirebaseReady && db) {

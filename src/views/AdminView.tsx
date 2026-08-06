@@ -200,7 +200,7 @@ export default function AdminView() {
     
     try {
       const options = getQueryOptions(col);
-      const data = await localDB.getCollection(col, options);
+      const data = await localDB.getCollection(col, { ...options, forceRefresh });
       setRecords(data);
     } catch (error) {
       console.error("Error loading data in AdminView:", error);
