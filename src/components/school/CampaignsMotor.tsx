@@ -389,6 +389,7 @@ export function CampaignsMotor() {
         body: JSON.stringify({
           leadName: selectedLead.name,
           leadClasificacion: selectedLead.clasificacion,
+          leadFecha: selectedLead.fecha,
           chatLog: chatLog
         })
       });
@@ -707,12 +708,48 @@ export function CampaignsMotor() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1.5">
                       <span className="font-bold text-white text-xs truncate block">{lead.name}</span>
-                      {interestBadge}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {lead.phone && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const formattedPhone = lead.phone.replace(/[^\d+]/g, '');
+                              window.open(`https://wa.me/${formattedPhone}`, '_blank');
+                            }}
+                            className="p-1 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-md transition-colors"
+                            title="Abrir chat individual en WhatsApp Web"
+                          >
+                            <Phone className="w-3 h-3" />
+                          </button>
+                        )}
+                        {interestBadge}
+                      </div>
                     </div>
                     <span className="text-[10px] text-[#38BDF8] block truncate font-medium mt-0.5">{lead.interes || 'Diplomado Homeopatía'}</span>
-                    <div className="flex items-center gap-3 mt-1.5 text-[9px] text-slate-400 font-mono">
-                      <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5" /> {lead.phone || '---'}</span>
-                      <span className="truncate flex items-center gap-0.5"><Calendar className="w-2.5 h-2.5" /> {lead.fecha}</span>
+                    <div className="flex items-center justify-between gap-3 mt-1.5 text-[9px] text-slate-400 font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5" /> {lead.phone || '---'}</span>
+                        <span className="truncate flex items-center gap-0.5"><Calendar className="w-2.5 h-2.5" /> {lead.fecha}</span>
+                      </div>
+                      {lead.fecha && (
+                        <span className="text-slate-500 italic">
+                          {(() => {
+                            const today = new Date();
+                            today.setHours(0,0,0,0);
+                            const leadDateParts = lead.fecha.split('-');
+                            if (leadDateParts.length === 3) {
+                               const leadDate = new Date(parseInt(leadDateParts[0]), parseInt(leadDateParts[1])-1, parseInt(leadDateParts[2]));
+                               const diffTime = Math.abs(today.getTime() - leadDate.getTime());
+                               const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                               if (diffDays === 0) return 'Hoy';
+                               if (diffDays === 1) return 'Ayer';
+                               return `Hace ${diffDays} días`;
+                            }
+                            return '';
+                          })()}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -1011,19 +1048,41 @@ export function CampaignsMotor() {
                           <Send className="w-3.5 h-3.5 text-emerald-500" /> Propuesta de Respuesta WhatsApp Diseñada por IA
                         </span>
                         
-                        <button
-                          type="button"
-                          onClick={() => handleCopyToClipboard(analysisResult.suggestedMessage)}
-                          className={cn(
-                            "text-[10px] px-3 py-1 rounded-lg font-black uppercase tracking-wider transition-all flex items-center gap-1 border",
-                            copied 
-                              ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50" 
-                              : "bg-[#1E3A5F] hover:bg-[#1D3557] text-[#38BDF8] border-[#1E293B] cursor-pointer"
-                          )}
-                        >
-                          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copied ? '¡Copiado!' : 'Copiar Mensaje'}
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyToClipboard(analysisResult.suggestedMessage)}
+                            className={cn(
+                              "text-[10px] px-3 py-1 rounded-lg font-black uppercase tracking-wider transition-all flex items-center gap-1 border",
+                              copied 
+                                ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50" 
+                                : "bg-[#1E3A5F] hover:bg-[#1D3557] text-[#38BDF8] border-[#1E293B] cursor-pointer"
+                            )}
+                          >
+                            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copied ? '¡Copiado!' : 'Copiar'}
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!selectedLead || !selectedLead.phone) {
+                                alert("Este prospecto no tiene número de teléfono registrado.");
+                                return;
+                              }
+                              const formattedPhone = selectedLead.phone.replace(/[^\d+]/g, '');
+                              let msg = analysisResult.suggestedMessage;
+                              if (msg.includes('{{NOMBRE}}')) {
+                                msg = msg.replace(/\{\{NOMBRE\}\}/g, selectedLead.name.split(' ')[0] || '');
+                              }
+                              const encodedMessage = encodeURIComponent(msg);
+                              window.open(`https://wa.me/${formattedPhone}?text=${encodedMessage}`, '_blank');
+                            }}
+                            className="text-[10px] px-3 py-1 bg-emerald-600/80 hover:bg-emerald-500 text-white rounded-lg font-black uppercase tracking-wider transition-all flex items-center gap-1 border border-emerald-500/50 cursor-pointer shadow-lg shadow-emerald-900/20"
+                          >
+                            <Phone className="w-3.5 h-3.5" /> Enviar Directo
+                          </button>
+                        </div>
                       </div>
                       
                       <div className="p-4 bg-[#111A2E]/30 text-xs font-sans whitespace-pre-wrap leading-relaxed text-slate-200 border-b border-[#1E293B]">

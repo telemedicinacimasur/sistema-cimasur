@@ -1,0 +1,21 @@
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleCopyToClipboard(analysisResult.suggestedMessage)}
+                          className={cn(
+                            "text-[10px] px-3 py-1 rounded-lg font-black uppercase tracking-wider transition-all flex items-center gap-1 border",
+                            copied 
+                              ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50" 
+                              : "bg-[#1E3A5F] hover:bg-[#1D3557] text-[#38BDF8] border-[#1E293B] cursor-pointer"
+                          )}
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copied ? '¡Copiado!' : 'Copiar Mensaje'}
+                        </button>
+                      </div>
+                      
+                      <div className="p-4 bg-[#111A2E]/30 text-xs font-sans whitespace-pre-wrap leading-relaxed text-slate-200 border-b border-[#1E293B]">
+                        {analysisResult.suggestedMessage}
+                      </div>
+
+                      <div className="p-3 bg-[#111A2E]/60 flex justify-end">

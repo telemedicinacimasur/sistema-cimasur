@@ -1415,7 +1415,7 @@ Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de
   app.post('/api/ai/analyze-whatsapp-chat', async (req, res) => {
     console.log('API call: POST /api/ai/analyze-whatsapp-chat');
     try {
-      const { leadName, leadClasificacion, chatLog } = req.body;
+      const { leadName, leadClasificacion, leadFecha, chatLog } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor." });
@@ -1434,6 +1434,7 @@ Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de
         model: "gemini-2.5-flash",
         contents: `Eres un Analista Experto en Ventas y Psicología de Clientes para la Escuela de Educación Médica CIMASUR.
 Tu tarea es analizar la siguiente conversación de WhatsApp entre un potencial alumno (Lead) de clasificación "${leadClasificacion || 'Médico Veterinario'}" llamado "${leadName}" y el asesor de Escuela CIMASUR.
+Fecha en que el lead ingresó o mostró interés: ${leadFecha || 'Desconocida'} (La fecha actual del sistema es ${new Date().toISOString().split('T')[0]}).
 
 Conversación de WhatsApp:
 """
@@ -1445,7 +1446,8 @@ Analiza rigurosamente la conversación y genera un objeto JSON con los siguiente
 2. "summary": Un resumen conciso (máximo 3 líneas) de la interacción, destacando de qué hablaron y el tono del lead.
 3. "objections": Un array de strings con las objeciones o dudas principales identificadas (ej. "Precio alto", "Falta de tiempo", "Dudas sobre certificación", "Horarios", etc.). Si no hay, dejar vacío.
 4. "nextAction": Una recomendación de la siguiente mejor acción de seguimiento comercial.
-5. "suggestedMessage": Un mensaje personalizado listo para enviar por WhatsApp que aborde sus dudas o continúe la interacción con calidez y profesionalismo, utilizando emojis atractivos y un tono de aliado clínico de CIMASUR. Puede usar marcadores como "{{NOMBRE}}".`,
+5. "suggestedMessage": Un mensaje personalizado listo para enviar por WhatsApp que aborde sus dudas o continúe la interacción con calidez y profesionalismo, utilizando emojis atractivos y un tono de aliado clínico de CIMASUR.
+ATENCIÓN IMPORTANTE PARA EL MENSAJE Y LA ACCIÓN: Ten muy en cuenta el tiempo transcurrido desde la fecha en que el lead se registró (${leadFecha || 'Desconocida'}) hasta hoy (${new Date().toISOString().split('T')[0]}). Si ha pasado mucho tiempo (ej. semanas o meses), el mensaje NO debe asumir que hablaron ayer ni ser insistente; debe ser un mensaje de "retoma de contacto" o reconexión suave (ej. "Hola! Hace un tiempo nos contactaste interesad@ en... ¿pudiste revisar la información?"). Si es reciente, usa un tono más inmediato. Puede usar marcadores como "{{NOMBRE}}".`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
