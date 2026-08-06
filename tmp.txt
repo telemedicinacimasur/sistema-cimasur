@@ -1,21 +1,41 @@
-                        
-                        <button
-                          type="button"
-                          onClick={() => handleCopyToClipboard(analysisResult.suggestedMessage)}
-                          className={cn(
-                            "text-[10px] px-3 py-1 rounded-lg font-black uppercase tracking-wider transition-all flex items-center gap-1 border",
-                            copied 
-                              ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50" 
-                              : "bg-[#1E3A5F] hover:bg-[#1D3557] text-[#38BDF8] border-[#1E293B] cursor-pointer"
-                          )}
-                        >
-                          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copied ? '¡Copiado!' : 'Copiar Mensaje'}
-                        </button>
-                      </div>
-                      
-                      <div className="p-4 bg-[#111A2E]/30 text-xs font-sans whitespace-pre-wrap leading-relaxed text-slate-200 border-b border-[#1E293B]">
-                        {analysisResult.suggestedMessage}
-                      </div>
-
-                      <div className="p-3 bg-[#111A2E]/60 flex justify-end">
+386:  const handleSendEmail = async () => {
+387-    const bcc = selectedClients.map(c => c.email).filter(e => !!e).join(',');
+388-    const subject = (document.getElementById('email-subject-input') as HTMLInputElement)?.value || `Campaña: ${selectedCampaign?.name || 'Información Importante'}`;
+389-    const htmlContent = document.getElementById('email-preview-content')?.innerHTML || 'No content generated.';
+390-
+391-    const emlContent = `To: Recipients <undisclosed-recipients@example.com>\r
+392-Bcc: ${bcc}\r
+393-Subject: ${subject}\r
+394-X-Unsent: 1\r
+395-Content-Type: text/html; charset=utf-8\r
+396-\r
+397-${htmlContent}`;
+398-
+399-    const blob = new Blob([emlContent], { type: 'message/rfc822' });
+400-    const url = URL.createObjectURL(blob);
+401-    
+402-    const a = document.createElement('a');
+403-    a.href = url;
+404-    a.download = `campana_${Date.now()}.eml`;
+405-    document.body.appendChild(a);
+406-    a.click();
+407-    document.body.removeChild(a);
+408-    URL.revokeObjectURL(url);
+409-
+410-    // Register log for each selected client
+411-    for (const c of selectedClients) {
+412-      await registerCampaignLog(c, 'Email', true);
+413-    }
+414-
+415-    // Single global activity for the mass send
+416-    try {
+417-      await localDB.saveToCollection('crm_activities', {
+418-        fecha: new Date().toISOString(),
+419-        campania: selectedCampaign?.name || 'Campaña Manual',
+420-        tipo: 'Email Marketing',
+421-        observaciones: `Envío masivo por Email a ${selectedClients.length} destinatarios.`,
+422-        responsable: 'Envío Masivo CRM'
+423-      });
+424-    } catch (err) {
+425-      console.error("Error logging global activity", err);
+426-    }

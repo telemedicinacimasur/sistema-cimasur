@@ -384,28 +384,28 @@ export default function CampaignsBuilder({
   };
 
   const handleSendEmail = async () => {
-    const bcc = selectedClients.map(c => c.email).filter(e => !!e).join(',');
-    const subject = (document.getElementById('email-subject-input') as HTMLInputElement)?.value || `Campaña: ${selectedCampaign?.name || 'Información Importante'}`;
-    const htmlContent = document.getElementById('email-preview-content')?.innerHTML || 'No content generated.';
-
-    const emlContent = `To: Recipients <undisclosed-recipients@example.com>\r
-Bcc: ${bcc}\r
-Subject: ${subject}\r
-X-Unsent: 1\r
-Content-Type: text/html; charset=utf-8\r
-\r
-${htmlContent}`;
-
-    const blob = new Blob([emlContent], { type: 'message/rfc822' });
-    const url = URL.createObjectURL(blob);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidClients = selectedClients.filter(c => c.email && !emailRegex.test(c.email.trim()));
     
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `campana_${Date.now()}.eml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (invalidClients.length > 0) {
+      const invalidList = invalidClients.slice(0, 5).map(c => `- ${c.name}: ${c.email}`).join('\n');
+      const moreText = invalidClients.length > 5 ? `\n...y ${invalidClients.length - 5} más.` : '';
+      alert(`⚠️ ADVERTENCIA: Se encontraron correos inválidos que provocarán rebotes.\n\nCorrige los siguientes correos antes de enviar:\n${invalidList}${moreText}`);
+      return;
+    }
+
+    const validEmails = selectedClients.map(c => c.email?.trim()).filter(e => e && emailRegex.test(e));
+    if (validEmails.length === 0) {
+        alert("No hay correos electrónicos válidos para enviar.");
+        return;
+    }
+
+    const bcc = validEmails.join(',');
+    const subject = (document.getElementById('email-subject-input') as HTMLInputElement)?.value || `Campaña: ${selectedCampaign?.name || 'Informacion Importante'}`;
+    const textContent = document.getElementById('email-preview-content')?.innerText || 'No content generated.';
+
+    const mailtoLink = `mailto:?bcc=${bcc}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(textContent + '\n\n')}`;
+    window.location.href = mailtoLink;
 
     // Register log for each selected client
     for (const c of selectedClients) {
@@ -703,7 +703,7 @@ ${htmlContent}`;
                     onClick={handleSendEmail}
                     className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all text-sm"
                 >
-                    <Send size={16}/> Enviar por Email (Thunderbird) a {selectedClientIds.size} seleccionados
+                    <Send size={16}/> Enviar por Email a {selectedClientIds.size} seleccionados
                 </button>
             ) : (
                 <div className="space-y-2">

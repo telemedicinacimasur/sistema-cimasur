@@ -644,9 +644,19 @@ export function CampaignsMotor() {
               <button
                 type="button"
                 onClick={() => {
-                  const emails = filteredLeads.map(l => l.email).filter(Boolean);
-                  if (emails.length > 0) {
-                    window.location.href = `mailto:?bcc=${emails.join(',')}`;
+                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                  const invalidLeads = filteredLeads.filter(l => l.email && !emailRegex.test(l.email.trim()));
+                  
+                  if (invalidLeads.length > 0) {
+                    const invalidList = invalidLeads.slice(0, 5).map(l => `- ${l.name}: ${l.email}`).join('\n');
+                    const moreText = invalidLeads.length > 5 ? `\n...y ${invalidLeads.length - 5} más.` : '';
+                    alert(`⚠️ ADVERTENCIA: Se encontraron correos inválidos que provocarán rebotes.\n\nCorrige los siguientes correos antes de enviar:\n${invalidList}${moreText}`);
+                    return;
+                  }
+
+                  const validEmails = filteredLeads.map(l => l.email?.trim()).filter(e => e && emailRegex.test(e));
+                  if (validEmails.length > 0) {
+                    window.location.href = `mailto:?bcc=${validEmails.join(',')}`;
                   } else {
                     alert('No hay correos electrónicos válidos en la lista actual.');
                   }
