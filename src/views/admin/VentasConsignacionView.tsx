@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { localDB } from '../../lib/auth';
+import { localDB, addAuditLog } from '../../lib/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getDb, isFirebaseReady } from '../../lib/firebase';
@@ -22,7 +22,7 @@ import {
   deleteField
 } from 'firebase/firestore';
 import { 
-  Save, 
+  Save, Users, 
   PlusCircle, 
   Target, 
   Package, 
@@ -47,7 +47,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Upload, Edit2, Edit3, X
+  Upload, Edit, Edit2, Edit3, X
 } from 'lucide-react';
 const PRODUCTOS_CATALOGO: string[] = [];
 
@@ -204,6 +204,8 @@ const ClientAutocomplete = ({
           )}
         </div>
       )}
+
+
     </div>
   );
 };
@@ -760,6 +762,10 @@ export default function VentasConsignacionView() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [newClientName, setNewClientName] = useState('');
   const [newClientRut, setNewClientRut] = useState('');
+  const [showEditClientModal, setShowEditClientModal] = useState(false);
+  const [editingClient, setEditingClient] = useState<any>(null);
+  const [editClientName, setEditClientName] = useState('');
+  const [editClientRut, setEditClientRut] = useState('');
 
   // Form for Lote Delivery / Creation
   const [formEntrega, setFormEntrega] = useState({
@@ -1584,27 +1590,65 @@ export default function VentasConsignacionView() {
     }
   };
 
-  const handleCreateNewClient = async () => {
+    const handleSaveClient = async () => {
     if (!newClientName.trim()) {
       alert("Por favor ingrese el nombre del cliente.");
       return;
     }
     try {
-      const clientObj = {
-        name: newClientName.trim(),
-        rut: newClientRut.trim(),
-        categoria: 'Consignación',
-        createdAt: new Date().toISOString()
-      };
-      await localDB.saveToCollection('consignacion_clientes', clientObj);
-      alert(`Cliente "${newClientName}" registrado correctamente.`);
+      if (editingClient) {
+        const updatedClient = {
+          ...editingClient,
+          name: newClientName.trim(),
+          rut: newClientRut.trim(),
+          updatedAt: new Date().toISOString()
+        };
+        await localDB.updateInCollection('consignacion_clientes', editingClient.id, updatedClient);
+        if (user) {
+          await addAuditLog(user, `Editó cliente en Consignación: "${editingClient.name}" -> "${updatedClient.name}"`, 'Administración');
+        }
+        alert(`Cliente "${updatedClient.name}" actualizado correctamente.`);
+      } else {
+        const clientObj = {
+          name: newClientName.trim(),
+          rut: newClientRut.trim(),
+          categoria: 'Consignación',
+          createdAt: new Date().toISOString()
+        };
+        await localDB.saveToCollection('consignacion_clientes', clientObj);
+        if (user) {
+          await addAuditLog(user, `Registró nuevo cliente en Consignación: "${clientObj.name}"`, 'Administración');
+        }
+        alert(`Cliente "${newClientName}" registrado correctamente.`);
+      }
       setNewClientName('');
       setNewClientRut('');
+      setEditingClient(null);
       setShowAddClientForm(false);
       await loadClientes();
     } catch (e: any) {
       console.error(e);
-      alert("Error al registrar cliente: " + e.message);
+      alert("Error al guardar cliente: " + e.message);
+    }
+  };
+
+  const handleDeleteClient = async (client: any) => {
+    if (window.confirm(`¿Está seguro de eliminar al cliente "${client.name}"?`)) {
+      try {
+        await localDB.deleteFromCollection('consignacion_clientes', client.id);
+        if (user) {
+          await addAuditLog(user, `Eliminó cliente en Consignación: "${client.name}"`, 'Administración');
+        }
+        if (editingClient?.id === client.id) {
+          setEditingClient(null);
+          setNewClientName('');
+          setNewClientRut('');
+        }
+        await loadClientes();
+      } catch (e: any) {
+        console.error(e);
+        alert("Error al eliminar cliente: " + e.message);
+      }
     }
   };
 
@@ -1890,20 +1934,24 @@ export default function VentasConsignacionView() {
                             </button>
                             <button
                               onClick={() => {
-                                setShowAddClientForm(!showAddClientForm);
+                                setEditingClient(null);
+                                setNewClientName('');
+                                setNewClientRut('');
+                                setShowAddClientForm(!showAddClientForm || editingClient !== null);
                                 setShowAddLoteForm(false);
                                 setShowImportForm(false);
                               }}
                               className={cn(
                                 "px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md",
-                                showAddClientForm 
-                                  ? "bg-sky-500 text-[#050914]" 
+                                showAddClientForm && !editingClient
+                                  ? "bg-sky-500 text-[#050914]"
                                   : "bg-[#050914] text-sky-400 border border-sky-500/20 hover:bg-sky-500 hover:text-[#050914]"
                               )}
                             >
                               <Plus size={14} />
                               Crear Cliente
                             </button>
+                            
                             <button
                               onClick={() => {
                                 setShowImportForm(!showImportForm);
@@ -1942,6 +1990,7 @@ export default function VentasConsignacionView() {
                             placeholder="Buscar y filtrar por cliente..."
                           />
                         </div>
+                        
                         <input
                           type="text"
                           placeholder="Buscar producto..."
@@ -2063,12 +2112,71 @@ export default function VentasConsignacionView() {
                         </div>
                       )}
 
-                      {/* Dropdown Form 2: Crear Cliente */}
+                      {/* Dropdown Form 2: Registrar / Editar Cliente */}
                       {showAddClientForm && (
-                        <div className="bg-[#0D1627] p-5 rounded-2xl border border-sky-500/20 shadow-xl space-y-4 animate-in slide-in-from-top-2 duration-200 mb-2">
-                          <h5 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
-                            <PlusCircle size={14} /> Registrar Nuevo Cliente en Consignación
-                          </h5>
+                        <div className={cn(
+                          "p-5 rounded-2xl border shadow-xl space-y-4 animate-in slide-in-from-top-2 duration-200 mb-2 transition-colors",
+                          editingClient ? "bg-[#0D1627] border-amber-500/30" : "bg-[#0D1627] border-sky-500/20"
+                        )}>
+                          <div className="flex justify-between items-center border-b border-[#1E293B] pb-3 flex-wrap gap-2">
+                            <h5 className={cn("text-xs font-black uppercase tracking-widest flex items-center gap-2", editingClient ? "text-amber-400" : "text-sky-400")}>
+                              {editingClient ? (
+                                <>
+                                  <Edit size={16} /> Modificar / Actualizar Cliente en Consignación
+                                </>
+                              ) : (
+                                <>
+                                  <PlusCircle size={16} /> Registrar Nuevo Cliente en Consignación
+                                </>
+                              )}
+                            </h5>
+                            {editingClient && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingClient(null);
+                                  setNewClientName('');
+                                  setNewClientRut('');
+                                }}
+                                className="text-xs text-sky-400 hover:text-sky-300 font-bold underline flex items-center gap-1"
+                              >
+                                <Plus size={12} /> Cambiar a modo "Crear Nuevo Cliente"
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Dropdown selector when editing or multiple clients exist */}
+                          {clientes.length > 0 && (
+                            <div className="bg-[#050914] p-3 rounded-xl border border-[#1E293B]">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                {editingClient ? 'Cliente Actualmente Seleccionado para Editar:' : 'Cargar Cliente Existente para Editar:'}
+                              </label>
+                              <select
+                                className="w-full bg-[#0D1627] text-white border border-[#1E293B] rounded-lg p-2 text-xs font-semibold outline-none focus:border-amber-500"
+                                value={editingClient?.id || ''}
+                                onChange={(e) => {
+                                  const selected = clientes.find(c => c.id === e.target.value);
+                                  if (selected) {
+                                    setEditingClient(selected);
+                                    setNewClientName(selected.name || '');
+                                    setNewClientRut(selected.rut || '');
+                                  } else {
+                                    setEditingClient(null);
+                                    setNewClientName('');
+                                    setNewClientRut('');
+                                  }
+                                }}
+                              >
+                                <option value="">-- {editingClient ? 'Cambiar de cliente a editar...' : 'Seleccione cliente si desea editar uno existente'} --</option>
+                                {clientes.map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name} {c.rut ? `(${c.rut})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Nombre de la Empresa / Cliente</label>
@@ -2093,20 +2201,71 @@ export default function VentasConsignacionView() {
                             <div className="md:col-span-2 flex justify-end gap-2 pt-2">
                               <button
                                 type="button"
-                                onClick={() => setShowAddClientForm(false)}
+                                onClick={() => {
+                                  setShowAddClientForm(false);
+                                  setEditingClient(null);
+                                  setNewClientName('');
+                                  setNewClientRut('');
+                                }}
                                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs uppercase"
                               >
                                 Cancelar
                               </button>
                               <button
                                 type="button"
-                                onClick={handleCreateNewClient}
-                                className="px-5 py-2 bg-sky-500 hover:bg-sky-600 text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider shadow-md shadow-sky-500/10"
+                                onClick={handleSaveClient}
+                                className={cn(
+                                  "px-5 py-2 font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-1.5",
+                                  editingClient
+                                    ? "bg-amber-500 hover:bg-amber-400 text-[#050914] shadow-amber-500/10"
+                                    : "bg-sky-500 hover:bg-sky-600 text-[#050914] shadow-sky-500/10"
+                                )}
                               >
-                                Crear Cliente
+                                {editingClient ? <Save size={14} /> : <PlusCircle size={14} />}
+                                {editingClient ? 'ACTUALIZAR CLIENTE' : 'CREAR CLIENTE'}
                               </button>
                             </div>
                           </div>
+
+                          {/* LIST OF REGISTERED CLIENTS */}
+                          {clientes.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-[#1E293B]">
+                              <h6 className="text-[11px] font-black text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <Users size={14} className="text-sky-400" /> Clientes Registrados en Sistema ({clientes.length})
+                              </h6>
+                              <div className="max-h-52 overflow-y-auto border border-[#1E293B] rounded-xl divide-y divide-[#1E293B] bg-[#050914]">
+                                {clientes.map(c => (
+                                  <div key={c.id} className="p-2.5 flex items-center justify-between hover:bg-[#0D1627] transition-colors">
+                                    <div>
+                                      <span className="text-xs font-bold text-white block">{c.name}</span>
+                                      {c.rut && <span className="text-[10px] text-slate-400 font-mono">RUT: {c.rut}</span>}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingClient(c);
+                                          setNewClientName(c.name || '');
+                                          setNewClientRut(c.rut || '');
+                                        }}
+                                        className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#050914] rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-colors"
+                                      >
+                                        <Edit size={12} /> Editar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteClient(c)}
+                                        className="p-1 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors"
+                                        title="Eliminar Cliente"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -2962,6 +3121,25 @@ export default function VentasConsignacionView() {
                     onChange={setRegistroVentasCliente}
                     placeholder="Escriba para buscar cliente..."
                   />
+                  {registroVentasCliente && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const clientObj = clientes.find(c => c.id === registroVentasCliente);
+                        if (clientObj) {
+                          setEditingClient(clientObj);
+                          setEditClientName(clientObj.name || '');
+                          setEditClientRut(clientObj.rut || '');
+                          setShowEditClientModal(true);
+                        }
+                      }}
+                      className="px-3 py-2 bg-[#050914] text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-[#050914] rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md mt-3 w-full justify-center"
+                      title="Editar Nombre de este Cliente"
+                    >
+                      <Edit size={14} />
+                      Editar Nombre del Cliente
+                    </button>
+                  )}
                 </div>
 
                 {registroVentasCliente ? (

@@ -33,7 +33,9 @@ import {
   Clock,
   ArrowUp,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { RecordActions } from '../components/RecordActions';
@@ -3753,9 +3755,11 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   const [showPOModal, setShowPOModal] = useState(false);
   const [poItems, setPoItems] = useState<any[]>([]);
   const [poEncargado, setPoEncargado] = useState('ADMINISTRACION');
-  const [poSelectedArea, setPoSelectedArea] = useState<string>('Etiquetas salina');
+  const [poSelectedAreas, setPoSelectedAreas] = useState<string[]>(['TODAS']);
+  const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
   const [showPOHistory, setShowPOHistory] = useState(false);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [editingPOId, setEditingPOId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPOs = async () => {
@@ -4314,14 +4318,15 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                       alert('No hay insumos bajo el límite crítico (alerta) en esta área. Seleccione el área correspondiente al abrir la Orden de Compra.');
                     }
                     
-                    setPoSelectedArea(selectedArea);
+                    setPoSelectedAreas([selectedArea === 'TODAS' ? 'TODAS' : selectedArea]);
                     setPoItems(itemsToBuy.map(r => ({
                       id: r.id,
                       item: r.item || '',
                       code: r.code || '',
                       qty: r.qty || '0',
                       alerta: getRecordAlertaThreshold(r),
-                      reposicion: ''
+                      reposicion: '',
+                      area: r.area || ''
                     })));
                     setShowPOModal(true);
                   }}
@@ -4654,7 +4659,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
           <div className="bg-[#0F172A] border border-[#1E293B] rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl max-h-[90vh]">
             <div className="p-4 border-b border-[#1E293B] flex justify-between items-center bg-[#1E3A5F]/20 rounded-t-2xl">
               <div>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Generar Orden de Compra</h3>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">{editingPOId ? 'Editar Orden de Compra' : 'Generar Orden de Compra'}</h3>
                 <p className="text-xs text-slate-400 mt-1">Configure las cantidades a reponer para generar el PDF.</p>
               </div>
               <button onClick={() => setShowPOModal(false)} className="text-slate-400 hover:text-white p-2">
@@ -4663,7 +4668,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
             </div>
             
             <div className="p-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 relative z-30">
                 <FormField label="Encargado">
                   <input
                     type="text"
@@ -4673,51 +4678,102 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                     placeholder="Ej. Carlos Vega"
                   />
                 </FormField>
-                <FormField label="Área de Reposición">
-                  <select
-                    value={poSelectedArea}
-                    onChange={e => {
-                      const newArea = e.target.value;
-                      setPoSelectedArea(newArea);
-                      
-                      const itemsForNewArea = inventoryRecords.filter(r => (r.area === newArea || newArea === 'TODAS') && (Number(r.qty) || 0) <= getRecordAlertaThreshold(r));
-                      setPoItems(itemsForNewArea.map(r => ({
-                        id: r.id,
-                        item: r.item || '',
-                        code: r.code || '',
-                        qty: r.qty || '0',
-                        alerta: getRecordAlertaThreshold(r),
-                        area: r.area || '',
-                        reposicion: ''
-                      })));
-                    }}
-                    className="w-full bg-[#111A2E] text-white border border-[#1E293B] rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="TODAS">-- Todas las Áreas --</option>
-                    {areas.map(a => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
+                <FormField label="Áreas de Reposición">
+                  <div className="relative">
+                    <button 
+                      type="button"
+                      onClick={() => setIsAreaDropdownOpen(!isAreaDropdownOpen)}
+                      className="w-full bg-[#111A2E] text-white border border-[#1E293B] rounded-xl px-3 py-2 text-xs outline-none text-left flex justify-between items-center"
+                    >
+                      <span className="truncate">
+                        {poSelectedAreas.includes('TODAS') 
+                          ? 'Todas las Áreas' 
+                          : poSelectedAreas.length > 0 
+                            ? poSelectedAreas.join(', ') 
+                            : 'Seleccionar Área...'}
+                      </span>
+                      <ChevronDown size={14} className="text-slate-400" />
+                    </button>
+                    
+                    {isAreaDropdownOpen && (
+                      <div className="absolute z-[100] top-full mt-1 w-full bg-[#111A2E] border border-[#1E293B] rounded-xl shadow-2xl max-h-60 overflow-y-auto">
+                        <div 
+                          className="px-3 py-2 border-b border-[#1E293B] hover:bg-[#15233C] cursor-pointer flex items-center gap-2"
+                          onClick={() => {
+                            const newAreas = ['TODAS'];
+                            setPoSelectedAreas(newAreas);
+                            const itemsForNewArea = inventoryRecords.filter(r => (Number(r.qty) || 0) <= getRecordAlertaThreshold(r));
+                            setPoItems(itemsForNewArea.map(r => ({
+                              id: r.id, item: r.item || '', code: r.code || '', qty: r.qty || '0', alerta: getRecordAlertaThreshold(r), area: r.area || '', reposicion: ''
+                            })));
+                          }}
+                        >
+                          <div className={`w-4 h-4 rounded flex items-center justify-center border ${poSelectedAreas.includes('TODAS') ? 'bg-sky-500 border-sky-500' : 'border-[#1E293B] bg-[#0A101F]'}`}>
+                            {poSelectedAreas.includes('TODAS') && <Check size={12} className="text-white" />}
+                          </div>
+                          <span className="text-xs font-bold text-sky-400">TODAS LAS ÁREAS</span>
+                        </div>
+                        
+                        {areas.map(a => {
+                          const isSelected = !poSelectedAreas.includes('TODAS') && poSelectedAreas.includes(a);
+                          return (
+                            <div 
+                              key={a}
+                              className="px-3 py-2 border-b border-[#1E293B]/50 hover:bg-[#15233C] cursor-pointer flex items-center gap-2"
+                              onClick={() => {
+                                let newAreas = [...poSelectedAreas];
+                                if (newAreas.includes('TODAS')) {
+                                  newAreas = [a];
+                                } else {
+                                  if (isSelected) {
+                                    newAreas = newAreas.filter(area => area !== a);
+                                  } else {
+                                    newAreas.push(a);
+                                  }
+                                }
+                                if (newAreas.length === 0) newAreas = ['TODAS'];
+                                setPoSelectedAreas(newAreas);
+                                
+                                const itemsForNewArea = inventoryRecords.filter(r => 
+                                  (newAreas.includes('TODAS') || newAreas.includes(r.area)) && 
+                                  (Number(r.qty) || 0) <= getRecordAlertaThreshold(r)
+                                );
+                                setPoItems(itemsForNewArea.map(r => ({
+                                  id: r.id, item: r.item || '', code: r.code || '', qty: r.qty || '0', alerta: getRecordAlertaThreshold(r), area: r.area || '', reposicion: ''
+                                })));
+                              }}
+                            >
+                              <div className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? 'bg-sky-500 border-sky-500' : 'border-[#1E293B] bg-[#0A101F]'}`}>
+                                {isSelected && <Check size={12} className="text-white" />}
+                              </div>
+                              <span className="text-xs text-slate-300">{a}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </FormField>
               </div>
 
-              <div className="border border-[#1E293B] rounded-xl overflow-hidden">
+              <div className="border border-[#1E293B] rounded-xl overflow-hidden relative z-10">
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-[#111A2E] text-[10px] font-black uppercase text-slate-400">
                     <tr>
                       <th className="p-3">Insumo</th>
-                      {poSelectedArea === 'TODAS' && <th className="p-3">Área</th>}
+                      {poSelectedAreas.includes('TODAS') && <th className="p-3">Área</th>}
                       <th className="p-3">Código</th>
                       <th className="p-3 text-center">Stock Actual</th>
                       <th className="p-3 text-center">Límite Alerta</th>
                       <th className="p-3 text-center">Reposición</th>
+                      <th className="p-3 text-center">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1E293B] bg-[#1E3A5F]/10">
                     {poItems.map((item, idx) => (
                       <tr key={item.id} className="hover:bg-[#1E3A5F]/30 transition-colors">
                         <td className="p-3 font-medium text-white">{item.item}</td>
-                        {poSelectedArea === 'TODAS' && <td className="p-3 text-[10px] text-slate-500 uppercase">{item.area}</td>}
+                        {poSelectedAreas.includes('TODAS') && <td className="p-3 text-[10px] text-slate-500 uppercase">{item.area}</td>}
                         <td className="p-3 text-slate-400">{item.code || '---'}</td>
                         <td className="p-3 text-center">
                           <span className="bg-[#111A2E] px-2 py-1 rounded text-red-400 font-black">{item.qty}</span>
@@ -4737,10 +4793,20 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                             placeholder="Ej. 10"
                           />
                         </td>
+                        <td className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setPoItems(poItems.filter((_, i) => i !== idx))}
+                            className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors"
+                            title="Eliminar insumo de la orden"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {poItems.length === 0 && (
-                      <tr><td colSpan={poSelectedArea === 'TODAS' ? 6 : 5} className="p-4 text-center text-slate-500 italic">No hay insumos críticos para esta área.</td></tr>
+                      <tr><td colSpan={poSelectedAreas.includes('TODAS') ? 7 : 6} className="p-4 text-center text-slate-500 italic">No hay insumos críticos para esta área.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -4766,7 +4832,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                   let data: any[][];
                   let headers: string[];
                   
-                  if (poSelectedArea === 'TODAS') {
+                  if (poSelectedAreas.includes('TODAS')) {
                     headers = ['Insumo', 'Área', 'Código', 'Stock Actual', 'Límite Alerta', 'Reposición'];
                     data = finalItemsToExport.map(item => [
                       item.item,
@@ -4787,28 +4853,35 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                     ]);
                   }
 
-                  const titleSuffix = poSelectedArea === 'TODAS' ? 'TODAS LAS ÁREAS' : poSelectedArea.toUpperCase();
+                  const titleSuffix = poSelectedAreas.includes('TODAS') ? 'TODAS LAS ÁREAS' : poSelectedAreas.join(', ').toUpperCase();
                   
                   exportTableToPDF(
                     `ORDEN DE COMPRA (${titleSuffix})`,
                     headers,
                     data,
-                    `orden_compra_${mesAnio.toLowerCase().replace(/\s+/g, '_')}_${poSelectedArea.toLowerCase().replace(/\s+/g, '_')}`,
+                    `orden_compra_${mesAnio.toLowerCase().replace(/\s+/g, '_')}_${(poSelectedAreas.includes('TODAS') ? 'todas' : poSelectedAreas.join('_')).toLowerCase().replace(/\s+/g, '_')}`,
                     'p',
                     `MES: ${mesAnio.toUpperCase()} | ENCARGADO: ${poEncargado.toUpperCase()}`
                   );
                   
                   // Save to DB
                   try {
-                    const newOrder = {
+                    const newOrder: any = {
                       fecha: new Date().toISOString(),
                       mesAnio,
                       encargado: poEncargado,
-                      area: poSelectedArea,
+                      area: poSelectedAreas.includes('TODAS') ? 'TODAS' : poSelectedAreas.join(', '),
                       items: finalItemsToExport
                     };
-                    await localDB.saveToCollection('purchase_orders', newOrder);
-                    
+                    if (editingPOId) {
+                      newOrder.id = editingPOId;
+                      await localDB.updateInCollection('purchase_orders', editingPOId, newOrder);
+                      if (user) await addAuditLog(user, `Editó Orden de Compra: ${newOrder.area}`, 'Laboratorio');
+                      setEditingPOId(null);
+                    } else {
+                      await localDB.saveToCollection('purchase_orders', newOrder);
+                    }
+                    if (user) await addAuditLog(user, `Generó Orden de Compra: ${newOrder.area}`, 'Laboratorio');
                     const updatedPOs = await localDB.getCollection('purchase_orders');
                     setPurchaseOrders(updatedPOs || []);
                     
@@ -4821,7 +4894,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                 disabled={poItems.length === 0}
                 className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-lg flex items-center gap-2 shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FileText className="w-4 h-4" /> Generar PDF
+                <Save className="w-4 h-4" /> Guardar
               </button>
             </div>
           </div>
@@ -4865,6 +4938,45 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                           <span className="bg-[#111A2E] px-2 py-1 rounded text-emerald-400 font-black">{order.items?.length || 0}</span>
                         </td>
                         <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                          {canDelete && (
+                            <button
+                              onClick={async () => {
+                                if (window.confirm('¿Está seguro de eliminar esta Orden de Compra?')) {
+                                  try {
+                                    await localDB.deleteFromCollection('purchase_orders', order.id);
+                                    if (user) await addAuditLog(user, `Eliminó Orden de Compra: ${order.area}`, 'Laboratorio');
+                                    setPurchaseOrders(prev => prev.filter(p => p.id !== order.id));
+                                    const updatedPOs = await localDB.getCollection('purchase_orders', { forceRefresh: true });
+                                    if (updatedPOs) setPurchaseOrders(updatedPOs);
+                                  } catch(e) {
+                                    console.error("Error al eliminar Orden de Compra:", e);
+                                    alert("Error al eliminar la orden de compra.");
+                                  }
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-400/10 p-1.5 rounded transition-colors"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button
+                              onClick={() => {
+                                setEditingPOId(order.id);
+                                setPoSelectedAreas(order.area === 'TODAS' ? ['TODAS'] : (order.area || '').split(', '));
+                                setPoEncargado(order.encargado || 'ADMINISTRACION');
+                                setPoItems(order.items || []);
+                                setShowPOHistory(false);
+                                setShowPOModal(true);
+                              }}
+                              className="text-sky-400 hover:text-sky-300 hover:bg-sky-400/10 p-1.5 rounded transition-colors"
+                              title="Editar"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               const isAll = order.area === 'TODAS';
@@ -4908,6 +5020,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                           >
                             <FileText className="w-3.5 h-3.5" /> Descargar
                           </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
