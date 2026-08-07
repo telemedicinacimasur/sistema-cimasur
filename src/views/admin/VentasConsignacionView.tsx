@@ -312,14 +312,53 @@ export default function VentasConsignacionView() {
   const [fixedDataExpanded, setFixedDataExpanded] = useState(false);
   const [selectedFixedLoteIds, setSelectedFixedLoteIds] = useState<Set<string>>(new Set());
   const [savedPlanillaMonths, setSavedPlanillaMonths] = useState<Set<string>>(new Set());
+  const [savedPlanillasMeta, setSavedPlanillasMeta] = useState<Record<string, {
+    isBimonthly?: boolean;
+    secondMonth?: string;
+    customPeriodLabel?: string;
+    observaciones?: string;
+  }>>({});
+
+  const [editarPlanillaModal, setEditarPlanillaModal] = useState<{
+    isOpen: boolean;
+    month: string;
+  } | null>(null);
+
+  const [editarPlanillaForm, setEditarPlanillaForm] = useState<{
+    month: string;
+    isBimonthly: boolean;
+    secondMonth: string;
+    customPeriodLabel: string;
+    observaciones: string;
+    items: Array<{
+      loteId: string;
+      productoId: string;
+      solucionLote: string;
+      unidadesVendidas: number;
+      precioUnitNeto: number;
+    }>;
+  }>({
+    month: '',
+    isBimonthly: false,
+    secondMonth: '',
+    customPeriodLabel: '',
+    observaciones: '',
+    items: []
+  });
+
+  const [addLoteToPlanillaSearch, setAddLoteToPlanillaSearch] = useState('');
+  const [addLoteDropdownOpen, setAddLoteDropdownOpen] = useState(false);
+  const [savingEditarPlanilla, setSavingEditarPlanilla] = useState(false);
 
   const loadSavedPlanillas = useCallback(async (clienteId: string) => {
     if (!clienteId) {
       setSavedPlanillaMonths(new Set());
+      setSavedPlanillasMeta({});
       return;
     }
     try {
       const set = new Set<string>();
+      const metaMap: Record<string, any> = {};
       if (isFirebaseReady()) {
         const db = getDb();
         const q = query(
@@ -329,7 +368,15 @@ export default function VentasConsignacionView() {
         const snap = await getDocs(q);
         snap.docs.forEach(d => {
           const data = d.data();
-          if (data.month) set.add(data.month);
+          if (data.month) {
+            set.add(data.month);
+            metaMap[data.month] = {
+              isBimonthly: data.isBimonthly,
+              secondMonth: data.secondMonth,
+              customPeriodLabel: data.customPeriodLabel,
+              observaciones: data.observaciones
+            };
+          }
         });
       } else {
         for (let i = 0; i < localStorage.length; i++) {
@@ -337,10 +384,25 @@ export default function VentasConsignacionView() {
           if (k && k.startsWith(`mock_planilla_${clienteId}_`)) {
             const m = k.replace(`mock_planilla_${clienteId}_`, '');
             set.add(m);
+            try {
+              const stored = localStorage.getItem(k);
+              if (stored && stored.startsWith('{')) {
+                const parsed = JSON.parse(stored);
+                metaMap[m] = {
+                  isBimonthly: parsed.isBimonthly,
+                  secondMonth: parsed.secondMonth,
+                  customPeriodLabel: parsed.customPeriodLabel,
+                  observaciones: parsed.observaciones
+                };
+              }
+            } catch (e) {
+              // ignore
+            }
           }
         }
       }
       setSavedPlanillaMonths(set);
+      setSavedPlanillasMeta(metaMap);
     } catch (e) {
       console.error("Error loading saved planillas:", e);
     }
@@ -1847,6 +1909,136 @@ export default function VentasConsignacionView() {
     } catch (e: any) {
       console.error(e);
       alert('Error borrando la planilla: ' + e.message);
+    }
+  };
+
+  const openEditarPlanillaModal = (month: string, itemsInMonth: any[], meta?: any) => {
+    const currentMeta = meta || savedPlanillasMeta[month] || {};
+    
+    let initialLabel = currentMeta.customPeriodLabel || '';
+    if (!initialLabel) {
+      if (currentMeta.isBimonthly && currentMeta.secondMonth) {
+        initialLabel = `${formatMonthName(month)} y ${formatMonthName(currentMeta.secondMonth)}`;
+      } else {
+        initialLabel = formatMonthName(month);
+      }
+    }
+
+    setEditarPlanillaForm({
+      month: month,
+      isBimonthly: Boolean(currentMeta.isBimonthly),
+      secondMonth: currentMeta.secondMonth || '',
+      customPeriodLabel: initialLabel,
+      observaciones: currentMeta.observaciones || '',
+      items: itemsInMonth.map(item => ({
+        loteId: item.loteId || item.id || '',
+        productoId: item.productoId,
+        solucionLote: item.solucionLote || '',
+        unidadesVendidas: Number(item.unidadesVendidas) || 0,
+        precioUnitNeto: Number(item.precioUnitNeto) || 0,
+      }))
+    });
+
+    setAddLoteToPlanillaSearch('');
+    setAddLoteDropdownOpen(false);
+    setEditarPlanillaModal({ isOpen: true, month });
+  };
+
+  const handleSaveEditedPlanilla = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cid = declaracionCliente || registroVentasCliente || adminFilterCliente;
+    if (!cid || !editarPlanillaForm.month) return;
+
+    try {
+      setSavingEditarPlanilla(true);
+      const month = editarPlanillaForm.month;
+
+      if (isFirebaseReady()) {
+        const db = getDb();
+
+        for (const item of editarPlanillaForm.items) {
+          if (!item.loteId) continue;
+          const loteRef = doc(db, 'crm_consignacion_lotes', item.loteId);
+          const units = Number(item.unidadesVendidas) || 0;
+          const price = Number(item.precioUnitNeto) || 0;
+          const totalNeto = units * price;
+
+          if (units > 0) {
+            await updateDoc(loteRef, {
+              precioUnitNeto: price,
+              [`movimientos.${month}`]: {
+                unidadesVendidas: units,
+                montoVentaNeto: totalNeto,
+                fechaRegistro: Timestamp.now()
+              }
+            });
+          } else {
+            await updateDoc(loteRef, {
+              [`movimientos.${month}`]: deleteField()
+            });
+          }
+        }
+
+        const planillaRef = doc(db, 'planillas_consignacion', `${cid}_${month}`);
+        await setDoc(planillaRef, {
+          clienteId: cid,
+          month: month,
+          isBimonthly: Boolean(editarPlanillaForm.isBimonthly),
+          secondMonth: editarPlanillaForm.secondMonth || '',
+          customPeriodLabel: editarPlanillaForm.customPeriodLabel || '',
+          observaciones: editarPlanillaForm.observaciones || '',
+          updatedAt: Timestamp.now()
+        }, { merge: true });
+
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          const allLotes = JSON.parse(existing);
+          editarPlanillaForm.items.forEach(item => {
+            const l = allLotes.find((x: any) => x.id.toString() === item.loteId.toString());
+            if (l) {
+              const units = Number(item.unidadesVendidas) || 0;
+              const price = Number(item.precioUnitNeto) || 0;
+              l.precioUnitNeto = price;
+              if (!l.movimientos) l.movimientos = {};
+              if (units > 0) {
+                l.movimientos[month] = {
+                  unidadesVendidas: units,
+                  montoVentaNeto: units * price,
+                  fechaRegistro: new Date().toISOString()
+                };
+              } else {
+                delete l.movimientos[month];
+              }
+            }
+          });
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
+
+        localStorage.setItem(`mock_planilla_${cid}_${month}`, JSON.stringify({
+          clienteId: cid,
+          month: month,
+          isBimonthly: Boolean(editarPlanillaForm.isBimonthly),
+          secondMonth: editarPlanillaForm.secondMonth || '',
+          customPeriodLabel: editarPlanillaForm.customPeriodLabel || '',
+          observaciones: editarPlanillaForm.observaciones || '',
+          updatedAt: new Date().toISOString()
+        }));
+      }
+
+      await loadSavedPlanillas(cid);
+      await loadLotes(cid, true);
+      await loadTodosLosLotes(true);
+
+      setSavingEditarPlanilla(false);
+      setEditarPlanillaModal(null);
+      setSaveNotification("Historial de planilla y cotización actualizados correctamente.");
+      setTimeout(() => setSaveNotification(null), 5000);
+    } catch (err: any) {
+      console.error('Error al guardar la planilla editada:', err);
+      alert('Error al guardar los cambios: ' + err.message);
+      setSavingEditarPlanilla(false);
     }
   };
 
@@ -3560,8 +3752,70 @@ export default function VentasConsignacionView() {
 
                     const savedMonthsList = Object.entries(monthSummaryMap).map(([month, data]) => ({
                       month,
-                      ...data
+                      ...data,
+                      meta: savedPlanillasMeta[month] || {}
                     })).sort((a, b) => String(b.month || '').localeCompare(String(a.month || '')));
+
+                    const totalActiveStockUnits = activeItems.reduce((sum, { traj }) => sum + (traj?.frascosRestantes || 0), 0);
+                    const totalInactiveStockUnits = inactiveItems.reduce((sum, { traj }) => sum + (traj?.frascosRestantes || 0), 0);
+                    const totalAllStockUnits = inventoryStatus.reduce((sum, { traj }) => sum + (traj?.frascosRestantes || 0), 0);
+
+                    // Excel Export Handlers for Stock
+                    const handleExportActiveStockExcel = () => {
+                      const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
+                      const data = activeItems.map(({ lote, traj }) => ({
+                        'Producto': lote.productoId,
+                        'Solución': lote.solucionLote || 'S/S',
+                        'Precio Unitario Neto ($)': lote.precioUnitNeto || 0,
+                        'Fecha Vencimiento': formatDateToDDMMYYYY(lote.fechaVencimiento),
+                        'Stock Disponible (Unidades)': traj?.frascosRestantes || 0,
+                        'Valor Total Stock ($)': (traj?.frascosRestantes || 0) * (lote.precioUnitNeto || 0)
+                      }));
+
+                      const totalVal = activeItems.reduce((sum, { lote, traj }) => sum + ((traj?.frascosRestantes || 0) * (lote.precioUnitNeto || 0)), 0);
+                      data.push({
+                        'Producto': 'TOTAL STOCK ACTIVO',
+                        'Solución': '',
+                        'Precio Unitario Neto ($)': 0,
+                        'Fecha Vencimiento': '',
+                        'Stock Disponible (Unidades)': totalActiveStockUnits,
+                        'Valor Total Stock ($)': totalVal
+                      });
+
+                      const ws = XLSX.utils.json_to_sheet(data);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Stock Activo");
+                      XLSX.writeFile(wb, `Stock_Activo_${clientName.replace(/\s+/g, '_')}.xlsx`);
+                    };
+
+                    const handleExportAllStockExcel = () => {
+                      const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
+                      const data = inventoryStatus.map(({ lote, traj }) => ({
+                        'Producto': lote.productoId,
+                        'Solución': lote.solucionLote || 'S/S',
+                        'Precio Unitario Neto ($)': lote.precioUnitNeto || 0,
+                        'Fecha Vencimiento': formatDateToDDMMYYYY(lote.fechaVencimiento),
+                        'Stock Disponible (Unidades)': traj?.frascosRestantes || 0,
+                        'Estado': (traj?.frascosRestantes || 0) > 0 ? 'Activo' : 'Agotado / Sin Stock',
+                        'Valor Total Stock ($)': (traj?.frascosRestantes || 0) * (lote.precioUnitNeto || 0)
+                      }));
+
+                      const totalVal = inventoryStatus.reduce((sum, { lote, traj }) => sum + ((traj?.frascosRestantes || 0) * (lote.precioUnitNeto || 0)), 0);
+                      data.push({
+                        'Producto': 'TOTAL CONSIGNACIÓN',
+                        'Solución': '',
+                        'Precio Unitario Neto ($)': 0,
+                        'Fecha Vencimiento': '',
+                        'Stock Disponible (Unidades)': totalAllStockUnits,
+                        'Estado': '',
+                        'Valor Total Stock ($)': totalVal
+                      });
+
+                      const ws = XLSX.utils.json_to_sheet(data);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Stock Consignacion");
+                      XLSX.writeFile(wb, `Stock_Consignacion_${clientName.replace(/\s+/g, '_')}.xlsx`);
+                    };
 
                     // Function to export the remaining stock report as PDF
                     const handleExportStockPDF = () => {
@@ -3709,9 +3963,9 @@ export default function VentasConsignacionView() {
                     };
 
                     // Function to download a quote-style sales report in PDF
-                    const handleDownloadQuoteReport = (month: string, items: any[]) => {
+                    const handleDownloadQuoteReport = (month: string, items: any[], customPeriodLabel?: string) => {
                       const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
-                      const monthNameFormatted = formatMonthName(month);
+                      const monthNameFormatted = customPeriodLabel || formatMonthName(month);
                       const doc = new jsPDF({ orientation: 'p' });
                       
                       // Title
@@ -3781,27 +4035,41 @@ export default function VentasConsignacionView() {
                             <div className="flex items-center gap-2">
                               <Package className="text-emerald-400" size={18} />
                               <div>
-                                <h4 className="text-sm font-black text-slate-200 uppercase tracking-wider">
+                                <h4 className="text-sm font-black text-slate-200 uppercase tracking-wider flex items-center gap-2 flex-wrap">
                                   Stock de Productos en Consignación
+                                  <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[11px] font-black font-mono tracking-normal">
+                                    {totalActiveStockUnits} u. disponibles
+                                  </span>
                                 </h4>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
                               {activeItems.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={handleExportActiveStockPDF}
-                                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95"
-                                >
-                                  <Download size={11} />
-                                  Activos (PDF)
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={handleExportActiveStockExcel}
+                                    title="Descargar stock activo en Excel (.xlsx)"
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95 cursor-pointer"
+                                  >
+                                    <Download size={11} />
+                                    Activos (Excel)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleExportActiveStockPDF}
+                                    className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95 cursor-pointer"
+                                  >
+                                    <Download size={11} />
+                                    Activos (PDF)
+                                  </button>
+                                </>
                               )}
                               {inactiveItems.length > 0 && (
                                 <button
                                   type="button"
                                   onClick={handleExportInactiveStockPDF}
-                                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95"
+                                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95 cursor-pointer"
                                 >
                                   <Download size={11} />
                                   Inactivos (PDF)
@@ -3809,8 +4077,17 @@ export default function VentasConsignacionView() {
                               )}
                               <button
                                 type="button"
+                                onClick={handleExportAllStockExcel}
+                                title="Descargar todo el inventario en Excel (.xlsx)"
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95 cursor-pointer"
+                              >
+                                <Download size={11} />
+                                Todo (Excel)
+                              </button>
+                              <button
+                                type="button"
                                 onClick={handleExportStockPDF}
-                                className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95"
+                                className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow active:scale-95 cursor-pointer"
                               >
                                 <Download size={11} />
                                 Todo (PDF)
@@ -3865,7 +4142,7 @@ export default function VentasConsignacionView() {
                                     : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
                                 )}
                               >
-                                🟢 Activos ({activeItems.length})
+                                🟢 Activos ({activeItems.length} lotes | {totalActiveStockUnits} u.)
                               </button>
                               <button
                                 type="button"
@@ -3892,7 +4169,9 @@ export default function VentasConsignacionView() {
                                   <th className="p-4 pl-6">Producto</th>
                                   <th className="p-4 text-center">F. Venc.</th>
                                   <th className="p-4 text-center">Valor Unitario</th>
-                                  <th className="p-4 text-center">Stock Disponible</th>
+                                  <th className="p-4 text-center">
+                                  Stock Disponible ({registroVentasStockTab === 'activos' ? `${totalActiveStockUnits} u.` : '0 u.'})
+                                </th>
                                   <th className="p-4 text-center">Acción</th>
                                 </tr>
                               </thead>
@@ -4056,6 +4335,7 @@ export default function VentasConsignacionView() {
                                   const sales = Number(mov?.unidadesVendidas || 0);
                                   if (mov && !mov.hidden && sales > 0) {
                                     return {
+                                      loteId: lote.id,
                                       productoId: lote.productoId,
                                       solucionLote: lote.solucionLote,
                                       fechaVencimiento: lote.fechaVencimiento,
@@ -4084,7 +4364,16 @@ export default function VentasConsignacionView() {
                                           )} 
                                         />
                                         <div className="flex flex-col">
-                                          <span className="text-sm font-black text-slate-100">{formatMonthName(m.month)}</span>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-sm font-black text-slate-100">
+                                            {m.meta?.customPeriodLabel || formatMonthName(m.month)}
+                                          </span>
+                                          {m.meta?.isBimonthly && (
+                                            <span className="bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase px-2 py-0.5 rounded-md border border-amber-500/30">
+                                              Ventas 2 Meses
+                                            </span>
+                                          )}
+                                        </div>
                                           <span className="text-[10px] text-slate-400 font-semibold">{itemsInMonth.length} soluciones declaradas</span>
                                         </div>
                                       </div>
@@ -4236,11 +4525,11 @@ export default function VentasConsignacionView() {
                                         <div className="flex justify-end gap-2 pr-1">
                                           <button
                                             type="button"
-                                            onClick={() => handleEditPlanilla(m)}
-                                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                                            onClick={() => openEditarPlanillaModal(m.month, itemsInMonth, m.meta)}
+                                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
                                           >
-                                            <Settings size={13} />
-                                            Editar
+                                            <Edit3 size={13} />
+                                            Editar Planilla / Cotización
                                           </button>
                                           <button
                                             type="button"
@@ -4252,7 +4541,7 @@ export default function VentasConsignacionView() {
                                           </button>
                                           <button
                                             type="button"
-                                            onClick={() => handleDownloadQuoteReport(m.month, itemsInMonth)}
+                                            onClick={() => handleDownloadQuoteReport(m.month, itemsInMonth, m.meta?.customPeriodLabel)}
                                             className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-[#050914] font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md active:scale-95"
                                           >
                                             <Download size={13} />
@@ -4286,6 +4575,435 @@ export default function VentasConsignacionView() {
           </>
         )}
       </div>
+
+      {/* EDITOR DE PLANILLA / COTIZACIÓN DE HISTORIAL MODAL */}
+      {editarPlanillaModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-[#0D1627] border border-amber-500/40 rounded-3xl p-6 w-full max-w-3xl shadow-2xl shadow-amber-500/10 space-y-5 max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 rounded-2xl text-amber-400 border border-amber-500/20">
+                  <Edit3 size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    Editor de Planilla & Cotización de Ventas
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Modifique las ventas declaradas, ajuste cantidades y defina el período (ej. ventas de 2 meses).
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditarPlanillaModal(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedPlanilla} className="space-y-5">
+              {/* 1. CONFIGURACIÓN DEL PERÍODO (SINGLE VS BIMENSUAL 2 MESES) */}
+              <div className="bg-[#050914] border border-[#1E293B] rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar size={14} /> Período de Ventas / Cotización
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Mes base: <strong className="text-white font-mono">{formatMonthName(editarPlanillaForm.month)}</strong>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className={cn(
+                    "p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all",
+                    !editarPlanillaForm.isBimonthly
+                      ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                      : "bg-[#0D1627] border-[#1E293B] text-slate-400 hover:border-slate-700"
+                  )}>
+                    <input
+                      type="radio"
+                      name="periodType"
+                      checked={!editarPlanillaForm.isBimonthly}
+                      onChange={() => {
+                        setEditarPlanillaForm(prev => ({
+                          ...prev,
+                          isBimonthly: false,
+                          customPeriodLabel: formatMonthName(prev.month)
+                        }));
+                      }}
+                      className="accent-amber-500"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-white">Mes Único</div>
+                      <div className="text-[10px] text-slate-400">Las ventas corresponden a un solo mes</div>
+                    </div>
+                  </label>
+
+                  <label className={cn(
+                    "p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all",
+                    editarPlanillaForm.isBimonthly
+                      ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                      : "bg-[#0D1627] border-[#1E293B] text-slate-400 hover:border-slate-700"
+                  )}>
+                    <input
+                      type="radio"
+                      name="periodType"
+                      checked={editarPlanillaForm.isBimonthly}
+                      onChange={() => {
+                        const m = editarPlanillaForm.month;
+                        let defaultSecond = '';
+                        if (m && m.includes('-')) {
+                          const [yearStr, monthStr] = m.split('-');
+                          let y = parseInt(yearStr, 10);
+                          let mNum = parseInt(monthStr, 10) + 1;
+                          if (mNum > 12) { mNum = 1; y += 1; }
+                          defaultSecond = `${y}-${mNum.toString().padStart(2, '0')}`;
+                        }
+                        const label = defaultSecond
+                          ? `${formatMonthName(m)} y ${formatMonthName(defaultSecond)}`
+                          : `${formatMonthName(m)} (2 Meses)`;
+
+                        setEditarPlanillaForm(prev => ({
+                          ...prev,
+                          isBimonthly: true,
+                          secondMonth: defaultSecond,
+                          customPeriodLabel: label
+                        }));
+                      }}
+                      className="accent-amber-500"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        Corresponde a 2 Meses
+                        <span className="bg-amber-500/20 text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-black">
+                          Bimensual
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">Ventas acumuladas (ej. Junio y Julio)</div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Custom Period Title Input & Presets */}
+                <div className="space-y-2 pt-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                    Nombre / Etiqueta del Período para la Cotización (PDF):
+                  </label>
+                  <input
+                    type="text"
+                    value={editarPlanillaForm.customPeriodLabel}
+                    onChange={(e) => setEditarPlanillaForm(prev => ({ ...prev, customPeriodLabel: e.target.value }))}
+                    placeholder="Ej. JUNIO Y JULIO 2026"
+                    className="w-full bg-[#0D1627] text-white border border-[#1E293B] rounded-xl px-3.5 py-2 text-xs font-bold font-mono outline-none focus:border-amber-500 uppercase"
+                  />
+                  
+                  {/* Quick Presets */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] text-slate-500 font-bold mr-1">Atajos:</span>
+                    {[
+                      `Junio y Julio ${editarPlanillaForm.month.substring(0,4) || '2026'}`,
+                      `Mayo y Junio ${editarPlanillaForm.month.substring(0,4) || '2026'}`,
+                      `Julio y Agosto ${editarPlanillaForm.month.substring(0,4) || '2026'}`,
+                      `Consignación ${formatMonthName(editarPlanillaForm.month)}`
+                    ].map((preset, pIdx) => (
+                      <button
+                        key={pIdx}
+                        type="button"
+                        onClick={() => setEditarPlanillaForm(prev => ({
+                          ...prev,
+                          isBimonthly: preset.includes(' y '),
+                          customPeriodLabel: preset
+                        }))}
+                        className="px-2.5 py-1 bg-[#0D1627] hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-[#1E293B] hover:border-amber-500/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. TABLA DE PRODUCTOS E ÍTEMS DE LA PLANILLA */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle size={14} className="text-emerald-400" />
+                    Productos e Ítems en la Planilla ({editarPlanillaForm.items.length})
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    Ajuste la cantidad vendida o precio unitario por producto.
+                  </span>
+                </div>
+
+                <div className="bg-[#050914] border border-[#1E293B] rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#0D1627] text-[9px] uppercase font-black text-slate-400 border-b border-[#1E293B]">
+                      <tr>
+                        <th className="p-3 pl-4">Producto / Solución</th>
+                        <th className="p-3 text-center w-32">Cant. Vendida</th>
+                        <th className="p-3 text-center w-36">Precio Unit. ($)</th>
+                        <th className="p-3 text-right pr-4 w-32">Subtotal ($)</th>
+                        <th className="p-3 text-center w-12"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1E293B]/40">
+                      {editarPlanillaForm.items.length > 0 ? (
+                        editarPlanillaForm.items.map((item, idx) => {
+                          const subtotal = (Number(item.unidadesVendidas) || 0) * (Number(item.precioUnitNeto) || 0);
+                          return (
+                            <tr key={idx} className="hover:bg-slate-800/20 transition-colors">
+                              <td className="p-3 pl-4">
+                                <div className="font-bold text-slate-100">{item.productoId}</div>
+                                <div className="text-[10px] text-amber-400 font-mono">
+                                  Solución: {item.solucionLote || 'S/S'}
+                                </div>
+                              </td>
+                              <td className="p-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={item.unidadesVendidas}
+                                  onChange={(e) => {
+                                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                    setEditarPlanillaForm(prev => {
+                                      const nextItems = [...prev.items];
+                                      nextItems[idx] = { ...nextItems[idx], unidadesVendidas: val };
+                                      return { ...prev, items: nextItems };
+                                    });
+                                  }}
+                                  className="w-20 bg-[#0D1627] text-amber-300 font-mono font-black text-center border border-[#1E293B] rounded-lg py-1 text-xs outline-none focus:border-amber-500"
+                                />
+                              </td>
+                              <td className="p-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={item.precioUnitNeto}
+                                  onChange={(e) => {
+                                    const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                    setEditarPlanillaForm(prev => {
+                                      const nextItems = [...prev.items];
+                                      nextItems[idx] = { ...nextItems[idx], precioUnitNeto: val };
+                                      return { ...prev, items: nextItems };
+                                    });
+                                  }}
+                                  className="w-28 bg-[#0D1627] text-slate-200 font-mono font-bold text-center border border-[#1E293B] rounded-lg py-1 text-xs outline-none focus:border-amber-500"
+                                />
+                              </td>
+                              <td className="p-3 text-right pr-4 font-mono font-black text-emerald-400">
+                                {formatCurrency(subtotal)}
+                              </td>
+                              <td className="p-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditarPlanillaForm(prev => ({
+                                      ...prev,
+                                      items: prev.items.filter((_, i) => i !== idx)
+                                    }));
+                                  }}
+                                  title="Quitar producto de esta planilla"
+                                  className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-500/20 rounded-lg transition-all cursor-pointer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-slate-500 italic">
+                            No hay productos en esta planilla. Utilice el buscador abajo para agregar ítems.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. BÚSQUEDA Y AGREGAR MAS PRODUCTOS A ESTA PLANILLA */}
+              <div className="bg-[#050914] border border-[#1E293B] rounded-2xl p-4 space-y-2">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                  + Agregar Producto / Lote del Cliente a esta Planilla:
+                </label>
+                <div className="relative">
+                  <div className="relative flex items-center">
+                    <Search size={14} className="absolute left-3 text-sky-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Escriba el nombre o solución para añadir un producto..."
+                      value={addLoteToPlanillaSearch}
+                      onFocus={() => setAddLoteDropdownOpen(true)}
+                      onChange={(e) => {
+                        setAddLoteToPlanillaSearch(e.target.value);
+                        setAddLoteDropdownOpen(true);
+                      }}
+                      className="w-full bg-[#0D1627] text-white border border-[#1E293B] rounded-xl pl-9 pr-8 py-2 text-xs font-bold outline-none focus:border-sky-500 uppercase"
+                    />
+                    {addLoteToPlanillaSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddLoteToPlanillaSearch('');
+                          setAddLoteDropdownOpen(true);
+                        }}
+                        className="absolute right-2.5 text-slate-500 hover:text-white p-1"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {addLoteDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#0A1120] border border-sky-500/30 rounded-2xl shadow-2xl max-h-52 overflow-y-auto divide-y divide-[#1E293B]/40 animate-in fade-in duration-150">
+                      {(() => {
+                        const targetCid = declaracionCliente || registroVentasCliente || adminFilterCliente;
+                        const clientLotesList = todosLosLotes.filter((l: any) => l.clienteId === targetCid);
+                        const existingLoteIds = new Set(editarPlanillaForm.items.map(i => i.loteId));
+
+                        const available = clientLotesList.filter((l: any) => {
+                          if (existingLoteIds.has(l.id)) return false;
+                          if (!addLoteToPlanillaSearch.trim()) return true;
+                          const term = addLoteToPlanillaSearch.toLowerCase().trim();
+                          const prod = (l.productoId || '').toLowerCase();
+                          const sol = (l.solucionLote || '').toLowerCase();
+                          return prod.includes(term) || sol.includes(term);
+                        });
+
+                        if (available.length === 0) {
+                          return (
+                            <div className="p-4 text-center text-slate-500 text-xs italic">
+                              No hay otros productos disponibles para añadir.
+                            </div>
+                          );
+                        }
+
+                        return available.map((lote: any) => (
+                          <button
+                            key={lote.id}
+                            type="button"
+                            onClick={() => {
+                              setEditarPlanillaForm(prev => ({
+                                ...prev,
+                                items: [
+                                  ...prev.items,
+                                  {
+                                    loteId: lote.id,
+                                    productoId: lote.productoId,
+                                    solucionLote: lote.solucionLote || 'S/S',
+                                    unidadesVendidas: 1,
+                                    precioUnitNeto: Number(lote.precioUnitNeto) || 0
+                                  }
+                                ]
+                              }));
+                              setAddLoteToPlanillaSearch('');
+                              setAddLoteDropdownOpen(false);
+                            }}
+                            className="w-full text-left p-3 hover:bg-sky-500/10 flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <div>
+                              <span className="font-bold text-white uppercase text-xs">{lote.productoId}</span>
+                              <span className="text-[10px] text-sky-400 font-mono ml-2">Solución: {lote.solucionLote || 'S/S'}</span>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-amber-400">
+                              {formatCurrency(lote.precioUnitNeto || 0)}
+                            </span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. TOTALES RESUMEN */}
+              {(() => {
+                const totalUnits = editarPlanillaForm.items.reduce((sum, item) => sum + (Number(item.unidadesVendidas) || 0), 0);
+                const totalNeto = editarPlanillaForm.items.reduce((sum, item) => sum + ((Number(item.unidadesVendidas) || 0) * (Number(item.precioUnitNeto) || 0)), 0);
+                const totalIVA = totalNeto * 0.19;
+                const totalGeneral = totalNeto + totalIVA;
+
+                return (
+                  <div className="bg-[#050914] border border-amber-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-6 flex-wrap">
+                      <div>
+                        <div className="text-[10px] text-slate-400 uppercase font-black">Total Unidades</div>
+                        <div className="text-base font-black font-mono text-amber-300">{totalUnits} u.</div>
+                      </div>
+                      <div className="border-l border-[#1E293B] pl-6">
+                        <div className="text-[10px] text-slate-400 uppercase font-black">Monto Neto</div>
+                        <div className="text-base font-black font-mono text-emerald-400">{formatCurrency(totalNeto)}</div>
+                      </div>
+                      <div className="border-l border-[#1E293B] pl-6">
+                        <div className="text-[10px] text-slate-400 uppercase font-black">IVA (19%)</div>
+                        <div className="text-base font-black font-mono text-sky-400">{formatCurrency(totalIVA)}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-amber-400 uppercase font-black tracking-widest text-right">Total General</div>
+                      <div className="text-xl font-black font-mono text-amber-400 text-right">{formatCurrency(totalGeneral)}</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 5. PIE DE MODAL / ACCIONES */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadQuoteReport(
+                    editarPlanillaForm.month,
+                    editarPlanillaForm.items.map(i => ({
+                      productoId: i.productoId,
+                      solucionLote: i.solucionLote,
+                      unidadesVendidas: Number(i.unidadesVendidas) || 0,
+                      precioUnitNeto: Number(i.precioUnitNeto) || 0,
+                      montoVendido: (Number(i.unidadesVendidas) || 0) * (Number(i.precioUnitNeto) || 0)
+                    })),
+                    editarPlanillaForm.customPeriodLabel
+                  )}
+                  className="px-4 py-2.5 bg-sky-500 hover:bg-sky-400 text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-sky-500/20 active:scale-95 cursor-pointer"
+                >
+                  <Download size={15} />
+                  Descargar Cotización (PDF)
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditarPlanillaModal(null)}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs uppercase transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingEditarPlanilla}
+                    className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl shadow-amber-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    {savingEditarPlanilla ? (
+                      <>
+                        <RefreshCw size={15} className="animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={15} />
+                        Guardar Cambios en Historial
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* DEVOLUCION / REBAJA DE STOCK MODAL WITH MANUAL SEARCH */}
       {devolucionModal?.isOpen && (
