@@ -3750,6 +3750,20 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [kardexSearchTerm, setKardexSearchTerm] = useState('');
+  const [showPOModal, setShowPOModal] = useState(false);
+  const [poItems, setPoItems] = useState<any[]>([]);
+  const [poEncargado, setPoEncargado] = useState('ADMINISTRACION');
+  const [poSelectedArea, setPoSelectedArea] = useState<string>('Etiquetas salina');
+  const [showPOHistory, setShowPOHistory] = useState(false);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadPOs = async () => {
+      const data = await localDB.getCollection('purchase_orders');
+      setPurchaseOrders(data || []);
+    };
+    loadPOs();
+  }, []);
 
   const areas = useMemo(() => {
     const defaults = [
@@ -4285,6 +4299,37 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                 </button>
+                <button 
+                  onClick={() => setShowPOHistory(true)}
+                  className="p-1.5 hover:bg-[#1E293B] rounded text-sky-400 flex items-center gap-1 border border-sky-500/30 bg-sky-500/10 text-[9px] font-black uppercase tracking-wider transition-all ml-2"
+                  title="Ver Historial de Órdenes de Compra"
+                >
+                  <History className="w-3.5 h-3.5" /> Historial Órdenes
+                </button>
+                <button 
+                  onClick={() => {
+                    const itemsToBuy = filteredRecords.filter(r => (Number(r.qty) || 0) <= getRecordAlertaThreshold(r));
+                    
+                    if (itemsToBuy.length === 0) {
+                      alert('No hay insumos bajo el límite crítico (alerta) en esta área. Seleccione el área correspondiente al abrir la Orden de Compra.');
+                    }
+                    
+                    setPoSelectedArea(selectedArea);
+                    setPoItems(itemsToBuy.map(r => ({
+                      id: r.id,
+                      item: r.item || '',
+                      code: r.code || '',
+                      qty: r.qty || '0',
+                      alerta: getRecordAlertaThreshold(r),
+                      reposicion: ''
+                    })));
+                    setShowPOModal(true);
+                  }}
+                  className="p-1.5 hover:bg-[#1E293B] rounded text-emerald-400 flex items-center gap-1 border border-emerald-500/30 bg-emerald-500/10 text-[9px] font-black uppercase tracking-wider transition-all"
+                  title="Generar Orden de Compra PDF"
+                >
+                  <FileText className="w-3.5 h-3.5" /> Orden Compra
+                </button>
                 <div className="flex items-center gap-2 text-[9px] font-black text-slate-400">
                   <div className="w-3 h-3 bg-red-100 rounded"></div> Crítico
                   <div className="w-3 h-3 bg-[#111A2E] rounded ml-2"></div> Óptimo
@@ -4603,6 +4648,288 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
            </div>
         </div>
       </div>
+
+      {showPOModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-[#0F172A] border border-[#1E293B] rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl max-h-[90vh]">
+            <div className="p-4 border-b border-[#1E293B] flex justify-between items-center bg-[#1E3A5F]/20 rounded-t-2xl">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Generar Orden de Compra</h3>
+                <p className="text-xs text-slate-400 mt-1">Configure las cantidades a reponer para generar el PDF.</p>
+              </div>
+              <button onClick={() => setShowPOModal(false)} className="text-slate-400 hover:text-white p-2">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <FormField label="Encargado">
+                  <input
+                    type="text"
+                    value={poEncargado}
+                    onChange={e => setPoEncargado(e.target.value)}
+                    className="w-full bg-[#111A2E] text-white border border-[#1E293B] rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Ej. Carlos Vega"
+                  />
+                </FormField>
+                <FormField label="Área de Reposición">
+                  <select
+                    value={poSelectedArea}
+                    onChange={e => {
+                      const newArea = e.target.value;
+                      setPoSelectedArea(newArea);
+                      
+                      const itemsForNewArea = inventoryRecords.filter(r => (r.area === newArea || newArea === 'TODAS') && (Number(r.qty) || 0) <= getRecordAlertaThreshold(r));
+                      setPoItems(itemsForNewArea.map(r => ({
+                        id: r.id,
+                        item: r.item || '',
+                        code: r.code || '',
+                        qty: r.qty || '0',
+                        alerta: getRecordAlertaThreshold(r),
+                        area: r.area || '',
+                        reposicion: ''
+                      })));
+                    }}
+                    className="w-full bg-[#111A2E] text-white border border-[#1E293B] rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="TODAS">-- Todas las Áreas --</option>
+                    {areas.map(a => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+
+              <div className="border border-[#1E293B] rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-[#111A2E] text-[10px] font-black uppercase text-slate-400">
+                    <tr>
+                      <th className="p-3">Insumo</th>
+                      {poSelectedArea === 'TODAS' && <th className="p-3">Área</th>}
+                      <th className="p-3">Código</th>
+                      <th className="p-3 text-center">Stock Actual</th>
+                      <th className="p-3 text-center">Límite Alerta</th>
+                      <th className="p-3 text-center">Reposición</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1E293B] bg-[#1E3A5F]/10">
+                    {poItems.map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-[#1E3A5F]/30 transition-colors">
+                        <td className="p-3 font-medium text-white">{item.item}</td>
+                        {poSelectedArea === 'TODAS' && <td className="p-3 text-[10px] text-slate-500 uppercase">{item.area}</td>}
+                        <td className="p-3 text-slate-400">{item.code || '---'}</td>
+                        <td className="p-3 text-center">
+                          <span className="bg-[#111A2E] px-2 py-1 rounded text-red-400 font-black">{item.qty}</span>
+                        </td>
+                        <td className="p-3 text-center text-slate-400">{item.alerta}</td>
+                        <td className="p-3 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.reposicion}
+                            onChange={e => {
+                              const newItems = [...poItems];
+                              newItems[idx].reposicion = e.target.value;
+                              setPoItems(newItems);
+                            }}
+                            className="w-20 bg-[#111A2E] text-white border border-emerald-500/30 rounded-lg px-2 py-1 text-center font-bold outline-none focus:border-emerald-500 transition-colors mx-auto block"
+                            placeholder="Ej. 10"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {poItems.length === 0 && (
+                      <tr><td colSpan={poSelectedArea === 'TODAS' ? 6 : 5} className="p-4 text-center text-slate-500 italic">No hay insumos críticos para esta área.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-[#1E293B] bg-[#0F172A] rounded-b-2xl flex justify-end gap-3">
+              <button 
+                onClick={() => setShowPOModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={async () => {
+                  const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                  const date = new Date();
+                  const mesAnio = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+                  
+                  const filteredItemsToExport = poItems.filter(i => i.reposicion && i.reposicion !== '0');
+                  const finalItemsToExport = filteredItemsToExport.length > 0 ? filteredItemsToExport : poItems;
+                  
+                  let data: any[][];
+                  let headers: string[];
+                  
+                  if (poSelectedArea === 'TODAS') {
+                    headers = ['Insumo', 'Área', 'Código', 'Stock Actual', 'Límite Alerta', 'Reposición'];
+                    data = finalItemsToExport.map(item => [
+                      item.item,
+                      item.area,
+                      item.code || '---',
+                      String(item.qty),
+                      String(item.alerta),
+                      item.reposicion || '0'
+                    ]);
+                  } else {
+                    headers = ['Insumo', 'Código', 'Stock Actual', 'Límite Alerta', 'Reposición'];
+                    data = finalItemsToExport.map(item => [
+                      item.item,
+                      item.code || '---',
+                      String(item.qty),
+                      String(item.alerta),
+                      item.reposicion || '0'
+                    ]);
+                  }
+
+                  const titleSuffix = poSelectedArea === 'TODAS' ? 'TODAS LAS ÁREAS' : poSelectedArea.toUpperCase();
+                  
+                  exportTableToPDF(
+                    `ORDEN DE COMPRA (${titleSuffix})`,
+                    headers,
+                    data,
+                    `orden_compra_${mesAnio.toLowerCase().replace(/\s+/g, '_')}_${poSelectedArea.toLowerCase().replace(/\s+/g, '_')}`,
+                    'p',
+                    `MES: ${mesAnio.toUpperCase()} | ENCARGADO: ${poEncargado.toUpperCase()}`
+                  );
+                  
+                  // Save to DB
+                  try {
+                    const newOrder = {
+                      fecha: new Date().toISOString(),
+                      mesAnio,
+                      encargado: poEncargado,
+                      area: poSelectedArea,
+                      items: finalItemsToExport
+                    };
+                    await localDB.saveToCollection('purchase_orders', newOrder);
+                    
+                    const updatedPOs = await localDB.getCollection('purchase_orders');
+                    setPurchaseOrders(updatedPOs || []);
+                    
+                  } catch (e) {
+                    console.error("Error saving PO to db", e);
+                  }
+                  
+                  setShowPOModal(false);
+                }}
+                disabled={poItems.length === 0}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-lg flex items-center gap-2 shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileText className="w-4 h-4" /> Generar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPOHistory && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-[#0F172A] border border-[#1E293B] rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl max-h-[90vh]">
+            <div className="p-4 border-b border-[#1E293B] flex justify-between items-center bg-[#1E3A5F]/20 rounded-t-2xl">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Historial de Órdenes de Compra</h3>
+                <p className="text-xs text-slate-400 mt-1">Registro de órdenes generadas anteriormente.</p>
+              </div>
+              <button onClick={() => setShowPOHistory(false)} className="text-slate-400 hover:text-white p-2">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto flex-1">
+              <div className="border border-[#1E293B] rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-[#111A2E] text-[10px] font-black uppercase text-slate-400">
+                    <tr>
+                      <th className="p-3">Fecha</th>
+                      <th className="p-3">Mes/Año</th>
+                      <th className="p-3">Área</th>
+                      <th className="p-3">Encargado</th>
+                      <th className="p-3 text-center">Items</th>
+                      <th className="p-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1E293B] bg-[#1E3A5F]/10">
+                    {[...purchaseOrders].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((order) => (
+                      <tr key={order.id} className="hover:bg-[#1E3A5F]/30 transition-colors">
+                        <td className="p-3 font-medium text-white">{new Date(order.fecha).toLocaleDateString()}</td>
+                        <td className="p-3 text-sky-400">{order.mesAnio}</td>
+                        <td className="p-3 text-slate-400">{order.area}</td>
+                        <td className="p-3 text-slate-400">{order.encargado}</td>
+                        <td className="p-3 text-center">
+                          <span className="bg-[#111A2E] px-2 py-1 rounded text-emerald-400 font-black">{order.items?.length || 0}</span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => {
+                              const isAll = order.area === 'TODAS';
+                              const titleSuffix = isAll ? 'TODAS LAS ÁREAS' : order.area.toUpperCase();
+                              
+                              let headers: string[];
+                              let data: any[][];
+                              
+                              if (isAll) {
+                                headers = ['Insumo', 'Área', 'Código', 'Stock Actual', 'Límite Alerta', 'Reposición'];
+                                data = order.items.map((item: any) => [
+                                  item.item,
+                                  item.area || '---',
+                                  item.code || '---',
+                                  String(item.qty || '0'),
+                                  String(item.alerta || '0'),
+                                  item.reposicion || '0'
+                                ]);
+                              } else {
+                                headers = ['Insumo', 'Código', 'Stock Actual', 'Límite Alerta', 'Reposición'];
+                                data = order.items.map((item: any) => [
+                                  item.item,
+                                  item.code || '---',
+                                  String(item.qty || '0'),
+                                  String(item.alerta || '0'),
+                                  item.reposicion || '0'
+                                ]);
+                              }
+
+                              exportTableToPDF(
+                                `ORDEN DE COMPRA (${titleSuffix})`,
+                                headers,
+                                data,
+                                `orden_compra_${order.mesAnio.toLowerCase().replace(/\s+/g, '_')}_${order.area.toLowerCase().replace(/\s+/g, '_')}`,
+                                'p',
+                                `MES: ${order.mesAnio.toUpperCase()} | ENCARGADO: ${order.encargado.toUpperCase()}`
+                              );
+                            }}
+                            className="p-1.5 hover:bg-[#1E293B] rounded text-sky-400 inline-flex items-center gap-1 border border-sky-500/30 bg-sky-500/10 transition-all"
+                            title="Descargar PDF"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> Descargar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {purchaseOrders.length === 0 && (
+                      <tr><td colSpan={6} className="p-8 text-center text-slate-500 italic">No hay órdenes de compra registradas en el historial.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-[#1E293B] bg-[#0F172A] rounded-b-2xl flex justify-end gap-3">
+              <button 
+                onClick={() => setShowPOHistory(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

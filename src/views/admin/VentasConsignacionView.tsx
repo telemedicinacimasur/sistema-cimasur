@@ -3035,6 +3035,7 @@ export default function VentasConsignacionView() {
                       doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
                       doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
                       
+                      const totalStock = inventoryStatus.reduce((sum, { traj }) => sum + (traj?.frascosRestantes || 0), 0);
                       const headers = ['PRODUCTO', 'SOLUCIÓN', 'P. UNITARIO', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
                       const data = inventoryStatus.map(({ lote, traj }) => {
                         const venc = formatDateToDDMMYYYY(lote.fechaVencimiento);
@@ -3043,7 +3044,7 @@ export default function VentasConsignacionView() {
                           lote.solucionLote || 'S/S',
                           formatCurrency(lote.precioUnitNeto || 0),
                           venc,
-                          `${traj?.frascosRestantes || 0} unidades`
+                          String(traj?.frascosRestantes || 0)
                         ];
                       });
                       
@@ -3051,18 +3052,18 @@ export default function VentasConsignacionView() {
                         startY: 36,
                         head: [headers],
                         body: data,
+                        foot: [['', '', '', 'TOTAL', String(totalStock)]],
                         theme: 'plain',
                         margin: { left: 14, right: 14 },
-                        headStyles: {
-                          textColor: [30, 58, 95],
-                          fontSize: 9,
-                          fontStyle: 'bold',
-                          fillColor: [248, 250, 252],
-                        },
-                        styles: {
-                          fontSize: 9,
-                          cellPadding: 4,
-                          textColor: [51, 65, 85],
+                        headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        footStyles: { textColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
+                        didDrawCell: (cellData) => {
+                           if (cellData.row.section === 'head' || cellData.row.section === 'body' || cellData.row.section === 'foot') {
+                              doc.setDrawColor(226, 232, 240);
+                              doc.setLineWidth(0.1);
+                              doc.line(cellData.cell.x, cellData.cell.y + cellData.cell.height, cellData.cell.x + cellData.cell.width, cellData.cell.y + cellData.cell.height);
+                           }
                         }
                       });
                       
@@ -3088,23 +3089,33 @@ export default function VentasConsignacionView() {
                       doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
                       doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
 
+                      const totalStock = activeItems.reduce((sum, { traj }) => sum + (traj?.frascosRestantes || 0), 0);
                       const headers = ['PRODUCTO', 'SOLUCIÓN', 'P. UNITARIO', 'FECHA VENCIMIENTO', 'STOCK DISPONIBLE'];
                       const data = activeItems.map(({ lote, traj }) => [
                         lote.productoId,
                         lote.solucionLote || 'S/S',
                         formatCurrency(lote.precioUnitNeto || 0),
                         formatDateToDDMMYYYY(lote.fechaVencimiento),
-                        `${traj?.frascosRestantes || 0} unidades`
+                        String(traj?.frascosRestantes || 0)
                       ]);
 
                       autoTable(doc, {
                         startY: 36,
                         head: [headers],
                         body: data,
+                        foot: [['', '', '', 'TOTAL', String(totalStock)]],
                         theme: 'plain',
                         margin: { left: 14, right: 14 },
                         headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
-                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] }
+                        footStyles: { textColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
+                        didDrawCell: (cellData) => {
+                           if (cellData.row.section === 'head' || cellData.row.section === 'body' || cellData.row.section === 'foot') {
+                              doc.setDrawColor(226, 232, 240);
+                              doc.setLineWidth(0.1);
+                              doc.line(cellData.cell.x, cellData.cell.y + cellData.cell.height, cellData.cell.x + cellData.cell.width, cellData.cell.y + cellData.cell.height);
+                           }
+                        }
                       });
                       doc.save(`Stock_Activo_${clientName.replace(/\s+/g, '_')}.pdf`);
                     };
@@ -3122,23 +3133,33 @@ export default function VentasConsignacionView() {
                       doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
                       doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, 14, 30);
 
+                      const totalStock = inactiveItems.reduce((sum, { traj }) => sum + (traj?.frascosRestantes || 0), 0);
                       const headers = ['PRODUCTO', 'SOLUCIÓN', 'P. UNITARIO', 'FECHA VENCIMIENTO', 'ESTADO'];
                       const data = inactiveItems.map(({ lote, traj }) => [
                         lote.productoId,
                         lote.solucionLote || 'S/S',
                         formatCurrency(lote.precioUnitNeto || 0),
                         formatDateToDDMMYYYY(lote.fechaVencimiento),
-                        'Agotado (0 u.)'
+                        'Agotado'
                       ]);
 
                       autoTable(doc, {
                         startY: 36,
                         head: [headers],
                         body: data,
+                        foot: [['', '', '', 'TOTAL', String(totalStock)]],
                         theme: 'plain',
                         margin: { left: 14, right: 14 },
                         headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
-                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] }
+                        footStyles: { textColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
+                        didDrawCell: (cellData) => {
+                           if (cellData.row.section === 'head' || cellData.row.section === 'body' || cellData.row.section === 'foot') {
+                              doc.setDrawColor(226, 232, 240);
+                              doc.setLineWidth(0.1);
+                              doc.line(cellData.cell.x, cellData.cell.y + cellData.cell.height, cellData.cell.x + cellData.cell.width, cellData.cell.y + cellData.cell.height);
+                           }
+                        }
                       });
                       doc.save(`Stock_Inactivo_${clientName.replace(/\s+/g, '_')}.pdf`);
                     };
@@ -3179,81 +3200,31 @@ export default function VentasConsignacionView() {
                         return [
                           item.productoId,
                           item.solucionLote || 'S/S',
-                          `${item.unidadesVendidas} u.`,
+                          String(item.unidadesVendidas),
                           formatCurrency(item.precioUnitNeto),
                           formatCurrency(item.montoVendido)
                         ];
                       });
                       
-                      // Push total row
-                      data.push([
-                        'TOTALES DECLARADOS',
-                        '',
-                        `${totalUnits} u.`,
-                        '',
-                        formatCurrency(grandTotal)
-                      ]);
-                      
                       autoTable(doc, {
                         startY: 42,
                         head: [headers],
                         body: data,
+                        foot: [['TOTALES DECLARADOS', '', String(totalUnits), '', formatCurrency(grandTotal)]],
                         theme: 'plain',
                         margin: { left: 14, right: 14 },
-                        headStyles: {
-                          textColor: [30, 58, 95], // PRIMARY_COLOR
-                          fontSize: 9,
-                          fontStyle: 'bold',
-                          fillColor: [248, 250, 252], // Slate 50
-                        },
-                        styles: {
-                          fontSize: 9,
-                          cellPadding: 4,
-                          textColor: [51, 65, 85], // Slate 700
-                        },
+                        headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        footStyles: { textColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
                         didDrawCell: (cellData) => {
-                           if (cellData.row.section === 'head' || cellData.row.section === 'body') {
-                              doc.setDrawColor(226, 232, 240); // Slate 200 border
+                           if (cellData.row.section === 'head' || cellData.row.section === 'body' || cellData.row.section === 'foot') {
+                              doc.setDrawColor(226, 232, 240);
                               doc.setLineWidth(0.1);
                               doc.line(cellData.cell.x, cellData.cell.y + cellData.cell.height, cellData.cell.x + cellData.cell.width, cellData.cell.y + cellData.cell.height);
-                           }
-                           if (cellData.row.section === 'body' && cellData.row.index === data.length - 1) {
-                              doc.setFont('helvetica', 'bold');
-                              doc.setTextColor(30, 41, 59); // Dark slate
                            }
                         }
                       });
                       
-                      let currentY = (doc as any).lastAutoTable.finalY + 15;
-                      
-                      // Notes
-                      doc.setFont('helvetica', 'bold');
-                      doc.setFontSize(8.5);
-                      doc.setTextColor(71, 85, 105);
-                      doc.text('NOTAS:', 14, currentY);
-                      currentY += 5;
-                      
-                      doc.setFont('helvetica', 'normal');
-                      doc.setFontSize(8);
-                      doc.setTextColor(100, 116, 139);
-                      doc.text('- Documento emitido para fines de control y cobro de consignación.', 14, currentY);
-                      currentY += 4;
-                      doc.text('- Los saldos y stock restante se actualizan automáticamente en el sistema.', 14, currentY);
-                      currentY += 15;
-                      
-                      // Signatures
-                      if (currentY + 20 < doc.internal.pageSize.getHeight()) {
-                        doc.setDrawColor(203, 213, 225); // Slate 300
-                        doc.setLineWidth(0.5);
-                        
-                        // Left signature line
-                        doc.line(14, currentY, 80, currentY);
-                        doc.text('Firma Cliente', 14, currentY + 4);
-                        
-                        // Right signature line
-                        doc.line(130, currentY, 196, currentY);
-                        doc.text('Firma Autorizada', 130, currentY + 4);
-                      }
                       
                       doc.save(`Venta_Consignacion_${clientName.replace(/\s+/g, '_')}_${month}.pdf`);
                     };

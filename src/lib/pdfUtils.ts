@@ -16,11 +16,23 @@ const setupPremiumPage = (
   cimasurFontSize: number = 18,
   titleFontSize: number = 12,
   dateFontSize: number = 9
-) => {
-  const pageWidth = orientation === 'p' ? 210 : 297;
+) => {  const pageWidth = orientation === 'p' ? 210 : 297;
   const pageHeight = orientation === 'p' ? 297 : 210;
   
-  if (title.toUpperCase().includes('FÓRMULA MAGISTRAL') || title.toUpperCase().includes('FORMULA MAGISTRAL')) {
+  if (title.toUpperCase().includes('ORDEN DE COMPRA')) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59); // Slate 800
+    const titleWidth = doc.getTextWidth(title.toUpperCase());
+    doc.text(title.toUpperCase(), (pageWidth - titleWidth) / 2, 15);
+    
+    if (subtitle && subtitle !== 'Ficha de Registro' && subtitle !== 'Reporte de Registros') {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const subtitleWidth = doc.getTextWidth(subtitle.toUpperCase());
+      doc.text(subtitle.toUpperCase(), (pageWidth - subtitleWidth) / 2, 21);
+    }
+  } else if (title.toUpperCase().includes('FÓRMULA MAGISTRAL') || title.toUpperCase().includes('FORMULA MAGISTRAL')) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139); // Slate 500
@@ -46,14 +58,13 @@ const setupPremiumPage = (
       doc.text(subtitle, 14, yPos);
     }
   }
-
   return { pageWidth, pageHeight };
 };
 
-export const exportTableToPDF = (title: string, headers: string[], data: any[][], fileName: string, orientation: 'p' | 'l' = 'l') => {
+export const exportTableToPDF = (title: string, headers: string[], data: any[][], fileName: string, orientation: 'p' | 'l' = 'l', subtitle: string = 'Reporte de Registros') => {
   const orientationToUse = orientation; 
   const doc = new jsPDF({ orientation: orientationToUse });
-  const { pageWidth } = setupPremiumPage(doc, orientationToUse, title, 'Reporte de Registros');
+  const { pageWidth } = setupPremiumPage(doc, orientationToUse, title, subtitle);
   
   const safeData = data.map(row => row.map(cell => cell ?? ''));
   
