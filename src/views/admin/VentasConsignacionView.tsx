@@ -744,7 +744,8 @@ export default function VentasConsignacionView() {
   
   // Inline manual product addition inside the template
   const [inlineAddOpen, setInlineAddOpen] = useState(false);
-  const [selectedLoteToLink, setSelectedLoteToLink] = useState('');
+  const [selectedLotesToLink, setSelectedLotesToLink] = useState<Record<string, number>>({});
+  const [bulkUnitsInput, setBulkUnitsInput] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [inlineForm, setInlineForm] = useState({
     productoId: '',
@@ -1326,52 +1327,67 @@ export default function VentasConsignacionView() {
     }
   };
 
-  const handleAddProductToMonthTemplate = async (loteId: string) => {
-    if (!loteId) {
-      alert("Por favor seleccione un producto/lote de la lista.");
+  const handleAddMultipleProductsToMonthTemplate = async (selectedMap: Record<string, number>) => {
+    const loteIds = Object.keys(selectedMap);
+    if (loteIds.length === 0) {
+      alert("Por favor seleccione al menos un producto de la lista.");
       return;
     }
     try {
       if (isFirebaseReady()) {
         const db = getDb();
-        const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
-        await updateDoc(loteRef, {
-          [`movimientos.${selectedMonth}`]: {
-            unidadesVendidas: 0,
-            saldoAnterior: 0,
-            saldoResultante: 0,
-            montoVentaNeto: 0,
-            fechaRegistro: Timestamp.now(),
-            added: true
-          }
+        const promises = loteIds.map(loteId => {
+          const units = Number(selectedMap[loteId] || 0);
+          const loteRef = doc(db, 'crm_consignacion_lotes', loteId);
+          return updateDoc(loteRef, {
+            [`movimientos.${selectedMonth}`]: {
+              unidadesVendidas: units,
+              saldoAnterior: 0,
+              saldoResultante: 0,
+              montoVentaNeto: 0,
+              fechaRegistro: Timestamp.now(),
+              added: true
+            }
+          });
         });
+        await Promise.all(promises);
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
-          const idx = allLotes.findIndex((l: any) => l.id === loteId);
-          if (idx !== -1) {
-            if (!allLotes[idx].movimientos) allLotes[idx].movimientos = {};
-            allLotes[idx].movimientos[selectedMonth] = {
-              unidadesVendidas: 0,
-              fechaRegistro: new Date().toISOString(),
-              added: true
-            };
-            localStorage.setItem(key, JSON.stringify(allLotes));
-          }
+          loteIds.forEach(loteId => {
+            const units = Number(selectedMap[loteId] || 0);
+            const idx = allLotes.findIndex((l: any) => l.id === loteId);
+            if (idx !== -1) {
+              if (!allLotes[idx].movimientos) allLotes[idx].movimientos = {};
+              allLotes[idx].movimientos[selectedMonth] = {
+                unidadesVendidas: units,
+                fechaRegistro: new Date().toISOString(),
+                added: true
+              };
+            }
+          });
+          localStorage.setItem(key, JSON.stringify(allLotes));
         }
       }
       
+      setSalesInputs(prev => {
+        const updated = { ...prev };
+        loteIds.forEach(id => {
+          updated[id] = Number(selectedMap[id] || 0);
+        });
+        return updated;
+      });
+
       await loadLotes(declaracionCliente, true);
-      setSalesInputs(prev => ({ ...prev, [loteId]: 0 }));
       setInlineAddOpen(false);
-      setSelectedLoteToLink('');
+      setSelectedLotesToLink({});
       
-      alert("Producto agregado a la planilla de este mes.");
+      alert(`Se agregaron ${loteIds.length} producto(s) a la planilla de este mes.`);
     } catch (e: any) {
       console.error(e);
-      alert("Error al agregar producto: " + e.message);
+      alert("Error al agregar productos: " + e.message);
     }
   };
 
@@ -2861,7 +2877,7 @@ export default function VentasConsignacionView() {
                                            type="button"
                                            onClick={() => {
                                              setInlineAddOpen(true);
-                                             setSelectedLoteToLink('');
+                                             setSelectedLotesToLink({});
                                            }}
                                            className="px-4 py-2 bg-[#1A263E]/60 hover:bg-sky-500/20 text-sky-400 rounded-xl border border-dashed border-sky-500/35 transition-all flex items-center gap-1.5 text-xs font-black uppercase tracking-wider active:scale-95"
                                          >
@@ -2869,201 +2885,395 @@ export default function VentasConsignacionView() {
                                            Agregar Producto
                                          </button>
                                        ) : (
-                                         <div className="bg-[#0D1627] p-5 rounded-2xl border border-sky-500/20 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                                           <h5 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
-                                             <PlusCircle size={14} /> Agregar Producto de Datos Fijos a esta Planilla
-                                           </h5>
-                                           
-                                           {(() => {
-                                             const flattenedItems: any[] = [];
-                                             lotesActivos.forEach(l => {
-                                               let totalVendidas = 0;
-                                               Object.values(l.movimientos || {}).forEach((m: any) => {
-                                                 if (!m.hidden) {
-                                                    totalVendidas += Number(m.unidadesVendidas || 0);
-                                                 }
-                                               });
-                                               let remainingOriginal = Math.max(0, Number(l.unidadesIniciales || 0) - totalVendidas);
-                                               let remainingVentasForReps = Math.max(0, totalVendidas - Number(l.unidadesIniciales || 0));
+                                          <div className="bg-[#0D1627] p-5 rounded-2xl border border-sky-500/20 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                                            <div className="flex items-center justify-between flex-wrap gap-2">
+                                              <h5 className="text-xs font-black text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <PlusCircle size={14} /> Agregar Producto(s) de Datos Fijos a esta Planilla
+                                              </h5>
+                                              {Object.keys(selectedLotesToLink).length > 0 && (
+                                                <span className="text-[11px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full uppercase">
+                                                  {Object.keys(selectedLotesToLink).length} seleccionado(s) | Total a descontar: {Object.values(selectedLotesToLink).reduce((a: number, b: any) => a + Number(b || 0), 0)} u.
+                                                </span>
+                                              )}
+                                            </div>
+                                            
+                                            {(() => {
+                                              const flattenedItems: any[] = [];
+                                              lotesActivos.forEach(l => {
+                                                let totalVendidas = 0;
+                                                Object.values(l.movimientos || {}).forEach((m: any) => {
+                                                  if (!m.hidden) {
+                                                     totalVendidas += Number(m.unidadesVendidas || 0);
+                                                  }
+                                                });
+                                                let remainingOriginal = Math.max(0, Number(l.unidadesIniciales || 0) - totalVendidas);
+                                                let remainingVentasForReps = Math.max(0, totalVendidas - Number(l.unidadesIniciales || 0));
 
-                                               // Lote original
-                                               flattenedItems.push({
-                                                 ...l,
-                                                 displayId: l.id,
-                                                 type: 'ORIGINAL',
-                                                 sortDate: parseDateString(l.fechaVencimiento),
-                                                 displayUnidades: remainingOriginal,
-                                                 originalUnidades: l.unidadesIniciales
-                                               });
-                                               
-                                               // Reposiciones como filas separadas
-                                               l.reposiciones?.forEach((rep: any, idx: number) => {
-                                                 const currentRepUnits = Number(rep.unidades || 0);
-                                                 const remainingRep = Math.max(0, currentRepUnits - remainingVentasForReps);
-                                                 remainingVentasForReps = Math.max(0, remainingVentasForReps - currentRepUnits);
-                                                 flattenedItems.push({
-                                                   ...l,
-                                                   displayId: `${l.id}_rep_${idx}`,
-                                                   type: 'REP',
-                                                   sortDate: parseDateString(l.fechaVencimiento),
-                                                   displayUnidades: remainingRep,
-                                                   originalUnidades: currentRepUnits,
-                                                   fechaRep: rep.fecha
-                                                 });
-                                               });
-                                             });
+                                                // Lote original
+                                                flattenedItems.push({
+                                                  ...l,
+                                                  displayId: l.id,
+                                                  type: 'ORIGINAL',
+                                                  sortDate: parseDateString(l.fechaVencimiento),
+                                                  displayUnidades: remainingOriginal,
+                                                  originalUnidades: l.unidadesIniciales
+                                                });
+                                                
+                                                // Reposiciones como filas separadas
+                                                l.reposiciones?.forEach((rep: any, idx: number) => {
+                                                  const currentRepUnits = Number(rep.unidades || 0);
+                                                  const remainingRep = Math.max(0, currentRepUnits - remainingVentasForReps);
+                                                  remainingVentasForReps = Math.max(0, remainingVentasForReps - currentRepUnits);
+                                                  flattenedItems.push({
+                                                    ...l,
+                                                    displayId: `${l.id}_rep_${idx}`,
+                                                    type: 'REP',
+                                                    sortDate: parseDateString(l.fechaVencimiento),
+                                                    displayUnidades: remainingRep,
+                                                    originalUnidades: currentRepUnits,
+                                                    fechaRep: rep.fecha
+                                                  });
+                                                });
+                                              });
 
-                                             const itemsWithStock = flattenedItems.filter(item => item.displayUnidades > 0);
+                                              const itemsWithStock = flattenedItems.filter(item => item.displayUnidades > 0);
 
-                                             const sortedItems = [...itemsWithStock].sort((a, b) => {
-                                               const nameA = (a.productoId || "").toString().toLowerCase();
-                                               const nameB = (b.productoId || "").toString().toLowerCase();
-                                               if (nameA !== nameB) return nameA.localeCompare(nameB);
-                                               
-                                               // Safe date comparison
-                                               const dateA = a.sortDate ? new Date(a.sortDate).getTime() : 0;
-                                               const dateB = b.sortDate ? new Date(b.sortDate).getTime() : 0;
-                                               return dateA - dateB;
-                                             });
+                                              const sortedItems = [...itemsWithStock].sort((a, b) => {
+                                                const nameA = (a.productoId || "").toString().toLowerCase();
+                                                const nameB = (b.productoId || "").toString().toLowerCase();
+                                                if (nameA !== nameB) return nameA.localeCompare(nameB);
+                                                
+                                                // Safe date comparison
+                                                const dateA = a.sortDate ? new Date(a.sortDate).getTime() : 0;
+                                                const dateB = b.sortDate ? new Date(b.sortDate).getTime() : 0;
+                                                return dateA - dateB;
+                                              });
 
-                                             // Mapa de prioridad FIFO por producto
-                                             const earliestMap: Record<string, string> = {};
-                                             sortedItems.forEach(item => {
-                                               if (!earliestMap[item.productoId]) {
-                                                 earliestMap[item.productoId] = item.displayId;
-                                               }
-                                             });
+                                              // Mapa de prioridad FIFO por producto
+                                              const earliestMap: Record<string, string> = {};
+                                              sortedItems.forEach(item => {
+                                                if (!earliestMap[item.productoId]) {
+                                                  earliestMap[item.productoId] = item.displayId;
+                                                }
+                                              });
 
-                                             const filteredItems = sortedItems.filter(l => 
-                                               (l.productoId || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                               (l.solucionLote || "").toLowerCase().includes(searchTerm.toLowerCase())
-                                             );
+                                              const filteredItems = sortedItems.filter(l => 
+                                                (l.productoId || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                                (l.solucionLote || "").toLowerCase().includes(searchTerm.toLowerCase())
+                                              );
 
-                                             if (itemsWithStock.length === 0) {
+                                              const selectedCount = Object.keys(selectedLotesToLink).length;
+                                              const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(l => selectedLotesToLink[l.id] !== undefined);
+
+                                              const handleToggleSelectAll = () => {
+                                                if (allFilteredSelected) {
+                                                  setSelectedLotesToLink(prev => {
+                                                    const next = { ...prev };
+                                                    filteredItems.forEach(l => delete next[l.id]);
+                                                    return next;
+                                                  });
+                                                } else {
+                                                  setSelectedLotesToLink(prev => {
+                                                    const next = { ...prev };
+                                                    filteredItems.forEach(l => {
+                                                      if (next[l.id] === undefined) {
+                                                        next[l.id] = 0;
+                                                      }
+                                                    });
+                                                    return next;
+                                                  });
+                                                }
+                                              };
+
+                                              const handleApplyBulkUnits = () => {
+                                                const unitsVal = Math.max(0, parseInt(bulkUnitsInput) || 0);
+                                                if (selectedCount === 0) {
+                                                  alert("Por favor seleccione al menos un producto para aplicar las unidades.");
+                                                  return;
+                                                }
+                                                setSelectedLotesToLink(prev => {
+                                                  const next = { ...prev };
+                                                  Object.keys(next).forEach(id => {
+                                                    next[id] = unitsVal;
+                                                  });
+                                                  return next;
+                                                });
+                                              };
+
+                                              const handleApplyMaxUnitsToSelected = () => {
+                                                if (selectedCount === 0) {
+                                                  alert("Por favor seleccione al menos un producto.");
+                                                  return;
+                                                }
+                                                setSelectedLotesToLink(prev => {
+                                                  const next = { ...prev };
+                                                  filteredItems.forEach(l => {
+                                                    if (next[l.id] !== undefined) {
+                                                      next[l.id] = l.displayUnidades;
+                                                    }
+                                                  });
+                                                  return next;
+                                                });
+                                              };
+
+                                              if (itemsWithStock.length === 0) {
+                                                return (
+                                                  <div className="text-[#94A3B8] text-xs font-medium bg-[#111A2E]/55 p-4 rounded-xl border border-[#1E293B] flex flex-col gap-2">
+                                                    <p>⚠️ No hay más productos/lotes registrados en Datos Fijos para este cliente que no estén ya en esta planilla.</p>
+                                                    <p className="text-[11px] text-[#64748B]">
+                                                      Por favor, registre nuevos productos para este cliente en la sección <strong>⚙️ Administración de Datos Fijos</strong> más abajo.
+                                                    </p>
+                                                    <div className="flex justify-end mt-2">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => setInlineAddOpen(false)}
+                                                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                                                      >
+                                                        Cerrar
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              }
+
                                                return (
-                                                 <div className="text-slate-400 text-xs font-medium bg-[#111A2E]/55 p-4 rounded-xl border border-[#1E293B] flex flex-col gap-2">
-                                                   <p>⚠️ No hay más productos/lotes registrados en Datos Fijos para este cliente que no estén ya en esta planilla.</p>
-                                                   <p className="text-[11px] text-slate-500">
-                                                     Por favor, registre nuevos productos para este cliente en la sección <strong>⚙️ Administración de Datos Fijos</strong> más abajo.
-                                                   </p>
-                                                   <div className="flex justify-end mt-2">
-                                                     <button
-                                                       type="button"
-                                                       onClick={() => setInlineAddOpen(false)}
-                                                       className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
-                                                     >
-                                                       Cerrar
-                                                     </button>
+                                                 <div className="space-y-4">
+                                                   {/* Search and Bulk Action Toolbar */}
+                                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end bg-[#050914] p-3 rounded-xl border border-[#1E293B]">
+                                                     <div>
+                                                       <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Buscar producto manual</label>
+                                                       <input
+                                                         type="text"
+                                                         className="w-full bg-[#0D1627] text-white border border-[#1E293B]/80 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-500 text-xs font-semibold"
+                                                         placeholder="Buscar por nombre o solución (ej: ARNICA)..."
+                                                         value={searchTerm}
+                                                         onChange={e => setSearchTerm(e.target.value)}
+                                                       />
+                                                     </div>
+
+                                                     <div className="flex items-center gap-2 flex-wrap justify-start md:justify-end">
+                                                       <div className="flex items-center gap-1.5">
+                                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fijar u. en seleccionados:</span>
+                                                         <input
+                                                           type="number"
+                                                           min="0"
+                                                           placeholder="Ej: 1"
+                                                           className="w-16 bg-[#0D1627] text-white border border-[#1E293B] rounded-lg px-2 py-1 text-xs text-center font-mono font-bold outline-none focus:border-sky-500"
+                                                           value={bulkUnitsInput}
+                                                           onChange={e => setBulkUnitsInput(e.target.value)}
+                                                         />
+                                                         <button
+                                                           type="button"
+                                                           onClick={handleApplyBulkUnits}
+                                                           className="px-2.5 py-1 bg-sky-500/20 hover:bg-sky-500 text-sky-400 hover:text-[#050914] border border-sky-500/30 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                                                         >
+                                                           Aplicar
+                                                         </button>
+                                                       </div>
+                                                       <button
+                                                         type="button"
+                                                         onClick={handleApplyMaxUnitsToSelected}
+                                                         className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/30 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                                                         title="Fijar stock máximo disponible para todos los seleccionados"
+                                                       >
+                                                         Stock Máx.
+                                                       </button>
+                                                     </div>
+                                                   </div>
+
+                                                   {/* Selection summary & table label */}
+                                                   <div className="flex items-center justify-between px-1">
+                                                     <label className="block text-[10px] font-black text-slate-300 uppercase tracking-wider">
+                                                       Seleccionar Productos (Lotes Registrados en Datos Fijos)
+                                                     </label>
+                                                     <div className="flex items-center gap-2">
+                                                       <button
+                                                         type="button"
+                                                         onClick={handleToggleSelectAll}
+                                                         className="text-[10px] font-black text-sky-400 hover:text-sky-300 underline uppercase tracking-wider"
+                                                       >
+                                                         {allFilteredSelected ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                                                       </button>
+                                                     </div>
+                                                   </div>
+
+                                                   <div className="max-h-72 overflow-y-auto border border-[#1E293B] rounded-xl bg-[#050914] mb-2 shadow-inner">
+                                                     <table className="w-full text-left text-[10px]">
+                                                       <thead className="bg-[#0D1627] text-slate-400 uppercase font-black text-[9px] sticky top-0 z-10 shadow-sm">
+                                                         <tr>
+                                                           <th className="p-2.5 border-b border-[#1E293B] text-center w-10">
+                                                             <input
+                                                               type="checkbox"
+                                                               checked={allFilteredSelected}
+                                                               onChange={handleToggleSelectAll}
+                                                               className="accent-sky-500 cursor-pointer w-3.5 h-3.5"
+                                                             />
+                                                           </th>
+                                                           <th className="p-2.5 border-b border-[#1E293B]">Producto</th>
+                                                           <th className="p-2.5 border-b border-[#1E293B]">Solución</th>
+                                                           <th className="p-2.5 border-b border-[#1E293B]">Venc.</th>
+                                                           <th className="p-2.5 border-b border-[#1E293B] text-center">Stock Disp.</th>
+                                                           <th className="p-2.5 border-b border-[#1E293B] text-right">Precio</th>
+                                                           <th className="p-2.5 border-b border-[#1E293B] text-center w-40">Unidades a Descontar</th>
+                                                         </tr>
+                                                       </thead>
+                                                       <tbody className="divide-y divide-[#1E293B]">
+                                                         {filteredItems.map(l => {
+                                                           const isFIFO = earliestMap[l.productoId] === l.displayId;
+                                                           const isSelected = selectedLotesToLink[l.id] !== undefined;
+                                                           const currentUnits = isSelected ? selectedLotesToLink[l.id] : 0;
+
+                                                           const toggleSelection = () => {
+                                                             setSelectedLotesToLink(prev => {
+                                                               const next = { ...prev };
+                                                               if (next[l.id] !== undefined) {
+                                                                 delete next[l.id];
+                                                               } else {
+                                                                 next[l.id] = 0;
+                                                               }
+                                                               return next;
+                                                             });
+                                                           };
+
+                                                           const updateUnits = (val: number) => {
+                                                             const safeVal = Math.max(0, val);
+                                                             setSelectedLotesToLink(prev => ({
+                                                               ...prev,
+                                                               [l.id]: safeVal
+                                                             }));
+                                                           };
+
+                                                           return (
+                                                             <tr 
+                                                               key={l.displayId} 
+                                                               className={cn(
+                                                                 "hover:bg-[#1E293B]/60 transition-colors border-l-4",
+                                                                 isSelected ? "bg-sky-500/10 border-l-sky-500" : "border-l-transparent",
+                                                                 isFIFO && !isSelected ? "bg-rose-500/5 border-l-rose-500/50" : ""
+                                                               )} 
+                                                             >
+                                                               <td className="p-2.5 text-center">
+                                                                 <input
+                                                                   type="checkbox"
+                                                                   checked={isSelected}
+                                                                   onChange={toggleSelection}
+                                                                   className="accent-sky-500 cursor-pointer w-3.5 h-3.5"
+                                                                 />
+                                                               </td>
+                                                               <td className="p-2.5 cursor-pointer" onClick={toggleSelection}>
+                                                                 <div className={cn("font-black text-xs flex items-center flex-wrap gap-1", isFIFO ? "text-rose-400" : "text-white")}>
+                                                                   {l.productoId}
+                                                                   {isFIFO && <span className="text-[8px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-tighter font-black">Prioridad FIFO</span>}
+                                                                   {l.type === 'REP' && (
+                                                                     <span className="text-[8px] bg-emerald-500 text-[#050914] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">REP</span>
+                                                                   )}
+                                                                 </div>
+                                                                 <div className="mt-0.5 flex items-center gap-2">
+                                                                   <span className="text-[9px] text-slate-500 font-bold uppercase">
+                                                                     {l.type === 'ORIGINAL' ? 'Original:' : `Reposición (${l.fechaRep}):`}
+                                                                   </span>
+                                                                   <span className="text-[9px] text-sky-400 font-mono font-black">{l.displayUnidades} u.</span>
+                                                                 </div>
+                                                               </td>
+                                                               <td className="p-2.5 text-emerald-400 font-mono text-[10px] cursor-pointer" onClick={toggleSelection}>
+                                                                 {l.solucionLote || 'S/L'}
+                                                               </td>
+                                                               <td className="p-2.5 text-slate-300 text-[10px] cursor-pointer" onClick={toggleSelection}>
+                                                                 <span className={isFIFO ? "text-rose-300 font-black" : "font-medium"}>{formatDateToDDMMYYYY(l.fechaVencimiento)}</span>
+                                                               </td>
+                                                               <td className="p-2.5 text-center font-mono font-bold text-sky-400 text-[11px] cursor-pointer" onClick={toggleSelection}>
+                                                                 {l.displayUnidades} u.
+                                                               </td>
+                                                               <td className="p-2.5 text-right text-amber-400 font-mono text-[10px] cursor-pointer" onClick={toggleSelection}>
+                                                                 {formatCurrency(Number(l.precioUnitNeto) || 0)}
+                                                               </td>
+                                                               <td className="p-2.5 text-center">
+                                                                 <div className="flex items-center justify-center gap-1.5">
+                                                                   <input
+                                                                     type="number"
+                                                                     min="0"
+                                                                     max={l.displayUnidades}
+                                                                     value={isSelected ? currentUnits : ''}
+                                                                     placeholder="0"
+                                                                     onChange={(e) => {
+                                                                       const val = parseInt(e.target.value);
+                                                                       if (isNaN(val)) {
+                                                                         setSelectedLotesToLink(prev => {
+                                                                           const next = { ...prev };
+                                                                           delete next[l.id];
+                                                                           return next;
+                                                                         });
+                                                                       } else {
+                                                                         updateUnits(val);
+                                                                       }
+                                                                     }}
+                                                                     className={cn(
+                                                                       "w-20 bg-[#0D1627] text-white border rounded-lg p-1.5 text-xs font-mono font-bold text-center outline-none transition-colors",
+                                                                       isSelected ? "border-sky-500 font-black text-sky-400" : "border-[#1E293B] text-slate-400 focus:border-sky-500"
+                                                                     )}
+                                                                   />
+                                                                   <button
+                                                                     type="button"
+                                                                     onClick={() => updateUnits(l.displayUnidades)}
+                                                                     className="px-1.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[9px] font-mono font-black uppercase tracking-tighter"
+                                                                     title="Fijar stock máximo disponible"
+                                                                   >
+                                                                     Máx
+                                                                   </button>
+                                                                 </div>
+                                                               </td>
+                                                             </tr>
+                                                           );
+                                                         })}
+                                                         {filteredItems.length === 0 && (
+                                                           <tr>
+                                                             <td colSpan={7} className="p-8 text-center text-slate-500 font-bold uppercase tracking-widest text-[9px]">
+                                                               No se encontraron productos
+                                                             </td>
+                                                           </tr>
+                                                         )}
+                                                       </tbody>
+                                                     </table>
+                                                   </div>
+
+                                                   {/* Footer Actions */}
+                                                   <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#1E293B]">
+                                                     <div className="text-[11px] font-bold text-slate-400">
+                                                       {selectedCount > 0 ? (
+                                                         <span className="text-sky-400 font-black">
+                                                           {selectedCount} producto(s) listo(s) para agregar a la planilla
+                                                         </span>
+                                                       ) : (
+                                                         <span>Marque los productos que desea incluir en la planilla del mes</span>
+                                                       )}
+                                                     </div>
+                                                     <div className="flex justify-end gap-2">
+                                                       <button
+                                                         type="button"
+                                                         onClick={() => {
+                                                           setInlineAddOpen(false);
+                                                           setSelectedLotesToLink({});
+                                                         }}
+                                                         className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                                                       >
+                                                         Cancelar
+                                                       </button>
+                                                       <button
+                                                         type="button"
+                                                         disabled={selectedCount === 0}
+                                                         onClick={() => handleAddMultipleProductsToMonthTemplate(selectedLotesToLink)}
+                                                         className="px-6 py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 disabled:cursor-not-allowed text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-sky-500/20"
+                                                       >
+                                                         <Check size={14} strokeWidth={3} />
+                                                         Agregar {selectedCount > 0 ? `(${selectedCount})` : ''} a Planilla
+                                                       </button>
+                                                     </div>
                                                    </div>
                                                  </div>
                                                );
-                                             }
-
-                                              return (
-                                                <div className="space-y-4">
-                                                  <div>
-                                                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Buscar producto manual</label>
-                                                    <input
-                                                      type="text"
-                                                      className="w-full bg-[#050914] text-white border border-[#1E293B]/60 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-500 text-xs mb-2"
-                                                      placeholder="Buscar (ej: ARNICA)..."
-                                                      value={searchTerm}
-                                                      onChange={e => setSearchTerm(e.target.value)}
-                                                    />
-                                                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Seleccionar Producto (Lote Registrado en Datos Fijos)</label>
-                                                    <div className="max-h-64 overflow-y-auto border border-[#1E293B] rounded-lg bg-[#050914] mb-2 shadow-inner">
-                                                      <table className="w-full text-left text-[10px]">
-                                                        <thead className="bg-[#0D1627] text-slate-400 uppercase font-black text-[9px] sticky top-0 z-10 shadow-sm">
-                                                          <tr>
-                                                            <th className="p-2 border-b border-[#1E293B]">Producto</th>
-                                                            <th className="p-2 border-b border-[#1E293B]">Solución</th>
-                                                            <th className="p-2 border-b border-[#1E293B]">Venc.</th>
-                                                            <th className="p-2 border-b border-[#1E293B] text-right">Precio</th>
-                                                            <th className="p-2 border-b border-[#1E293B] text-center">Acción</th>
-                                                          </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-[#1E293B]">
-                                                           {filteredItems.map(l => {
-                                                              const isFIFO = earliestMap[l.productoId] === l.displayId;
-
-                                                              return (
-                                                            <tr 
-                                                              key={l.displayId} 
-                                                              className={cn(
-                                                                "hover:bg-[#1E293B]/60 cursor-pointer transition-colors border-l-4",
-                                                                selectedLoteToLink === l.id ? "bg-sky-500/10 border-sky-500" : "border-transparent",
-                                                                isFIFO ? "bg-rose-500/5 border-l-rose-500" : ""
-                                                              )} 
-                                                              onClick={() => setSelectedLoteToLink(l.id)}
-                                                            >
-                                                              <td className="p-2">
-                                                                <div className={cn("font-black text-xs", isFIFO ? "text-rose-400" : "text-white")}>
-                                                                  {l.productoId}
-                                                                  {isFIFO && <span className="ml-2 text-[8px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Prioridad FIFO</span>}
-                                                                  {l.type === 'REP' && (
-                                                                    <span className="ml-2 text-[8px] bg-emerald-500 text-[#050914] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">REP</span>
-                                                                  )}
-                                                                </div>
-                                                                <div className="mt-1 flex items-center gap-2">
-                                                                  <span className="text-[9px] text-slate-500 font-bold uppercase">
-                                                                    {l.type === 'ORIGINAL' ? 'Stock Original:' : `Reposición (${l.fechaRep}):`}
-                                                                  </span>
-                                                                  <span className="text-[9px] text-sky-400 font-mono font-black">{l.displayUnidades}u</span>
-                                                                </div>
-                                                              </td>
-                                                              <td className="p-2 text-emerald-400 font-mono text-[10px]">{l.solucionLote || 'S/L'}</td>
-                                                              <td className="p-2 text-slate-300 text-[10px]">
-                                                                <span className={isFIFO ? "text-rose-300 font-black" : "font-medium"}>{formatDateToDDMMYYYY(l.fechaVencimiento)}</span>
-                                                              </td>
-                                                              <td className="p-2 text-right text-amber-400 font-mono text-[10px]">{formatCurrency(Number(l.precioUnitNeto) || 0)}</td>
-                                                              <td className="p-2 text-center">
-                                                                <div className={cn(
-                                                                  "w-5 h-5 rounded-full border mx-auto flex items-center justify-center transition-all",
-                                                                  selectedLoteToLink === l.id 
-                                                                    ? "bg-sky-500 border-sky-500 text-[#050914]" 
-                                                                    : "border-[#1E293B] bg-[#050914]"
-                                                                )}>
-                                                                  {selectedLoteToLink === l.id && <Check size={12} strokeWidth={4} />}
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                          ); })}
-                                                          {filteredItems.length === 0 && (
-                                                            <tr>
-                                                              <td colSpan={5} className="p-8 text-center text-slate-500 font-bold uppercase tracking-widest text-[9px]">
-                                                                No se encontraron productos
-                                                              </td>
-                                                            </tr>
-                                                          )}
-                                                        </tbody>
-                                                      </table>
-                                                    </div>
-                                                  </div>
-                                                  
-                                                  <div className="flex justify-end gap-2 pt-1.5">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => {
-                                                        setInlineAddOpen(false);
-                                                        setSelectedLoteToLink('');
-                                                      }}
-                                                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
-                                                    >
-                                                      Cancelar
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => handleAddProductToMonthTemplate(selectedLoteToLink)}
-                                                      className="px-5 py-2 bg-sky-500 hover:bg-sky-600 text-[#050914] font-black rounded-lg text-[10px] uppercase tracking-widest flex items-center gap-1 transition-all active:scale-95 shadow-md shadow-sky-500/10"
-                                                    >
-                                                      <Check size={12} /> Agregar a Planilla
-                                                    </button>
-                                                  </div>
-                                                </div>
-                                              );
-                                           })()}
-                                         </div>
-                                       )}
+                                            })()}
+                                          </div>
+                                         )}
                                      </td>
                                    </tr>
                                  </tbody>
