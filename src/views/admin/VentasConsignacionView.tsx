@@ -47,7 +47,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Upload, Edit, Edit2, Edit3, X
+  Upload, Edit, Edit2, Edit3, X, RotateCcw, Search
 } from 'lucide-react';
 const PRODUCTOS_CATALOGO: string[] = [];
 
@@ -489,6 +489,41 @@ export default function VentasConsignacionView() {
   // Tab 2: Registro de Ventas (Select Cliente)
   const [registroVentasCliente, setRegistroVentasCliente] = useState('');
   const [registroVentasStockTab, setRegistroVentasStockTab] = useState<'activos' | 'inactivos'>('activos');
+  const [stockSearchTerm, setStockSearchTerm] = useState('');
+
+  // Devolución / Rebaja Modal state
+  const [devolucionModal, setDevolucionModal] = useState<{
+    isOpen: boolean;
+    loteId?: string;
+  } | null>(null);
+
+  const [devolucionForm, setDevolucionForm] = useState({
+    loteId: '',
+    fecha: new Date().toISOString().split('T')[0],
+    unidades: 1,
+    motivo: '',
+  });
+  const [savingDevolucion, setSavingDevolucion] = useState(false);
+  const [devolucionSearchQuery, setDevolucionSearchQuery] = useState('');
+  const [devolucionDropdownOpen, setDevolucionDropdownOpen] = useState(false);
+
+  const openDevolucionModal = (lote?: any, targetMonth?: string) => {
+    const targetLoteId = lote ? lote.id.toString() : '';
+    const initialDate = targetMonth ? `${targetMonth}-15` : new Date().toISOString().split('T')[0];
+    setDevolucionForm({
+      loteId: targetLoteId,
+      fecha: initialDate,
+      unidades: 1,
+      motivo: '',
+    });
+    if (lote) {
+      setDevolucionSearchQuery(`${lote.productoId} - Solución: ${lote.solucionLote || 'S/S'}`);
+    } else {
+      setDevolucionSearchQuery('');
+    }
+    setDevolucionDropdownOpen(false);
+    setDevolucionModal({ isOpen: true, loteId: targetLoteId });
+  };
 
   // Reposición / Quick Add Modal state
   const [reponerModal, setReponerModal] = useState<{
@@ -632,6 +667,100 @@ export default function VentasConsignacionView() {
       precioUnitNeto: Number(lote.precioUnitNeto || 0),
     });
     setEditLoteModal({ isOpen: true, lote });
+  };
+
+  const handleSaveDevolucion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devolucionForm.loteId) {
+      alert('Por favor seleccione un producto o lote para rebajar.');
+      return;
+    }
+    const units = Number(devolucionForm.unidades);
+    if (!units || units <= 0) {
+      alert('Las unidades a devolver deben ser mayores a 0.');
+      return;
+    }
+
+    const targetLote = todosLosLotes.find((l: any) => l.id.toString() === devolucionForm.loteId.toString());
+    if (!targetLote) {
+      alert('No se encontró el lote seleccionado.');
+      return;
+    }
+
+    try {
+      setSavingDevolucion(true);
+      const newDev = {
+        id: Date.now().toString(),
+        fecha: devolucionForm.fecha || new Date().toISOString().split('T')[0],
+        unidades: units,
+        motivo: devolucionForm.motivo.trim() || 'Devolución de stock',
+        createdAt: new Date().toISOString()
+      };
+
+      const currentDevs = targetLote.devoluciones || [];
+      const updatedDevs = [...currentDevs, newDev];
+
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const loteRef = doc(db, 'crm_consignacion_lotes', targetLote.id);
+        await setDoc(loteRef, { devoluciones: updatedDevs }, { merge: true });
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          const allLotes = JSON.parse(existing);
+          const idx = allLotes.findIndex((l: any) => l.id.toString() === targetLote.id.toString());
+          if (idx !== -1) {
+            allLotes[idx].devoluciones = updatedDevs;
+            localStorage.setItem(key, JSON.stringify(allLotes));
+          }
+        }
+      }
+
+      setDevolucionModal(null);
+      const cid = registroVentasCliente || declaracionCliente || adminFilterCliente;
+      if (cid) {
+        await loadLotes(cid, true);
+      }
+      await loadTodosLosLotes(true);
+    } catch (err: any) {
+      alert('Error al registrar la devolución: ' + err.message);
+    } finally {
+      setSavingDevolucion(false);
+    }
+  };
+
+  const handleDeleteDevolucion = async (loteId: string, devId: string) => {
+    if (!confirm('¿Está seguro de eliminar esta devolución?')) return;
+    const targetLote = todosLosLotes.find((l: any) => l.id.toString() === loteId.toString());
+    if (!targetLote) return;
+
+    try {
+      const updatedDevs = (targetLote.devoluciones || []).filter((d: any) => d.id !== devId);
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const loteRef = doc(db, 'crm_consignacion_lotes', targetLote.id);
+        await setDoc(loteRef, { devoluciones: updatedDevs }, { merge: true });
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          const allLotes = JSON.parse(existing);
+          const idx = allLotes.findIndex((l: any) => l.id.toString() === targetLote.id.toString());
+          if (idx !== -1) {
+            allLotes[idx].devoluciones = updatedDevs;
+            localStorage.setItem(key, JSON.stringify(allLotes));
+          }
+        }
+      }
+      const cid = registroVentasCliente || declaracionCliente || adminFilterCliente;
+      if (cid) {
+        await loadLotes(cid, true);
+      }
+      await loadTodosLosLotes(true);
+    } catch (err: any) {
+      alert('Error al eliminar la devolución: ' + err.message);
+    }
   };
 
   const handleSaveEditLote = async (e: React.FormEvent) => {
@@ -2574,39 +2703,54 @@ export default function VentasConsignacionView() {
                   </div>
 
                   {/* Filter 2: Mes de Reporte con Controles Nav */}
-                  <div className="bg-[#111A2E] p-5 rounded-2xl border border-[#1E293B] shadow-lg">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mes de Reporte</label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const idx = MONTH_OPTIONS.findIndex(m => m.value === selectedMonth);
-                          if (idx > 0) { setSelectedMonth(MONTH_OPTIONS[idx - 1].value); setIsEditingHistory(false); }
-                        }}
-                        disabled={selectedMonth === MONTH_OPTIONS[0].value || !declaracionCliente}
-                        className="p-2.5 bg-[#050914] hover:bg-[#1E293B]/40 disabled:opacity-30 border border-[#1E293B] rounded-xl text-slate-400 hover:text-white transition-all text-xs font-black"
-                      >
-                        ◀
-                      </button>
-                      <input
-                        type="month"
-                        className="flex-1 bg-[#050914] text-sky-400 border border-[#1E293B] rounded-xl p-3 outline-none focus:border-sky-500 transition-colors font-black text-xs text-center"
-                        value={selectedMonth}
-                        disabled={!declaracionCliente}
-                        onChange={(e) => { setSelectedMonth(e.target.value); setIsEditingHistory(false); }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const idx = MONTH_OPTIONS.findIndex(m => m.value === selectedMonth);
-                          if (idx < MONTH_OPTIONS.length - 1) { setSelectedMonth(MONTH_OPTIONS[idx + 1].value); setIsEditingHistory(false); }
-                        }}
-                        disabled={selectedMonth === MONTH_OPTIONS[MONTH_OPTIONS.length - 1].value || !declaracionCliente}
-                        className="p-2.5 bg-[#050914] hover:bg-[#1E293B]/40 disabled:opacity-30 border border-[#1E293B] rounded-xl text-slate-400 hover:text-white transition-all text-xs font-black"
-                      >
-                        ▶
-                      </button>
+                  {/* Filter 2: Mes de Reporte con Controles Nav */}
+                  <div className="bg-[#111A2E] p-5 rounded-2xl border border-[#1E293B] shadow-lg flex flex-col justify-between">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                        Mes de Reporte
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const idx = MONTH_OPTIONS.findIndex(m => m.value === selectedMonth);
+                            if (idx > 0) { setSelectedMonth(MONTH_OPTIONS[idx - 1].value); setIsEditingHistory(false); }
+                          }}
+                          disabled={selectedMonth === MONTH_OPTIONS[0].value || !declaracionCliente}
+                          className="p-2.5 bg-[#050914] hover:bg-[#1E293B]/40 disabled:opacity-30 border border-[#1E293B] rounded-xl text-slate-400 hover:text-white transition-all text-xs font-black"
+                        >
+                          ◀
+                        </button>
+                        <input
+                          type="month"
+                          className="flex-1 bg-[#050914] text-sky-400 border border-[#1E293B] rounded-xl p-3 outline-none focus:border-sky-500 transition-colors font-black text-xs text-center"
+                          value={selectedMonth}
+                          disabled={!declaracionCliente}
+                          onChange={(e) => { setSelectedMonth(e.target.value); setIsEditingHistory(false); }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const idx = MONTH_OPTIONS.findIndex(m => m.value === selectedMonth);
+                            if (idx < MONTH_OPTIONS.length - 1) { setSelectedMonth(MONTH_OPTIONS[idx + 1].value); setIsEditingHistory(false); }
+                          }}
+                          disabled={selectedMonth === MONTH_OPTIONS[MONTH_OPTIONS.length - 1].value || !declaracionCliente}
+                          className="p-2.5 bg-[#050914] hover:bg-[#1E293B]/40 disabled:opacity-30 border border-[#1E293B] rounded-xl text-slate-400 hover:text-white transition-all text-xs font-black"
+                        >
+                          ▶
+                        </button>
+                      </div>
                     </div>
+                    {declaracionCliente && (
+                      <button
+                        type="button"
+                        onClick={() => openDevolucionModal(undefined, selectedMonth)}
+                        className="mt-3 w-full bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/30 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-md shadow-amber-500/5"
+                      >
+                        <RotateCcw size={13} />
+                        Registrar Devolución ({formatMonthName(selectedMonth)})
+                      </button>
+                    )}
                   </div>
 
                   {/* Filter 3: Filtro de Reposición */}
@@ -3376,8 +3520,20 @@ export default function VentasConsignacionView() {
                       return keyA.localeCompare(keyB);
                     });
 
-                    const activeItems = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) > 0);
-                    const inactiveItems = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) <= 0);
+                    const activeItemsAll = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) > 0);
+                    const inactiveItemsAll = inventoryStatus.filter(item => (item.traj?.frascosRestantes || 0) <= 0);
+
+                    const matchesStockSearch = ({ lote }: { lote: any }) => {
+                      if (!stockSearchTerm.trim()) return true;
+                      const term = stockSearchTerm.toLowerCase().trim();
+                      const prod = (lote.productoId || '').toLowerCase();
+                      const sol = (lote.solucionLote || '').toLowerCase();
+                      const venc = formatDateToDDMMYYYY(lote.fechaVencimiento).toLowerCase();
+                      return prod.includes(term) || sol.includes(term) || venc.includes(term);
+                    };
+
+                    const activeItems = activeItemsAll.filter(matchesStockSearch);
+                    const inactiveItems = inactiveItemsAll.filter(matchesStockSearch);
 
                     // Summarize saved month templates
                     // Let's gather all months that have any saved movimientos
@@ -3670,8 +3826,34 @@ export default function VentasConsignacionView() {
                             </div>
                           </div>
 
+                          {/* Buscador de Stock */}
+                          <div className="p-3 bg-[#0B1220] border-b border-[#1E293B] flex items-center justify-between gap-3 flex-wrap">
+                            <div className="relative flex-1 min-w-[220px]">
+                              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <input
+                                type="text"
+                                value={stockSearchTerm}
+                                onChange={(e) => setStockSearchTerm(e.target.value)}
+                                placeholder="Buscar producto, solución, vencimiento..."
+                                className="w-full bg-[#050914] text-xs text-slate-200 placeholder-slate-500 pl-9 pr-8 py-2 rounded-xl border border-[#1E293B] focus:border-amber-500/50 outline-none transition-all font-medium"
+                              />
+                              {stockSearchTerm && (
+                                <button
+                                  type="button"
+                                  onClick={() => setStockSearchTerm('')}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-0.5 rounded-full hover:bg-[#1E293B]"
+                                >
+                                  <X size={13} />
+                                </button>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-medium">
+                              {stockSearchTerm ? `Filtrando por "${stockSearchTerm}"` : `Mostrando lotes ${registroVentasStockTab === 'activos' ? 'con stock activo' : 'sin stock'}`}
+                            </div>
+                          </div>
+
                           {/* Activos / Inactivos Tab Switcher */}
-                          <div className="p-3 bg-[#0B1220] border-b border-[#1E293B] flex items-center justify-between gap-2 flex-wrap">
+                          <div className="p-3 bg-[#080E1A] border-b border-[#1E293B] flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
@@ -3728,12 +3910,31 @@ export default function VentasConsignacionView() {
                                           {formatCurrency(lote.precioUnitNeto || 0)}
                                         </td>
                                         <td className="p-4 text-center">
-                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-sky-500/10 text-sky-400 border border-sky-500/20 block w-fit mx-auto">
                                             {traj?.frascosRestantes || 0} u.
                                           </span>
+                                          {(() => {
+                                            const devUnits = (lote.devoluciones || []).reduce((sum: number, d: any) => sum + (Number(d.unidades) || 0), 0);
+                                            if (devUnits > 0) {
+                                              return (
+                                                <span className="text-[10px] text-amber-400 font-semibold font-mono mt-1 block">
+                                                  Devuelto: -${devUnits} u.
+                                                </span>
+                                              );
+                                            }
+                                            return null;
+                                          })()}
                                         </td>
                                         <td className="p-4 text-center">
                                           <div className="flex items-center justify-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => openDevolucionModal(lote)}
+                                              title="Registrar devolución o rebaja de stock"
+                                              className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <RotateCcw size={12} /> Rebaja
+                                            </button>
                                             <button
                                               type="button"
                                               onClick={() => openEditLoteModal(lote)}
@@ -3780,6 +3981,14 @@ export default function VentasConsignacionView() {
                                         </td>
                                         <td className="p-4 text-center">
                                           <div className="flex items-center justify-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => openDevolucionModal(lote)}
+                                              title="Registrar devolución o rebaja de stock"
+                                              className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <RotateCcw size={12} /> Rebaja
+                                            </button>
                                             <button
                                               type="button"
                                               onClick={() => openEditLoteModal(lote)}
@@ -3881,20 +4090,111 @@ export default function VentasConsignacionView() {
                                       </div>
                                       
                                       <div className="flex items-center gap-6">
-                                        <div className="text-right">
-                                          <div className="text-xs font-black font-mono text-slate-300">{m.unidadesVendidas} u.</div>
-                                          <div className="text-[10px] text-slate-500 font-bold">Unidades</div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-xs font-black font-mono text-emerald-400">{formatCurrency(m.montoVendido)}</div>
-                                          <div className="text-[10px] text-slate-500 font-bold">Monto</div>
-                                        </div>
+                                        {(() => {
+                                          const monthDevs = clientLotes.flatMap(lote => {
+                                            const devs = (lote.devoluciones || []).filter((d: any) => d.fecha && d.fecha.substring(0, 7) === m.month);
+                                            return devs.map((d: any) => ({
+                                              ...d,
+                                              loteId: lote.id,
+                                              productoId: lote.productoId,
+                                              solucionLote: lote.solucionLote,
+                                              precioUnitNeto: Number(lote.precioUnitNeto) || 0,
+                                              montoTotal: (Number(d.unidades) || 0) * (Number(lote.precioUnitNeto) || 0)
+                                            }));
+                                          });
+                                          const devUnits = monthDevs.reduce((sum, d) => sum + Number(d.unidades), 0);
+                                          const devMonto = monthDevs.reduce((sum, d) => sum + d.montoTotal, 0);
+
+                                          return (
+                                            <>
+                                              {devUnits > 0 && (
+                                                <div className="text-right bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl">
+                                                  <div className="text-xs font-black font-mono text-amber-400">-{devUnits} u.</div>
+                                                  <div className="text-[9px] text-amber-500 font-bold">Devuelto ({formatCurrency(devMonto)})</div>
+                                                </div>
+                                              )}
+                                              <div className="text-right">
+                                                <div className="text-xs font-black font-mono text-slate-300">{m.unidadesVendidas} u.</div>
+                                                <div className="text-[10px] text-slate-500 font-bold font-mono">Vendidas</div>
+                                              </div>
+                                              <div className="text-right">
+                                                <div className="text-xs font-black font-mono text-emerald-400">{formatCurrency(m.montoVendido)}</div>
+                                                <div className="text-[10px] text-slate-500 font-bold">Monto Venta</div>
+                                              </div>
+                                            </>
+                                          );
+                                        })()}
                                       </div>
                                     </button>
 
                                     {/* Expanded Detail Panel */}
                                     {isExpanded && (
                                       <div className="p-4 bg-[#0A1120]/40 border-t border-sky-500/10 space-y-4 animate-in fade-in duration-200">
+                                        {/* Devoluciones section for this month */}
+                                        {(() => {
+                                          const monthDevs = clientLotes.flatMap(lote => {
+                                            const devs = (lote.devoluciones || []).filter((d: any) => d.fecha && d.fecha.substring(0, 7) === m.month);
+                                            return devs.map((d: any) => ({
+                                              ...d,
+                                              loteId: lote.id,
+                                              productoId: lote.productoId,
+                                              solucionLote: lote.solucionLote,
+                                              precioUnitNeto: Number(lote.precioUnitNeto) || 0,
+                                              montoTotal: (Number(d.unidades) || 0) * (Number(lote.precioUnitNeto) || 0)
+                                            }));
+                                          });
+
+                                          return (
+                                            <div className="bg-[#0D1627] rounded-2xl border border-amber-500/30 p-4 space-y-3">
+                                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                                <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-wider">
+                                                  <RotateCcw size={15} />
+                                                  Devoluciones / Rebajas de Stock en {formatMonthName(m.month)}
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openDevolucionModal(undefined, m.month)}
+                                                  className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/30 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                                >
+                                                  + Registrar Devolución en {formatMonthName(m.month)}
+                                                </button>
+                                              </div>
+
+                                              {monthDevs.length > 0 ? (
+                                                <div className="divide-y divide-[#1E293B]">
+                                                  {monthDevs.map((d) => (
+                                                    <div key={d.id} className="py-2.5 flex items-center justify-between gap-3 text-xs flex-wrap">
+                                                      <div>
+                                                        <span className="font-black text-white uppercase">{d.productoId}</span>
+                                                        <span className="text-slate-400 text-[11px] ml-2">({d.solucionLote || 'S/S'})</span>
+                                                        <p className="text-[10px] text-slate-500 italic mt-0.5">
+                                                          {d.motivo || 'Sin observaciones'} - Fecha: {formatDateToDDMMYYYY(d.fecha)}
+                                                        </p>
+                                                      </div>
+                                                      <div className="flex items-center gap-4">
+                                                        <div className="text-right">
+                                                          <span className="font-mono font-black text-amber-400">-{d.unidades} u.</span>
+                                                          <div className="text-[10px] font-mono text-slate-400">{formatCurrency(d.montoTotal)}</div>
+                                                        </div>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => handleDeleteDevolucion(d.loteId, d.id)}
+                                                          className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                                          title="Eliminar esta devolución"
+                                                        >
+                                                          <Trash2 size={13} />
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                <p className="text-[11px] text-slate-500 italic">No se registraron devoluciones en {formatMonthName(m.month)}.</p>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
+
                                         {/* Products Table list for this month */}
                                         <div className="bg-[#0D1627]/90 rounded-2xl border border-[#1E293B]/60 overflow-hidden">
                                           <table className="w-full text-left text-[11px]">
@@ -3986,6 +4286,243 @@ export default function VentasConsignacionView() {
           </>
         )}
       </div>
+
+      {/* DEVOLUCION / REBAJA DE STOCK MODAL WITH MANUAL SEARCH */}
+      {devolucionModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0D1627] border border-amber-500/30 rounded-3xl p-6 w-full max-w-lg shadow-2xl shadow-amber-500/10 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 rounded-2xl text-amber-400">
+                  <RotateCcw size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                    Registrar Devolución / Rebaja de Stock
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Descuente o devuelva unidades del stock de consignación.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDevolucionModal(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDevolucion} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Buscar y Seleccionar Producto / Lote
+                </label>
+                <div className="relative">
+                  <div className="relative flex items-center">
+                    <Search size={14} className="absolute left-3 text-amber-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Escriba el nombre, código o solución del producto..."
+                      className="w-full bg-[#050914] text-white placeholder-slate-500 border border-[#1E293B] rounded-xl pl-9 pr-8 py-2.5 text-xs font-bold outline-none focus:border-amber-500 uppercase transition-all"
+                      value={devolucionSearchQuery}
+                      onFocus={() => setDevolucionDropdownOpen(true)}
+                      onChange={(e) => {
+                        setDevolucionSearchQuery(e.target.value);
+                        setDevolucionForm(prev => ({ ...prev, loteId: '' }));
+                        setDevolucionDropdownOpen(true);
+                      }}
+                    />
+                    {devolucionSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDevolucionSearchQuery('');
+                          setDevolucionForm(prev => ({ ...prev, loteId: '' }));
+                          setDevolucionDropdownOpen(true);
+                        }}
+                        className="absolute right-2.5 text-slate-500 hover:text-slate-300 p-1 rounded-lg"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown list of filtered products */}
+                  {devolucionDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#0A1120] border border-amber-500/30 rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-[#1E293B]/40 animate-in fade-in duration-150">
+                      {(() => {
+                        const targetClientId = declaracionCliente || registroVentasCliente || adminFilterCliente;
+                        const availableLotes = todosLosLotes.filter((l: any) => {
+                          if (targetClientId && l.clienteId !== targetClientId) return false;
+                          if (!devolucionSearchQuery.trim()) return true;
+                          const query = devolucionSearchQuery.toLowerCase().trim();
+                          const prod = (l.productoId || '').toLowerCase();
+                          const sol = (l.solucionLote || '').toLowerCase();
+                          return prod.includes(query) || sol.includes(query);
+                        });
+
+                        if (availableLotes.length === 0) {
+                          return (
+                            <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                              No se encontraron productos que coincidan con "{devolucionSearchQuery}"
+                            </div>
+                          );
+                        }
+
+                        return availableLotes.map((l: any) => {
+                          const maxM = new Date().toISOString().substring(0, 7);
+                          const traj = getLoteTrajectoryUpToMonth(l, maxM, undefined);
+                          const available = traj?.frascosRestantes || 0;
+                          const isSelected = devolucionForm.loteId.toString() === l.id.toString();
+
+                          return (
+                            <button
+                              key={l.id}
+                              type="button"
+                              onClick={() => {
+                                setDevolucionForm(prev => ({ ...prev, loteId: l.id.toString() }));
+                                setDevolucionSearchQuery(`${l.productoId} - Solución: ${l.solucionLote || 'S/S'}`);
+                                setDevolucionDropdownOpen(false);
+                              }}
+                              className={cn(
+                                "w-full text-left p-3 flex items-center justify-between gap-3 hover:bg-amber-500/10 transition-colors cursor-pointer",
+                                isSelected && "bg-amber-500/20 border-l-4 border-amber-500"
+                              )}
+                            >
+                              <div>
+                                <div className="text-xs font-black text-white uppercase">{l.productoId}</div>
+                                <div className="text-[11px] text-slate-400 font-medium">Solución: {l.solucionLote || 'S/S'}</div>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] font-mono font-black text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-lg border border-sky-500/20">
+                                  Stock: {available} u.
+                                </span>
+                                <div className="text-[10px] text-amber-400 font-mono font-bold mt-0.5">
+                                  {formatCurrency(l.precioUnitNeto || 0)}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {devolucionForm.loteId && (() => {
+                const selectedLoteObj = todosLosLotes.find((l: any) => l.id.toString() === devolucionForm.loteId.toString());
+                if (!selectedLoteObj) return null;
+                const maxM = new Date().toISOString().substring(0, 7);
+                const traj = getLoteTrajectoryUpToMonth(selectedLoteObj, maxM, undefined);
+                const available = traj?.frascosRestantes || 0;
+                const devs = selectedLoteObj.devoluciones || [];
+                return (
+                  <div className="bg-[#050914] border border-[#1E293B] rounded-2xl p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-semibold">Stock Actual Disponible:</span>
+                      <span className="font-mono font-black text-sky-400">{available} u.</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-semibold">Precio Unitario Neto:</span>
+                      <span className="font-mono font-bold text-amber-400">{formatCurrency(selectedLoteObj.precioUnitNeto || 0)}</span>
+                    </div>
+
+                    {devs.length > 0 && (
+                      <div className="pt-2 border-t border-[#1E293B] mt-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+                          Historial de Devoluciones / Rebajas registradas:
+                        </span>
+                        <div className="max-h-28 overflow-y-auto space-y-1.5 pr-1">
+                          {devs.map((d: any) => (
+                            <div key={d.id} className="flex items-center justify-between bg-[#0D1627] p-2 rounded-xl text-[11px] border border-[#1E293B]">
+                              <div>
+                                <span className="text-amber-400 font-bold font-mono">-{d.unidades} u.</span>
+                                <span className="text-slate-400 ml-2 font-mono">({formatDateToDDMMYYYY(d.fecha)})</span>
+                                <p className="text-[10px] text-slate-500 italic mt-0.5">{d.motivo}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDevolucion(selectedLoteObj.id, d.id)}
+                                title="Eliminar esta devolución"
+                                className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    Unidades a Rebajar / Devolver
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    className="w-full bg-[#050914] text-amber-400 font-mono border border-[#1E293B] rounded-xl p-2.5 text-xs font-black outline-none focus:border-amber-500"
+                    value={devolucionForm.unidades}
+                    onChange={(e) => setDevolucionForm({ ...devolucionForm, unidades: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    Fecha de Devolución
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full bg-[#050914] text-slate-200 border border-[#1E293B] rounded-xl p-2.5 text-xs font-bold outline-none focus:border-amber-500"
+                    value={devolucionForm.fecha}
+                    onChange={(e) => setDevolucionForm({ ...devolucionForm, fecha: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Motivo / Observación
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Devolución cliente, producto vencido, merma..."
+                  className="w-full bg-[#050914] text-slate-200 border border-[#1E293B] rounded-xl p-2.5 text-xs font-medium outline-none focus:border-amber-500"
+                  value={devolucionForm.motivo}
+                  onChange={(e) => setDevolucionForm({ ...devolucionForm, motivo: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => setDevolucionModal(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDevolucion}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 disabled:text-slate-600 text-[#050914] font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                >
+                  {savingDevolucion ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                  Guardar Devolución / Rebaja
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* QUICK REPOSICION / INGRESO DE STOCK MODAL */}
       {reponerModal?.isOpen && (
@@ -4371,6 +4908,14 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
       }
     });
   }
+  if (lote.devoluciones) {
+    lote.devoluciones.forEach((d: any) => {
+      if (d.fecha && d.fecha.length >= 7) {
+        const m = d.fecha.substring(0, 7);
+        if (m < startMonth) startMonth = m;
+      }
+    });
+  }
   // Allow registration and calculation from targetMonth even if earlier than startMonth
   if (targetMonth < startMonth) {
     startMonth = targetMonth;
@@ -4416,8 +4961,11 @@ function getLoteTrajectoryUpToMonth(lote: any, targetMonth: string, tempSalesFor
   for (const m of months) {
     const repsInMonth = (lote.reposiciones || []).filter((r: any) => r.fecha && r.fecha.substring(0, 7) === m);
     const totalRepInMonth = repsInMonth.reduce((sum: number, r: any) => sum + (Number(r.unidades) || 0), 0);
-    
-    runningStock += totalRepInMonth;
+
+    const devsInMonth = (lote.devoluciones || []).filter((r: any) => r.fecha && r.fecha.substring(0, 7) === m);
+    const totalDevInMonth = devsInMonth.reduce((sum: number, r: any) => sum + (Number(r.unidades) || 0), 0);
+
+    runningStock += (totalRepInMonth - totalDevInMonth);
 
     const stockDisp = runningStock;
     // Use tempSalesForTargetMonth if m is targetMonth and is passed, else database's saved ventas
