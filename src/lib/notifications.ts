@@ -1,6 +1,7 @@
 import { localDB } from './auth';
 import { dbInstance as db, isFirebaseReady } from './firebase';
 import { collection, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { onActivityStateChange } from './idleTracker';
 
 export interface Notification {
   id?: string;
@@ -199,37 +200,57 @@ export const subscribeToNotifications = (
     return isRoleRecipient;
   };
 
-  if (isFirebaseReady && db) {
-    const usuarioActualId = usuarioActualIdParam || currentUserEmail || currentUserName;
+  let unsubSnapshot: (() => void) | null = null;
 
-    const q = query(
-      collection(db, 'notifications'),
-      where('usuarioId', '==', usuarioActualId),
-      where('leida', '==', false),
-      limit(50)
-    );
+  const startSnapshot = () => {
+    if (unsubSnapshot) return;
+    if (isFirebaseReady && db) {
+      const usuarioActualId = usuarioActualIdParam || currentUserEmail || currentUserName;
 
-    return onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          ...d,
-          read: d.read ?? d.leida ?? false,
-          leida: d.leida ?? d.read ?? false,
-        } as unknown as Notification;
-      });
-      const filtered = data.filter(isRecipient);
-      callback(filtered);
-    }, (err) => {
-      console.warn("Firestore notifications onSnapshot error, falling back to local cache:", err);
-      localDB.getCollection('notifications', { limitCount: 50 }).then((data) => {
-        const filtered = (data || []).filter(isRecipient);
+      const q = query(
+        collection(db, 'notifications'),
+        where('usuarioId', '==', usuarioActualId),
+        where('leida', '==', false),
+        limit(50)
+      );
+
+      unsubSnapshot = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            ...d,
+            read: d.read ?? d.leida ?? false,
+            leida: d.leida ?? d.read ?? false,
+          } as unknown as Notification;
+        });
+        const filtered = data.filter(isRecipient);
         callback(filtered);
-      }).catch(e => console.warn("Failed to fetch fallback notifications", e));
-      return () => {};
-    });
-  }
+      }, (err) => {
+        console.warn("Firestore notifications onSnapshot error, falling back to local cache:", err);
+        localDB.getCollection('notifications', { limitCount: 50 }).then((data) => {
+          const filtered = (data || []).filter(isRecipient);
+          callback(filtered);
+        }).catch(e => console.warn("Failed to fetch fallback notifications", e));
+      });
+    }
+  };
+
+  const stopSnapshot = () => {
+    if (unsubSnapshot) {
+      unsubSnapshot();
+      unsubSnapshot = null;
+    }
+  };
+
+  // Automatically disconnect from Firestore when tab is idle or hidden
+  const unsubActivity = onActivityStateChange((active) => {
+    if (active) {
+      startSnapshot();
+    } else {
+      stopSnapshot();
+    }
+  });
   
   // Local mode fallback
   const handleLocalChange = async (e?: Event) => {
@@ -262,10 +283,10 @@ export const subscribeToNotifications = (
   handleLocalChange();
   window.addEventListener('db-change', onDbChange);
   
-  // Polling for local mode
+  // Polling for local mode (only when tab is visible)
   let isPolling = false;
   const poll = async () => {
-    if (isPolling) return;
+    if (isPolling || document.hidden) return;
     try {
       isPolling = true;
       await handleLocalChange();
@@ -274,10 +295,12 @@ export const subscribeToNotifications = (
     }
   };
   
-  const pollInterval = setInterval(poll, 15000); // Less aggressive polling (15s instead of 5s)
+  const pollInterval = setInterval(poll, 15000); // Less aggressive polling
   
   return () => {
-    window.removeEventListener('db-change', handleLocalChange);
+    unsubActivity();
+    stopSnapshot();
+    window.removeEventListener('db-change', onDbChange);
     clearInterval(pollInterval);
   };
 };

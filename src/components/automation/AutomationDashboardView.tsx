@@ -24,8 +24,11 @@ export const AutomationDashboardView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    // Simulate background polling
-    const interval = setInterval(fetchData, 10000);
+    // Simulate background polling (only when tab is visible)
+    const interval = setInterval(() => {
+      if (document.hidden) return;
+      fetchData();
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 

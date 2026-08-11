@@ -1,6 +1,7 @@
 import { authInstance as auth, dbInstance as db, isFirebaseReady } from './firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, limit, writeBatch } from 'firebase/firestore';
+import { isTabActive } from './idleTracker';
 
 export interface UserProfile {
   uid: string;
@@ -402,7 +403,10 @@ export const localDB = {
       ? `${name}_${options!.dateField}_${options!.startDate}_${options!.endDate}_${limitStr}`
       : `${name}_${limitStr}`;
 
-    if (!options?.forceRefresh) {
+    const active = isTabActive();
+
+    // Try cache if not forcing refresh OR if tab is currently inactive/idle
+    if (!options?.forceRefresh || !active) {
       if (collectionCache[cacheKey]) {
         return [...collectionCache[cacheKey]];
       }

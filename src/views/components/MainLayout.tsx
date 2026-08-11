@@ -130,7 +130,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       );
       return () => unsubscribe();
     }
-  }, [user]);
+  }, [user?.uid, user?.email, user?.role, JSON.stringify(user?.roles)]);
 
   React.useEffect(() => {
     return () => {
