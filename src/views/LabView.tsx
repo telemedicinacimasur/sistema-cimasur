@@ -35,7 +35,8 @@ import {
   Upload,
   FileSpreadsheet,
   ChevronDown,
-  Check
+  Check,
+  RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { RecordActions } from '../components/RecordActions';
@@ -5144,17 +5145,29 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     situacion: 'PENDIENTE'
   });
 
-  useEffect(() => {
-    const loadTrackingData = async () => {
-      try {
-        const data = await localDB.getCollection('order_tracking');
-        setTrackingRecords(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('Initial Load Error:', err);
-        setTrackingRecords([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadTrackingData = async (forceRefresh = false) => {
+    try {
+      if (forceRefresh) {
+        setIsRefreshing(true);
+        localDB.clearCache();
       }
-    };
-    loadTrackingData();
+      const data = await localDB.getCollection('order_tracking', { limitCount: 5000, forceRefresh });
+      setTrackingRecords(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Initial Load Error:', err);
+      setTrackingRecords([]);
+    } finally {
+      if (forceRefresh) {
+        setTimeout(() => setIsRefreshing(false), 600);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadTrackingData(true);
+    handleSyncFromQuotes(true);
     const handleTrackingDbChange = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (!detail?.collection || detail.collection === 'order_tracking') {
@@ -5245,25 +5258,25 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     setEditingId(null);
   };
 
-  const handleSyncFromQuotes = async () => {
+  const handleSyncFromQuotes = async (silent = false) => {
     try {
       console.log('Sync: Fetching quotes via localDB with forceRefresh...');
-      const allQuotes = await localDB.getCollection('quotes', { limitCount: 2000, forceRefresh: true });
+      const allQuotes = await localDB.getCollection('quotes', { limitCount: 5000, forceRefresh: true });
       
       const approvedQuotes = allQuotes.filter(q => {
         const estadoStr = String(q.estado || '').toUpperCase().trim();
-        return estadoStr === 'APROBADA';
+        return estadoStr === 'APROBADA' || estadoStr === 'APROBADO' || estadoStr.startsWith('APROBAD');
       });
       console.log(`Sync: Found ${approvedQuotes.length} approved quotes.`);
 
       console.log('Sync: Fetching existing tracking records...');
-      const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 2000, forceRefresh: true });
+      const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 5000, forceRefresh: true });
       const existingTrackingIds = new Set(existingTracking.map(d => String(d.nroCotiz || d.id || '').trim()));
       console.log(`Sync: Found ${existingTrackingIds.size} existing tracking records.`);
 
       let addedCount = 0;
       for (const quote of approvedQuotes) {
-        const numCotiz = String(quote.nroCotiz || quote.id || '').trim();
+        const numCotiz = String(quote.nroCotiz || quote.numeroCotiz || quote.nro_cotizacion || quote.id || '').trim();
         if (!numCotiz) continue;
 
         if (!existingTrackingIds.has(numCotiz)) {
@@ -5271,18 +5284,18 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
           const newTrackingRecord = {
             id: numCotiz,
             nroCotiz: numCotiz,
-            ot: '',
+            ot: safe(quote.ot || ''),
             cliente: safe(quote.cliente),
-            fechaCotiz: safe(quote.fechaElab) || new Date().toISOString().split('T')[0],
-            fechaEnvio: '',
-            fechaCierre: '',
-            fechaRecepcion: '',
-            courier: 'Retiro en Oficina',
-            detalleSeguimiento: '',
+            fechaCotiz: safe(quote.fechaElab || quote.fecha) || new Date().toISOString().split('T')[0],
+            fechaEnvio: safe(quote.fechaEnvio || ''),
+            fechaCierre: safe(quote.fechaCierre || ''),
+            fechaRecepcion: safe(quote.fechaRecepcion || quote.fechaRecepción || ''),
+            courier: safe(quote.courier) || 'Retiro en Oficina',
+            detalleSeguimiento: safe(quote.observaciones || quote.detalleSeguimiento || ''),
             situacion: 'PENDIENTE',
             logs: [{
               date: new Date().toLocaleString('es-CL'),
-              user: 'Sistema (Sync)',
+              user: user?.displayName || user?.email || 'Sistema (Sync)',
               action: 'Pedido sincronizado desde Administración'
             }]
           };
@@ -5293,18 +5306,22 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         }
       }
       
-      const updated = await localDB.getCollection('order_tracking', { forceRefresh: true });
+      const updated = await localDB.getCollection('order_tracking', { limitCount: 5000, forceRefresh: true });
       setTrackingRecords(Array.isArray(updated) ? updated : []);
       window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
 
-      if (addedCount > 0) {
-        alert(`Éxito: Se sincronizaron ${addedCount} nuevas cotizaciones aprobadas desde Administración.`);
-      } else {
-        alert('Información: Todos los datos están sincronizados al día con Administración.');
+      if (!silent) {
+        if (addedCount > 0) {
+          alert(`Éxito: Se sincronizaron ${addedCount} nuevas cotizaciones aprobadas desde Administración.`);
+        } else {
+          alert('Información: Todos los datos están sincronizados al día con Administración.');
+        }
       }
     } catch (err) {
       console.error('Sync Error:', err);
-      alert('Error técnico al sincronizar. Detalle: ' + (err as Error).message);
+      if (!silent) {
+        alert('Error técnico al sincronizar. Detalle: ' + (err as Error).message);
+      }
     }
   };
 
@@ -5641,8 +5658,18 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
               <Download className="w-3.5 h-3.5" /> PDF General
             </button>
             <button 
-              onClick={handleSyncFromQuotes} 
-              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors"
+              onClick={async () => {
+                await loadTrackingData(true);
+                await handleSyncFromQuotes(false);
+              }} 
+              className="text-[10px] bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] border border-[#38BDF8]/50 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+              title="Refrescar datos y forzar sincronización en vivo con administración"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} /> Actualizar Datos
+            </button>
+            <button 
+              onClick={() => handleSyncFromQuotes(false)} 
+              className="text-[10px] bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded flex items-center gap-1.5 uppercase transition-colors font-black shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
               title="Importar cotizaciones aprobadas desde administración"
             >
               <FileUp className="w-3.5 h-3.5" /> Sincronizar Cotizaciones

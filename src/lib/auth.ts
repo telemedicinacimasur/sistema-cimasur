@@ -400,7 +400,7 @@ export const localDB = {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
   },
   getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number; forceRefresh?: boolean }): Promise<any[]> => {
-    const rawLimit = options?.limitCount ?? 20;
+    const rawLimit = options?.limitCount !== undefined ? options.limitCount : 5000;
     const shouldLimit = rawLimit > 0;
     const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
     const hasDateFilter = Boolean(options && options.dateField && options.startDate && options.endDate);
@@ -410,8 +410,8 @@ export const localDB = {
 
     const active = isTabActive();
 
-    // Try cache if not forcing refresh OR if tab is currently inactive/idle
-    if (!options?.forceRefresh || !active) {
+    // Try cache ONLY if forceRefresh is false (or if tab is inactive and forceRefresh wasn't requested)
+    if (!options?.forceRefresh) {
       if (collectionCache[cacheKey]) {
         return [...collectionCache[cacheKey]];
       }
