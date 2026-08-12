@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authInstance as auth, dbInstance as db, isFirebaseReady } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { onActivityStateChange } from '../lib/idleTracker';
+import { doc, getDoc } from 'firebase/firestore';
 
 export interface UserProfile {
   uid: string;
@@ -19,6 +18,8 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
+  hasError: boolean;
+  hasQuotaError: boolean;
   login: (email: string, pass: string) => Promise<void>; 
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -29,6 +30,37 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [hasQuotaError, setHasQuotaError] = useState(false);
+
+  const checkErrorIsQuotaOrUnavailable = (error: any) => {
+    if (!error) return false;
+    const code = String(error.code || '').toLowerCase();
+    const message = String(error.message || '').toLowerCase();
+    return (
+      code === 'resource-exhausted' ||
+      code === 'unavailable' ||
+      code.includes('quota') ||
+      code.includes('resource-exhausted') ||
+      message.includes('quota') ||
+      message.includes('resource-exhausted') ||
+      message.includes('unavailable') ||
+      message.includes('exceeded')
+    );
+  };
+
+  const handleFirestoreError = (error: any, fallbackUser?: UserProfile | null) => {
+    console.error("Firestore error intercepted:", error);
+    setHasError(true);
+    if (checkErrorIsQuotaOrUnavailable(error)) {
+      setHasQuotaError(true);
+    }
+    // Prevent app from getting stuck on blank loading screen
+    if (fallbackUser !== undefined) {
+      setUser(prev => prev || fallbackUser);
+    }
+    setLoading(false);
+  };
 
   const refreshUser = async () => {
     if (isFirebaseReady && auth?.currentUser && db) {
@@ -52,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (error) {
             console.error("Error refreshing user data:", error);
+            handleFirestoreError(error);
         }
     } else if (!isFirebaseReady && user) {
         // Local mode refresh
@@ -96,37 +129,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return () => clearInterval(interval);
     }
 
-    let unsubscribeUserDoc: (() => void) | null = null;
-
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // Clean up previous user doc subscription if any
-      if (unsubscribeUserDoc) {
-        unsubscribeUserDoc();
-        unsubscribeUserDoc = null;
-      }
-
       if (firebaseUser && db) {
-        // First, check if a document with the UID exists
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
-        let unsubActivityDoc: (() => void) | null = null;
-
-        const setupDocListener = (docId: string) => {
-            if (unsubscribeUserDoc) unsubscribeUserDoc();
-            if (unsubActivityDoc) unsubActivityDoc();
-
-            let activeSnapshotUnsub: (() => void) | null = null;
-
-            const startDocSnapshot = () => {
-              if (activeSnapshotUnsub) return;
-              activeSnapshotUnsub = onSnapshot(doc(db, 'users', docId), (docSnap) => {
-                if (docSnap.exists()) {
-                  const userData = docSnap.data();
+        const checkAndProvision = async () => {
+            try {
+                const { getDoc, getDocs, collection, query, where, setDoc, deleteDoc, limit } = await import('firebase/firestore');
+                
+                // Helper to populate state from user data object
+                const applyUserProfile = (userData: any) => {
                   const roles = Array.isArray(userData.roles) 
                       ? userData.roles 
                       : (userData.roles && typeof userData.roles === 'object' ? Object.values(userData.roles) : [userData.role || 'viewer']);
 
-                  const newUser = {
+                  const profile: UserProfile = {
                       uid: firebaseUser.uid,
                       email: firebaseUser.email,
                       displayName: userData.displayName || firebaseUser.displayName || 'Usuario Cimasur',
@@ -136,87 +153,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       permissions: userData.permissions,
                       allowedSubmodules: userData.allowedSubmodules
                   };
+                  setUser(profile);
+                  sessionStorage.setItem('cimasur_user', JSON.stringify(profile));
+                  setLoading(false);
+                };
 
-                  setUser(prev => {
-                    if (prev && JSON.stringify(prev) === JSON.stringify(newUser)) {
-                      return prev;
-                    }
-                    return newUser;
-                  });
-                } else {
-                  // If it doesn't exist, we fallback to viewer
-                  const defaultUser = {
-                      uid: firebaseUser.uid,
-                      email: firebaseUser.email,
-                      displayName: firebaseUser.displayName || 'Usuario Cimasur',
-                      photoURL: firebaseUser.photoURL,
-                      role: 'viewer',
-                      roles: ['viewer']
-                  };
-                  setUser(prev => {
-                    if (prev && JSON.stringify(prev) === JSON.stringify(defaultUser)) {
-                      return prev;
-                    }
-                    return defaultUser;
-                  });
-                }
-                setLoading(false);
-              }, (error) => {
-                console.error("Error listening to user data:", error);
-                setLoading(false);
-              });
-            };
-
-            const stopDocSnapshot = () => {
-              if (activeSnapshotUnsub) {
-                activeSnapshotUnsub();
-                activeSnapshotUnsub = null;
-              }
-            };
-
-            unsubActivityDoc = onActivityStateChange((active) => {
-              if (active) {
-                startDocSnapshot();
-              } else {
-                stopDocSnapshot();
-              }
-            });
-
-            unsubscribeUserDoc = () => {
-              if (unsubActivityDoc) unsubActivityDoc();
-              stopDocSnapshot();
-            };
-        };
-
-        // Attempt initial sync: check by UID first, if not found try email query before setting default values
-        const checkAndProvision = async () => {
-            try {
-                const { getDoc, getDocs, collection, query, where, setDoc, deleteDoc } = await import('firebase/firestore');
-                
                 // 1. Verify if user document exists in Firestore by UID
                 const snap = await getDoc(userDocRef);
                 
                 if (snap.exists()) {
-                    // Document ALREADY exists in Firestore:
-                    // DO NOT perform any setDoc or overwrite. Pure read & snapshot subscription.
-                    setupDocListener(firebaseUser.uid);
+                    applyUserProfile(snap.data());
                     return;
                 }
 
-                // 2. Document does not exist by UID. Check if document exists by email before creating a default profile.
+                // 2. Check if document exists by email
                 let existingUserData: any = null;
                 let existingDocId: string | null = null;
 
                 if (firebaseUser.email) {
                     const emailClean = firebaseUser.email.trim();
-                    const q1 = query(collection(db, 'users'), where('email', '==', emailClean));
+                    const q1 = query(collection(db, 'users'), where('email', '==', emailClean), limit(20));
                     const emailSnap1 = await getDocs(q1);
 
                     if (!emailSnap1.empty) {
                         existingDocId = emailSnap1.docs[0].id;
                         existingUserData = emailSnap1.docs[0].data();
                     } else {
-                        const q2 = query(collection(db, 'users'), where('email', '==', emailClean.toLowerCase()));
+                        const q2 = query(collection(db, 'users'), where('email', '==', emailClean.toLowerCase()), limit(20));
                         const emailSnap2 = await getDocs(q2);
                         if (!emailSnap2.empty) {
                             existingDocId = emailSnap2.docs[0].id;
@@ -226,7 +189,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
 
                 if (existingUserData) {
-                    // Document found by email: Preserve ALL existing fields (displayName, roles, permissions, allowedSubmodules)
                     const preservedProfile = {
                         ...existingUserData,
                         uid: firebaseUser.uid,
@@ -249,12 +211,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         }
                     }
 
-                    setupDocListener(firebaseUser.uid);
+                    applyUserProfile(preservedProfile);
                     return;
                 }
 
-                // 3. ONLY if !userSnap.exists() AND no document exists by email in Firestore:
-                // Create basic default profile
+                // 3. Create basic default profile
                 const defaultProfile = {
                     email: firebaseUser.email,
                     displayName: firebaseUser.displayName || 'Nuevo Usuario',
@@ -264,11 +225,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     uid: firebaseUser.uid
                 };
                 await setDoc(userDocRef, defaultProfile);
-                setupDocListener(firebaseUser.uid);
+                applyUserProfile(defaultProfile);
 
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Provisioning error:", err);
-                setLoading(false);
+                const fallbackUser: UserProfile = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName || 'Usuario Cimasur',
+                  photoURL: firebaseUser.photoURL,
+                  role: 'viewer',
+                  roles: ['viewer']
+                };
+                handleFirestoreError(err, fallbackUser);
             }
         };
 
@@ -281,7 +250,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       unsubscribeAuth();
-      if (unsubscribeUserDoc) unsubscribeUserDoc();
     };
   }, []);
 
@@ -309,6 +277,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     loading,
     isAdmin: user?.role === 'admin' || (user?.roles || []).includes('admin'),
+    hasError,
+    hasQuotaError,
     login,
     logout,
     refreshUser
@@ -316,6 +286,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={value}>
+      {hasQuotaError && (
+        <div className="bg-amber-600 text-white px-4 py-2.5 text-xs md:text-sm font-medium flex items-center justify-between shadow-lg sticky top-0 z-[9999] animate-fadeIn border-b border-amber-700">
+          <div className="flex items-center gap-2 max-w-7xl mx-auto">
+            <span className="bg-amber-800 text-amber-100 px-2 py-0.5 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider shrink-0">
+              Límite alcanzado
+            </span>
+            <span>
+              Se ha alcanzado el límite diario de consultas de Firestore o la conexión no está disponible. La aplicación continuará funcionando en modo seguro con datos almacenados en caché local para evitar la pantalla en blanco.
+            </span>
+          </div>
+          <button 
+            onClick={() => setHasQuotaError(false)} 
+            className="ml-4 hover:bg-amber-700 p-1.5 rounded-lg transition-colors text-white/90 hover:text-white shrink-0"
+            title="Cerrar notificación"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {children}
     </AuthContext.Provider>
   );

@@ -49,12 +49,15 @@ function initFirebase() {
       app = initializeApp(firebaseConfig);
       const dbId = getEnv('VITE_FIREBASE_FIRESTORE_DATABASE_ID') || "(default)";
       
-      // Initialize Firestore with persistent local cache for better performance and reduced reads
-      db = initializeFirestore(app, {
-        localCache: persistentLocalCache({
-          tabManager: persistentMultipleTabManager()
-        })
-      }, dbId);
+      try {
+        db = initializeFirestore(app, {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager()
+          })
+        }, dbId);
+      } catch (dbErr) {
+        db = getFirestore(app, dbId);
+      }
 
       auth = getAuth(app);
     } catch (error) {

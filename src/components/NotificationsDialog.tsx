@@ -42,7 +42,7 @@ export const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ isOpen
       });
       return () => unsubscribe();
     }
-  }, [user]);
+  }, [user?.uid, user?.email, user?.role, JSON.stringify(user?.roles)]);
 
   const markAsRead = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();

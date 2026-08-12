@@ -74,8 +74,13 @@ export const localAuth = {
   // Admin Methods
   getAllUsers: async (): Promise<UserProfile[]> => {
     if (isFirebaseReady && db) {
-      const snapshot = await getDocs(collection(db, 'users'));
-      return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() })) as UserProfile[];
+      try {
+        const snapshot = await getDocs(query(collection(db, 'users'), limit(20)));
+        return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() })) as UserProfile[];
+      } catch (err: any) {
+        console.warn("getAllUsers error (resource-exhausted or unavailable):", err);
+        return [];
+      }
     } else {
       let res = await fetch('/api/users');
       if (!res.ok) {
@@ -395,7 +400,7 @@ export const localDB = {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
   },
   getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number; forceRefresh?: boolean }): Promise<any[]> => {
-    const rawLimit = options?.limitCount ?? -1;
+    const rawLimit = options?.limitCount ?? 20;
     const shouldLimit = rawLimit > 0;
     const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
     const hasDateFilter = Boolean(options && options.dateField && options.startDate && options.endDate);

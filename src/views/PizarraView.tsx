@@ -101,7 +101,7 @@ export default function PizarraView() {
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [user?.uid, user?.email]);
 
   const loadData = async () => {
     setLoading(true);

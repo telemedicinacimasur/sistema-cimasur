@@ -382,7 +382,7 @@ export default function CRMView() {
     loadData();
     window.addEventListener('db-change', handleDbChange);
     return () => window.removeEventListener('db-change', handleDbChange);
-  }, [user]);
+  }, [user?.uid, user?.email]);
 
   const handleImportFromIntranet = async () => {
     try {
@@ -892,7 +892,7 @@ function CRMRegister() {
     if (user) {
       setForm(prev => ({ ...prev, responsable: user.displayName }));
     }
-  }, [user]);
+  }, [user?.uid, user?.displayName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

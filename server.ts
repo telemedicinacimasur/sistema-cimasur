@@ -442,22 +442,6 @@ const crmTools: FunctionDeclaration[] = [
     }
   }
 
-  // --- SEED ADMIN ---
-  (async () => {
-    const users = await readRecords('users');
-    if (users.length === 0) {
-        await writeRecords('users', [{
-            uid: 'admin-001',
-            email: 'admin@cimasur.cl',
-            displayName: 'Administrador Cimasur',
-            photoURL: '',
-            role: 'admin',
-            pass: 'admin123'
-        }]);
-        console.log('Usuario admin creado por defecto.');
-    }
-  })();
-
   // --- API ROUTES ---
   app.use('/api', (req, res, next) => {
     console.log(`API Request: ${req.method} ${req.url}`);
@@ -468,8 +452,20 @@ const crmTools: FunctionDeclaration[] = [
   app.post('/api/auth/login', async (req, res) => {
     console.log('API call: POST /api/auth/login');
     const { email, pass } = req.body;
-    const users = await readRecords('users');
-    const user = users.find(u => u.email === email && u.pass === pass);
+    let users = await readRecords('users');
+    if (!users || users.length === 0) {
+      const defaultAdmin = {
+        uid: 'admin-001',
+        email: 'admin@cimasur.cl',
+        displayName: 'Administrador Cimasur',
+        photoURL: '',
+        role: 'admin',
+        pass: 'admin123'
+      };
+      await writeRecords('users', [defaultAdmin]);
+      users = [defaultAdmin];
+    }
+    const user = users.find((u: any) => u.email === email && u.pass === pass);
     if (user) {
       const { pass: _, ...userWithoutPass } = user;
       res.json(userWithoutPass);

@@ -1,7 +1,6 @@
 import { localDB } from './auth';
 import { dbInstance as db, isFirebaseReady } from './firebase';
-import { collection, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, limit } from 'firebase/firestore';
-import { onActivityStateChange } from './idleTracker';
+import { collection, getDocs, query, where, orderBy, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 
 export interface Notification {
   id?: string;
@@ -200,21 +199,17 @@ export const subscribeToNotifications = (
     return isRoleRecipient;
   };
 
-  let unsubSnapshot: (() => void) | null = null;
-
-  const startSnapshot = () => {
-    if (unsubSnapshot) return;
+  const fetchOnDemand = async () => {
     if (isFirebaseReady && db) {
-      const usuarioActualId = usuarioActualIdParam || currentUserEmail || currentUserName;
-
-      const q = query(
-        collection(db, 'notifications'),
-        where('usuarioId', '==', usuarioActualId),
-        where('leida', '==', false),
-        limit(50)
-      );
-
-      unsubSnapshot = onSnapshot(q, (snapshot) => {
+      try {
+        const usuarioActualId = usuarioActualIdParam || currentUserEmail || currentUserName;
+        const q = query(
+          collection(db, 'notifications'),
+          where('usuarioId', '==', usuarioActualId),
+          where('leida', '==', false),
+          limit(20)
+        );
+        const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => {
           const d = doc.data();
           return {
@@ -226,82 +221,44 @@ export const subscribeToNotifications = (
         });
         const filtered = data.filter(isRecipient);
         callback(filtered);
-      }, (err) => {
-        console.warn("Firestore notifications onSnapshot error, falling back to local cache:", err);
-        localDB.getCollection('notifications', { limitCount: 50 }).then((data) => {
+      } catch (err) {
+        console.warn("Firestore getDocs notifications error, falling back to local cache:", err);
+        try {
+          const data = await localDB.getCollection('notifications', { limitCount: 20 });
           const filtered = (data || []).filter(isRecipient);
           callback(filtered);
-        }).catch(e => console.warn("Failed to fetch fallback notifications", e));
-      });
-    }
-  };
-
-  const stopSnapshot = () => {
-    if (unsubSnapshot) {
-      unsubSnapshot();
-      unsubSnapshot = null;
-    }
-  };
-
-  // Automatically disconnect from Firestore when tab is idle or hidden
-  const unsubActivity = onActivityStateChange((active) => {
-    if (active) {
-      startSnapshot();
+        } catch (e) {
+          console.warn("Failed to fetch fallback notifications", e);
+        }
+      }
     } else {
-      stopSnapshot();
-    }
-  });
-  
-  // Local mode fallback
-  const handleLocalChange = async (e?: Event) => {
-    if (e) {
-      const detail = (e as CustomEvent)?.detail;
-      if (detail?.collection && detail.collection !== 'notifications') return;
-    }
-    if (isFirebaseReady && db) return; // Snapshot handles it
-    try {
-      const data = await localDB.getCollection('notifications');
-      const sorted = [...data].sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return timeB - timeA;
-      });
-      const filtered = sorted.filter(isRecipient);
-      callback(filtered);
-    } catch (e) {
-      console.warn("Polling notifications temporarily failed", e);
+      try {
+        const data = await localDB.getCollection('notifications', { limitCount: 20 });
+        const sorted = [...data].sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+        const filtered = sorted.filter(isRecipient);
+        callback(filtered);
+      } catch (e) {
+        console.warn("Local notifications fetch error:", e);
+      }
     }
   };
 
   const onDbChange = (e?: Event) => {
     const detail = (e as CustomEvent)?.detail;
     if (!detail?.collection || detail.collection === 'notifications') {
-      handleLocalChange();
+      fetchOnDemand();
     }
   };
 
-  handleLocalChange();
+  fetchOnDemand();
   window.addEventListener('db-change', onDbChange);
-  
-  // Polling for local mode (only when tab is visible)
-  let isPolling = false;
-  const poll = async () => {
-    if (isPolling || document.hidden) return;
-    try {
-      isPolling = true;
-      await handleLocalChange();
-    } finally {
-      isPolling = false;
-    }
-  };
-  
-  const pollInterval = setInterval(poll, 15000); // Less aggressive polling
-  
+
   return () => {
-    unsubActivity();
-    stopSnapshot();
     window.removeEventListener('db-change', onDbChange);
-    clearInterval(pollInterval);
   };
 };
 
@@ -385,9 +342,9 @@ export const deleteNotification = async (id: string) => {
 
 export const migrateLegacyNotifications = async () => {
   if (!isFirebaseReady || !db) return;
-  const { query, collection, getDocs, writeBatch } = await import('firebase/firestore');
+  const { query, collection, getDocs, limit, writeBatch } = await import('firebase/firestore');
   
-  const q = query(collection(db, 'notifications'));
+  const q = query(collection(db, 'notifications'), limit(20));
   const snapshot = await getDocs(q);
   
   const batch = writeBatch(db);

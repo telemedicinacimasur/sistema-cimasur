@@ -19,7 +19,8 @@ import {
   deleteDoc,
   writeBatch,
   updateDoc,
-  deleteField
+  deleteField,
+  limit
 } from 'firebase/firestore';
 import { 
   Save, Users, 
@@ -101,6 +102,69 @@ const formatMonthName = (yearMonth: string): string => {
     return `${monthsEs[mIdx]} ${year}`;
   }
   return yearMonth;
+};
+
+const handleDownloadQuoteReportGlobal = (month: string, items: any[], clientName: string = 'Cliente', customPeriodLabel?: string) => {
+  const monthNameFormatted = customPeriodLabel || formatMonthName(month);
+  const doc = new jsPDF({ orientation: 'p' });
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59);
+  doc.text('DECLARACIÓN DE VENTAS / CONSIGNACIÓN', 14, 18);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
+  doc.text(`Periodo de Ventas: ${monthNameFormatted.toUpperCase()}`, 14, 30);
+  doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString()}`, 14, 35);
+  
+  const headers = ['PRODUCTO', 'SOLUCIÓN', 'CANTIDAD', 'P. UNITARIO', 'TOTAL'];
+  let grandTotal = 0;
+  let totalUnits = 0;
+
+  const sortedItems = [...items].sort((a, b) => {
+    const keyA = `${a.productoId || ''} ${a.solucionLote || ''}`.toLowerCase();
+    const keyB = `${b.productoId || ''} ${b.solucionLote || ''}`.toLowerCase();
+    return keyA.localeCompare(keyB);
+  });
+
+  const data = sortedItems.map(item => {
+    const unidades = Number(item.unidadesVendidas) || 0;
+    const precio = Number(item.precioUnitNeto) || 0;
+    const total = item.montoVendido ?? (unidades * precio);
+    grandTotal += total;
+    totalUnits += unidades;
+    return [
+      item.productoId,
+      item.solucionLote || 'S/S',
+      String(unidades),
+      formatCurrency(precio),
+      formatCurrency(total)
+    ];
+  });
+  
+  autoTable(doc, {
+    startY: 42,
+    head: [headers],
+    body: data,
+    foot: [['TOTALES DECLARADOS', '', String(totalUnits), '', formatCurrency(grandTotal)]],
+    theme: 'plain',
+    margin: { left: 14, right: 14 },
+    headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+    footStyles: { textColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
+    styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
+    didDrawCell: (cellData) => {
+       if (cellData.row.section === 'head' || cellData.row.section === 'body' || cellData.row.section === 'foot') {
+          doc.setDrawColor(226, 232, 240);
+          doc.setLineWidth(0.1);
+          doc.line(cellData.cell.x, cellData.cell.y + cellData.cell.height, cellData.cell.x + cellData.cell.width, cellData.cell.y + cellData.cell.height);
+       }
+    }
+  });
+  
+  doc.save(`Venta_Consignacion_${clientName.replace(/\s+/g, '_')}_${month}.pdf`);
 };
 
 const generateTwelveMonths = (startYearMonth: string): string[] => {
@@ -363,7 +427,8 @@ export default function VentasConsignacionView() {
         const db = getDb();
         const q = query(
           collection(db, 'planillas_consignacion'),
-          where('clienteId', '==', clienteId)
+          where('clienteId', '==', clienteId),
+          limit(20)
         );
         const snap = await getDocs(q);
         snap.docs.forEach(d => {
@@ -1047,7 +1112,7 @@ export default function VentasConsignacionView() {
 
       if (isFirebaseReady()) {
         const db = getDb();
-        const snap = await getDocs(collection(db, 'crm_consignacion_lotes'));
+        const snap = await getDocs(query(collection(db, 'crm_consignacion_lotes'), limit(20)));
         const loaded = [];
         for (const d of snap.docs) {
           const data = d.data();
@@ -1160,7 +1225,8 @@ export default function VentasConsignacionView() {
         const db = getDb();
         const q = query(
           collection(db, 'crm_consignacion_lotes'),
-          where('clienteId', '==', clienteId)
+          where('clienteId', '==', clienteId),
+          limit(20)
         );
         const snap = await getDocs(q);
         
@@ -3965,66 +4031,7 @@ export default function VentasConsignacionView() {
                     // Function to download a quote-style sales report in PDF
                     const handleDownloadQuoteReport = (month: string, items: any[], customPeriodLabel?: string) => {
                       const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
-                      const monthNameFormatted = customPeriodLabel || formatMonthName(month);
-                      const doc = new jsPDF({ orientation: 'p' });
-                      
-                      // Title
-                      doc.setFont('helvetica', 'bold');
-                      doc.setFontSize(14);
-                      doc.setTextColor(30, 41, 59); // Slate 800
-                      doc.text('DECLARACIÓN DE VENTAS / CONSIGNACIÓN', 14, 18);
-                      
-                      // Metadata
-                      doc.setFont('helvetica', 'normal');
-                      doc.setFontSize(9);
-                      doc.setTextColor(100, 116, 139); // Slate 500
-                      doc.text(`Cliente: ${clientName.toUpperCase()}`, 14, 25);
-                      doc.text(`Periodo de Ventas: ${monthNameFormatted.toUpperCase()}`, 14, 30);
-                      doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString()}`, 14, 35);
-                      
-                      const headers = ['PRODUCTO', 'SOLUCIÓN', 'CANTIDAD', 'P. UNITARIO', 'TOTAL'];
-                      let grandTotal = 0;
-                      let totalUnits = 0;
-
-                      const sortedItems = [...items].sort((a, b) => {
-                        const keyA = `${a.productoId || ''} ${a.solucionLote || ''}`.toLowerCase();
-                        const keyB = `${b.productoId || ''} ${b.solucionLote || ''}`.toLowerCase();
-                        return keyA.localeCompare(keyB);
-                      });
-
-                      const data = sortedItems.map(item => {
-                        grandTotal += item.montoVendido;
-                        totalUnits += item.unidadesVendidas;
-                        return [
-                          item.productoId,
-                          item.solucionLote || 'S/S',
-                          String(item.unidadesVendidas),
-                          formatCurrency(item.precioUnitNeto),
-                          formatCurrency(item.montoVendido)
-                        ];
-                      });
-                      
-                      autoTable(doc, {
-                        startY: 42,
-                        head: [headers],
-                        body: data,
-                        foot: [['TOTALES DECLARADOS', '', String(totalUnits), '', formatCurrency(grandTotal)]],
-                        theme: 'plain',
-                        margin: { left: 14, right: 14 },
-                        headStyles: { textColor: [30, 58, 95], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
-                        footStyles: { textColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', fillColor: [248, 250, 252] },
-                        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
-                        didDrawCell: (cellData) => {
-                           if (cellData.row.section === 'head' || cellData.row.section === 'body' || cellData.row.section === 'foot') {
-                              doc.setDrawColor(226, 232, 240);
-                              doc.setLineWidth(0.1);
-                              doc.line(cellData.cell.x, cellData.cell.y + cellData.cell.height, cellData.cell.x + cellData.cell.width, cellData.cell.y + cellData.cell.height);
-                           }
-                        }
-                      });
-                      
-                      
-                      doc.save(`Venta_Consignacion_${clientName.replace(/\s+/g, '_')}_${month}.pdf`);
+                      handleDownloadQuoteReportGlobal(month, items, clientName, customPeriodLabel);
                     };
 
                     return (
@@ -4956,17 +4963,21 @@ export default function VentasConsignacionView() {
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
-                  onClick={() => handleDownloadQuoteReport(
-                    editarPlanillaForm.month,
-                    editarPlanillaForm.items.map(i => ({
-                      productoId: i.productoId,
-                      solucionLote: i.solucionLote,
-                      unidadesVendidas: Number(i.unidadesVendidas) || 0,
-                      precioUnitNeto: Number(i.precioUnitNeto) || 0,
-                      montoVendido: (Number(i.unidadesVendidas) || 0) * (Number(i.precioUnitNeto) || 0)
-                    })),
-                    editarPlanillaForm.customPeriodLabel
-                  )}
+                  onClick={() => {
+                    const clientName = clientes.find(c => c.id === registroVentasCliente)?.name || 'Cliente';
+                    handleDownloadQuoteReportGlobal(
+                      editarPlanillaForm.month,
+                      editarPlanillaForm.items.map(i => ({
+                        productoId: i.productoId,
+                        solucionLote: i.solucionLote,
+                        unidadesVendidas: Number(i.unidadesVendidas) || 0,
+                        precioUnitNeto: Number(i.precioUnitNeto) || 0,
+                        montoVendido: (Number(i.unidadesVendidas) || 0) * (Number(i.precioUnitNeto) || 0)
+                      })),
+                      clientName,
+                      editarPlanillaForm.customPeriodLabel
+                    );
+                  }}
                   className="px-4 py-2.5 bg-sky-500 hover:bg-sky-400 text-[#050914] font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-sky-500/20 active:scale-95 cursor-pointer"
                 >
                   <Download size={15} />
