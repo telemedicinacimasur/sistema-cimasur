@@ -428,7 +428,7 @@ export default function VentasConsignacionView() {
         const q = query(
           collection(db, 'planillas_consignacion'),
           where('clienteId', '==', clienteId),
-          limit(20)
+          limit(5000)
         );
         const snap = await getDocs(q);
         snap.docs.forEach(d => {
@@ -1103,7 +1103,7 @@ export default function VentasConsignacionView() {
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
           const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < 300000) { // 5 minutes cache
+          if (Date.now() - timestamp < 10000) { // 10 seconds cache
             setTodosLosLotes(data);
             return;
           }
@@ -1112,7 +1112,7 @@ export default function VentasConsignacionView() {
 
       if (isFirebaseReady()) {
         const db = getDb();
-        const snap = await getDocs(query(collection(db, 'crm_consignacion_lotes'), limit(20)));
+        const snap = await getDocs(query(collection(db, 'crm_consignacion_lotes'), limit(5000)));
         const loaded = [];
         for (const d of snap.docs) {
           const data = d.data();
@@ -1214,7 +1214,7 @@ export default function VentasConsignacionView() {
       const cached = localStorage.getItem(cacheKey);
       if (!force && cached) {
         const { data, timestamp } = JSON.parse(cached);
-        if (now - timestamp < 600000) { // 10 minutes cache
+        if (now - timestamp < 10000) { // 10 seconds cache
           setLotesActivos(data);
           return;
         }
@@ -1226,7 +1226,7 @@ export default function VentasConsignacionView() {
         const q = query(
           collection(db, 'crm_consignacion_lotes'),
           where('clienteId', '==', clienteId),
-          limit(20)
+          limit(5000)
         );
         const snap = await getDocs(q);
         
@@ -1273,6 +1273,7 @@ export default function VentasConsignacionView() {
   useEffect(() => {
     if (registroVentasCliente) {
       loadSavedPlanillas(registroVentasCliente);
+      loadTodosLosLotes(true);
     }
   }, [registroVentasCliente, loadSavedPlanillas]);
 
