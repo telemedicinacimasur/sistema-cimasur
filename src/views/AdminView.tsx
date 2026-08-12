@@ -993,6 +993,32 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
 
           await localDB.saveToCollection('quotes', newQuote);
           importedCount++;
+
+          if (String(newQuote.estado || '').toUpperCase().trim() === 'APROBADA' && nroCotiz) {
+            const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 2000 });
+            const exists = existingTracking.some(d => String(d.nroCotiz || '').trim() === nroCotiz || String(d.id || '').trim() === nroCotiz);
+            if (!exists) {
+              await localDB.saveToCollection('order_tracking', {
+                id: nroCotiz,
+                nroCotiz: nroCotiz,
+                ot: '',
+                cliente: newQuote.cliente || '',
+                fechaCotiz: newQuote.fechaElab || new Date().toISOString().split('T')[0],
+                fechaEnvio: '',
+                fechaCierre: '',
+                fechaRecepción: '',
+                courier: 'Retiro en Oficina',
+                detalleSeguimiento: '',
+                situacion: 'PENDIENTE',
+                logs: [{
+                  date: new Date().toLocaleString('es-CL'),
+                  user: user?.displayName || user?.email || 'Sistema',
+                  action: 'Cotización Importada Aprobada en Administración (Auto-sincronizada)'
+                }]
+              });
+              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
+            }
+          }
         }
 
         await addAuditLog(user, `Importó ${importedCount} cotizaciones desde Excel`, 'Administración');
@@ -1088,6 +1114,34 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
       await addAuditLog(user, `Registró Cotización N° ${form.nroCotiz}`, 'Administración');
       alert('Cotización guardada exitosamente');
     }
+
+    if (String(form.estado || '').toUpperCase().trim() === 'APROBADA' && form.nroCotiz) {
+      const numCotiz = String(form.nroCotiz || '').trim();
+      const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 2000 });
+      const exists = existingTracking.some(d => String(d.nroCotiz || '').trim() === numCotiz || String(d.id || '').trim() === numCotiz);
+      if (!exists) {
+        await localDB.saveToCollection('order_tracking', {
+          id: numCotiz,
+          nroCotiz: numCotiz,
+          ot: '',
+          cliente: form.cliente || '',
+          fechaCotiz: form.fechaElab || new Date().toISOString().split('T')[0],
+          fechaEnvio: '',
+          fechaCierre: '',
+          fechaRecepción: '',
+          courier: 'Retiro en Oficina',
+          detalleSeguimiento: '',
+          situacion: 'PENDIENTE',
+          logs: [{
+            date: new Date().toLocaleString('es-CL'),
+            user: user?.displayName || user?.email || 'Sistema',
+            action: 'Cotización Registrada Aprobada en Administración (Auto-sincronizada)'
+          }]
+        });
+        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
+      }
+    }
+
     setForm({
       anio: new Date().getFullYear().toString(),
       mes: new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
@@ -1127,10 +1181,39 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
     try {
       const record = records.find(r => r.id === id);
       if (!record) return;
-      const newTotal = newStatus === 'Aprobada' ? (Number(record.invUnits || 0) + Number(record.todoUnits || 0)) : 0;
+      const isApproved = String(newStatus || '').toUpperCase().trim() === 'APROBADA';
+      const newTotal = isApproved ? (Number(record.invUnits || 0) + Number(record.todoUnits || 0)) : 0;
       await localDB.updateInCollection('quotes', id, { ...record, estado: newStatus, undTotal: newTotal });
       
-      if (newStatus === 'Aprobada') {
+      if (isApproved) {
+        // Auto-sincronizar con el módulo de Seguimiento de Pedidos / Trazabilidad en Laboratorio
+        const numCotiz = String(record.nroCotiz || '').trim();
+        if (numCotiz) {
+          const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 2000 });
+          const exists = existingTracking.some(d => String(d.nroCotiz || '').trim() === numCotiz || String(d.id || '').trim() === numCotiz);
+          if (!exists) {
+            await localDB.saveToCollection('order_tracking', {
+              id: numCotiz,
+              nroCotiz: numCotiz,
+              ot: '',
+              cliente: record.cliente || '',
+              fechaCotiz: record.fechaElab || new Date().toISOString().split('T')[0],
+              fechaEnvio: '',
+              fechaCierre: '',
+              fechaRecepción: '',
+              courier: 'Retiro en Oficina',
+              detalleSeguimiento: '',
+              situacion: 'PENDIENTE',
+              logs: [{
+                date: new Date().toLocaleString('es-CL'),
+                user: user?.displayName || user?.email || 'Sistema',
+                action: 'Cotización Aprobada en Administración (Auto-sincronizada)'
+              }]
+            });
+            window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
+          }
+        }
+
         await addNotification({
           title: 'Cotización Aprobada',
           message: `La cotización N° ${record.nroCotiz} para ${record.cliente} ha sido aprobada.`,
