@@ -5247,31 +5247,27 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
   const handleSyncFromQuotes = async () => {
     try {
-      console.log('Sync: Fetching quotes via localDB...');
-      // Fetch all quotes using localDB (works in both Firebase and Local environments transparently)
-      const allQuotes = await localDB.getCollection('quotes', { limitCount: 2000 });
+      console.log('Sync: Fetching quotes via localDB with forceRefresh...');
+      const allQuotes = await localDB.getCollection('quotes', { limitCount: 2000, forceRefresh: true });
       
-      // Filter quotes where state is approved (case-insensitive check for 'Aprobada' or 'APROBADA')
       const approvedQuotes = allQuotes.filter(q => {
         const estadoStr = String(q.estado || '').toUpperCase().trim();
         return estadoStr === 'APROBADA';
       });
       console.log(`Sync: Found ${approvedQuotes.length} approved quotes.`);
 
-      // 2. Fetch Existing Tracking IDs
       console.log('Sync: Fetching existing tracking records...');
-      const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 2000 });
-      const existingTrackingIds = new Set(existingTracking.map(d => String(d.nroCotiz || '').trim()));
+      const existingTracking = await localDB.getCollection('order_tracking', { limitCount: 2000, forceRefresh: true });
+      const existingTrackingIds = new Set(existingTracking.map(d => String(d.nroCotiz || d.id || '').trim()));
       console.log(`Sync: Found ${existingTrackingIds.size} existing tracking records.`);
 
       let addedCount = 0;
       for (const quote of approvedQuotes) {
-        const numCotiz = String(quote.nroCotiz || '').trim();
+        const numCotiz = String(quote.nroCotiz || quote.id || '').trim();
         if (!numCotiz) continue;
 
         if (!existingTrackingIds.has(numCotiz)) {
           console.log(`Sync: Adding new record for ${numCotiz}...`);
-          // 3. Save new using numCotiz as ID
           const newTrackingRecord = {
             id: numCotiz,
             nroCotiz: numCotiz,
@@ -5280,7 +5276,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             fechaCotiz: safe(quote.fechaElab) || new Date().toISOString().split('T')[0],
             fechaEnvio: '',
             fechaCierre: '',
-            fechaRecepción: '',
+            fechaRecepcion: '',
             courier: 'Retiro en Oficina',
             detalleSeguimiento: '',
             situacion: 'PENDIENTE',
@@ -5293,24 +5289,22 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
           await localDB.saveToCollection('order_tracking', newTrackingRecord);
           addedCount++;
-          existingTrackingIds.add(numCotiz); // Keep local set updated
-        } else {
-          console.log(`Sync: Skipping existing ${numCotiz}.`);
+          existingTrackingIds.add(numCotiz);
         }
       }
       
+      const updated = await localDB.getCollection('order_tracking', { forceRefresh: true });
+      setTrackingRecords(Array.isArray(updated) ? updated : []);
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
+
       if (addedCount > 0) {
-        alert(`Éxito: Se sincronizaron ${addedCount} nuevos pedidos.`);
-        // Reload locally
-        const updated = await localDB.getCollection('order_tracking');
-        setTrackingRecords(updated);
-        window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'order_tracking' } }));
+        alert(`Éxito: Se sincronizaron ${addedCount} nuevas cotizaciones aprobadas desde Administración.`);
       } else {
-        alert('Información: No hay nuevas cotizaciones aprobadas para sincronizar.');
+        alert('Información: Todos los datos están sincronizados al día con Administración.');
       }
     } catch (err) {
       console.error('Sync Error:', err);
-      alert('Error técnico al sincronizar. Revise la consola. Detalle: ' + (err as Error).message);
+      alert('Error técnico al sincronizar. Detalle: ' + (err as Error).message);
     }
   };
 
