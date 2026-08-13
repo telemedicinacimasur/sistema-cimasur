@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
 import { getDb, isFirebaseReady } from '../lib/firebase';
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  limit, 
+  onSnapshot, 
+  startAfter, 
+  getDocs, 
+  QueryDocumentSnapshot, 
+  DocumentData 
+} from 'firebase/firestore';
 import { checkStockAlerts, checkPendingOrderAlerts } from '../lib/stockAlerts';
 import { cn, formatDate, safe, parseExcelDate, formatDateForExcel } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -5145,6 +5156,10 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     situacion: 'PENDIENTE'
   });
 
+  const [lastTrackingDoc, setLastTrackingDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMoreTracking, setHasMoreTracking] = useState<boolean>(true);
+  const [loadingMoreTracking, setLoadingMoreTracking] = useState<boolean>(false);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadTrackingData = async (forceRefresh = false) => {
@@ -5153,7 +5168,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         setIsRefreshing(true);
         localDB.clearCache();
       }
-      const data = await localDB.getCollection('order_tracking', { limitCount: 5000, forceRefresh });
+      const data = await localDB.getCollection('order_tracking', { limitCount: 20, forceRefresh });
       setTrackingRecords(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Initial Load Error:', err);
@@ -5166,17 +5181,128 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   };
 
   useEffect(() => {
-    loadTrackingData(true);
+    let unsubscribe: (() => void) | null = null;
+
+    if (isFirebaseReady()) {
+      const db = getDb();
+      if (db) {
+        try {
+          const q = query(
+            collection(db, 'order_tracking'),
+            orderBy('fecha', 'desc'),
+            limit(20)
+          );
+
+          unsubscribe = onSnapshot(q, (snapshot) => {
+            const docs = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setTrackingRecords(docs);
+            if (snapshot.docs.length > 0) {
+              setLastTrackingDoc(snapshot.docs[snapshot.docs.length - 1]);
+            } else {
+              setLastTrackingDoc(null);
+            }
+            setHasMoreTracking(snapshot.docs.length === 20);
+          }, (err) => {
+            console.warn("Firestore order_tracking onSnapshot error (e.g., index or missing field), trying fallback query:", err);
+            try {
+              const fallbackQ = query(
+                collection(db, 'order_tracking'),
+                orderBy('fechaCotiz', 'desc'),
+                limit(20)
+              );
+              const unsubFallback = onSnapshot(fallbackQ, (fbSnap) => {
+                const docs = fbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setTrackingRecords(docs);
+                if (fbSnap.docs.length > 0) setLastTrackingDoc(fbSnap.docs[fbSnap.docs.length - 1]);
+                setHasMoreTracking(fbSnap.docs.length === 20);
+              }, () => {
+                loadTrackingData(true);
+              });
+              unsubscribe = unsubFallback;
+            } catch {
+              loadTrackingData(true);
+            }
+          });
+        } catch (err) {
+          console.error("Firestore order_tracking query setup error:", err);
+          loadTrackingData(true);
+        }
+      } else {
+        loadTrackingData(true);
+      }
+    } else {
+      loadTrackingData(true);
+    }
+
     handleSyncFromQuotes(true);
+
     const handleTrackingDbChange = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (!detail?.collection || detail.collection === 'order_tracking') {
-        loadTrackingData();
+        if (!isFirebaseReady()) {
+          loadTrackingData();
+        }
       }
     };
+
     window.addEventListener('db-change', handleTrackingDbChange);
-    return () => window.removeEventListener('db-change', handleTrackingDbChange);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+      window.removeEventListener('db-change', handleTrackingDbChange);
+    };
   }, []);
+
+  const loadMoreTrackingRecords = async () => {
+    if (!hasMoreTracking || loadingMoreTracking || !lastTrackingDoc) return;
+    setLoadingMoreTracking(true);
+    try {
+      if (isFirebaseReady()) {
+        const db = getDb();
+        if (db) {
+          let nextQuery = query(
+            collection(db, 'order_tracking'),
+            orderBy('fecha', 'desc'),
+            startAfter(lastTrackingDoc),
+            limit(20)
+          );
+          let snapshot;
+          try {
+            snapshot = await getDocs(nextQuery);
+          } catch {
+            nextQuery = query(
+              collection(db, 'order_tracking'),
+              orderBy('fechaCotiz', 'desc'),
+              startAfter(lastTrackingDoc),
+              limit(20)
+            );
+            snapshot = await getDocs(nextQuery);
+          }
+          if (!snapshot.empty) {
+            const newDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setTrackingRecords(prev => {
+              const existingIds = new Set(prev.map(item => item.id));
+              const uniqueNew = newDocs.filter(item => !existingIds.has(item.id));
+              return [...prev, ...uniqueNew];
+            });
+            setLastTrackingDoc(snapshot.docs[snapshot.docs.length - 1]);
+            setHasMoreTracking(snapshot.docs.length === 20);
+          } else {
+            setHasMoreTracking(false);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error loading more order_tracking records:", err);
+    } finally {
+      setLoadingMoreTracking(false);
+    }
+  };
 
   useEffect(() => {
     if (trackingRecords.length > 0) {
@@ -5875,6 +6001,26 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             </tbody>
           </table>
         </div>
+        {hasMoreTracking && (
+          <div className="p-4 text-center border-t border-[#1E293B] bg-[#0F172A]/50">
+            <button
+              type="button"
+              onClick={loadMoreTrackingRecords}
+              disabled={loadingMoreTracking}
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow inline-flex items-center gap-2 cursor-pointer"
+            >
+              {loadingMoreTracking ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Cargando más registros...
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5" /> Cargar más registros (+20)
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
