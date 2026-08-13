@@ -4,8 +4,11 @@ import {
   getFirestore, 
   initializeFirestore, 
   persistentLocalCache, 
-  persistentMultipleTabManager 
+  persistentMultipleTabManager,
+  setLogLevel
 } from 'firebase/firestore';
+
+setLogLevel('debug');
 
 let app: any = null;
 let db: any = null;

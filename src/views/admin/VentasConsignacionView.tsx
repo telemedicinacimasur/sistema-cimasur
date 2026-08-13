@@ -104,6 +104,59 @@ const formatMonthName = (yearMonth: string): string => {
   return yearMonth;
 };
 
+const generateMultiMonthLabel = (baseYearMonth: string, numMonths: number): string => {
+  if (!baseYearMonth || !baseYearMonth.includes('-')) return '';
+  if (numMonths <= 1) return formatMonthName(baseYearMonth);
+
+  const [yearStr, monthStr] = baseYearMonth.split('-');
+  let y = parseInt(yearStr, 10);
+  let m = parseInt(monthStr, 10);
+
+  const monthsEs = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+
+  if (numMonths === 2) {
+    let nextM = m + 1;
+    let nextY = y;
+    if (nextM > 12) { nextM = 1; nextY += 1; }
+    if (y === nextY) {
+      return `${monthsEs[m - 1]} y ${monthsEs[nextM - 1]} ${y}`;
+    } else {
+      return `${monthsEs[m - 1]} ${y} y ${monthsEs[nextM - 1]} ${nextY}`;
+    }
+  }
+
+  if (numMonths === 3) {
+    let m2 = m + 1;
+    let y2 = y;
+    if (m2 > 12) { m2 = 1; y2 += 1; }
+    let m3 = m + 2;
+    let y3 = y;
+    if (m3 > 12) { m3 -= 12; y3 += 1; }
+
+    if (y === y3) {
+      return `${monthsEs[m - 1]}, ${monthsEs[m2 - 1]} y ${monthsEs[m3 - 1]} ${y}`;
+    } else {
+      return `${monthsEs[m - 1]} ${y} a ${monthsEs[m3 - 1]} ${y3}`;
+    }
+  }
+
+  let endM = m + numMonths - 1;
+  let endY = y;
+  while (endM > 12) {
+    endM -= 12;
+    endY += 1;
+  }
+
+  if (y === endY) {
+    return `${monthsEs[m - 1]} a ${monthsEs[endM - 1]} ${y}`;
+  } else {
+    return `${monthsEs[m - 1]} ${y} a ${monthsEs[endM - 1]} ${endY}`;
+  }
+};
+
 const handleDownloadQuoteReportGlobal = (month: string, items: any[], clientName: string = 'Cliente', customPeriodLabel?: string) => {
   const monthNameFormatted = customPeriodLabel || formatMonthName(month);
   const doc = new jsPDF({ orientation: 'p' });
@@ -383,6 +436,7 @@ export default function VentasConsignacionView() {
   const [selectedFixedLoteIds, setSelectedFixedLoteIds] = useState<Set<string>>(new Set());
   const [savedPlanillaMonths, setSavedPlanillaMonths] = useState<Set<string>>(new Set());
   const [savedPlanillasMeta, setSavedPlanillasMeta] = useState<Record<string, {
+    numMonths?: number;
     isBimonthly?: boolean;
     secondMonth?: string;
     customPeriodLabel?: string;
@@ -396,6 +450,7 @@ export default function VentasConsignacionView() {
 
   const [editarPlanillaForm, setEditarPlanillaForm] = useState<{
     month: string;
+    numMonths: number;
     isBimonthly: boolean;
     secondMonth: string;
     customPeriodLabel: string;
@@ -409,6 +464,7 @@ export default function VentasConsignacionView() {
     }>;
   }>({
     month: '',
+    numMonths: 1,
     isBimonthly: false,
     secondMonth: '',
     customPeriodLabel: '',
@@ -452,6 +508,7 @@ export default function VentasConsignacionView() {
           if (data.month) {
             set.add(data.month);
             metaMap[data.month] = {
+              numMonths: data.numMonths || (data.isBimonthly ? 2 : 1),
               isBimonthly: data.isBimonthly,
               secondMonth: data.secondMonth,
               customPeriodLabel: data.customPeriodLabel,
@@ -470,6 +527,7 @@ export default function VentasConsignacionView() {
               if (stored && stored.startsWith('{')) {
                 const parsed = JSON.parse(stored);
                 metaMap[m] = {
+                  numMonths: parsed.numMonths || (parsed.isBimonthly ? 2 : 1),
                   isBimonthly: parsed.isBimonthly,
                   secondMonth: parsed.secondMonth,
                   customPeriodLabel: parsed.customPeriodLabel,
@@ -712,6 +770,7 @@ export default function VentasConsignacionView() {
 
   const handleSaveQuickReponer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingReponer) return;
     if (!reponerForm.clienteId) {
       alert('Por favor seleccione un cliente.');
       return;
@@ -728,46 +787,103 @@ export default function VentasConsignacionView() {
     try {
       setSavingReponer(true);
       const uProduct = reponerForm.productoId.toUpperCase().trim();
+      const uSolucion = reponerForm.solucionLote.toUpperCase().trim() || 'S/L';
       const units = Number(reponerForm.unidadesIniciales);
       const price = Number(reponerForm.precioUnitNeto);
       const totalVal = units * price;
+      const targetVenc = reponerForm.fechaVencimiento;
+
+      // Invalidate memory and local caches
+      todosLosLotesMemoryCache.current = null;
+      if (reponerForm.clienteId) {
+        delete clientLotesMemoryCache.current[reponerForm.clienteId];
+        localStorage.removeItem(`cache_lotes_${reponerForm.clienteId}`);
+      }
+      localStorage.removeItem('cache_todos_los_lotes');
 
       if (isFirebaseReady()) {
         const db = getDb();
-        const loteData = {
-          clienteId: reponerForm.clienteId,
-          productoId: uProduct,
-          solucionLote: reponerForm.solucionLote.toUpperCase().trim() || 'S/L',
-          fechaEntrega: Timestamp.fromDate(new Date(reponerForm.fechaEntrega + 'T12:00:00')),
-          fechaVencimiento: Timestamp.fromDate(new Date(reponerForm.fechaVencimiento + 'T12:00:00')),
-          unidadesIniciales: units,
-          precioUnitNeto: price,
-          totalVentaOriginal: totalVal,
-          activo: true,
-          createdAt: Timestamp.now()
-        };
-        await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
+        const q = query(
+          collection(db, 'crm_consignacion_lotes'),
+          where('clienteId', '==', reponerForm.clienteId),
+          where('productoId', '==', uProduct)
+        );
+        const snap = await getDocs(q);
+        let existingLoteDoc: any = null;
+
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const docSol = (data.solucionLote || 'S/L').toUpperCase().trim();
+          const docVenc = parseDateString(data.fechaVencimiento);
+          if (docSol === uSolucion && docVenc === targetVenc) {
+            existingLoteDoc = { id: d.id, ...data };
+          }
+        });
+
+        if (existingLoteDoc) {
+          const loteRef = doc(db, 'crm_consignacion_lotes', existingLoteDoc.id);
+          const currentUnits = Number(existingLoteDoc.unidadesIniciales || 0);
+          const newUnits = currentUnits + units;
+          const finalPrice = price > 0 ? price : Number(existingLoteDoc.precioUnitNeto || 0);
+          await updateDoc(loteRef, {
+            unidadesIniciales: newUnits,
+            precioUnitNeto: finalPrice,
+            totalVentaOriginal: newUnits * finalPrice,
+            updatedAt: Timestamp.now()
+          });
+        } else {
+          const loteData = {
+            clienteId: reponerForm.clienteId,
+            productoId: uProduct,
+            solucionLote: uSolucion,
+            fechaEntrega: Timestamp.fromDate(new Date(reponerForm.fechaEntrega + 'T12:00:00')),
+            fechaVencimiento: Timestamp.fromDate(new Date(targetVenc + 'T12:00:00')),
+            unidadesIniciales: units,
+            precioUnitNeto: price,
+            totalVentaOriginal: totalVal,
+            activo: true,
+            createdAt: Timestamp.now()
+          };
+          await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
+        }
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         let allLotes = existing ? JSON.parse(existing) : [];
 
-        const newLote = {
-          id: `lote_${Date.now()}`,
-          clienteId: reponerForm.clienteId,
-          productoId: uProduct,
-          solucionLote: reponerForm.solucionLote.toUpperCase().trim() || 'S/L',
-          fechaEntrega: reponerForm.fechaEntrega,
-          fechaVencimiento: reponerForm.fechaVencimiento,
-          unidadesIniciales: units,
-          precioUnitNeto: price,
-          totalVentaOriginal: totalVal,
-          activo: true,
-          createdAt: new Date().toISOString(),
-          movimientos: {}
-        };
-        allLotes.push(newLote);
-        localStorage.setItem(key, JSON.stringify(allLotes));
+        const existingIdx = allLotes.findIndex((l: any) =>
+          l.clienteId === reponerForm.clienteId &&
+          (l.productoId || '').toUpperCase().trim() === uProduct &&
+          (l.solucionLote || 'S/L').toUpperCase().trim() === uSolucion &&
+          parseDateString(l.fechaVencimiento) === targetVenc
+        );
+
+        if (existingIdx !== -1) {
+          const currentUnits = Number(allLotes[existingIdx].unidadesIniciales || 0);
+          const newUnits = currentUnits + units;
+          const finalPrice = price > 0 ? price : Number(allLotes[existingIdx].precioUnitNeto || 0);
+          allLotes[existingIdx].unidadesIniciales = newUnits;
+          allLotes[existingIdx].precioUnitNeto = finalPrice;
+          allLotes[existingIdx].totalVentaOriginal = newUnits * finalPrice;
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        } else {
+          const newLote = {
+            id: `lote_${Date.now()}`,
+            clienteId: reponerForm.clienteId,
+            productoId: uProduct,
+            solucionLote: uSolucion,
+            fechaEntrega: reponerForm.fechaEntrega,
+            fechaVencimiento: targetVenc,
+            unidadesIniciales: units,
+            precioUnitNeto: price,
+            totalVentaOriginal: totalVal,
+            activo: true,
+            createdAt: new Date().toISOString(),
+            movimientos: {}
+          };
+          allLotes.push(newLote);
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
       }
 
       setSaveNotification(`✅ Reposición de stock guardada: ${units} u. de ${uProduct} registradas exitosamente.`);
@@ -776,8 +892,8 @@ export default function VentasConsignacionView() {
       setReponerModal(null);
 
       await loadTodosLosLotes(true);
-      if (declaracionCliente === reponerForm.clienteId) {
-        await loadLotes(declaracionCliente, true);
+      if (declaracionCliente === reponerForm.clienteId || registroVentasCliente === reponerForm.clienteId) {
+        await loadLotes(reponerForm.clienteId, true);
       }
     } catch (err: any) {
       console.error(err);
@@ -1481,46 +1597,103 @@ export default function VentasConsignacionView() {
 
     try {
       const uProduct = formEntrega.producto_id.toUpperCase().trim();
+      const uSolucion = formEntrega.solucion_lote.toUpperCase().trim() || 'S/L';
       const units = Number(formEntrega.unidades_iniciales);
       const price = Number(formEntrega.precio_unit_neto);
       const totalVal = units * price;
+      const targetVenc = formEntrega.fecha_vencimiento;
+
+      // Invalidate memory and local caches
+      todosLosLotesMemoryCache.current = null;
+      if (formEntrega.cliente_id) {
+        delete clientLotesMemoryCache.current[formEntrega.cliente_id];
+        localStorage.removeItem(`cache_lotes_${formEntrega.cliente_id}`);
+      }
+      localStorage.removeItem('cache_todos_los_lotes');
 
       if (isFirebaseReady()) {
         const db = getDb();
-        const loteData = {
-          clienteId: formEntrega.cliente_id,
-          productoId: uProduct,
-          solucionLote: formEntrega.solucion_lote.toUpperCase().trim() || 'S/L',
-          fechaEntrega: Timestamp.fromDate(new Date(formEntrega.fecha_entrega + 'T12:00:00')),
-          fechaVencimiento: Timestamp.fromDate(new Date(formEntrega.fecha_vencimiento + 'T12:00:00')),
-          unidadesIniciales: units,
-          precioUnitNeto: price,
-          totalVentaOriginal: totalVal,
-          activo: true,
-          createdAt: Timestamp.now()
-        };
-        await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
+        const q = query(
+          collection(db, 'crm_consignacion_lotes'),
+          where('clienteId', '==', formEntrega.cliente_id),
+          where('productoId', '==', uProduct)
+        );
+        const snap = await getDocs(q);
+        let existingLoteDoc: any = null;
+
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const docSol = (data.solucionLote || 'S/L').toUpperCase().trim();
+          const docVenc = parseDateString(data.fechaVencimiento);
+          if (docSol === uSolucion && docVenc === targetVenc) {
+            existingLoteDoc = { id: d.id, ...data };
+          }
+        });
+
+        if (existingLoteDoc) {
+          const loteRef = doc(db, 'crm_consignacion_lotes', existingLoteDoc.id);
+          const currentUnits = Number(existingLoteDoc.unidadesIniciales || 0);
+          const newUnits = currentUnits + units;
+          const finalPrice = price > 0 ? price : Number(existingLoteDoc.precioUnitNeto || 0);
+          await updateDoc(loteRef, {
+            unidadesIniciales: newUnits,
+            precioUnitNeto: finalPrice,
+            totalVentaOriginal: newUnits * finalPrice,
+            updatedAt: Timestamp.now()
+          });
+        } else {
+          const loteData = {
+            clienteId: formEntrega.cliente_id,
+            productoId: uProduct,
+            solucionLote: uSolucion,
+            fechaEntrega: Timestamp.fromDate(new Date(formEntrega.fecha_entrega + 'T12:00:00')),
+            fechaVencimiento: Timestamp.fromDate(new Date(targetVenc + 'T12:00:00')),
+            unidadesIniciales: units,
+            precioUnitNeto: price,
+            totalVentaOriginal: totalVal,
+            activo: true,
+            createdAt: Timestamp.now()
+          };
+          await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
+        }
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         let allLotes = existing ? JSON.parse(existing) : [];
         
-        const newLote = {
-          id: `lote_${Date.now()}`,
-          clienteId: formEntrega.cliente_id,
-          productoId: uProduct,
-          solucionLote: formEntrega.solucion_lote.toUpperCase().trim() || 'S/L',
-          fechaEntrega: formEntrega.fecha_entrega,
-          fechaVencimiento: formEntrega.fecha_vencimiento,
-          unidadesIniciales: units,
-          precioUnitNeto: price,
-          totalVentaOriginal: totalVal,
-          activo: true,
-          createdAt: new Date().toISOString(),
-          movimientos: {}
-        };
-        allLotes.push(newLote);
-        localStorage.setItem(key, JSON.stringify(allLotes));
+        const existingIdx = allLotes.findIndex((l: any) =>
+          l.clienteId === formEntrega.cliente_id &&
+          (l.productoId || '').toUpperCase().trim() === uProduct &&
+          (l.solucionLote || 'S/L').toUpperCase().trim() === uSolucion &&
+          parseDateString(l.fechaVencimiento) === targetVenc
+        );
+
+        if (existingIdx !== -1) {
+          const currentUnits = Number(allLotes[existingIdx].unidadesIniciales || 0);
+          const newUnits = currentUnits + units;
+          const finalPrice = price > 0 ? price : Number(allLotes[existingIdx].precioUnitNeto || 0);
+          allLotes[existingIdx].unidadesIniciales = newUnits;
+          allLotes[existingIdx].precioUnitNeto = finalPrice;
+          allLotes[existingIdx].totalVentaOriginal = newUnits * finalPrice;
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        } else {
+          const newLote = {
+            id: `lote_${Date.now()}`,
+            clienteId: formEntrega.cliente_id,
+            productoId: uProduct,
+            solucionLote: uSolucion,
+            fechaEntrega: formEntrega.fecha_entrega,
+            fechaVencimiento: targetVenc,
+            unidadesIniciales: units,
+            precioUnitNeto: price,
+            totalVentaOriginal: totalVal,
+            activo: true,
+            createdAt: new Date().toISOString(),
+            movimientos: {}
+          };
+          allLotes.push(newLote);
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
       }
 
       alert('Lote en consignación registrado correctamente.');
@@ -1534,11 +1707,10 @@ export default function VentasConsignacionView() {
         precio_unit_neto: 0
       });
 
-      if (declaracionCliente === formEntrega.cliente_id) {
-        await loadLotes(declaracionCliente, true);
-      } else {
-        await loadTodosLosLotes();
+      if (declaracionCliente === formEntrega.cliente_id || registroVentasCliente === formEntrega.cliente_id) {
+        await loadLotes(formEntrega.cliente_id, true);
       }
+      await loadTodosLosLotes(true);
     } catch (err: any) {
       console.error(err);
       alert('Error registrando despacho: ' + err.message);
@@ -1557,48 +1729,104 @@ export default function VentasConsignacionView() {
 
     try {
       const uProduct = inlineForm.productoId.toUpperCase().trim();
+      const uSolucion = inlineForm.solucionLote.toUpperCase().trim() || 'SALINA';
       const units = Number(inlineForm.unidadesIniciales);
       const price = Number(inlineForm.precioUnitNeto);
       const totalVal = units * price;
-      // Use the first day of the selected month as the delivery/creation date
+      const targetVenc = inlineForm.fechaVencimiento;
       const deliveryDateStr = `${selectedMonth}-01`;
+
+      // Invalidate memory and local caches
+      todosLosLotesMemoryCache.current = null;
+      if (declaracionCliente) {
+        delete clientLotesMemoryCache.current[declaracionCliente];
+        localStorage.removeItem(`cache_lotes_${declaracionCliente}`);
+      }
+      localStorage.removeItem('cache_todos_los_lotes');
 
       if (isFirebaseReady()) {
         const db = getDb();
-        const loteData = {
-          clienteId: declaracionCliente,
-          productoId: uProduct,
-          solucionLote: inlineForm.solucionLote.toUpperCase().trim() || 'SALINA',
-          fechaEntrega: Timestamp.fromDate(new Date(deliveryDateStr + 'T12:00:00')),
-          fechaVencimiento: Timestamp.fromDate(new Date(inlineForm.fechaVencimiento + 'T12:00:00')),
-          unidadesIniciales: units,
-          precioUnitNeto: price,
-          totalVentaOriginal: totalVal,
-          activo: true,
-          createdAt: Timestamp.now()
-        };
-        await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
+        const q = query(
+          collection(db, 'crm_consignacion_lotes'),
+          where('clienteId', '==', declaracionCliente),
+          where('productoId', '==', uProduct)
+        );
+        const snap = await getDocs(q);
+        let existingLoteDoc: any = null;
+
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const docSol = (data.solucionLote || 'S/L').toUpperCase().trim();
+          const docVenc = parseDateString(data.fechaVencimiento);
+          if (docSol === uSolucion && docVenc === targetVenc) {
+            existingLoteDoc = { id: d.id, ...data };
+          }
+        });
+
+        if (existingLoteDoc) {
+          const loteRef = doc(db, 'crm_consignacion_lotes', existingLoteDoc.id);
+          const currentUnits = Number(existingLoteDoc.unidadesIniciales || 0);
+          const newUnits = currentUnits + units;
+          const finalPrice = price > 0 ? price : Number(existingLoteDoc.precioUnitNeto || 0);
+          await updateDoc(loteRef, {
+            unidadesIniciales: newUnits,
+            precioUnitNeto: finalPrice,
+            totalVentaOriginal: newUnits * finalPrice,
+            updatedAt: Timestamp.now()
+          });
+        } else {
+          const loteData = {
+            clienteId: declaracionCliente,
+            productoId: uProduct,
+            solucionLote: uSolucion,
+            fechaEntrega: Timestamp.fromDate(new Date(deliveryDateStr + 'T12:00:00')),
+            fechaVencimiento: Timestamp.fromDate(new Date(targetVenc + 'T12:00:00')),
+            unidadesIniciales: units,
+            precioUnitNeto: price,
+            totalVentaOriginal: totalVal,
+            activo: true,
+            createdAt: Timestamp.now()
+          };
+          await addDoc(collection(db, 'crm_consignacion_lotes'), loteData);
+        }
       } else {
         const key = 'mock_consignacion_lotes';
         const existing = localStorage.getItem(key);
         let allLotes = existing ? JSON.parse(existing) : [];
         
-        const newLote = {
-          id: `lote_${Date.now()}`,
-          clienteId: declaracionCliente,
-          productoId: uProduct,
-          solucionLote: inlineForm.solucionLote.toUpperCase().trim() || 'SALINA',
-          fechaEntrega: deliveryDateStr,
-          fechaVencimiento: inlineForm.fechaVencimiento,
-          unidadesIniciales: units,
-          precioUnitNeto: price,
-          totalVentaOriginal: totalVal,
-          activo: true,
-          createdAt: new Date().toISOString(),
-          movimientos: {}
-        };
-        allLotes.push(newLote);
-        localStorage.setItem(key, JSON.stringify(allLotes));
+        const existingIdx = allLotes.findIndex((l: any) =>
+          l.clienteId === declaracionCliente &&
+          (l.productoId || '').toUpperCase().trim() === uProduct &&
+          (l.solucionLote || 'S/L').toUpperCase().trim() === uSolucion &&
+          parseDateString(l.fechaVencimiento) === targetVenc
+        );
+
+        if (existingIdx !== -1) {
+          const currentUnits = Number(allLotes[existingIdx].unidadesIniciales || 0);
+          const newUnits = currentUnits + units;
+          const finalPrice = price > 0 ? price : Number(allLotes[existingIdx].precioUnitNeto || 0);
+          allLotes[existingIdx].unidadesIniciales = newUnits;
+          allLotes[existingIdx].precioUnitNeto = finalPrice;
+          allLotes[existingIdx].totalVentaOriginal = newUnits * finalPrice;
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        } else {
+          const newLote = {
+            id: `lote_${Date.now()}`,
+            clienteId: declaracionCliente,
+            productoId: uProduct,
+            solucionLote: uSolucion,
+            fechaEntrega: deliveryDateStr,
+            fechaVencimiento: targetVenc,
+            unidadesIniciales: units,
+            precioUnitNeto: price,
+            totalVentaOriginal: totalVal,
+            activo: true,
+            createdAt: new Date().toISOString(),
+            movimientos: {}
+          };
+          allLotes.push(newLote);
+          localStorage.setItem(key, JSON.stringify(allLotes));
+        }
       }
 
       alert('Producto agregado correctamente.');
@@ -1612,9 +1840,144 @@ export default function VentasConsignacionView() {
       });
 
       await loadLotes(declaracionCliente, true);
+      await loadTodosLosLotes(true);
     } catch (err: any) {
       console.error(err);
       alert('Error al agregar producto: ' + err.message);
+    }
+  };
+
+  const [consolidating, setConsolidating] = useState(false);
+
+  const handleConsolidateDuplicates = async (clienteId: string) => {
+    if (!clienteId) return;
+    try {
+      setConsolidating(true);
+      todosLosLotesMemoryCache.current = null;
+      if (clienteId) {
+        delete clientLotesMemoryCache.current[clienteId];
+        localStorage.removeItem(`cache_lotes_${clienteId}`);
+      }
+      localStorage.removeItem('cache_todos_los_lotes');
+
+      if (isFirebaseReady()) {
+        const db = getDb();
+        const q = query(
+          collection(db, 'crm_consignacion_lotes'),
+          where('clienteId', '==', clienteId),
+          limit(5000)
+        );
+        const snap = await getDocs(q);
+        const allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+
+        const groups: Record<string, any[]> = {};
+        allDocs.forEach(docItem => {
+          const p = (docItem.productoId || '').toUpperCase().trim();
+          const s = (docItem.solucionLote || 'S/L').toUpperCase().trim();
+          const v = parseDateString(docItem.fechaVencimiento);
+          const key = `${p}|${s}|${v}`;
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(docItem);
+        });
+
+        let consolidatedCount = 0;
+        for (const key of Object.keys(groups)) {
+          const items = groups[key];
+          if (items.length > 1) {
+            const primary = items[0];
+            let totalUnits = Number(primary.unidadesIniciales || 0);
+            const mergedMovs = { ...(primary.movimientos || {}) };
+
+            for (let i = 1; i < items.length; i++) {
+              const dup = items[i];
+              totalUnits += Number(dup.unidadesIniciales || 0);
+
+              if (dup.movimientos) {
+                Object.keys(dup.movimientos).forEach(mKey => {
+                  if (!mergedMovs[mKey]) {
+                    mergedMovs[mKey] = dup.movimientos[mKey];
+                  } else {
+                    const pSales = Number(mergedMovs[mKey]?.unidadesVendidas || 0);
+                    const dSales = Number(dup.movimientos[mKey]?.unidadesVendidas || 0);
+                    mergedMovs[mKey].unidadesVendidas = pSales + dSales;
+                  }
+                });
+              }
+
+              await deleteDoc(doc(db, 'crm_consignacion_lotes', dup.id));
+              consolidatedCount++;
+            }
+
+            const primaryRef = doc(db, 'crm_consignacion_lotes', primary.id);
+            const price = Number(primary.precioUnitNeto || 0);
+            await updateDoc(primaryRef, {
+              unidadesIniciales: totalUnits,
+              totalVentaOriginal: totalUnits * price,
+              movimientos: mergedMovs,
+              updatedAt: Timestamp.now()
+            });
+          }
+        }
+
+        if (consolidatedCount > 0) {
+          alert(`✅ Se unificaron ${consolidatedCount} lote(s) duplicados correctamente.`);
+        } else {
+          alert('No se encontraron lotes duplicados para este cliente.');
+        }
+      } else {
+        const key = 'mock_consignacion_lotes';
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          let allLotes = JSON.parse(existing);
+          const clientLotes = allLotes.filter((l: any) => l.clienteId === clienteId);
+          const otherLotes = allLotes.filter((l: any) => l.clienteId !== clienteId);
+
+          const groups: Record<string, any[]> = {};
+          clientLotes.forEach((docItem: any) => {
+            const p = (docItem.productoId || '').toUpperCase().trim();
+            const s = (docItem.solucionLote || 'S/L').toUpperCase().trim();
+            const v = parseDateString(docItem.fechaVencimiento);
+            const groupKey = `${p}|${s}|${v}`;
+            if (!groups[groupKey]) groups[groupKey] = [];
+            groups[groupKey].push(docItem);
+          });
+
+          let mergedClientLotes: any[] = [];
+          let consolidatedCount = 0;
+
+          Object.keys(groups).forEach(gKey => {
+            const items = groups[gKey];
+            if (items.length > 1) {
+              const primary = { ...items[0] };
+              let totalUnits = Number(primary.unidadesIniciales || 0);
+              for (let i = 1; i < items.length; i++) {
+                totalUnits += Number(items[i].unidadesIniciales || 0);
+                consolidatedCount++;
+              }
+              primary.unidadesIniciales = totalUnits;
+              primary.totalVentaOriginal = totalUnits * Number(primary.precioUnitNeto || 0);
+              mergedClientLotes.push(primary);
+            } else {
+              mergedClientLotes.push(items[0]);
+            }
+          });
+
+          localStorage.setItem(key, JSON.stringify([...otherLotes, ...mergedClientLotes]));
+          if (consolidatedCount > 0) {
+            alert(`✅ Se unificaron ${consolidatedCount} lote(s) duplicados correctamente.`);
+          } else {
+            alert('No se encontraron lotes duplicados para este cliente.');
+          }
+        }
+      }
+
+      await loadTodosLosLotes(true);
+      await loadLotes(clienteId, true);
+    } catch (e: any) {
+      console.error(e);
+      alert('Error unificando duplicados: ' + e.message);
+    } finally {
+      setConsolidating(false);
     }
   };
 
@@ -2014,19 +2377,17 @@ export default function VentasConsignacionView() {
 
   const openEditarPlanillaModal = (month: string, itemsInMonth: any[], meta?: any) => {
     const currentMeta = meta || savedPlanillasMeta[month] || {};
+    let numM = currentMeta.numMonths || (currentMeta.isBimonthly ? 2 : 1);
     
     let initialLabel = currentMeta.customPeriodLabel || '';
     if (!initialLabel) {
-      if (currentMeta.isBimonthly && currentMeta.secondMonth) {
-        initialLabel = `${formatMonthName(month)} y ${formatMonthName(currentMeta.secondMonth)}`;
-      } else {
-        initialLabel = formatMonthName(month);
-      }
+      initialLabel = generateMultiMonthLabel(month, numM);
     }
 
     setEditarPlanillaForm({
       month: month,
-      isBimonthly: Boolean(currentMeta.isBimonthly),
+      numMonths: numM,
+      isBimonthly: numM > 1,
       secondMonth: currentMeta.secondMonth || '',
       customPeriodLabel: initialLabel,
       observaciones: currentMeta.observaciones || '',
@@ -2052,6 +2413,7 @@ export default function VentasConsignacionView() {
     try {
       setSavingEditarPlanilla(true);
       const month = editarPlanillaForm.month;
+      const numM = editarPlanillaForm.numMonths || (editarPlanillaForm.isBimonthly ? 2 : 1);
 
       if (isFirebaseReady()) {
         const db = getDb();
@@ -2083,7 +2445,8 @@ export default function VentasConsignacionView() {
         await setDoc(planillaRef, {
           clienteId: cid,
           month: month,
-          isBimonthly: Boolean(editarPlanillaForm.isBimonthly),
+          numMonths: numM,
+          isBimonthly: numM > 1,
           secondMonth: editarPlanillaForm.secondMonth || '',
           customPeriodLabel: editarPlanillaForm.customPeriodLabel || '',
           observaciones: editarPlanillaForm.observaciones || '',
@@ -2119,7 +2482,8 @@ export default function VentasConsignacionView() {
         localStorage.setItem(`mock_planilla_${cid}_${month}`, JSON.stringify({
           clienteId: cid,
           month: month,
-          isBimonthly: Boolean(editarPlanillaForm.isBimonthly),
+          numMonths: numM,
+          isBimonthly: numM > 1,
           secondMonth: editarPlanillaForm.secondMonth || '',
           customPeriodLabel: editarPlanillaForm.customPeriodLabel || '',
           observaciones: editarPlanillaForm.observaciones || '',
@@ -4105,6 +4469,17 @@ export default function VentasConsignacionView() {
                       handleDownloadQuoteReportGlobal(month, items, clientName, customPeriodLabel);
                     };
 
+                    const duplicateCount = (() => {
+                      const keys = new Set<string>();
+                      let dupes = 0;
+                      clientLotes.forEach(l => {
+                        const k = `${(l.productoId || '').toUpperCase().trim()}|${(l.solucionLote || 'S/L').toUpperCase().trim()}|${parseDateString(l.fechaVencimiento)}`;
+                        if (keys.has(k)) dupes++;
+                        else keys.add(k);
+                      });
+                      return dupes;
+                    })();
+
                     return (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                         {/* 1. Inventory remaining stock list with export capabilities */}
@@ -4122,6 +4497,18 @@ export default function VentasConsignacionView() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
+                              {duplicateCount > 0 && (
+                                <button
+                                  type="button"
+                                  disabled={consolidating}
+                                  onClick={() => handleConsolidateDuplicates(registroVentasCliente)}
+                                  title="Unificar lotes duplicados con el mismo producto, solución y fecha de vencimiento"
+                                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow cursor-pointer disabled:opacity-50"
+                                >
+                                  {consolidating ? <RefreshCw size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                                  Unificar Duplicados ({duplicateCount})
+                                </button>
+                              )}
                               {activeItems.length > 0 && (
                                 <>
                                   <button
@@ -4446,9 +4833,9 @@ export default function VentasConsignacionView() {
                                           <span className="text-sm font-black text-slate-100">
                                             {m.meta?.customPeriodLabel || formatMonthName(m.month)}
                                           </span>
-                                          {m.meta?.isBimonthly && (
+                                          {((m.meta?.numMonths && m.meta.numMonths > 1) || m.meta?.isBimonthly) && (
                                             <span className="bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase px-2 py-0.5 rounded-md border border-amber-500/30">
-                                              Ventas 2 Meses
+                                              Ventas {m.meta?.numMonths || 2} Meses
                                             </span>
                                           )}
                                         </div>
@@ -4683,9 +5070,9 @@ export default function VentasConsignacionView() {
             </div>
 
             <form onSubmit={handleSaveEditedPlanilla} className="space-y-5">
-              {/* 1. CONFIGURACIÓN DEL PERÍODO (SINGLE VS BIMENSUAL 2 MESES) */}
+              {/* 1. CONFIGURACIÓN DEL PERÍODO (SINGLE VS 2 O MÁS MESES) */}
               <div className="bg-[#050914] border border-[#1E293B] rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <label className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Calendar size={14} /> Período de Ventas / Cotización
                   </label>
@@ -4694,75 +5081,91 @@ export default function VentasConsignacionView() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <label className={cn(
-                    "p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all",
-                    !editarPlanillaForm.isBimonthly
-                      ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
-                      : "bg-[#0D1627] border-[#1E293B] text-slate-400 hover:border-slate-700"
-                  )}>
-                    <input
-                      type="radio"
-                      name="periodType"
-                      checked={!editarPlanillaForm.isBimonthly}
-                      onChange={() => {
-                        setEditarPlanillaForm(prev => ({
-                          ...prev,
-                          isBimonthly: false,
-                          customPeriodLabel: formatMonthName(prev.month)
-                        }));
-                      }}
-                      className="accent-amber-500"
-                    />
-                    <div>
-                      <div className="text-xs font-bold text-white">Mes Único</div>
-                      <div className="text-[10px] text-slate-400">Las ventas corresponden a un solo mes</div>
-                    </div>
-                  </label>
+                {/* Multi-month duration selector */}
+                <div className="space-y-2">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Duración del período acumulado:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {[
+                      { num: 1, label: '1 Mes', badge: 'Mes Único' },
+                      { num: 2, label: '2 Meses', badge: 'Bimensual' },
+                      { num: 3, label: '3 Meses', badge: 'Trimestral' },
+                      { num: 4, label: '4 Meses', badge: 'Cuatrimestral' },
+                      { num: 0, label: 'Varios Meses', badge: 'Personalizado' },
+                    ].map((opt) => {
+                      const currentNum = editarPlanillaForm.numMonths || 1;
+                      const isSelected = opt.num === 0
+                        ? currentNum > 4
+                        : currentNum === opt.num;
 
-                  <label className={cn(
-                    "p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all",
-                    editarPlanillaForm.isBimonthly
-                      ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
-                      : "bg-[#0D1627] border-[#1E293B] text-slate-400 hover:border-slate-700"
-                  )}>
-                    <input
-                      type="radio"
-                      name="periodType"
-                      checked={editarPlanillaForm.isBimonthly}
-                      onChange={() => {
-                        const m = editarPlanillaForm.month;
-                        let defaultSecond = '';
-                        if (m && m.includes('-')) {
-                          const [yearStr, monthStr] = m.split('-');
-                          let y = parseInt(yearStr, 10);
-                          let mNum = parseInt(monthStr, 10) + 1;
-                          if (mNum > 12) { mNum = 1; y += 1; }
-                          defaultSecond = `${y}-${mNum.toString().padStart(2, '0')}`;
-                        }
-                        const label = defaultSecond
-                          ? `${formatMonthName(m)} y ${formatMonthName(defaultSecond)}`
-                          : `${formatMonthName(m)} (2 Meses)`;
+                      return (
+                        <button
+                          key={opt.num}
+                          type="button"
+                          onClick={() => {
+                            const targetNum = opt.num === 0 ? 5 : opt.num;
+                            const newLabel = generateMultiMonthLabel(editarPlanillaForm.month, targetNum);
+                            setEditarPlanillaForm(prev => ({
+                              ...prev,
+                              numMonths: targetNum,
+                              isBimonthly: targetNum > 1,
+                              customPeriodLabel: newLabel
+                            }));
+                          }}
+                          className={cn(
+                            "p-2.5 rounded-xl border flex flex-col items-center justify-center text-center cursor-pointer transition-all min-h-[64px]",
+                            isSelected
+                              ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-md shadow-amber-500/10 font-bold"
+                              : "bg-[#0D1627] border-[#1E293B] text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                          )}
+                        >
+                          <div className="text-xs font-bold text-white">{opt.label}</div>
+                          <span className={cn(
+                            "text-[9px] font-black uppercase px-1.5 py-0.5 rounded mt-1",
+                            isSelected ? "bg-amber-500/30 text-amber-200" : "bg-slate-800 text-slate-400"
+                          )}>
+                            {opt.badge}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                        setEditarPlanillaForm(prev => ({
-                          ...prev,
-                          isBimonthly: true,
-                          secondMonth: defaultSecond,
-                          customPeriodLabel: label
-                        }));
-                      }}
-                      className="accent-amber-500"
-                    />
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        Corresponde a 2 Meses
-                        <span className="bg-amber-500/20 text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-black">
-                          Bimensual
-                        </span>
+                  {/* Quick Stepper for 2 or more months */}
+                  {(editarPlanillaForm.numMonths || 1) >= 2 && (
+                    <div className="flex items-center justify-between bg-[#0D1627] p-2.5 rounded-xl border border-[#1E293B] mt-2 flex-wrap gap-2">
+                      <span className="text-xs text-slate-300 font-bold flex items-center gap-1.5">
+                        <Calendar size={13} className="text-amber-400" />
+                        Número exacto de meses:
+                      </span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {[2, 3, 4, 5, 6, 8, 12].map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => {
+                              const newLabel = generateMultiMonthLabel(editarPlanillaForm.month, n);
+                              setEditarPlanillaForm(prev => ({
+                                ...prev,
+                                numMonths: n,
+                                isBimonthly: true,
+                                customPeriodLabel: newLabel
+                              }));
+                            }}
+                            className={cn(
+                              "px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer",
+                              (editarPlanillaForm.numMonths || 2) === n
+                                ? "bg-amber-500 text-slate-950 shadow font-black"
+                                : "bg-[#050914] text-slate-300 hover:bg-slate-800 border border-[#1E293B]"
+                            )}
+                          >
+                            {n} m
+                          </button>
+                        ))}
                       </div>
-                      <div className="text-[10px] text-slate-400">Ventas acumuladas (ej. Junio y Julio)</div>
                     </div>
-                  </label>
+                  )}
                 </div>
 
                 {/* Custom Period Title Input & Presets */}
@@ -4774,30 +5177,36 @@ export default function VentasConsignacionView() {
                     type="text"
                     value={editarPlanillaForm.customPeriodLabel}
                     onChange={(e) => setEditarPlanillaForm(prev => ({ ...prev, customPeriodLabel: e.target.value }))}
-                    placeholder="Ej. JUNIO Y JULIO 2026"
+                    placeholder="Ej. JUNIO Y JULIO 2026, TRIMESTRE MA-JU-JL"
                     className="w-full bg-[#0D1627] text-white border border-[#1E293B] rounded-xl px-3.5 py-2 text-xs font-bold font-mono outline-none focus:border-amber-500 uppercase"
                   />
                   
                   {/* Quick Presets */}
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-slate-500 font-bold mr-1">Atajos:</span>
+                    <span className="text-[10px] text-slate-500 font-bold mr-1">Atajos rápidos:</span>
                     {[
-                      `Junio y Julio ${editarPlanillaForm.month.substring(0,4) || '2026'}`,
-                      `Mayo y Junio ${editarPlanillaForm.month.substring(0,4) || '2026'}`,
-                      `Julio y Agosto ${editarPlanillaForm.month.substring(0,4) || '2026'}`,
-                      `Consignación ${formatMonthName(editarPlanillaForm.month)}`
-                    ].map((preset, pIdx) => (
+                      { label: `2 Meses (${generateMultiMonthLabel(editarPlanillaForm.month, 2)})`, num: 2 },
+                      { label: `3 Meses (${generateMultiMonthLabel(editarPlanillaForm.month, 3)})`, num: 3 },
+                      { label: `4 Meses (${generateMultiMonthLabel(editarPlanillaForm.month, 4)})`, num: 4 },
+                      { label: `Consignación ${formatMonthName(editarPlanillaForm.month)}`, num: 1 }
+                    ].map((presetObj, pIdx) => (
                       <button
                         key={pIdx}
                         type="button"
-                        onClick={() => setEditarPlanillaForm(prev => ({
-                          ...prev,
-                          isBimonthly: preset.includes(' y '),
-                          customPeriodLabel: preset
-                        }))}
+                        onClick={() => {
+                          const generated = presetObj.num > 1 
+                            ? generateMultiMonthLabel(editarPlanillaForm.month, presetObj.num)
+                            : `Consignación ${formatMonthName(editarPlanillaForm.month)}`;
+                          setEditarPlanillaForm(prev => ({
+                            ...prev,
+                            numMonths: presetObj.num,
+                            isBimonthly: presetObj.num > 1,
+                            customPeriodLabel: generated
+                          }));
+                        }}
                         className="px-2.5 py-1 bg-[#0D1627] hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-[#1E293B] hover:border-amber-500/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                       >
-                        + {preset}
+                        + {presetObj.label}
                       </button>
                     ))}
                   </div>
