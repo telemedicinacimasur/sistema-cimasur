@@ -359,6 +359,12 @@ export default function VentasConsignacionView() {
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [lotesCache, setLotesCache] = useState<Record<string, { data: any[], timestamp: number }>>({});
 
+  // Memory Caching Refs to prevent unnecessary Firestore queries across month or client changes
+  const clientesCacheRef = React.useRef<any[] | null>(null);
+  const clientLotesMemoryCache = React.useRef<Record<string, any[]>>({});
+  const todosLosLotesMemoryCache = React.useRef<any[] | null>(null);
+  const savedPlanillasMemoryCache = React.useRef<Record<string, { months: Set<string>; meta: Record<string, any> }>>({});
+
   // Tab 1: Declaración Mensual (Select Cliente)
   const [declaracionCliente, setDeclaracionCliente] = useState('');
   const [lotesActivos, setLotesActivos] = useState<any[]>([]);
@@ -414,10 +420,20 @@ export default function VentasConsignacionView() {
   const [addLoteDropdownOpen, setAddLoteDropdownOpen] = useState(false);
   const [savingEditarPlanilla, setSavingEditarPlanilla] = useState(false);
 
-  const loadSavedPlanillas = useCallback(async (clienteId: string) => {
+  // Pagination state for "Seleccionar productos (Lotes registrados en datos fijos)"
+  const [inlineAddPage, setInlineAddPage] = useState(1);
+  const INLINE_ADD_PAGE_SIZE = 25;
+
+  const loadSavedPlanillas = useCallback(async (clienteId: string, force = false) => {
     if (!clienteId) {
       setSavedPlanillaMonths(new Set());
       setSavedPlanillasMeta({});
+      return;
+    }
+    // Return instantly from memory cache if available and not forced
+    if (!force && savedPlanillasMemoryCache.current[clienteId]) {
+      setSavedPlanillaMonths(savedPlanillasMemoryCache.current[clienteId].months);
+      setSavedPlanillasMeta(savedPlanillasMemoryCache.current[clienteId].meta);
       return;
     }
     try {
@@ -466,6 +482,7 @@ export default function VentasConsignacionView() {
           }
         }
       }
+      savedPlanillasMemoryCache.current[clienteId] = { months: set, meta: metaMap };
       setSavedPlanillaMonths(set);
       setSavedPlanillasMeta(metaMap);
     } catch (e) {
@@ -1037,11 +1054,14 @@ export default function VentasConsignacionView() {
 
   useEffect(() => {
     loadClientes();
-    loadTodosLosLotes();
   }, []);
 
-  const loadClientes = async () => {
+  const loadClientes = async (force = false) => {
     try {
+      if (!force && clientesCacheRef.current && clientesCacheRef.current.length > 0) {
+        setClientes(clientesCacheRef.current);
+        return;
+      }
       setLoading(true);
       const contacts = await localDB.getCollection('consignacion_clientes');
       
@@ -1055,6 +1075,7 @@ export default function VentasConsignacionView() {
       const realContacts = contacts.filter((c: any) => c.id && !c.id.startsWith('demo_'));
       realContacts.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
       
+      clientesCacheRef.current = realContacts;
       setClientes(realContacts);
     } catch (e) {
       console.error('Error loading consignment clients:', e);
@@ -1098,12 +1119,17 @@ export default function VentasConsignacionView() {
 
   const loadTodosLosLotes = async (force = false) => {
     try {
+      if (!force && todosLosLotesMemoryCache.current && todosLosLotesMemoryCache.current.length > 0) {
+        setTodosLosLotes(todosLosLotesMemoryCache.current);
+        return;
+      }
       const cacheKey = 'cache_todos_los_lotes';
       if (!force) {
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
           const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < 10000) { // 10 seconds cache
+          if (Date.now() - timestamp < 300000) { // 5 mins cache
+            todosLosLotesMemoryCache.current = data;
             setTodosLosLotes(data);
             return;
           }
@@ -1125,6 +1151,7 @@ export default function VentasConsignacionView() {
           });
         }
         localStorage.setItem(cacheKey, JSON.stringify({ data: loaded, timestamp: Date.now() }));
+        todosLosLotesMemoryCache.current = loaded;
         setTodosLosLotes(loaded);
       } else {
         const key = 'mock_consignacion_lotes';
@@ -1145,8 +1172,10 @@ export default function VentasConsignacionView() {
             return true;
           });
           localStorage.setItem(key, JSON.stringify(allLotes));
+          todosLosLotesMemoryCache.current = allLotes;
           setTodosLosLotes(allLotes);
         } else {
+          todosLosLotesMemoryCache.current = [];
           setTodosLosLotes([]);
         }
       }
@@ -1192,9 +1221,11 @@ export default function VentasConsignacionView() {
       setRepDates(prev => ({ ...prev, [loteId]: '' }));
       
       if (declaracionCliente) {
+        delete clientLotesMemoryCache.current[declaracionCliente];
         await loadLotes(declaracionCliente, true);
       } else {
-        await loadTodosLosLotes();
+        todosLosLotesMemoryCache.current = null;
+        await loadTodosLosLotes(true);
       }
     } catch (e: any) {
       console.error(e);
@@ -1207,14 +1238,18 @@ export default function VentasConsignacionView() {
       if (!clienteId) return;
       
       // Memory Cache Check
+      if (!force && clientLotesMemoryCache.current[clienteId]) {
+        setLotesActivos(clientLotesMemoryCache.current[clienteId]);
+        return;
+      }
+
       const now = Date.now();
-      
-      // Persistent Cache Check
       const cacheKey = `cache_lotes_${clienteId}`;
       const cached = localStorage.getItem(cacheKey);
       if (!force && cached) {
         const { data, timestamp } = JSON.parse(cached);
-        if (now - timestamp < 10000) { // 10 seconds cache
+        if (now - timestamp < 300000) { // 5 mins cache
+          clientLotesMemoryCache.current[clienteId] = data;
           setLotesActivos(data);
           return;
         }
@@ -1243,9 +1278,11 @@ export default function VentasConsignacionView() {
 
         const results = await Promise.all(promises);
         localStorage.setItem(cacheKey, JSON.stringify({ data: results, timestamp: now }));
+        clientLotesMemoryCache.current[clienteId] = results;
         setLotesActivos(results);
       } else {
         const clientLotes = getMockLotesForClient(clienteId);
+        clientLotesMemoryCache.current[clienteId] = clientLotes;
         setLotesActivos(clientLotes);
       }
     } catch (e) {
@@ -1273,7 +1310,7 @@ export default function VentasConsignacionView() {
   useEffect(() => {
     if (registroVentasCliente) {
       loadSavedPlanillas(registroVentasCliente);
-      loadTodosLosLotes(true);
+      loadTodosLosLotes();
     }
   }, [registroVentasCliente, loadSavedPlanillas]);
 
@@ -1305,18 +1342,14 @@ export default function VentasConsignacionView() {
     });
   }, [declaracionCliente, selectedMonth, lotesActivos]);
 
-  // Only load all lotes when specifically needed (e.g., Tab 2 or Fixed Data list)
+  // Only load all lotes when specifically needed (e.g., when Admin de Datos Fijos is expanded)
   useEffect(() => {
     let active = true;
-    if (activeTab === 'declaraciones_mensuales' || fixedDataExpanded) {
-      loadTodosLosLotes().then(() => {
-        if (active && activeTab === 'declaraciones_mensuales') {
-          // Additional logic if needed
-        }
-      });
+    if (fixedDataExpanded) {
+      loadTodosLosLotes().then(() => {});
     }
     return () => { active = false; };
-  }, [activeTab, fixedDataExpanded]);
+  }, [fixedDataExpanded]);
 
   const handleImportExcel = async (file: File, cid: string) => {
     if (!cid) {
@@ -1899,7 +1932,7 @@ export default function VentasConsignacionView() {
       setNewClientRut('');
       setEditingClient(null);
       setShowAddClientForm(false);
-      await loadClientes();
+      await loadClientes(true);
     } catch (e: any) {
       console.error(e);
       alert("Error al guardar cliente: " + e.message);
@@ -1918,7 +1951,7 @@ export default function VentasConsignacionView() {
           setNewClientName('');
           setNewClientRut('');
         }
-        await loadClientes();
+        await loadClientes(true);
       } catch (e: any) {
         console.error(e);
         alert("Error al eliminar cliente: " + e.message);
@@ -3365,6 +3398,10 @@ export default function VentasConsignacionView() {
                                                 (l.solucionLote || "").toLowerCase().includes(searchTerm.toLowerCase())
                                               );
 
+                                              const totalInlineAddPages = Math.ceil(filteredItems.length / INLINE_ADD_PAGE_SIZE) || 1;
+                                              const currentInlinePage = Math.min(inlineAddPage, totalInlineAddPages);
+                                              const paginatedItems = filteredItems.slice((currentInlinePage - 1) * INLINE_ADD_PAGE_SIZE, currentInlinePage * INLINE_ADD_PAGE_SIZE);
+
                                               const selectedCount = Object.keys(selectedLotesToLink).length;
                                               const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(l => selectedLotesToLink[l.id] !== undefined);
 
@@ -3450,7 +3487,10 @@ export default function VentasConsignacionView() {
                                                          className="w-full bg-[#0D1627] text-white border border-[#1E293B]/80 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-500 text-xs font-semibold"
                                                          placeholder="Buscar por nombre o solución (ej: ARNICA)..."
                                                          value={searchTerm}
-                                                         onChange={e => setSearchTerm(e.target.value)}
+                                                         onChange={e => {
+                                                           setSearchTerm(e.target.value);
+                                                           setInlineAddPage(1);
+                                                         }}
                                                        />
                                                      </div>
 
@@ -3521,7 +3561,7 @@ export default function VentasConsignacionView() {
                                                          </tr>
                                                        </thead>
                                                        <tbody className="divide-y divide-[#1E293B]">
-                                                         {filteredItems.map(l => {
+                                                         {paginatedItems.map(l => {
                                                            const isFIFO = earliestMap[l.productoId] === l.displayId;
                                                            const isSelected = selectedLotesToLink[l.id] !== undefined;
                                                            const currentUnits = isSelected ? selectedLotesToLink[l.id] : 0;
@@ -3638,6 +3678,36 @@ export default function VentasConsignacionView() {
                                                        </tbody>
                                                      </table>
                                                    </div>
+
+                                                   {/* Pagination Controls */}
+                                                   {filteredItems.length > INLINE_ADD_PAGE_SIZE && (
+                                                     <div className="flex items-center justify-between px-3 py-2 bg-[#0D1627] rounded-xl border border-[#1E293B] text-[10px] text-slate-400">
+                                                       <div>
+                                                         Mostrando <span className="text-white font-bold">{((currentInlinePage - 1) * INLINE_ADD_PAGE_SIZE) + 1}</span> - <span className="text-white font-bold">{Math.min(currentInlinePage * INLINE_ADD_PAGE_SIZE, filteredItems.length)}</span> de <span className="text-white font-bold">{filteredItems.length}</span> productos
+                                                       </div>
+                                                       <div className="flex items-center gap-1.5">
+                                                         <button
+                                                           type="button"
+                                                           disabled={currentInlinePage <= 1}
+                                                           onClick={() => setInlineAddPage(prev => Math.max(1, prev - 1))}
+                                                           className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                                                         >
+                                                           Anterior
+                                                         </button>
+                                                         <span className="font-mono font-bold text-slate-300 px-1.5">
+                                                           Pág. {currentInlinePage} de {totalInlineAddPages}
+                                                         </span>
+                                                         <button
+                                                           type="button"
+                                                           disabled={currentInlinePage >= totalInlineAddPages}
+                                                           onClick={() => setInlineAddPage(prev => Math.min(totalInlineAddPages, prev + 1))}
+                                                           className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                                                         >
+                                                           Siguiente
+                                                         </button>
+                                                       </div>
+                                                     </div>
+                                                   )}
 
                                                    {/* Footer Actions */}
                                                    <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#1E293B]">
