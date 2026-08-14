@@ -3700,7 +3700,7 @@ function CRMActivities({ onViewClient }: { onViewClient?: (id: string) => void }
       responsable: user.displayName || user.email || '',
       targetCategories: []
     }));
-  }, [user, editingId]);
+  }, [user?.uid, user?.email, user?.displayName, editingId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

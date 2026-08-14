@@ -14,7 +14,7 @@ const hasRecentNotification = async (title: string, message: string): Promise<bo
     // Cache the collection for 1 minute during a check cycle
     const now = Date.now();
     if (!cachedNotificationsForCheck || (now - lastNotificationsFetchTime > 60000)) {
-        cachedNotificationsForCheck = await localDB.getCollection('notifications');
+        cachedNotificationsForCheck = await localDB.getCollection('notifications', { limitCount: 50 });
         lastNotificationsFetchTime = now;
     }
 
@@ -132,7 +132,7 @@ export const checkPendingOrderAlerts = async (force?: boolean) => {
     isCheckingOrders = true;
 
     try {
-        let orders = await localDB.getCollection('order_tracking');
+        let orders = await localDB.getCollection('order_tracking', { limitCount: 50 });
         if (!Array.isArray(orders)) orders = [];
 
         const threeMonthsAgo = new Date();

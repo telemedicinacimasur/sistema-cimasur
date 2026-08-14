@@ -56,7 +56,8 @@ function initFirebase() {
         db = initializeFirestore(app, {
           localCache: persistentLocalCache({
             tabManager: persistentMultipleTabManager()
-          })
+          }),
+          experimentalAutoDetectLongPolling: true,
         }, dbId);
       } catch (dbErr) {
         db = getFirestore(app, dbId);

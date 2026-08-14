@@ -48,7 +48,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Upload, Edit, Edit2, Edit3, X, RotateCcw, Search
+  Upload, Edit, Edit2, Edit3, X, RotateCcw, Search, ListFilter
 } from 'lucide-react';
 const PRODUCTOS_CATALOGO: string[] = [];
 
@@ -691,6 +691,7 @@ export default function VentasConsignacionView() {
   // Tab 2: Registro de Ventas (Select Cliente)
   const [registroVentasCliente, setRegistroVentasCliente] = useState('');
   const [registroVentasStockTab, setRegistroVentasStockTab] = useState<'activos' | 'inactivos'>('activos');
+  const [inactivosSubTab, setInactivosSubTab] = useState<'todos' | 'lotes' | 'rebajas'>('todos');
   const [stockSearchTerm, setStockSearchTerm] = useState('');
 
   // Devolución / Rebaja Modal state
@@ -742,29 +743,29 @@ export default function VentasConsignacionView() {
     solucionLote: '',
     fechaEntrega: new Date().toISOString().split('T')[0],
     fechaVencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-    unidadesIniciales: 100,
-    precioUnitNeto: 0,
+    unidadesIniciales: '' as any,
+    precioUnitNeto: '' as any,
   });
   const [savingReponer, setSavingReponer] = useState(false);
 
   const openReponerModal = (clienteId: string = '', productoId: string = '', solucionLote: string = '', precioUnitNeto: number = 0) => {
     const cid = clienteId || registroVentasCliente || adminFilterCliente || declaracionCliente || '';
-    const finalPrice = precioUnitNeto || PRECIOS_BASE[productoId] || 0;
+    const finalPrice = precioUnitNeto || PRECIOS_BASE[productoId] || '';
     setReponerForm({
       clienteId: cid,
       productoId: productoId,
       solucionLote: solucionLote,
       fechaEntrega: new Date().toISOString().split('T')[0],
       fechaVencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-      unidadesIniciales: 100,
-      precioUnitNeto: finalPrice,
+      unidadesIniciales: '' as any,
+      precioUnitNeto: finalPrice as any,
     });
     setReponerModal({
       isOpen: true,
       clienteId: cid,
       productoId,
       solucionLote,
-      precioUnitNeto: finalPrice,
+      precioUnitNeto: typeof finalPrice === 'number' ? finalPrice : 0,
     });
   };
 
@@ -1140,8 +1141,8 @@ export default function VentasConsignacionView() {
     productoId: '',
     solucionLote: '',
     fechaVencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-    unidadesIniciales: 100,
-    precioUnitNeto: 0,
+    unidadesIniciales: '' as any,
+    precioUnitNeto: '' as any,
   });
 
   // Fixed Data Collapsible Forms & Fields
@@ -1164,8 +1165,8 @@ export default function VentasConsignacionView() {
     solucion_lote: '',
     fecha_entrega: new Date().toISOString().split('T')[0],
     fecha_vencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-    unidades_iniciales: 100,
-    precio_unit_neto: 0
+    unidades_iniciales: '' as any,
+    precio_unit_neto: '' as any
   });
 
   useEffect(() => {
@@ -1703,8 +1704,8 @@ export default function VentasConsignacionView() {
         solucion_lote: '',
         fecha_entrega: new Date().toISOString().split('T')[0],
         fecha_vencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-        unidades_iniciales: 100,
-        precio_unit_neto: 0
+        unidades_iniciales: '' as any,
+        precio_unit_neto: '' as any
       });
 
       if (declaracionCliente === formEntrega.cliente_id || registroVentasCliente === formEntrega.cliente_id) {
@@ -1835,8 +1836,8 @@ export default function VentasConsignacionView() {
         productoId: '',
         solucionLote: '',
         fechaVencimiento: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-        unidadesIniciales: 100,
-        precioUnitNeto: 0,
+        unidadesIniciales: '' as any,
+        precioUnitNeto: '' as any,
       });
 
       await loadLotes(declaracionCliente, true);
@@ -2877,9 +2878,10 @@ export default function VentasConsignacionView() {
                               <input
                                 type="number"
                                 min="1"
+                                placeholder="Ej: 100"
                                 className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-mono font-bold outline-none focus:border-emerald-500 text-center"
-                                value={formEntrega.unidades_iniciales}
-                                onChange={e => setFormEntrega({ ...formEntrega, unidades_iniciales: parseInt(e.target.value) || 0 })}
+                                value={formEntrega.unidades_iniciales ?? ''}
+                                onChange={e => setFormEntrega({ ...formEntrega, unidades_iniciales: e.target.value === '' ? ('' as any) : parseInt(e.target.value) || 0 })}
                                 required
                               />
                             </div>
@@ -2888,9 +2890,10 @@ export default function VentasConsignacionView() {
                               <input
                                 type="number"
                                 min="0"
+                                placeholder="0"
                                 className="w-full bg-[#050914] text-white border border-[#1E293B] rounded-xl p-2.5 text-xs font-mono font-bold outline-none focus:border-emerald-500 text-center"
-                                value={formEntrega.precio_unit_neto}
-                                onChange={e => setFormEntrega({ ...formEntrega, precio_unit_neto: parseInt(e.target.value) || 0 })}
+                                value={formEntrega.precio_unit_neto ?? ''}
+                                onChange={e => setFormEntrega({ ...formEntrega, precio_unit_neto: e.target.value === '' ? ('' as any) : parseFloat(e.target.value) || 0 })}
                                 required
                               />
                             </div>
@@ -3921,14 +3924,16 @@ export default function VentasConsignacionView() {
                                                            <th className="p-2.5 border-b border-[#1E293B]">Venc.</th>
                                                            <th className="p-2.5 border-b border-[#1E293B] text-center">Stock Disp.</th>
                                                            <th className="p-2.5 border-b border-[#1E293B] text-right">Precio</th>
-                                                           <th className="p-2.5 border-b border-[#1E293B] text-center w-40">Unidades a Descontar</th>
+                                                           <th className="p-2.5 border-b border-[#1E293B] text-center w-36">Unidades a Descontar</th>
+                                                           <th className="p-2.5 border-b border-[#1E293B] text-center w-28">Saldo Restante</th>
                                                          </tr>
                                                        </thead>
                                                        <tbody className="divide-y divide-[#1E293B]">
                                                          {paginatedItems.map(l => {
                                                            const isFIFO = earliestMap[l.productoId] === l.displayId;
                                                            const isSelected = selectedLotesToLink[l.id] !== undefined;
-                                                           const currentUnits = isSelected ? selectedLotesToLink[l.id] : 0;
+                                                           const currentUnits = isSelected ? (selectedLotesToLink[l.id] ?? 0) : 0;
+                                                           const remainingStock = Math.max(0, Number(l.displayUnidades || 0) - (isSelected ? Number(currentUnits || 0) : 0));
 
                                                            const toggleSelection = () => {
                                                              setSelectedLotesToLink(prev => {
@@ -4000,7 +4005,7 @@ export default function VentasConsignacionView() {
                                                                      type="number"
                                                                      min="0"
                                                                      max={l.displayUnidades}
-                                                                     value={isSelected ? currentUnits : ''}
+                                                                     value={isSelected ? (currentUnits === 0 ? '' : currentUnits) : ''}
                                                                      placeholder="0"
                                                                      onChange={(e) => {
                                                                        const val = parseInt(e.target.value);
@@ -4029,12 +4034,24 @@ export default function VentasConsignacionView() {
                                                                    </button>
                                                                  </div>
                                                                </td>
+                                                               <td className="p-2.5 text-center cursor-pointer" onClick={toggleSelection}>
+                                                                 <span className={cn(
+                                                                   "font-mono font-black text-[11px] px-2.5 py-1 rounded-lg border inline-flex items-center gap-1 transition-all",
+                                                                   remainingStock === 0
+                                                                     ? "bg-slate-800/80 text-slate-400 border-slate-700"
+                                                                     : remainingStock < 5
+                                                                     ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                                                                     : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                                                 )}>
+                                                                   {remainingStock} u.
+                                                                 </span>
+                                                               </td>
                                                              </tr>
                                                            );
                                                          })}
                                                          {filteredItems.length === 0 && (
                                                            <tr>
-                                                             <td colSpan={7} className="p-8 text-center text-slate-500 font-bold uppercase tracking-widest text-[9px]">
+                                                             <td colSpan={8} className="p-8 text-center text-slate-500 font-bold uppercase tracking-widest text-[9px]">
                                                                No se encontraron productos
                                                              </td>
                                                            </tr>
@@ -4227,6 +4244,32 @@ export default function VentasConsignacionView() {
 
                     const activeItems = activeItemsAll.filter(matchesStockSearch);
                     const inactiveItems = inactiveItemsAll.filter(matchesStockSearch);
+
+                    const devolucionesList = clientLotes.flatMap((lote: any) => {
+                      const devs = lote.devoluciones || [];
+                      return devs.map((d: any) => ({
+                        ...d,
+                        loteId: lote.id,
+                        productoId: lote.productoId,
+                        solucionLote: lote.solucionLote,
+                        fechaVencimiento: lote.fechaVencimiento,
+                        precioUnitNeto: Number(lote.precioUnitNeto) || 0,
+                        unidadesInicialesLote: lote.unidadesIniciales,
+                        loteActivo: lote.activo,
+                        loteObj: lote
+                      }));
+                    }).filter((d: any) => {
+                      if (!stockSearchTerm.trim()) return true;
+                      const term = stockSearchTerm.toLowerCase().trim();
+                      const prod = (d.productoId || '').toLowerCase();
+                      const sol = (d.solucionLote || '').toLowerCase();
+                      const mot = (d.motivo || '').toLowerCase();
+                      const fecha = (d.fecha || '').toLowerCase();
+                      return prod.includes(term) || sol.includes(term) || mot.includes(term) || fecha.includes(term);
+                    }).sort((a: any, b: any) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+
+                    const totalDevolvedUnits = devolucionesList.reduce((sum: number, d: any) => sum + (Number(d.unidades) || 0), 0);
+                    const totalDevolvedAmount = devolucionesList.reduce((sum: number, d: any) => sum + ((Number(d.unidades) || 0) * (Number(d.precioUnitNeto) || 0)), 0);
 
                     // Summarize saved month templates
                     // Let's gather all months that have any saved movimientos
@@ -4596,12 +4639,12 @@ export default function VentasConsignacionView() {
 
                           {/* Activos / Inactivos Tab Switcher */}
                           <div className="p-3 bg-[#080E1A] border-b border-[#1E293B] flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => setRegistroVentasStockTab('activos')}
                                 className={cn(
-                                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5",
+                                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
                                   registroVentasStockTab === 'activos'
                                     ? "bg-emerald-500 text-[#050914] shadow-lg shadow-emerald-500/20"
                                     : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
@@ -4613,163 +4656,381 @@ export default function VentasConsignacionView() {
                                 type="button"
                                 onClick={() => setRegistroVentasStockTab('inactivos')}
                                 className={cn(
-                                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5",
+                                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
                                   registroVentasStockTab === 'inactivos'
                                     ? "bg-slate-700 text-white shadow-lg shadow-slate-700/20"
                                     : "bg-[#050914] text-slate-400 hover:text-white border border-[#1E293B]"
                                 )}
                               >
-                                ⚪ Inactivos / Stock 0 ({inactiveItems.length})
+                                ⚪ Inactivos / Rebajados ({inactiveItems.length} lotes | {devolucionesList.length} rebajas)
                               </button>
                             </div>
                             <div className="text-[11px] text-slate-400 font-medium">
-                              Mostrando lotes {registroVentasStockTab === 'activos' ? 'con stock activo (> 0)' : 'sin stock (0 o agotados)'}
+                              {registroVentasStockTab === 'activos' 
+                                ? 'Mostrando lotes con stock activo (> 0)' 
+                                : 'Mostrando lotes sin stock y registro histórico de productos rebajados/devueltos'}
                             </div>
                           </div>
 
+                          {/* Subtabs when in Inactivos */}
+                          {registroVentasStockTab === 'inactivos' && (
+                            <div className="p-2.5 bg-[#0D1627]/90 border-b border-[#1E293B] flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => setInactivosSubTab('lotes')}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                                    inactivosSubTab === 'lotes'
+                                      ? "bg-slate-600 text-white shadow-sm"
+                                      : "bg-[#050914] text-slate-400 hover:text-slate-200 border border-[#1E293B]"
+                                  )}
+                                >
+                                  <Package size={13} />
+                                  Lotes Agotados ({inactiveItems.length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setInactivosSubTab('rebajas')}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                                    inactivosSubTab === 'rebajas'
+                                      ? "bg-amber-500 text-[#050914] font-black shadow-sm"
+                                      : "bg-[#050914] text-slate-400 hover:text-slate-200 border border-[#1E293B]"
+                                  )}
+                                >
+                                  <RotateCcw size={13} />
+                                  Historial de Rebajas / Devoluciones ({devolucionesList.length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setInactivosSubTab('todo')}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                                    inactivosSubTab === 'todo'
+                                      ? "bg-sky-500 text-[#050914] font-black shadow-sm"
+                                      : "bg-[#050914] text-slate-400 hover:text-slate-200 border border-[#1E293B]"
+                                  )}
+                                >
+                                  <ListFilter size={13} />
+                                  Vista Completa
+                                </button>
+                              </div>
+                              <div className="text-[10px] text-amber-400/90 font-mono font-bold">
+                                Total Rebajado: <span className="text-amber-300 font-black">{totalDevolvedUnits} u.</span> ({formatCurrency(totalDevolvedAmount)})
+                              </div>
+                            </div>
+                          )}
+
                           <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                              <thead className="bg-[#0D1627] border-b border-[#1E293B] text-[9px] uppercase font-black tracking-widest text-slate-400">
-                                <tr>
-                                  <th className="p-4 pl-6">Producto</th>
-                                  <th className="p-4 text-center">F. Venc.</th>
-                                  <th className="p-4 text-center">Valor Unitario</th>
-                                  <th className="p-4 text-center">
-                                  Stock Disponible ({registroVentasStockTab === 'activos' ? `${totalActiveStockUnits} u.` : '0 u.'})
-                                </th>
-                                  <th className="p-4 text-center">Acción</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-[#1E293B]/10 text-xs">
-                                {registroVentasStockTab === 'activos' ? (
-                                  activeItems.length > 0 ? (
-                                    activeItems.map(({ lote, traj }) => (
-                                      <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors">
-                                        <td className="p-4 pl-6">
-                                          <div className="font-bold text-slate-200">{lote.productoId}</div>
-                                          <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
-                                        </td>
-                                        <td className="p-4 text-center text-slate-400 font-semibold font-mono">{formatDateToDDMMYYYY(lote.fechaVencimiento)}</td>
-                                        <td className="p-4 text-center font-mono font-bold text-amber-400">
-                                          {formatCurrency(lote.precioUnitNeto || 0)}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-sky-500/10 text-sky-400 border border-sky-500/20 block w-fit mx-auto">
-                                            {traj?.frascosRestantes || 0} u.
-                                          </span>
-                                          {(() => {
-                                            const devUnits = (lote.devoluciones || []).reduce((sum: number, d: any) => sum + (Number(d.unidades) || 0), 0);
-                                            if (devUnits > 0) {
-                                              return (
-                                                <span className="text-[10px] text-amber-400 font-semibold font-mono mt-1 block">
-                                                  Devuelto: -${devUnits} u.
-                                                </span>
-                                              );
-                                            }
-                                            return null;
-                                          })()}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                          <div className="flex items-center justify-center gap-2">
-                                            <button
-                                              type="button"
-                                              onClick={() => openDevolucionModal(lote)}
-                                              title="Registrar devolución o rebaja de stock"
-                                              className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                            >
-                                              <RotateCcw size={12} /> Rebaja
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => openEditLoteModal(lote)}
-                                              title="Editar producto"
-                                              className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-[#050914] border border-sky-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                            >
-                                              <Edit2 size={12} /> Editar
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => openDeleteLoteModal(lote)}
-                                              title="Eliminar producto"
-                                              className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                            >
-                                              <Trash2 size={12} /> Eliminar
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))
-                                  ) : (
-                                    <tr>
-                                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
-                                        No hay productos con stock activo para este cliente.
-                                      </td>
-                                    </tr>
-                                  )
-                                ) : (
-                                  inactiveItems.length > 0 ? (
-                                    inactiveItems.map(({ lote, traj }) => (
-                                      <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors opacity-90">
-                                        <td className="p-4 pl-6">
-                                          <div className="font-bold text-slate-400 line-through">{lote.productoId}</div>
-                                          <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
-                                        </td>
-                                        <td className="p-4 text-center text-slate-500 font-semibold font-mono">{formatDateToDDMMYYYY(lote.fechaVencimiento)}</td>
-                                        <td className="p-4 text-center font-mono font-bold text-amber-400/70">
-                                          {formatCurrency(lote.precioUnitNeto || 0)}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                          <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                            0 u. (Agotado)
-                                          </span>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                          <div className="flex items-center justify-center gap-2">
-                                            <button
-                                              type="button"
-                                              onClick={() => openDevolucionModal(lote)}
-                                              title="Registrar devolución o rebaja de stock"
-                                              className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                            >
-                                              <RotateCcw size={12} /> Rebaja
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => openEditLoteModal(lote)}
-                                              title="Editar producto"
-                                              className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-[#050914] border border-sky-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                            >
-                                              <Edit2 size={12} /> Editar
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => openDeleteLoteModal(lote)}
-                                              title="Eliminar producto"
-                                              className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                            >
-                                              <Trash2 size={12} /> Eliminar
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))
-                                  ) : (
-                                    <tr>
-                                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
-                                        No hay productos inactivos o sin stock para este cliente.
-                                      </td>
-                                    </tr>
-                                  )
-                                )}
-                                {inventoryStatus.length === 0 && (
+                            {/* IF INACTIVOS SUBTAB IS REBAJAS ONLY */}
+                            {registroVentasStockTab === 'inactivos' && inactivosSubTab === 'rebajas' ? (
+                              <table className="w-full text-left">
+                                <thead className="bg-[#0D1627] border-b border-[#1E293B] text-[9px] uppercase font-black tracking-widest text-slate-400">
                                   <tr>
-                                    <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
-                                      Este cliente no posee ningún producto registrado en consignación.
-                                    </td>
+                                    <th className="p-4 pl-6">Producto / Lote</th>
+                                    <th className="p-4 text-center">F. Rebaja</th>
+                                    <th className="p-4 text-center">Unidades Rebajadas</th>
+                                    <th className="p-4 text-center">Valor Unitario</th>
+                                    <th className="p-4 text-center">Total Rebajado</th>
+                                    <th className="p-4">Motivo / Justificación</th>
+                                    <th className="p-4 text-center">Acción</th>
                                   </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#1E293B]/20 text-xs">
+                                  {devolucionesList.length > 0 ? (
+                                    devolucionesList.map((d: any) => {
+                                      const totalMonto = (Number(d.unidades) || 0) * (Number(d.precioUnitNeto) || 0);
+                                      return (
+                                        <tr key={d.id} className="hover:bg-[#1E293B]/20 transition-colors">
+                                          <td className="p-4 pl-6">
+                                            <div className="font-bold text-slate-200 flex items-center gap-2">
+                                              {d.productoId}
+                                              <span className="text-[8px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono font-bold uppercase">
+                                                Rebaja
+                                              </span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                                              <span className="text-emerald-400">Solución: {d.solucionLote || 'S/L'}</span>
+                                              <span>•</span>
+                                              <span>Venc: {formatDateToDDMMYYYY(d.fechaVencimiento)}</span>
+                                            </div>
+                                          </td>
+                                          <td className="p-4 text-center text-slate-300 font-semibold font-mono text-xs">
+                                            {formatDateToDDMMYYYY(d.fecha)}
+                                          </td>
+                                          <td className="p-4 text-center">
+                                            <span className="font-black px-2.5 py-1 rounded-full font-mono text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 inline-block">
+                                              -{d.unidades} u.
+                                            </span>
+                                          </td>
+                                          <td className="p-4 text-center font-mono font-bold text-slate-300">
+                                            {formatCurrency(d.precioUnitNeto || 0)}
+                                          </td>
+                                          <td className="p-4 text-center font-mono font-black text-rose-400">
+                                            -{formatCurrency(totalMonto)}
+                                          </td>
+                                          <td className="p-4 text-slate-300 text-xs">
+                                            <span className="bg-[#050914] px-2.5 py-1 rounded-lg border border-[#1E293B] text-[11px] text-slate-300 block w-fit">
+                                              {d.motivo || 'Devolución / Ajuste de stock'}
+                                            </span>
+                                          </td>
+                                          <td className="p-4 text-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteDevolucion(d.loteId, d.id)}
+                                              title="Revertir / Eliminar esta rebaja"
+                                              className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                            >
+                                              <Trash2 size={14} />
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={7} className="p-12 text-center text-slate-500 font-bold">
+                                        No se han registrado rebajas ni devoluciones de productos para este cliente.
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            ) : (
+                              /* STANDARD TABLE FOR ACTIVOS, INACTIVOS (LOTES) OR TODO */
+                              <>
+                                <table className="w-full text-left">
+                                  <thead className="bg-[#0D1627] border-b border-[#1E293B] text-[9px] uppercase font-black tracking-widest text-slate-400">
+                                    <tr>
+                                      <th className="p-4 pl-6">Producto</th>
+                                      <th className="p-4 text-center">F. Venc.</th>
+                                      <th className="p-4 text-center">Valor Unitario</th>
+                                      <th className="p-4 text-center">
+                                        Stock Disponible ({registroVentasStockTab === 'activos' ? `${totalActiveStockUnits} u.` : '0 u.'})
+                                      </th>
+                                      <th className="p-4 text-center">Acción</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[#1E293B]/10 text-xs">
+                                    {registroVentasStockTab === 'activos' ? (
+                                      activeItems.length > 0 ? (
+                                        activeItems.map(({ lote, traj }) => (
+                                          <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors">
+                                            <td className="p-4 pl-6">
+                                              <div className="font-bold text-slate-200">{lote.productoId}</div>
+                                              <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
+                                            </td>
+                                            <td className="p-4 text-center text-slate-400 font-semibold font-mono">{formatDateToDDMMYYYY(lote.fechaVencimiento)}</td>
+                                            <td className="p-4 text-center font-mono font-bold text-amber-400">
+                                              {formatCurrency(lote.precioUnitNeto || 0)}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                              <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-sky-500/10 text-sky-400 border border-sky-500/20 block w-fit mx-auto">
+                                                {traj?.frascosRestantes || 0} u.
+                                              </span>
+                                              {(() => {
+                                                const devUnits = (lote.devoluciones || []).reduce((sum: number, d: any) => sum + (Number(d.unidades) || 0), 0);
+                                                if (devUnits > 0) {
+                                                  return (
+                                                    <span className="text-[10px] text-amber-400 font-semibold font-mono mt-1 block">
+                                                      Rebajado: -{devUnits} u.
+                                                    </span>
+                                                  );
+                                                }
+                                                return null;
+                                              })()}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                              <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openDevolucionModal(lote)}
+                                                  title="Registrar devolución o rebaja de stock"
+                                                  className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                                >
+                                                  <RotateCcw size={12} /> Rebaja
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openEditLoteModal(lote)}
+                                                  title="Editar producto"
+                                                  className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-[#050914] border border-sky-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                                >
+                                                  <Edit2 size={12} /> Editar
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openDeleteLoteModal(lote)}
+                                                  title="Eliminar producto"
+                                                  className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                                >
+                                                  <Trash2 size={12} /> Eliminar
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))
+                                      ) : (
+                                        <tr>
+                                          <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
+                                            No hay productos con stock activo para este cliente.
+                                          </td>
+                                        </tr>
+                                      )
+                                    ) : (
+                                      inactiveItems.length > 0 ? (
+                                        inactiveItems.map(({ lote, traj }) => {
+                                          const devUnits = (lote.devoluciones || []).reduce((sum: number, d: any) => sum + (Number(d.unidades) || 0), 0);
+                                          return (
+                                            <tr key={lote.id} className="hover:bg-[#1E293B]/10 transition-colors opacity-90">
+                                              <td className="p-4 pl-6">
+                                                <div className="font-bold text-slate-400 line-through">{lote.productoId}</div>
+                                                <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">Solución: {lote.solucionLote || 'S/S'}</span>
+                                              </td>
+                                              <td className="p-4 text-center text-slate-500 font-semibold font-mono">{formatDateToDDMMYYYY(lote.fechaVencimiento)}</td>
+                                              <td className="p-4 text-center font-mono font-bold text-amber-400/70">
+                                                {formatCurrency(lote.precioUnitNeto || 0)}
+                                              </td>
+                                              <td className="p-4 text-center">
+                                                <span className="font-black px-2.5 py-1 rounded-full font-mono text-[11px] bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                                  0 u. (Agotado)
+                                                </span>
+                                                {devUnits > 0 && (
+                                                  <span className="text-[10px] text-amber-400 font-semibold font-mono mt-1 block">
+                                                    Rebajado por dev.: -{devUnits} u.
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="p-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => openDevolucionModal(lote)}
+                                                    title="Registrar devolución o rebaja de stock"
+                                                    className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#050914] border border-amber-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                                  >
+                                                    <RotateCcw size={12} /> Rebaja
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => openEditLoteModal(lote)}
+                                                    title="Editar producto"
+                                                    className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-[#050914] border border-sky-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                                  >
+                                                    <Edit2 size={12} /> Editar
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => openDeleteLoteModal(lote)}
+                                                    title="Eliminar producto"
+                                                    className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 font-bold rounded-lg text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                                  >
+                                                    <Trash2 size={12} /> Eliminar
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      ) : (
+                                        <tr>
+                                          <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
+                                            No hay productos inactivos o sin stock para este cliente.
+                                          </td>
+                                        </tr>
+                                      )
+                                    )}
+                                    {inventoryStatus.length === 0 && (
+                                      <tr>
+                                        <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
+                                          Este cliente no posee ningún producto registrado en consignación.
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+
+                                {/* IF INACTIVOS SUBTAB IS TODO, ALSO RENDER THE REBAJADOS TABLE BELOW */}
+                                {registroVentasStockTab === 'inactivos' && inactivosSubTab === 'todo' && devolucionesList.length > 0 && (
+                                  <div className="mt-6 border-t border-[#1E293B] pt-4">
+                                    <div className="px-4 py-2 flex items-center justify-between bg-[#080E1A] rounded-xl mb-3 border border-[#1E293B]">
+                                      <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-wider">
+                                        <RotateCcw size={14} />
+                                        Historial Detallado de Rebajas y Devoluciones ({devolucionesList.length})
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono font-bold">
+                                        Total Rebajado: {totalDevolvedUnits} u. ({formatCurrency(totalDevolvedAmount)})
+                                      </div>
+                                    </div>
+                                    <table className="w-full text-left">
+                                      <thead className="bg-[#0D1627] border-b border-[#1E293B] text-[9px] uppercase font-black tracking-widest text-slate-400">
+                                        <tr>
+                                          <th className="p-3 pl-6">Producto / Lote</th>
+                                          <th className="p-3 text-center">F. Rebaja</th>
+                                          <th className="p-3 text-center">Unidades Rebajadas</th>
+                                          <th className="p-3 text-center">Valor Unitario</th>
+                                          <th className="p-3 text-center">Total</th>
+                                          <th className="p-3">Motivo</th>
+                                          <th className="p-3 text-center">Acción</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-[#1E293B]/20 text-xs">
+                                        {devolucionesList.map((d: any) => {
+                                          const totalMonto = (Number(d.unidades) || 0) * (Number(d.precioUnitNeto) || 0);
+                                          return (
+                                            <tr key={d.id} className="hover:bg-[#1E293B]/20 transition-colors">
+                                              <td className="p-3 pl-6">
+                                                <div className="font-bold text-slate-200 flex items-center gap-2">
+                                                  {d.productoId}
+                                                  <span className="text-[8px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 py-0.5 rounded font-mono font-bold uppercase">
+                                                    Rebaja
+                                                  </span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                                                  <span className="text-emerald-400">Solución: {d.solucionLote || 'S/L'}</span>
+                                                  <span>•</span>
+                                                  <span>Venc: {formatDateToDDMMYYYY(d.fechaVencimiento)}</span>
+                                                </div>
+                                              </td>
+                                              <td className="p-3 text-center text-slate-300 font-semibold font-mono text-xs">
+                                                {formatDateToDDMMYYYY(d.fecha)}
+                                              </td>
+                                              <td className="p-3 text-center">
+                                                <span className="font-black px-2 py-0.5 rounded-full font-mono text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 inline-block">
+                                                  -{d.unidades} u.
+                                                </span>
+                                              </td>
+                                              <td className="p-3 text-center font-mono font-bold text-slate-300">
+                                                {formatCurrency(d.precioUnitNeto || 0)}
+                                              </td>
+                                              <td className="p-3 text-center font-mono font-black text-rose-400">
+                                                -{formatCurrency(totalMonto)}
+                                              </td>
+                                              <td className="p-3 text-slate-300 text-xs">
+                                                <span className="bg-[#050914] px-2 py-0.5 rounded-lg border border-[#1E293B] text-[10px] text-slate-300 block w-fit">
+                                                  {d.motivo || 'Devolución / Ajuste de stock'}
+                                                </span>
+                                              </td>
+                                              <td className="p-3 text-center">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleDeleteDevolucion(d.loteId, d.id)}
+                                                  title="Revertir / Eliminar esta rebaja"
+                                                  className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                                >
+                                                  <Trash2 size={13} />
+                                                </button>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 )}
-                              </tbody>
-                            </table>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -5679,7 +5940,8 @@ export default function VentasConsignacionView() {
                     required
                     min="1"
                     className="w-full bg-[#050914] text-amber-400 font-mono border border-[#1E293B] rounded-xl p-2.5 text-xs font-black outline-none focus:border-amber-500"
-                    value={devolucionForm.unidades}
+                    value={devolucionForm.unidades === 0 ? '' : devolucionForm.unidades}
+                    placeholder="Ej: 5"
                     onChange={(e) => setDevolucionForm({ ...devolucionForm, unidades: parseInt(e.target.value) || 0 })}
                   />
                 </div>
@@ -5819,7 +6081,8 @@ export default function VentasConsignacionView() {
                     required
                     min="1"
                     className="w-full bg-[#050914] text-sky-400 font-mono border border-[#1E293B] rounded-xl p-2.5 text-xs font-black outline-none focus:border-emerald-500"
-                    value={reponerForm.unidadesIniciales}
+                    value={reponerForm.unidadesIniciales === 0 ? '' : (reponerForm.unidadesIniciales || '')}
+                    placeholder="Ej: 100"
                     onChange={(e) => setReponerForm({ ...reponerForm, unidadesIniciales: parseInt(e.target.value) || 0 })}
                   />
                 </div>
@@ -5846,7 +6109,8 @@ export default function VentasConsignacionView() {
                   type="number"
                   step="0.01"
                   className="w-full bg-[#050914] text-amber-400 font-black border border-[#1E293B] rounded-xl p-2.5 text-xs outline-none focus:border-emerald-500"
-                  value={reponerForm.precioUnitNeto}
+                  value={reponerForm.precioUnitNeto === 0 ? '' : (reponerForm.precioUnitNeto || '')}
+                  placeholder="0"
                   onChange={(e) => setReponerForm({ ...reponerForm, precioUnitNeto: parseFloat(e.target.value) || 0 })}
                 />
               </div>
@@ -5960,7 +6224,8 @@ export default function VentasConsignacionView() {
                     min="0"
                     required
                     className="w-full bg-[#050914] text-sky-400 border border-[#1E293B] rounded-xl p-2.5 text-xs font-mono font-bold outline-none focus:border-sky-500"
-                    value={editLoteForm.unidadesIniciales}
+                    value={editLoteForm.unidadesIniciales === 0 ? '' : (editLoteForm.unidadesIniciales || '')}
+                    placeholder="0"
                     onChange={(e) => setEditLoteForm({ ...editLoteForm, unidadesIniciales: parseInt(e.target.value) || 0 })}
                   />
                 </div>
@@ -5975,7 +6240,8 @@ export default function VentasConsignacionView() {
                     step="any"
                     required
                     className="w-full bg-[#050914] text-amber-400 border border-[#1E293B] rounded-xl p-2.5 text-xs font-mono font-bold outline-none focus:border-sky-500"
-                    value={editLoteForm.precioUnitNeto}
+                    value={editLoteForm.precioUnitNeto === 0 ? '' : (editLoteForm.precioUnitNeto || '')}
+                    placeholder="0"
                     onChange={(e) => setEditLoteForm({ ...editLoteForm, precioUnitNeto: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
@@ -6221,7 +6487,7 @@ function LoteFixedDataRow({
     productoId: item.productoId || '',
     solucionLote: item.solucionLote || '',
     fechaVencimiento: parseDateString(item.fechaVencimiento),
-    unidadesIniciales: Number(item.originalUnidades ?? item.displayUnidades) || 100,
+    unidadesIniciales: Number(item.originalUnidades ?? item.displayUnidades) || 0,
     precioUnitNeto: Number(item.precioUnitNeto) || 0,
   });
   const [saving, setSaving] = useState(false);
@@ -6465,7 +6731,7 @@ function LoteFixedDataEditor({
     productoId: lote.productoId || '',
     solucionLote: lote.solucionLote || '',
     fechaVencimiento: parseDateString(lote.fechaVencimiento),
-    unidadesIniciales: Number(lote.unidadesIniciales) || 100,
+    unidadesIniciales: Number(lote.unidadesIniciales) || 0,
     precioUnitNeto: Number(lote.precioUnitNeto) || 0,
   });
   const [saving, setSaving] = useState(false);
