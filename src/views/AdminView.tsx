@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
 import { localDB, localAuth } from '../lib/auth';
 import { syncStudentsToSchoolPayments } from '../lib/syncUtils';
 import { cn, formatDate, formatDateTimeChile, formatCurrency, safe, parseExcelDate, formatDateForExcel, parseCurrency, findRowValue } from '../lib/utils';
@@ -126,7 +127,7 @@ export default function AdminView() {
 
   const handleLoadRangeChange = (range: 'ultimos_30_dias' | 'mes_actual' | 'anio_actual' | 'historico_completo') => {
     setLoadRange(range);
-    localStorage.setItem('cimasur_admin_data_range_v2', range);
+    safeLocalStorageSet('cimasur_admin_data_range_v2', range);
   };
 
   const getQueryOptions = (colName: string) => {
@@ -2838,7 +2839,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   const [dateTo, setDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [meta, setMeta] = useState(() => {
-    const saved = localStorage.getItem(`cimasur_school_meta_${new Date().getFullYear()}`);
+    const saved = safeLocalStorageGet(`cimasur_school_meta_${new Date().getFullYear()}`);
     return saved ? parseInt(saved, 10) : 50000000; // Increased to 50 million as it's an annual meta
   });
   const [isEditingMeta, setIsEditingMeta] = useState(false);
@@ -2846,7 +2847,7 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   // Effect to load meta when year filter changes
   useEffect(() => {
     if (yearFilter && yearFilter !== 'Todos') {
-      const saved = localStorage.getItem(`cimasur_school_meta_${yearFilter}`);
+      const saved = safeLocalStorageGet(`cimasur_school_meta_${yearFilter}`);
       if (saved) setMeta(parseInt(saved, 10));
     }
   }, [yearFilter]);
@@ -2855,9 +2856,9 @@ function SchoolPaymentsManager({ records, setRecords }: { records: any[], setRec
   const handleMetaChange = (newMeta: number) => {
     setMeta(newMeta);
     if (yearFilter && yearFilter !== 'Todos') {
-      localStorage.setItem(`cimasur_school_meta_${yearFilter}`, newMeta.toString());
+      safeLocalStorageSet(`cimasur_school_meta_${yearFilter}`, newMeta.toString());
     } else {
-      localStorage.setItem(`cimasur_school_meta_Todos`, newMeta.toString());
+      safeLocalStorageSet(`cimasur_school_meta_Todos`, newMeta.toString());
     }
   };
   

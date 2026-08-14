@@ -1,3 +1,5 @@
+import { safeLocalStorageGet, safeLocalStorageSet, safeLocalStorageRemove, cleanupLocalStorageQuota } from '../../lib/safeStorage';
+import { getIndexedDbCache, setIndexedDbCache, removeIndexedDbCache } from '../../lib/indexedDbCache';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -243,7 +245,7 @@ const generateTwelveMonths = (startYearMonth: string): string[] => {
 // Seed mock data for demonstration
 const getMockLotesForClient = (clienteId: string): any[] => {
   const key = 'mock_consignacion_lotes';
-  const existing = localStorage.getItem(key);
+  const existing = safeLocalStorageGet(key);
   let allLotes: any[] = [];
   if (existing) {
     try {
@@ -517,27 +519,33 @@ export default function VentasConsignacionView() {
           }
         });
       } else {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith(`mock_planilla_${clienteId}_`)) {
-            const m = k.replace(`mock_planilla_${clienteId}_`, '');
-            set.add(m);
-            try {
-              const stored = localStorage.getItem(k);
-              if (stored && stored.startsWith('{')) {
-                const parsed = JSON.parse(stored);
-                metaMap[m] = {
-                  numMonths: parsed.numMonths || (parsed.isBimonthly ? 2 : 1),
-                  isBimonthly: parsed.isBimonthly,
-                  secondMonth: parsed.secondMonth,
-                  customPeriodLabel: parsed.customPeriodLabel,
-                  observaciones: parsed.observaciones
-                };
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith(`mock_planilla_${clienteId}_`)) {
+                const m = k.replace(`mock_planilla_${clienteId}_`, '');
+                set.add(m);
+                try {
+                  const stored = safeLocalStorageGet(k);
+                  if (stored && stored.startsWith('{')) {
+                    const parsed = JSON.parse(stored);
+                    metaMap[m] = {
+                      numMonths: parsed.numMonths || (parsed.isBimonthly ? 2 : 1),
+                      isBimonthly: parsed.isBimonthly,
+                      secondMonth: parsed.secondMonth,
+                      customPeriodLabel: parsed.customPeriodLabel,
+                      observaciones: parsed.observaciones
+                    };
+                  }
+                } catch (e) {
+                  // ignore
+                }
               }
-            } catch (e) {
-              // ignore
             }
           }
+        } catch (e) {
+          console.warn('Error reading mock planillas from storage:', e);
         }
       }
       savedPlanillasMemoryCache.current[clienteId] = { months: set, meta: metaMap };
@@ -798,9 +806,9 @@ export default function VentasConsignacionView() {
       todosLosLotesMemoryCache.current = null;
       if (reponerForm.clienteId) {
         delete clientLotesMemoryCache.current[reponerForm.clienteId];
-        localStorage.removeItem(`cache_lotes_${reponerForm.clienteId}`);
+        safeLocalStorageRemove(`cache_lotes_${reponerForm.clienteId}`); removeIndexedDbCache(`cache_lotes_${reponerForm.clienteId}`).catch(() => {});
       }
-      localStorage.removeItem('cache_todos_los_lotes');
+      safeLocalStorageRemove('cache_todos_los_lotes'); removeIndexedDbCache('cache_todos_los_lotes').catch(() => {});
 
       if (isFirebaseReady()) {
         const db = getDb();
@@ -849,7 +857,7 @@ export default function VentasConsignacionView() {
         }
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         let allLotes = existing ? JSON.parse(existing) : [];
 
         const existingIdx = allLotes.findIndex((l: any) =>
@@ -866,7 +874,7 @@ export default function VentasConsignacionView() {
           allLotes[existingIdx].unidadesIniciales = newUnits;
           allLotes[existingIdx].precioUnitNeto = finalPrice;
           allLotes[existingIdx].totalVentaOriginal = newUnits * finalPrice;
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         } else {
           const newLote = {
             id: `lote_${Date.now()}`,
@@ -883,7 +891,7 @@ export default function VentasConsignacionView() {
             movimientos: {}
           };
           allLotes.push(newLote);
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
 
@@ -967,13 +975,13 @@ export default function VentasConsignacionView() {
         await setDoc(loteRef, { devoluciones: updatedDevs }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const idx = allLotes.findIndex((l: any) => l.id.toString() === targetLote.id.toString());
           if (idx !== -1) {
             allLotes[idx].devoluciones = updatedDevs;
-            localStorage.setItem(key, JSON.stringify(allLotes));
+            safeLocalStorageSet(key, JSON.stringify(allLotes));
           }
         }
       }
@@ -1004,13 +1012,13 @@ export default function VentasConsignacionView() {
         await setDoc(loteRef, { devoluciones: updatedDevs }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const idx = allLotes.findIndex((l: any) => l.id.toString() === targetLote.id.toString());
           if (idx !== -1) {
             allLotes[idx].devoluciones = updatedDevs;
-            localStorage.setItem(key, JSON.stringify(allLotes));
+            safeLocalStorageSet(key, JSON.stringify(allLotes));
           }
         }
       }
@@ -1053,7 +1061,7 @@ export default function VentasConsignacionView() {
         }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const idx = allLotes.findIndex((l: any) => l.id.toString() === loteId.toString());
@@ -1064,7 +1072,7 @@ export default function VentasConsignacionView() {
             allLotes[idx].unidadesIniciales = units;
             allLotes[idx].precioUnitNeto = price;
             allLotes[idx].totalVentaOriginal = totalVal;
-            localStorage.setItem(key, JSON.stringify(allLotes));
+            safeLocalStorageSet(key, JSON.stringify(allLotes));
           }
         }
       }
@@ -1107,11 +1115,11 @@ export default function VentasConsignacionView() {
         await deleteDoc(doc(db, 'crm_consignacion_lotes', loteId));
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           let allLotes = JSON.parse(existing);
           allLotes = allLotes.filter((l: any) => l.id.toString() !== loteId.toString());
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
       setDeleteLoteModal(null);
@@ -1170,6 +1178,7 @@ export default function VentasConsignacionView() {
   });
 
   useEffect(() => {
+    cleanupLocalStorageQuota();
     loadClientes();
   }, []);
 
@@ -1206,7 +1215,7 @@ export default function VentasConsignacionView() {
     if (formEntrega.producto_id && formEntrega.cliente_id) {
       if (!isFirebaseReady()) {
         const localKey = `mock_precios_${formEntrega.cliente_id}`;
-        const saved = localStorage.getItem(localKey);
+        const saved = safeLocalStorageGet(localKey);
         let customPrice = null;
         if (saved) {
           try {
@@ -1236,27 +1245,27 @@ export default function VentasConsignacionView() {
 
   const loadTodosLosLotes = async (force = false) => {
     try {
+      // 1. Check in-memory state / ref first (instant)
       if (!force && todosLosLotesMemoryCache.current && todosLosLotesMemoryCache.current.length > 0) {
         setTodosLosLotes(todosLosLotesMemoryCache.current);
         return;
       }
+      
       const cacheKey = 'cache_todos_los_lotes';
       if (!force) {
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < 300000) { // 5 mins cache
-            todosLosLotesMemoryCache.current = data;
-            setTodosLosLotes(data);
-            return;
-          }
+        // 2. Check IndexedDB cache (asynchronous, no 5MB limit)
+        const idbData = await getIndexedDbCache<any[]>(cacheKey);
+        if (idbData && Array.isArray(idbData) && idbData.length > 0) {
+          todosLosLotesMemoryCache.current = idbData;
+          setTodosLosLotes(idbData);
+          return;
         }
       }
 
       if (isFirebaseReady()) {
         const db = getDb();
         const snap = await getDocs(query(collection(db, 'crm_consignacion_lotes'), limit(5000)));
-        const loaded = [];
+        const loaded: any[] = [];
         for (const d of snap.docs) {
           const data = d.data();
           if (!data) continue;
@@ -1267,12 +1276,13 @@ export default function VentasConsignacionView() {
             movimientos: data.movimientos || {}
           });
         }
-        localStorage.setItem(cacheKey, JSON.stringify({ data: loaded, timestamp: Date.now() }));
+        // Save to IndexedDB (safe against QuotaExceededError) and Memory Cache
+        setIndexedDbCache(cacheKey, loaded, 300000).catch(() => {});
         todosLosLotesMemoryCache.current = loaded;
         setTodosLosLotes(loaded);
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           let allLotes = [];
           try {
@@ -1288,7 +1298,7 @@ export default function VentasConsignacionView() {
             if (l.id && (l.id.startsWith('lote_arnica_') || l.id.startsWith('lote_sarsa_') || l.id.startsWith('lote_beil_') || l.id.startsWith('lote_sili_'))) return false;
             return true;
           });
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
           todosLosLotesMemoryCache.current = allLotes;
           setTodosLosLotes(allLotes);
         } else {
@@ -1323,13 +1333,13 @@ export default function VentasConsignacionView() {
         await setDoc(docRef, { reposiciones: updatedRepos }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const idx = allLotes.findIndex((l: any) => l.id === loteId);
           if (idx !== -1) {
             allLotes[idx].reposiciones = updatedRepos;
-            localStorage.setItem(key, JSON.stringify(allLotes));
+            safeLocalStorageSet(key, JSON.stringify(allLotes));
           }
         }
       }
@@ -1354,20 +1364,19 @@ export default function VentasConsignacionView() {
     try {
       if (!clienteId) return;
       
-      // Memory Cache Check
-      if (!force && clientLotesMemoryCache.current[clienteId]) {
+      // 1. Memory Cache Check (instant)
+      if (!force && clientLotesMemoryCache.current[clienteId] && clientLotesMemoryCache.current[clienteId].length > 0) {
         setLotesActivos(clientLotesMemoryCache.current[clienteId]);
         return;
       }
 
-      const now = Date.now();
       const cacheKey = `cache_lotes_${clienteId}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (!force && cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (now - timestamp < 300000) { // 5 mins cache
-          clientLotesMemoryCache.current[clienteId] = data;
-          setLotesActivos(data);
+      if (!force) {
+        // 2. Check IndexedDB cache
+        const idbData = await getIndexedDbCache<any[]>(cacheKey);
+        if (idbData && Array.isArray(idbData) && idbData.length > 0) {
+          clientLotesMemoryCache.current[clienteId] = idbData;
+          setLotesActivos(idbData);
           return;
         }
       }
@@ -1394,7 +1403,8 @@ export default function VentasConsignacionView() {
         });
 
         const results = await Promise.all(promises);
-        localStorage.setItem(cacheKey, JSON.stringify({ data: results, timestamp: now }));
+        // Store in IndexedDB and Memory Cache (never in localStorage to prevent QuotaExceededError)
+        setIndexedDbCache(cacheKey, results, 300000).catch(() => {});
         clientLotesMemoryCache.current[clienteId] = results;
         setLotesActivos(results);
       } else {
@@ -1546,7 +1556,7 @@ export default function VentasConsignacionView() {
         }
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         let allLotes = existing ? JSON.parse(existing) : [];
         for (const item of importedList) {
           const totalVal = item.unidadesIniciales * item.precioUnitNeto;
@@ -1567,7 +1577,7 @@ export default function VentasConsignacionView() {
           allLotes.push(newLote);
           successCount++;
         }
-        localStorage.setItem(key, JSON.stringify(allLotes));
+        safeLocalStorageSet(key, JSON.stringify(allLotes));
       }
       
       alert(`Importación completada. Registrados: ${successCount}. Errores: ${failCount}`);
@@ -1608,9 +1618,9 @@ export default function VentasConsignacionView() {
       todosLosLotesMemoryCache.current = null;
       if (formEntrega.cliente_id) {
         delete clientLotesMemoryCache.current[formEntrega.cliente_id];
-        localStorage.removeItem(`cache_lotes_${formEntrega.cliente_id}`);
+        safeLocalStorageRemove(`cache_lotes_${formEntrega.cliente_id}`); removeIndexedDbCache(`cache_lotes_${formEntrega.cliente_id}`).catch(() => {});
       }
-      localStorage.removeItem('cache_todos_los_lotes');
+      safeLocalStorageRemove('cache_todos_los_lotes'); removeIndexedDbCache('cache_todos_los_lotes').catch(() => {});
 
       if (isFirebaseReady()) {
         const db = getDb();
@@ -1659,7 +1669,7 @@ export default function VentasConsignacionView() {
         }
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         let allLotes = existing ? JSON.parse(existing) : [];
         
         const existingIdx = allLotes.findIndex((l: any) =>
@@ -1676,7 +1686,7 @@ export default function VentasConsignacionView() {
           allLotes[existingIdx].unidadesIniciales = newUnits;
           allLotes[existingIdx].precioUnitNeto = finalPrice;
           allLotes[existingIdx].totalVentaOriginal = newUnits * finalPrice;
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         } else {
           const newLote = {
             id: `lote_${Date.now()}`,
@@ -1693,7 +1703,7 @@ export default function VentasConsignacionView() {
             movimientos: {}
           };
           allLotes.push(newLote);
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
 
@@ -1741,9 +1751,9 @@ export default function VentasConsignacionView() {
       todosLosLotesMemoryCache.current = null;
       if (declaracionCliente) {
         delete clientLotesMemoryCache.current[declaracionCliente];
-        localStorage.removeItem(`cache_lotes_${declaracionCliente}`);
+        safeLocalStorageRemove(`cache_lotes_${declaracionCliente}`); removeIndexedDbCache(`cache_lotes_${declaracionCliente}`).catch(() => {});
       }
-      localStorage.removeItem('cache_todos_los_lotes');
+      safeLocalStorageRemove('cache_todos_los_lotes'); removeIndexedDbCache('cache_todos_los_lotes').catch(() => {});
 
       if (isFirebaseReady()) {
         const db = getDb();
@@ -1792,7 +1802,7 @@ export default function VentasConsignacionView() {
         }
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         let allLotes = existing ? JSON.parse(existing) : [];
         
         const existingIdx = allLotes.findIndex((l: any) =>
@@ -1809,7 +1819,7 @@ export default function VentasConsignacionView() {
           allLotes[existingIdx].unidadesIniciales = newUnits;
           allLotes[existingIdx].precioUnitNeto = finalPrice;
           allLotes[existingIdx].totalVentaOriginal = newUnits * finalPrice;
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         } else {
           const newLote = {
             id: `lote_${Date.now()}`,
@@ -1826,7 +1836,7 @@ export default function VentasConsignacionView() {
             movimientos: {}
           };
           allLotes.push(newLote);
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
 
@@ -1857,9 +1867,9 @@ export default function VentasConsignacionView() {
       todosLosLotesMemoryCache.current = null;
       if (clienteId) {
         delete clientLotesMemoryCache.current[clienteId];
-        localStorage.removeItem(`cache_lotes_${clienteId}`);
+        safeLocalStorageRemove(`cache_lotes_${clienteId}`); removeIndexedDbCache(`cache_lotes_${clienteId}`).catch(() => {});
       }
-      localStorage.removeItem('cache_todos_los_lotes');
+      safeLocalStorageRemove('cache_todos_los_lotes'); removeIndexedDbCache('cache_todos_los_lotes').catch(() => {});
 
       if (isFirebaseReady()) {
         const db = getDb();
@@ -1927,7 +1937,7 @@ export default function VentasConsignacionView() {
         }
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           let allLotes = JSON.parse(existing);
           const clientLotes = allLotes.filter((l: any) => l.clienteId === clienteId);
@@ -1963,7 +1973,7 @@ export default function VentasConsignacionView() {
             }
           });
 
-          localStorage.setItem(key, JSON.stringify([...otherLotes, ...mergedClientLotes]));
+          safeLocalStorageSet(key, JSON.stringify([...otherLotes, ...mergedClientLotes]));
           if (consolidatedCount > 0) {
             alert(`✅ Se unificaron ${consolidatedCount} lote(s) duplicados correctamente.`);
           } else {
@@ -2008,7 +2018,7 @@ export default function VentasConsignacionView() {
         await Promise.all(promises);
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           loteIds.forEach(loteId => {
@@ -2023,7 +2033,7 @@ export default function VentasConsignacionView() {
               };
             }
           });
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
       
@@ -2057,14 +2067,14 @@ export default function VentasConsignacionView() {
         });
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const idx = allLotes.findIndex((l: any) => l.id === loteId);
           if (idx !== -1) {
             if (!allLotes[idx].movimientos) allLotes[idx].movimientos = {};
             allLotes[idx].movimientos[selectedMonth] = { hidden: true };
-            localStorage.setItem(key, JSON.stringify(allLotes));
+            safeLocalStorageSet(key, JSON.stringify(allLotes));
           }
         }
       }
@@ -2101,7 +2111,7 @@ export default function VentasConsignacionView() {
         await batch.commit();
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           selectedMonthlyLoteIds.forEach(loteId => {
@@ -2111,7 +2121,7 @@ export default function VentasConsignacionView() {
               allLotes[idx].movimientos[selectedMonth] = { hidden: true };
             }
           });
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
       
@@ -2223,7 +2233,7 @@ export default function VentasConsignacionView() {
       } else {
         // Almacenamiento Local (Mock DB) - Direct manipulation to avoid DATABASE_URL prompt
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           let allLotes = JSON.parse(existing);
           for (const [loteId, info] of Object.entries(groupedByLote)) {
@@ -2241,7 +2251,7 @@ export default function VentasConsignacionView() {
               allLotes[idx].reposiciones = repos;
             }
           }
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
       
@@ -2345,11 +2355,11 @@ export default function VentasConsignacionView() {
         
         alert("Planilla y movimientos borrados exitosamente.");
       } else {
-        localStorage.removeItem(`mock_planilla_${declaracionCliente}_${monthToDelete}`);
+        safeLocalStorageRemove(`mock_planilla_${declaracionCliente}_${monthToDelete}`);
         
         // Also delete from local mock db
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           allLotes.forEach((l: any) => {
@@ -2357,7 +2367,7 @@ export default function VentasConsignacionView() {
                 delete l.movimientos[monthToDelete];
              }
           });
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
         
         alert("Planilla borrada exitosamente.");
@@ -2456,7 +2466,7 @@ export default function VentasConsignacionView() {
 
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           editarPlanillaForm.items.forEach(item => {
@@ -2477,10 +2487,10 @@ export default function VentasConsignacionView() {
               }
             }
           });
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
 
-        localStorage.setItem(`mock_planilla_${cid}_${month}`, JSON.stringify({
+        safeLocalStorageSet(`mock_planilla_${cid}_${month}`, JSON.stringify({
           clienteId: cid,
           month: month,
           numMonths: numM,
@@ -2568,7 +2578,7 @@ export default function VentasConsignacionView() {
         setTimeout(() => setSaveNotification(null), 5000);
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           allLotes.forEach((l: any) => {
@@ -2594,10 +2604,10 @@ export default function VentasConsignacionView() {
               }
             }
           });
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
           
           const planillaKey = `mock_planilla_${declaracionCliente}_${selectedMonth}`;
-          localStorage.setItem(planillaKey, JSON.stringify({
+          safeLocalStorageSet(planillaKey, JSON.stringify({
             clienteId: declaracionCliente,
             month: selectedMonth,
             savedAt: new Date().toISOString()
@@ -6528,7 +6538,7 @@ function LoteFixedDataRow({
         }
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const index = allLotes.findIndex((l: any) => l.id === item.id);
@@ -6546,7 +6556,7 @@ function LoteFixedDataRow({
                    repos[item.repIndex].unidades = units;
                 }
             }
-            localStorage.setItem(key, JSON.stringify(allLotes));
+            safeLocalStorageSet(key, JSON.stringify(allLotes));
           }
         }
       }
@@ -6589,7 +6599,7 @@ function LoteFixedDataRow({
       } else {
         // Almacenamiento Local (Mock DB) - Direct manipulation
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           let allLotes = JSON.parse(existing);
           if (item.type === 'ORIGINAL') {
@@ -6602,7 +6612,7 @@ function LoteFixedDataRow({
                 allLotes[index].reposiciones = repos;
              }
           }
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
       onRefresh();
@@ -6756,7 +6766,7 @@ function LoteFixedDataEditor({
         }, { merge: true });
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           const allLotes = JSON.parse(existing);
           const index = allLotes.findIndex((l: any) => l.id === lote.id);
@@ -6767,7 +6777,7 @@ function LoteFixedDataEditor({
             allLotes[index].unidadesIniciales = units;
             allLotes[index].precioUnitNeto = price;
             allLotes[index].totalVentaOriginal = totalVal;
-            localStorage.setItem(key, JSON.stringify(allLotes));
+            safeLocalStorageSet(key, JSON.stringify(allLotes));
           }
         }
       }
@@ -6797,11 +6807,11 @@ function LoteFixedDataEditor({
         await deleteDoc(doc(db, 'crm_consignacion_lotes', lote.id));
       } else {
         const key = 'mock_consignacion_lotes';
-        const existing = localStorage.getItem(key);
+        const existing = safeLocalStorageGet(key);
         if (existing) {
           let allLotes = JSON.parse(existing);
           allLotes = allLotes.filter((l: any) => l.id !== lote.id);
-          localStorage.setItem(key, JSON.stringify(allLotes));
+          safeLocalStorageSet(key, JSON.stringify(allLotes));
         }
       }
       alert('Producto/solución eliminado exitosamente.');

@@ -2,6 +2,8 @@
 // Simple Mock Firestore implementation using LocalStorage
 // Provides onSnapshot, addDoc, query, orderBy, etc.
 
+import { safeLocalStorageGet, safeLocalStorageSet } from './safeStorage';
+
 type Callback = (snapshot: { docs: any[] }) => void;
 const listeners: Record<string, Callback[]> = {};
 
@@ -27,7 +29,7 @@ const notify = (collectionName: string) => {
 
 const getLocalCollection = (name: string): any[] => {
   try {
-    const item = localStorage.getItem(`db_${name}`);
+    const item = safeLocalStorageGet(`db_${name}`);
     return item ? JSON.parse(item) : [];
   } catch (e) {
     return [];
@@ -35,7 +37,7 @@ const getLocalCollection = (name: string): any[] => {
 };
 
 const setLocalCollection = (name: string, data: any[]) => {
-  localStorage.setItem(`db_${name}`, JSON.stringify(data));
+  safeLocalStorageSet(`db_${name}`, JSON.stringify(data));
 };
 
 export const collection = (db: any, name: string) => name;
