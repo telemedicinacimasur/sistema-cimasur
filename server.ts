@@ -1770,5 +1770,5 @@ Retorna UNICAMENTE un objeto JSON con el siguiente formato estricto:`;
 
 startServer().catch(err => {
   console.error('Error fatal al iniciar el servidor:', err);
-});
+}); 
 
