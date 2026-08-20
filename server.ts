@@ -1,3 +1,4 @@
+// Force deploy on Render
 import 'dotenv/config';
 
 console.log('--- SERVER STARTUP INITIALIZED ---');
