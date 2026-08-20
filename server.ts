@@ -1761,9 +1761,9 @@ Retorna UNICAMENTE un objeto JSON con el siguiente formato estricto:`;
     });
   }
 
-  const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor CIMASUR ejecutándose en http://localhost:${PORT}`);
+  const PORT = process.env.PORT || 3000;
+  app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`Servidor CIMASUR ejecutándose en http://0.0.0.0:${PORT}`);
   });
 }
 
