@@ -1,0 +1,878 @@
+import React, { useState } from 'react';
+import { 
+  BookOpen, 
+  Download, 
+  FileText, 
+  Printer, 
+  Search, 
+  CheckCircle2, 
+  Layers, 
+  FlaskConical, 
+  Users, 
+  DollarSign, 
+  GraduationCap, 
+  Calendar, 
+  Package, 
+  ClipboardCheck, 
+  AlertTriangle,
+  Beaker,
+  Microscope,
+  Droplets,
+  Table,
+  Settings,
+  Stethoscope,
+  Info,
+  ChevronRight,
+  TrendingUp,
+  FileSpreadsheet,
+  HelpCircle
+} from 'lucide-react';
+import { cn } from '../lib/utils';
+
+export default function ManualOperativo() {
+  const [activeSection, setActiveSection] = useState<string>('todos');
+  const [searchManual, setSearchManual] = useState<string>('');
+
+  const exportMarkdown = () => {
+    const content = getFullManualMarkdown();
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Manual_Operativo_Usuario_CIMASUR.md';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportDoc = () => {
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>Manual Operativo CIMASUR</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b; padding: 24px; }
+        h1 { color: #0284c7; border-bottom: 3px solid #0284c7; padding-bottom: 8px; font-size: 24px; }
+        h2 { color: #0f172a; margin-top: 24px; border-bottom: 2px solid #cbd5e1; padding-bottom: 4px; font-size: 18px; }
+        h3 { color: #0369a1; margin-top: 18px; font-size: 15px; }
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+        th, td { border: 1px solid #94a3b8; padding: 8px 10px; text-align: left; }
+        th { background-color: #f1f5f9; font-weight: bold; }
+        .badge { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .field { font-weight: bold; color: #0f172a; }
+        .note { background-color: #f8fafc; border-left: 4px solid #0284c7; padding: 10px; margin: 12px 0; font-size: 12px; }
+      </style>
+      </head>
+      <body>
+        ${getManualHTML()}
+      </body>
+      </html>
+    `;
+    const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Manual_Operativo_Usuario_CIMASUR.doc';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Barra de Encabezado y Descarga */}
+      <div className="bg-[#111A2E] p-6 rounded-2xl border border-[#1E293B] shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 bg-sky-500/20 text-[#38BDF8] rounded-xl">
+              <BookOpen className="w-5 h-5" />
+            </span>
+            <h3 className="text-xl font-black text-white uppercase tracking-wider">Manual Operativo de Usuario - Sistema CIMASUR</h3>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Guía oficial de procedimientos, campos requeridos y operación de todos los módulos y los 12 submódulos de Laboratorio.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={exportMarkdown}
+            className="px-3.5 py-2 bg-[#152035] hover:bg-[#1E293B] text-[#38BDF8] border border-[#38BDF8]/40 hover:border-[#38BDF8] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            title="Descargar archivo Markdown (.md)"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Descargar .MD</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={exportDoc}
+            className="px-3.5 py-2 bg-[#152035] hover:bg-[#1E293B] text-emerald-400 border border-emerald-500/40 hover:border-emerald-500 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            title="Descargar archivo Word / Docs (.doc)"
+          >
+            <Download className="w-4 h-4" />
+            <span>Descargar .DOC</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+            title="Imprimir o guardar en PDF"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Imprimir / PDF</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Barra de Búsqueda y Filtros de Navegación */}
+      <div className="bg-[#152035] p-4 rounded-2xl border border-[#1E293B] flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex items-center gap-2 bg-[#111A2E] px-3.5 py-2 rounded-xl border border-[#1E293B] grow max-w-md">
+          <Search className="w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por módulo, campo, sub-módulo o procedimiento..."
+            className="bg-transparent outline-none text-xs text-white placeholder-slate-400 w-full"
+            value={searchManual}
+            onChange={e => setSearchManual(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { id: 'todos', label: 'Todo el Sistema' },
+            { id: 'arq', label: '1. Visión & Arquitectura' },
+            { id: 'crm', label: '2. Comercial CRM' },
+            { id: 'gestion', label: '3. Gestión' },
+            { id: 'lab', label: '4. Laboratorio (12 Submódulos)' },
+            { id: 'admin', label: '5. Administración' },
+            { id: 'escuela', label: '6. Escuela CIMASUR' },
+            { id: 'paginacion', label: '7. Paginación y Rendimiento' }
+          ].map(sec => (
+            <button
+              key={sec.id}
+              onClick={() => setActiveSection(sec.id)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                activeSection === sec.id
+                  ? "bg-[#38BDF8] text-slate-950 font-black shadow"
+                  : "bg-[#111A2E] text-slate-400 hover:text-white border border-[#1E293B]"
+              )}
+            >
+              {sec.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Contenedor Principal del Manual */}
+      <div className="bg-[#111A2E] p-6 sm:p-8 rounded-2xl border border-[#1E293B] space-y-10 text-slate-200 text-sm leading-relaxed">
+        
+        {/* SECCIÓN 1: VISIÓN GENERAL Y ARQUITECTURA */}
+        {(activeSection === 'todos' || activeSection === 'arq') && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-3">
+              <span className="p-2 bg-sky-500/20 text-[#38BDF8] rounded-lg">
+                <Layers className="w-5 h-5" />
+              </span>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wide">1. Visión General y Arquitectura del Sistema</h2>
+            </div>
+            
+            <p>
+              El sistema integral <strong>CIMASUR</strong> está diseñado como una aplicación web de alta disponibilidad construida sobre <strong>React 18 + Vite</strong> y conectada a <strong>Google Firebase Firestore</strong> como motor de base de datos en la nube, con una capa de caché local y sincronización bidireccional inmediata.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+              <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B]">
+                <h4 className="text-white font-bold text-xs uppercase text-[#38BDF8] mb-1">Caché y Optimización</h4>
+                <p className="text-xs text-slate-400">Persistencia local con eventos en tiempo real (<code className="text-sky-300">db-change</code>) que reducen las lecturas en Firestore y garantizan carga instantánea.</p>
+              </div>
+              <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B]">
+                <h4 className="text-white font-bold text-xs uppercase text-emerald-400 mb-1">Paginación Estándar 20x20</h4>
+                <p className="text-xs text-slate-400">Todos los módulos y submódulos operan con paginador numerado de 20 registros con botones <strong>Primero, Anterior, Siguiente y Último</strong>.</p>
+              </div>
+              <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B]">
+                <h4 className="text-white font-bold text-xs uppercase text-purple-400 mb-1">Control de Acceso RBAC</h4>
+                <p className="text-xs text-slate-400">Permisos por usuario, roles (Admin, Editor, Viewer) y restricción granular de submódulos permitidos.</p>
+              </div>
+            </div>
+
+            <h3 className="text-base font-bold text-white pt-2">Estructura Global de Módulos</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border border-[#1E293B] rounded-xl overflow-hidden">
+                <thead className="bg-[#152035] text-slate-300 uppercase font-black">
+                  <tr>
+                    <th className="p-3 border-b border-[#1E293B]">Módulo</th>
+                    <th className="p-3 border-b border-[#1E293B]">Propósito y Funcionalidad Principal</th>
+                    <th className="p-3 border-b border-[#1E293B]">Perfil de Usuario</th>
+                    <th className="p-3 border-b border-[#1E293B]">Exportaciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1E293B]">
+                  <tr>
+                    <td className="p-3 font-bold text-sky-400">1. Comercial CRM</td>
+                    <td className="p-3">Gestión integral de clientes, contactos veterinarios, clasificación Club Comercial (Platinum, Oro, Plata, Bronce), oportunidades y campañas.</td>
+                    <td className="p-3 text-slate-300">Ejecutivos Comerciales, Ventas, Admin</td>
+                    <td className="p-3 font-mono text-emerald-400">PDF, Excel</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-emerald-400">2. Gestión</td>
+                    <td className="p-3">Bitácora diaria de interacciones, registro de llamadas, visitas técnicas, categorización de clientes e importación masiva por Excel.</td>
+                    <td className="p-3 text-slate-300">Consultoras, Soporte Técnico, Admin</td>
+                    <td className="p-3 font-mono text-emerald-400">PDF Expediente, Excel</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-amber-400">3. Laboratorio</td>
+                    <td className="p-3">12 submódulos técnicos: Seguimiento de Envíos, Stock de Insumo Diario por Área, Fórmulas Magistrales, Tinturas Madres, Diluciones, Nosodes, Vademécum, etc.</td>
+                    <td className="p-3 text-slate-300">Químico Farmacéutico, Técnicos de Lab, Logística</td>
+                    <td className="p-3 font-mono text-emerald-400">Fichas Técnicas PDF, Órdenes Compra PDF, Excel</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-purple-400">4. Administración</td>
+                    <td className="p-3">Cotizaciones, Facturación, Compras a Proveedores, Inventario General, Consignaciones, Flujo de Caja y Resumen de Ventas Tienda/ML.</td>
+                    <td className="p-3 text-slate-300">Administración, Finanzas, Gerencia</td>
+                    <td className="p-3 font-mono text-emerald-400">Cotización PDF, Liquidaciones PDF, Excel</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-pink-400">5. Escuela CIMASUR</td>
+                    <td className="p-3">Gestión de cursos veterinarios, módulos de capacitación, asistencia, calificaciones y expedientes académicos de alumnos.</td>
+                    <td className="p-3 text-slate-300">Coordinación Académica, Docentes</td>
+                    <td className="p-3 font-mono text-emerald-400">Certificados PDF, Planillas Excel</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* SECCIÓN 2: MÓDULO COMERCIAL CRM */}
+        {(activeSection === 'todos' || activeSection === 'crm') && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-3">
+              <span className="p-2 bg-sky-500/20 text-[#38BDF8] rounded-lg">
+                <Users className="w-5 h-5" />
+              </span>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wide">2. Módulo Comercial CRM</h2>
+            </div>
+
+            <p>
+              El módulo CRM permite el seguimiento 360° de clientes, clínicas veterinarias, médicos prescriptores y empresas distribuidoras.
+            </p>
+
+            <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-3">
+              <h3 className="text-sm font-bold text-white text-[#38BDF8] uppercase">Campos del Formulario de Contacto / Cliente</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                <div><span className="text-slate-400 block font-bold">Cliente / Clínica:</span> Nombre comercial o razón social.</div>
+                <div><span className="text-slate-400 block font-bold">RUT:</span> Identificador tributario (formato XX.XXX.XXX-X).</div>
+                <div><span className="text-slate-400 block font-bold">Contacto Principal:</span> Nombre del doctor/encargado.</div>
+                <div><span className="text-slate-400 block font-bold">Teléfono / Celular:</span> Con enlace directo a WhatsApp.</div>
+                <div><span className="text-slate-400 block font-bold">Correo Electrónico:</span> Para cotizaciones y avisos.</div>
+                <div><span className="text-slate-400 block font-bold">Región y Comuna:</span> Ubicación para zonificación logística.</div>
+                <div><span className="text-slate-400 block font-bold">Categoría Club:</span> Platinum, Oro, Plata, Bronce o Sin categoría.</div>
+                <div><span className="text-slate-400 block font-bold">Especialidad:</span> Homeopatía, Acupuntura, Pequeños Animales, etc.</div>
+                <div><span className="text-slate-400 block font-bold">Ventas Anuales (CLP):</span> Monto acumulado para cálculo de categoría.</div>
+              </div>
+            </div>
+
+            <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-2">
+              <h3 className="text-sm font-bold text-white text-emerald-400 uppercase">Herramienta de Detección de Duplicados</h3>
+              <p className="text-xs text-slate-300">
+                El sistema implementa un algoritmo inteligente de normalización fonética y eliminación de sufijos societarios (Ltda, SpA, EIRL, Dr, Dra). Al pulsar <strong>"Detectar Duplicados"</strong>, agrupa contactos repetidos por RUT o similitud de nombre y permite fusionar historiales o depurar la base de datos sin pérdida de información.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* SECCIÓN 3: MÓDULO DE GESTIÓN */}
+        {(activeSection === 'todos' || activeSection === 'gestion') && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-3">
+              <span className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                <ClipboardCheck className="w-5 h-5" />
+              </span>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wide">3. Módulo de Gestión</h2>
+            </div>
+
+            <p>
+              Diseñado para el registro diario de interacciones comerciales, seguimiento post-venta y visitas a clientes veterinarios.
+            </p>
+
+            <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-3">
+              <h3 className="text-sm font-bold text-white text-emerald-400 uppercase">Campos del Registro de Gestión</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                <div><span className="text-slate-400 block font-bold">Fecha de Ingreso:</span> Fecha de la interacción.</div>
+                <div><span className="text-slate-400 block font-bold">Cliente / Nombre:</span> Nombre del profesional o clínica.</div>
+                <div><span className="text-slate-400 block font-bold">RUT:</span> Identificador del cliente.</div>
+                <div><span className="text-slate-400 block font-bold">Medio de Contacto:</span> WhatsApp, Llamada, Visita, Correo, etc.</div>
+                <div><span className="text-slate-400 block font-bold">Consultora / Responsable:</span> Ejecutiva que atiende la gestión.</div>
+                <div><span className="text-slate-400 block font-bold">Estado:</span> En proceso, Con compra, Sin compra, Finalizado.</div>
+                <div><span className="text-slate-400 block font-bold">Categoría:</span> Platinum, Oro, Plata, Bronce.</div>
+                <div><span className="text-slate-400 block font-bold">Observaciones / Detalle:</span> Bitácora técnica del contacto.</div>
+              </div>
+            </div>
+
+            <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B]">
+              <h3 className="text-sm font-bold text-white text-sky-400 uppercase mb-2">Importación Masiva en Lote</h3>
+              <p className="text-xs text-slate-300">
+                Permite cargar planillas Excel (<code className="text-emerald-400">.xlsx</code>) directamente al sistema. La función procesa los registros en lotes atómicos (Write Batches) con normalización de fechas y validación de duplicados.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* SECCIÓN 4: MÓDULO DE LABORATORIO (12 SUBMÓDULOS COMPLETOS) */}
+        {(activeSection === 'todos' || activeSection === 'lab') && (
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-3">
+              <span className="p-2 bg-amber-500/20 text-amber-400 rounded-lg">
+                <FlaskConical className="w-5 h-5" />
+              </span>
+              <div>
+                <h2 className="text-xl font-bold text-white uppercase tracking-wide">4. Módulo de Laboratorio (12 Submódulos Operativos)</h2>
+                <p className="text-xs text-slate-400">Detalle exhaustivo de los formularios, campos exactos que se digitan y propósito de cada submódulo.</p>
+              </div>
+            </div>
+
+            {/* 1. Seguimiento de Pedidos */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-[#38BDF8] uppercase flex items-center gap-2">
+                  <ClipboardCheck className="w-4 h-4" /> 4.1. Seguimiento de Pedidos (Courier & Trazabilidad)
+                </h3>
+                <span className="text-[10px] bg-sky-500/20 text-[#38BDF8] px-2 py-0.5 rounded-full font-bold uppercase">Logística</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Control de despachos a clientes, estados de envío y enlace automático al tracking del courier según el número de OT.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">N° Cotización / Pedido:</span> Número de referencia de la cotización.</div>
+                <div><span className="text-slate-400 block font-bold">Orden de Transporte (OT):</span> Número de seguimiento emitido por el courier.</div>
+                <div><span className="text-slate-400 block font-bold">Cliente / Destinatario:</span> Nombre de la clínica o profesional que recibe.</div>
+                <div><span className="text-slate-400 block font-bold">Courier / Transporte:</span> Starken, Chilexpress, CorreosChile, BlueExpress, Varmontt, Cacem, etc.</div>
+                <div><span className="text-slate-400 block font-bold">Situación:</span> PENDIENTE, EN TRÁNSITO, OK (Entregado), RECLAMO, DEVUELTO.</div>
+                <div><span className="text-slate-400 block font-bold">Fechas Clave:</span> Fecha Cotización, Fecha Envío, Fecha Cierre, Fecha Recepción.</div>
+                <div className="sm:col-span-2 md:col-span-3"><span className="text-slate-400 block font-bold">Detalle de Seguimiento / Observaciones:</span> Notas sobre retrasos, motivos de reclamo o incidencias de entrega.</div>
+              </div>
+              <p className="text-[11px] text-slate-400 italic">
+                * Incluye paginador 20x20 con botones <strong>Primero, Anterior, Siguiente y Último</strong>, filtro por situación y opción para ocultar despachos ya entregados (OK).
+              </p>
+            </div>
+
+            {/* 2. Stock de Insumo Diario */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-emerald-400 uppercase flex items-center gap-2">
+                  <Package className="w-4 h-4" /> 4.2. Stock de Insumo Diario (Control por Área & Kardex)
+                </h3>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold uppercase">Inventario</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Inventario permanente ordenado automáticamente de A-Z por área de producción con alertas visuales de stock crítico y registro de movimientos Kardex.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Área de Producción:</span> Almacén Tinturas, Diluciones y Gotas Puras, Fórmulas Magistrales, Insumos Generales / Envases.</div>
+                <div><span className="text-slate-400 block font-bold">Insumo / Nombre del Item:</span> Descripción exacta del producto o reactivo.</div>
+                <div><span className="text-slate-400 block font-bold">Código Interno / SKU:</span> Identificador para auditoría y trazabilidad.</div>
+                <div><span className="text-slate-400 block font-bold">Stock Actual (Cantidad):</span> Saldo físico en inventario.</div>
+                <div><span className="text-slate-400 block font-bold">Límite Alerta de Stock Mínimo:</span> Umbral configurable que activa la alerta roja intermitente.</div>
+                <div><span className="text-slate-400 block font-bold">Alerta ON / OFF:</span> Permite silenciar alertas en insumos descontinuados o estacionales.</div>
+                <div><span className="text-slate-400 block font-bold">(-) Descontar Consumo:</span> Ingreso rápido de unidades consumidas con motivo.</div>
+                <div><span className="text-slate-400 block font-bold">Historial Kardex:</span> Bitácora automática de entradas, salidas y saldo final.</div>
+                <div><span className="text-slate-400 block font-bold">Generador de Órdenes de Compra:</span> Calcula faltantes y genera PDF consolidado por área.</div>
+              </div>
+            </div>
+
+            {/* 3. Elaboración Gotas y Diluciones */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-teal-400 uppercase flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4" /> 4.3. Elaboración Gotas y Diluciones
+                </h3>
+                <span className="text-[10px] bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded-full font-bold uppercase">Producción</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Registro de procesos de dinamización homeopática, preparación de diluciones decimales/centesimales y gotas puras.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Fecha de Elaboración:</span> Día del proceso de dilución.</div>
+                <div><span className="text-slate-400 block font-bold">Producto / Insumo Base:</span> Tintura o cepa de partida.</div>
+                <div><span className="text-slate-400 block font-bold">Dilución / Potencia:</span> Grado de dinamización (ej. 6D, 30CH, LM).</div>
+                <div><span className="text-slate-400 block font-bold">Cantidad / Frascos:</span> Unidades o volumen producido.</div>
+                <div><span className="text-slate-400 block font-bold">Lote Insumo Base:</span> Trazabilidad del lote de partida.</div>
+                <div><span className="text-slate-400 block font-bold">Responsable / Elaborador:</span> Técnico que dinamiza la fórmula.</div>
+                <div><span className="text-slate-400 block font-bold">Estado / Control Calidad:</span> Óptimo, Observado, En Proceso, OK.</div>
+                <div className="sm:col-span-2"><span className="text-slate-400 block font-bold">Observaciones:</span> Parámetros ambientales o notas del protocolo.</div>
+              </div>
+            </div>
+
+            {/* 4. Formulación Magistral */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-amber-400 uppercase flex items-center gap-2">
+                  <FileText className="w-4 h-4" /> 4.4. Formulación Magistral
+                </h3>
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase">Magistrales</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Preparación de recetas magistrales personalizadas prescritas por médicos veterinarios.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">N° Receta / Folio:</span> Identificador de la orden médica.</div>
+                <div><span className="text-slate-400 block font-bold">Paciente / Propietario / Cliente:</span> Nombre del tutor o clínica.</div>
+                <div><span className="text-slate-400 block font-bold">Médico Prescriptor:</span> Doctor veterinario que prescribe.</div>
+                <div><span className="text-slate-400 block font-bold">Principios Activos:</span> Componentes, porcentajes y dosis exactas.</div>
+                <div><span className="text-slate-400 block font-bold">Forma Farmacéutica / Vehículo:</span> Solución, Jarabe, Glóbulos, Gotas, Crema.</div>
+                <div><span className="text-slate-400 block font-bold">Volumen / Cantidad Total:</span> Tamaño del envase (ej. 30ml, 60ml, 100g).</div>
+                <div><span className="text-slate-400 block font-bold">Estado:</span> Pendiente, En Elaboración, Finalizado, Entregado.</div>
+                <div><span className="text-slate-400 block font-bold">Fechas:</span> Fecha de preparación y fecha límite de uso.</div>
+                <div><span className="text-slate-400 block font-bold">Responsable:</span> Químico Farmacéutico / Operador asignado.</div>
+              </div>
+            </div>
+
+            {/* 5. Evaluación Gotas Puras */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-indigo-400 uppercase flex items-center gap-2">
+                  <Beaker className="w-4 h-4" /> 4.5. Evaluación Gotas Puras
+                </h3>
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full font-bold uppercase">Control de Calidad</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Inspección organoléptica, verificación de turbidez, sedimentación y liberación de lotes de gotas puras.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Fecha de Evaluación:</span> Día del análisis.</div>
+                <div><span className="text-slate-400 block font-bold">Producto / Gotas:</span> Nombre de la tintura o fórmula evaluada.</div>
+                <div><span className="text-slate-400 block font-bold">Estado Organoléptico:</span> Óptimo, Observado, Requiere Filtración, OK.</div>
+                <div><span className="text-slate-400 block font-bold">Estado Final:</span> OK (Liberado) / PENDIENTE.</div>
+                <div><span className="text-slate-400 block font-bold">Responsable:</span> Profesional que valida la calidad.</div>
+                <div className="sm:col-span-2"><span className="text-slate-400 block font-bold">Historial de Elaboración:</span> Registro de fechas, elaborador y notas de control.</div>
+              </div>
+            </div>
+
+            {/* 6. Ingreso Nosodes */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-purple-400 uppercase flex items-center gap-2">
+                  <Microscope className="w-4 h-4" /> 4.6. Ingreso Nosodes (Muestras Médicas)
+                </h3>
+                <span className="text-[10px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-bold uppercase">Bioterapéuticos</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Recepción y procesamiento de muestras biológicas autólogas para preparación de auto-nosodes o bio-terápicos.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Fecha de Recepción:</span> Día de ingreso de la muestra.</div>
+                <div><span className="text-slate-400 block font-bold">Código / Ficha Nosode:</span> Identificador único de la muestra.</div>
+                <div><span className="text-slate-400 block font-bold">Cliente / Paciente / Médico:</span> Datos de filiación del espécimen.</div>
+                <div><span className="text-slate-400 block font-bold">Tipo de Muestra:</span> Secreción, tejido, cálculo, cultivo, etc.</div>
+                <div><span className="text-slate-400 block font-bold">Potencia Dinamizada:</span> Escala de dinamización prescrita (ej. 30CH, 200CH).</div>
+                <div><span className="text-slate-400 block font-bold">Estado del Proceso:</span> Recibido, En Maceración, Dinamizado, Entregado.</div>
+                <div className="sm:col-span-2 md:col-span-3"><span className="text-slate-400 block font-bold">Observaciones del Protocolo:</span> Método de fijación, solvente e indicaciones técnicas.</div>
+              </div>
+            </div>
+
+            {/* 7. Ficha Tinturas Madres */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-blue-400 uppercase flex items-center gap-2">
+                  <Droplets className="w-4 h-4" /> 4.7. Ficha Tinturas Madres (Maceración & Extracción)
+                </h3>
+                <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold uppercase">Extracción Vegetal</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Control de procesos de maceración botánica, formulación hidroalcohólica y rendimientos de tintura madre (T.M.).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Fecha de Inicio Maceración:</span> Fecha de contacto droga-solvente.</div>
+                <div><span className="text-slate-400 block font-bold">Especie Botánica / Nombre:</span> Nombre científico o común de la planta.</div>
+                <div><span className="text-slate-400 block font-bold">Parte de la Planta:</span> Hoja, flor, raíz, fruto, corteza, sumidad.</div>
+                <div><span className="text-slate-400 block font-bold">Graduación Alcohólica:</span> % de alcohol utilizado en el solvente.</div>
+                <div><span className="text-slate-400 block font-bold">Peso Droga / Volumen Solvente:</span> Relación D/S (ej. 1:10, 1:5).</div>
+                <div><span className="text-slate-400 block font-bold">Lote / Rendimiento:</span> Identificador de lote y litros obtenidos.</div>
+                <div><span className="text-slate-400 block font-bold">Estado:</span> En Maceración, Prensada, Filtrada, Maduración, Liberada.</div>
+              </div>
+            </div>
+
+            {/* 8. Preparación Gotas Puras */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-teal-400 uppercase flex items-center gap-2">
+                  <Table className="w-4 h-4" /> 4.8. Preparación Gotas Puras (Envasado & Fraccionamiento)
+                </h3>
+                <span className="text-[10px] bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded-full font-bold uppercase">Envasado</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Planificación de lotes de fraccionamiento de gotas puras en frascos gotarios comerciales.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Fecha de Preparación:</span> Fecha del fraccionamiento.</div>
+                <div><span className="text-slate-400 block font-bold">Tintura Madre de Origen:</span> Lote matriz utilizado.</div>
+                <div><span className="text-slate-400 block font-bold">Unidades Envasadas:</span> Cantidad total de frascos producidos.</div>
+                <div><span className="text-slate-400 block font-bold">Tipo de Frasco / Gotario:</span> Frasco vidrio ámbar 30ml, 60ml, cuentagotas.</div>
+                <div><span className="text-slate-400 block font-bold">Operador Responsable:</span> Persona a cargo del sellado y rotulado.</div>
+              </div>
+            </div>
+
+            {/* 9. Registro de Insumos laboratorio T.M. y otros */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-orange-400 uppercase flex items-center gap-2">
+                  <Package className="w-4 h-4" /> 4.9. Registro de Insumos Laboratorio T.M. y Otros
+                </h3>
+                <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase">Recepción</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Recepción formal de materias primas botánicas, solventes, envases de vidrio, tapas y reactivos de laboratorio.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Fecha de Recepción:</span> Día de ingreso físico.</div>
+                <div><span className="text-slate-400 block font-bold">Proveedor:</span> Empresa suministradora.</div>
+                <div><span className="text-slate-400 block font-bold">Descripción del Insumo:</span> Detalle de la materia prima o material.</div>
+                <div><span className="text-slate-400 block font-bold">Cantidad Ingresada:</span> Volumen o unidades recibidas.</div>
+                <div><span className="text-slate-400 block font-bold">N° Guía / Factura:</span> Documento tributario de respaldo.</div>
+                <div><span className="text-slate-400 block font-bold">Lote del Proveedor & Vencimiento:</span> Trazabilidad de origen.</div>
+              </div>
+            </div>
+
+            {/* 10. Vademécum */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-amber-400 uppercase flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" /> 4.10. Vademécum Técnico
+                </h3>
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase">Catálogo Técnico</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Biblioteca oficial de fórmulas estándar del catálogo CIMASUR con insumos requeridos por fórmula, posología e indicaciones terapéuticas.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Nombre del Producto:</span> Denominación comercial o científica.</div>
+                <div><span className="text-slate-400 block font-bold">Código Vademécum:</span> Identificador interno de formulación.</div>
+                <div><span className="text-slate-400 block font-bold">Indicaciones Clínicas:</span> Usos terapéuticos en medicina veterinaria.</div>
+                <div><span className="text-slate-400 block font-bold">Composición / Insumos Requeridos:</span> Componentes necesarios por cada unidad.</div>
+                <div><span className="text-slate-400 block font-bold">Posología y Dosificación:</span> Instrucciones de administración.</div>
+              </div>
+            </div>
+
+            {/* 11. Mantención */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-slate-300 uppercase flex items-center gap-2">
+                  <Settings className="w-4 h-4" /> 4.11. Mantención de Equipos
+                </h3>
+                <span className="text-[10px] bg-slate-500/20 text-slate-300 px-2 py-0.5 rounded-full font-bold uppercase">Equipamiento</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Programa de calibración, limpieza profunda y mantenimiento preventivo de autoclaves, balanzas analíticas, campanas de flujo y agitadores.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-[#111A2E] p-3 rounded-xl">
+                <div><span className="text-slate-400 block font-bold">Fecha de Actividad:</span> Día de la intervención.</div>
+                <div><span className="text-slate-400 block font-bold">Equipo / Instrumento:</span> Balanza, Campana, Autoclave, Destilador, pH-metro.</div>
+                <div><span className="text-slate-400 block font-bold">Tipo de Mantención:</span> Calibración, Limpieza profunda, Desinfección, Preventivo.</div>
+                <div><span className="text-slate-400 block font-bold">Técnico / Responsable:</span> Persona o empresa certificadora.</div>
+                <div><span className="text-slate-400 block font-bold">Próxima Fecha Programada:</span> Alerta de re-calibración periódica.</div>
+              </div>
+            </div>
+
+            {/* 12. Fichas Especializadas / Dr. Conejero */}
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+                <h3 className="text-sm font-black text-white text-pink-400 uppercase flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4" /> 4.12. Fichas Especializadas / Dr. Conejero (Módulo EC)
+                </h3>
+                <span className="text-[10px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded-full font-bold uppercase">Protocolos Exclusivos</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Sección reservada para formulaciones exclusivas, protocolos clínicos especializados y combinaciones terapéuticas del Dr. Conejero.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* SECCIÓN 5: MÓDULO DE ADMINISTRACIÓN */}
+        {(activeSection === 'todos' || activeSection === 'admin') && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-3">
+              <span className="p-2 bg-purple-500/20 text-purple-400 rounded-lg">
+                <DollarSign className="w-5 h-5" />
+              </span>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wide">5. Módulo de Administración</h2>
+            </div>
+
+            <p>
+              Centro administrativo y financiero que coordina cotizaciones, órdenes de venta, facturación, consignaciones, inventario general y flujo de caja.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-2">
+                <h3 className="font-bold text-purple-300 uppercase">Cotizaciones y Ventas</h3>
+                <p className="text-slate-400">Emisión de cotizaciones formales con cálculo de IVA, descuentos por volumen, estados (Borrador, Enviada, Aprobada, Facturada) y exportación a PDF membretado.</p>
+              </div>
+              <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-2">
+                <h3 className="font-bold text-purple-300 uppercase">Ventas en Consignación</h3>
+                <p className="text-slate-400">Control de stock dejado en consignación a clínicas veterinarias, liquidaciones periódicas y control de saldos pendientes de pago.</p>
+              </div>
+              <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-2">
+                <h3 className="font-bold text-purple-300 uppercase">Inventario General Cimasur</h3>
+                <p className="text-slate-400">Gestión de catálogo de productos terminados, precios netos, listas de precios por canal de venta y valorización de inventario.</p>
+              </div>
+              <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-2">
+                <h3 className="font-bold text-purple-300 uppercase">Flujo de Caja y Presupuesto</h3>
+                <p className="text-slate-400">Control de ingresos, egresos operativos, pago a proveedores y proyecciones financieras mensuales.</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* SECCIÓN 6: ESCUELA CIMASUR */}
+        {(activeSection === 'todos' || activeSection === 'escuela') && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-3">
+              <span className="p-2 bg-pink-500/20 text-pink-400 rounded-lg">
+                <GraduationCap className="w-5 h-5" />
+              </span>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wide">6. Módulo Escuela CIMASUR</h2>
+            </div>
+
+            <p>
+              Plataforma de gestión académica para cursos de posgrado, diplomados y capacitaciones en medicina veterinaria integrativa.
+            </p>
+
+            <div className="bg-[#152035] p-4 rounded-xl border border-[#1E293B] space-y-3 text-xs">
+              <h3 className="font-bold text-pink-400 uppercase">Submódulos Académicos</h3>
+              <ul className="list-disc list-inside space-y-1.5 text-slate-300">
+                <li><strong>Alumnos:</strong> Ficha de matrícula, datos de contacto, profesión, estado de aranceles y expediente de cursos cursados.</li>
+                <li><strong>Cursos & Módulos:</strong> Programación de clases, docentes asignados, fechas, links de videoconferencia y material didáctico.</li>
+                <li><strong>Asistencia:</strong> Control de asistencia presencial y online con cálculo porcentual para aprobación.</li>
+                <li><strong>Calificaciones:</strong> Registro de evaluaciones, notas finales y emisión de actas académicas.</li>
+              </ul>
+            </div>
+          </section>
+        )}
+
+        {/* SECCIÓN 7: PAGINACIÓN Y RENDIMIENTO */}
+        {(activeSection === 'todos' || activeSection === 'paginacion') && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-[#1E293B] pb-3">
+              <span className="p-2 bg-sky-500/20 text-[#38BDF8] rounded-lg">
+                <TrendingUp className="w-5 h-5" />
+              </span>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wide">7. Estándar de Paginación y Rendimiento Global</h2>
+            </div>
+
+            <div className="bg-[#152035] p-5 rounded-2xl border border-[#1E293B] space-y-3 text-xs">
+              <h3 className="font-black text-white text-[#38BDF8] uppercase">Paginador Numerado 20 en 20</h3>
+              <p className="text-slate-300">
+                Todos los listados del sistema incorporan una barra de navegación estandarizada que garantiza un rendimiento óptimo de renderizado y ahorro de consumo en Firestore:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                <div className="bg-[#111A2E] p-3 rounded-xl border border-[#1E293B]">
+                  <span className="font-bold text-white block text-[#38BDF8]">Botón "Primero"</span>
+                  <span className="text-slate-400 text-[11px]">Salta directamente a la página 1 del listado.</span>
+                </div>
+                <div className="bg-[#111A2E] p-3 rounded-xl border border-[#1E293B]">
+                  <span className="font-bold text-white block text-slate-200">Botón "Anterior"</span>
+                  <span className="text-slate-400 text-[11px]">Retrocede una página en el orden cronológico.</span>
+                </div>
+                <div className="bg-[#111A2E] p-3 rounded-xl border border-[#1E293B]">
+                  <span className="font-bold text-white block text-emerald-400">Páginas Numeradas</span>
+                  <span className="text-slate-400 text-[11px]">Acceso directo a las páginas (ej. 1, 2, 3, 4, 5...).</span>
+                </div>
+                <div className="bg-[#111A2E] p-3 rounded-xl border border-[#1E293B]">
+                  <span className="font-bold text-white block text-[#38BDF8]">Botón "Último"</span>
+                  <span className="text-slate-400 text-[11px]">Salta inmediatamente a la página final de registros.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+function getFullManualMarkdown(): string {
+  return `# Manual Operativo de Usuario - Sistema CIMASUR
+
+**Versión:** 3.5  
+**Plataforma:** React + Vite + Firebase Firestore  
+**Documento Oficial de Procedimientos y Soporte Técnico**
+
+---
+
+## 1. VISIÓN GENERAL Y ARQUITECTURA
+
+El sistema integral **CIMASUR** es una plataforma web reactiva de alta disponibilidad conectada en tiempo real a Google Firebase Firestore.
+
+### 1.1 Tabla General de Módulos
+| Módulo | Propósito Principal | Perfil de Usuario | Exportaciones |
+|---|---|---|---|
+| **1. Comercial CRM** | Cartera de clientes, categorización Club (Platinum, Oro, Plata, Bronce), pipeline y oportunidades. | Ventas, Comercial, Admin | PDF, Excel |
+| **2. Gestión** | Bitácora diaria de interacciones, seguimiento a veterinarios, importación masiva por Excel. | Consultoras, Soporte | PDF Expediente, Excel |
+| **3. Laboratorio** | 12 submódulos técnicos: Seguimiento Courier, Stock por Área, Fórmulas Magistrales, Tinturas Madres, etc. | Químico Farmacéutico, Técnicos Lab | PDF Fichas, Órdenes Compra, Excel |
+| **4. Administración** | Cotizaciones, Ventas en Consignación, Inventario General Cimasur, Flujo de Caja y Resumen Ventas. | Administración, Finanzas | PDF Cotizaciones, Liquidaciones, Excel |
+| **5. Escuela CIMASUR** | Registro de alumnos, cursos de posgrado veterinario, control de asistencia y actas de notas. | Coordinación Académica, Docentes | PDF Certificados, Excel |
+
+---
+
+## 2. MÓDULO COMERCIAL CRM
+
+- **Campos del Registro:** Cliente / Clínica, RUT, Contacto Principal, Teléfono/Celular (WhatsApp), Correo, Región, Comuna, Categoría Club, Especialidad, Ventas Anuales.
+- **Herramienta Detección de Duplicados:** Algoritmo fonético que depura y fusiona registros sin pérdida de historial.
+- **Paginación:** Paginador numerado de 20 en 20 con botones Primero, Anterior, Siguiente y Último.
+
+---
+
+## 3. MÓDULO DE GESTIÓN
+
+- **Campos:** Fecha Ingreso, Cliente, RUT, Medio de Contacto, Consultora Responsable, Estado (En proceso, Con compra, Sin compra, Finalizado), Categoría y Observaciones.
+- **Carga Masiva:** Importación atómica en lotes (Write Batches) desde planillas Excel (.xlsx).
+
+---
+
+## 4. MÓDULO DE LABORATORIO (12 SUBMÓDULOS OPERATIVOS)
+
+### 4.1 Seguimiento de Pedidos (Courier & Trazabilidad)
+- **Campos:** N° Cotización/Pedido, OT (Orden de Transporte), Cliente/Destinatario, Courier (Starken, Chilexpress, CorreosChile, BlueExpress, etc.), Situación (PENDIENTE, EN TRÁNSITO, OK, RECLAMO), Fecha Cotización, Fecha Envío, Fecha Cierre, Fecha Recepción, Detalle de Seguimiento / Observaciones.
+- **Funcionalidades:** Enlace directo al tracking web del courier, switch para ocultar entregados (OK), paginador 20x20.
+
+### 4.2 Stock de Insumo Diario (Control por Área & Kardex)
+- **Áreas:** Almacén Tinturas, Diluciones y Gotas Puras, Fórmulas Magistrales, Insumos Generales / Envases.
+- **Campos:** Nombre del Item, Código Interno/SKU, Stock Actual, Límite Alerta Mínima, Switch Alerta ON/OFF.
+- **Kardex:** Historial de entradas, salidas (-) Descontar y saldo final. Generador automático de Órdenes de Compra en PDF.
+
+### 4.3 Elaboración Gotas y Diluciones
+- **Campos:** Fecha, Producto/Insumo Base, Dilución/Potencia (6D, 30CH, LM), Frascos Elaborados, Lote Insumo Base, Responsable, Estado Control de Calidad, Observaciones.
+
+### 4.4 Formulación Magistral
+- **Campos:** N° Receta/Folio, Paciente/Propietario, Médico Veterinario Prescriptor, Principios Activos y Dosis, Vehículo/Forma Farmacéutica, Volumen Total, Estado, Fechas de Elaboración y Vencimiento.
+
+### 4.5 Evaluación Gotas Puras
+- **Campos:** Fecha, Producto, Estado Organoléptico (Óptimo, Observado, OK), Estado Final (OK / PENDIENTE), Responsable, Historial de Elaboración.
+
+### 4.6 Ingreso Nosodes (Muestras Médicas)
+- **Campos:** Fecha de Recepción, Código/Ficha Nosode, Cliente/Médico, Tipo de Muestra (sangre, tejido, cálculo), Potencia Dinamizada, Estado del Proceso, Observaciones.
+
+### 4.7 Ficha Tinturas Madres (Maceración & Extracción)
+- **Campos:** Fecha Inicio Maceración, Especie Botánica, Parte de la Planta, Graduación Alcohólica (% GL), Relación Droga/Solvente (D/S), Lote y Rendimiento Obtenido, Estado.
+
+### 4.8 Preparación Gotas Puras (Envasado & Fraccionamiento)
+- **Campos:** Fecha, Tintura Madre de Origen, Unidades Envasadas, Tipo de Frasco/Gotario (30ml, 60ml), Operador Responsable.
+
+### 4.9 Registro de Insumos Laboratorio T.M. y Otros
+- **Campos:** Fecha de Ingreso, Proveedor, Descripción del Insumo, Cantidad y Unidad, N° Guía/Factura, Lote y Vencimiento.
+
+### 4.10 Vademécum Técnico
+- **Campos:** Nombre del Producto, Código Vademécum, Indicaciones Clínicas, Composición por Frasco, Posología y Vía de Administración.
+
+### 4.11 Mantención de Equipos
+- **Campos:** Fecha, Equipo/Instrumento (Autoclave, Balanza, Campana de Flujo, pH-metro), Tipo de Mantención, Técnico/Responsable, Próxima Fecha Programada.
+
+### 4.12 Fichas Especializadas / Dr. Conejero (Módulo EC)
+- **Propósito:** Protocolos técnicos especiales, combinaciones individualizadas y notas de formulación clínica.
+
+---
+
+## 5. MÓDULO DE ADMINISTRACIÓN
+- **Cotizaciones:** Emisión formal con desglose neto, IVA y exportación a PDF.
+- **Ventas en Consignación:** Control de stock en clínicas veterinarias y liquidaciones de venta.
+- **Inventario General:** Catálogo de productos terminados y listas de precios.
+- **Flujo de Caja:** Ingresos, egresos y control presupuestario mensual.
+
+---
+
+## 6. MÓDULO ESCUELA CIMASUR
+- **Alumnos:** Matrícula, historial de cursos y estado académico.
+- **Cursos y Módulos:** Planificación horaria, docentes y material.
+- **Asistencia y Calificaciones:** Control porcentual y actas de notas.
+
+---
+
+## 7. ESTÁNDAR DE PAGINACIÓN GLOBAL (20 EN 20)
+Todos los módulos y submódulos cuentan con navegación numerada:
+- **Primero:** Salta a la página 1.
+- **Anterior:** Retrocede una página.
+- **Numerados (1, 2, 3, ...):** Acceso directo a cada página.
+- **Siguiente:** Avanza una página.
+- **Último:** Salta a la página final.
+`;
+}
+
+function getManualHTML(): string {
+  return `
+    <h1>Manual Operativo de Usuario - Sistema CIMASUR</h1>
+    <p><strong>Versión:</strong> 3.5 | <strong>Plataforma:</strong> React + Vite + Firebase Firestore</p>
+    
+    <h2>1. Visión General y Arquitectura</h2>
+    <p>El sistema integral CIMASUR opera con persistencia en tiempo real en Firestore, sincronización local y paginación numerada de 20 en 20 en todos los módulos.</p>
+    
+    <table>
+      <tr>
+        <th>Módulo</th>
+        <th>Propósito Principal</th>
+        <th>Perfil de Usuario</th>
+      </tr>
+      <tr>
+        <td><strong>1. Comercial CRM</strong></td>
+        <td>Gestión de clientes, contactos, categorización Club Comercial, pipeline y campañas.</td>
+        <td>Ventas, Comercial, Admin</td>
+      </tr>
+      <tr>
+        <td><strong>2. Gestión</strong></td>
+        <td>Bitácora de interacciones, seguimiento diario e importación masiva por Excel.</td>
+        <td>Consultoras, Soporte</td>
+      </tr>
+      <tr>
+        <td><strong>3. Laboratorio</strong></td>
+        <td>12 submódulos: Seguimiento Courier, Stock Diario, Magistrales, Tinturas, Diluciones, etc.</td>
+        <td>Químico Farmacéutico, Técnicos</td>
+      </tr>
+      <tr>
+        <td><strong>4. Administración</strong></td>
+        <td>Cotizaciones, Consignaciones, Inventario Cimasur, Facturación y Flujo de Caja.</td>
+        <td>Administración, Finanzas</td>
+      </tr>
+      <tr>
+        <td><strong>5. Escuela CIMASUR</strong></td>
+        <td>Alumnos, Cursos veterinarios, Asistencia y Calificaciones.</td>
+        <td>Coordinación Académica, Docentes</td>
+      </tr>
+    </table>
+
+    <h2>2. Módulo Comercial CRM</h2>
+    <p>Permite registrar contactos, buscar instantáneamente en memoria, detectar duplicados y gestionar oportunidades.</p>
+
+    <h2>3. Módulo de Gestión</h2>
+    <p>Registro de actividades diarias, seguimiento a clientes veterinarios y carga masiva mediante planillas Excel.</p>
+
+    <h2>4. Módulo de Laboratorio (12 Submódulos)</h2>
+    <ol>
+      <li><strong>Seguimiento de Pedidos:</strong> N° Cotización, OT, Cliente, Courier, Situación (PENDIENTE, EN TRÁNSITO, OK, RECLAMO), Fechas y Detalle de Envío.</li>
+      <li><strong>Stock de Insumo Diario:</strong> Control por Área (Tinturas, Diluciones, Magistrales, Envases), Códigos, Saldo Físico, Alertas y Kardex.</li>
+      <li><strong>Elaboración Gotas y Diluciones:</strong> Fecha, Insumo Base, Dilución (6D, 30CH, LM), Frascos, Lote y Responsable.</li>
+      <li><strong>Formulación Magistral:</strong> N° Receta, Paciente, Médico Prescriptor, Principios Activos, Vehículo, Volumen y Fechas.</li>
+      <li><strong>Evaluación Gotas Puras:</strong> Fecha, Producto, Estado Organoléptico, Estado Final y Responsable.</li>
+      <li><strong>Ingreso Nosodes:</strong> Fecha Recepción, Código Nosode, Cliente/Médico, Tipo de Muestra y Potencia Dinamizada.</li>
+      <li><strong>Ficha Tinturas Madres:</strong> Fecha Inicio, Especie Botánica, Parte de Planta, Graduación Alcohólica, Relación D/S y Rendimiento.</li>
+      <li><strong>Preparación Gotas Puras:</strong> Fecha, Tintura Madre de Origen, Unidades Envasadas y Tipo de Frasco.</li>
+      <li><strong>Registro Insumos T.M. y Otros:</strong> Fecha, Proveedor, Insumo, Cantidad, N° Guía/Factura, Lote y Vencimiento.</li>
+      <li><strong>Vademécum Técnico:</strong> Nombre Producto, Código, Indicaciones Clínicas, Insumos por Frasco y Posología.</li>
+      <li><strong>Mantención de Equipos:</strong> Fecha, Equipo (Autoclave, Balanza, Campana), Tipo de Mantención y Técnico.</li>
+      <li><strong>Fichas Especializadas Dr. Conejero:</strong> Protocolos exclusivos y notas terapéuticas especializadas.</li>
+    </ol>
+
+    <h2>5. Módulo de Administración</h2>
+    <p>Control de Cotizaciones, Ventas en Consignación, Inventario General Cimasur, Flujo de Caja y Resumen de Ventas.</p>
+
+    <h2>6. Módulo Escuela CIMASUR</h2>
+    <p>Gestión integral de Alumnos, Cursos, Asistencia y Calificaciones.</p>
+
+    <h2>7. Paginador Numerado 20 en 20</h2>
+    <p>Estandarizado en todas las vistas con botones: <strong>Primero, Anterior, 1, 2, 3, ..., Siguiente, Último</strong>.</p>
+  `;
+}

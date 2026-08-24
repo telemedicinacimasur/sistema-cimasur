@@ -44,6 +44,7 @@ import {
 
 import { RecordActions } from '../components/RecordActions';
 import { Expediente } from '../components/Expediente';
+import { Pagination } from '../components/Pagination';
 
 import { addNotification } from '../lib/notifications';
 import { syncStudentsToSchoolPayments } from '../lib/syncUtils';
@@ -243,7 +244,7 @@ function ContactRegister({ records }: { records: any[] }) {
 
   const loadImportLogs = async () => {
     const logs = await localDB.getCollection('import_history');
-    setImportLogs(logs.filter(l => l.modulo === 'ESCUELA').sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
+    setImportLogs(logs.filter(l => l.modulo === 'ESCUELA').sort((a, b) => new Date(b?.fecha || 0).getTime() - new Date(a?.fecha || 0).getTime()));
   };
 
   useEffect(() => {
@@ -1614,6 +1615,15 @@ function TrackingView() {
     return matchesFilter && matchesSearch;
   });
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, search]);
+
+  const paginatedCombined = combined.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6">
       <div className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col md:flex-row justify-between items-center gap-4">
@@ -1713,7 +1723,7 @@ function TrackingView() {
               </tr>
            </thead>
            <tbody className="divide-y divide-[#1E293B]">
-              {combined.map((item: any) => (
+              {paginatedCombined.map((item: any) => (
                 <tr key={item.id} className="hover:bg-[#1E293B]/50 transition-colors">
                    <td className="p-5 font-bold text-slate-200">{safe(item.name)} <span className="block text-[9px] text-slate-400 font-mono mt-1">{safe(item.rut)}</span></td>
                    <td className="p-5">
@@ -1745,6 +1755,12 @@ function TrackingView() {
               )}
            </tbody>
         </table>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={combined.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
       {selectedClient && (
         <Expediente
@@ -1927,6 +1943,12 @@ function SchoolActivities() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  const sortedActivities = activities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+  const paginatedActivities = sortedActivities.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {detailView && (
@@ -2103,7 +2125,7 @@ function SchoolActivities() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {activities.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))).map(act => (
+              {paginatedActivities.map(act => (
                 <tr key={act.id} className="hover:bg-[#1E293B]/50 transition-colors">
                   <td className="p-4">{formatDate(act.fecha)}</td>
                   <td className="p-4 font-bold text-white">{act.actividad}</td>
@@ -2130,6 +2152,12 @@ function SchoolActivities() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={activities.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

@@ -12,12 +12,14 @@ import {
   GraduationCap, 
   TrendingUp, 
   Lock,
-  FileText
+  FileText,
+  BookOpen
 } from 'lucide-react';
 import { localAuth, localDB, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDateTimeChile } from '../lib/utils';
 import { RecordActions } from '../components/RecordActions';
+import ManualOperativo from '../components/ManualOperativo';
 
 export default function CPanelView() {
   const [records, setRecords] = useState<any[]>([]);
@@ -51,36 +53,37 @@ function FormField({ label, children }: { label: string, children: React.ReactNo
 }
 
 function CPanelManager({ records }: { records: any[] }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'modules'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'manual'>('users');
 
   return (
-    <div className="bg-[#152035] rounded-[1.5rem] border border-[#1E293B] shadow-xl overflow-hidden animate-in zoom-in-95 duration-500 min-h-screen">
-       <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-8  relative overflow-hidden">
+    <div className="bg-white rounded-[1.5rem] border border-slate-200 shadow-xl overflow-hidden animate-in zoom-in-95 duration-500 min-h-screen p-6 space-y-6">
+       <div className="bg-slate-900 text-white p-8 relative overflow-hidden rounded-3xl shadow-xl">
           <div className="absolute top-0 right-0 p-16 opacity-10">
              <Settings className="w-56 h-56 rotate-12" />
           </div>
           <div className="relative z-10 flex items-center gap-6">
-             <div className="p-3 bg-[#152035] rounded-2xl shadow-lg">
-                <ShieldCheck className="w-8 h-8" />
+             <div className="p-3 bg-slate-800 rounded-2xl shadow-lg border border-slate-700">
+                <ShieldCheck className="w-8 h-8 text-sky-400" />
              </div>
              <div>
                 <h3 className="text-3xl font-black uppercase tracking-tighter italic leading-none">CPANEL CONTROL</h3>
-                <p className="text-blue-300 text-[9px] font-black uppercase tracking-[0.3em] opacity-80 mt-2">Configuración Central de Privilegios y Gobernanza de Datos</p>
+                <p className="text-sky-300 text-[9px] font-black uppercase tracking-[0.3em] opacity-90 mt-2">Configuración Central de Privilegios, Gobernanza y Manuales</p>
              </div>
           </div>
        </div>
 
-       <div className="flex border-b border-[#1E293B] bg-[#152035]/50 p-2 gap-2">
+       <div className="flex flex-wrap border-b border-slate-200 bg-slate-50 p-3 gap-2 rounded-2xl">
           {[
-            { id: 'users', label: 'Gestión de Accesos', icon: Users, color: 'text-[#38BDF8]' },
-            { id: 'logs', label: 'Traza de Auditoría', icon: ShieldCheck, color: 'text-emerald-600' }
+            { id: 'users', label: 'Gestión de Accesos', icon: Users, color: 'text-sky-400' },
+            { id: 'logs', label: 'Traza de Auditoría', icon: ShieldCheck, color: 'text-emerald-400' },
+            { id: 'manual', label: 'Manual de Usuario y Soporte', icon: BookOpen, color: 'text-amber-400' }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={cn(
-                "px-6 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all rounded-2xl",
-                activeTab === tab.id ? "bg-[#152035] shadow-md text-[#38BDF8]" : "text-slate-400 hover:text-slate-300 hover:bg-[#111A2E]/50"
+                "px-6 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all rounded-2xl cursor-pointer shadow-sm",
+                activeTab === tab.id ? "bg-slate-900 text-white shadow-md" : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
               )}
             >
               <tab.icon className={cn("w-4 h-4", activeTab === tab.id ? tab.color : "")} />
@@ -89,77 +92,10 @@ function CPanelManager({ records }: { records: any[] }) {
           ))}
        </div>
 
-       <div className="p-6">
+       <div className="bg-white">
           {activeTab === 'users' && <UsersManager />}
           {activeTab === 'logs' && <AuditLogManager records={records} />}
-          {activeTab === 'modules' && (
-             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-                   <div className="bg-[#152035] p-6 rounded-3xl border border-[#1E293B] flex flex-col justify-between group hover:shadow-lg transition-all">
-                      <div>
-                         <div className="w-12 h-12 bg-[#111A2E] text-[#38BDF8] rounded-2xl flex items-center justify-center mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.4)] group-hover:scale-110 transition-transform">
-                            <FlaskConical className="w-6 h-6" />
-                         </div>
-                         <h4 className="text-lg font-black text-white uppercase tracking-tight italic">Módulo Laboratorio</h4>
-                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2">Control de producción homeopática, inventario de cepas y despacho logístico.</p>
-                      </div>
-                      <div className="mt-6 flex items-center justify-between">
-                         <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
-                         <button className="text-[#38BDF8] font-black text-[10px] uppercase hover:underline">Configurar</button>
-                      </div>
-                   </div>
-
-                   <div className="bg-[#152035] p-6 rounded-3xl border border-[#1E293B] flex flex-col justify-between group hover:shadow-lg transition-all">
-                      <div>
-                         <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.4)] group-hover:scale-110 transition-transform">
-                            <GraduationCap className="w-6 h-6" />
-                         </div>
-                         <h4 className="text-lg font-black text-white uppercase tracking-tight italic">Módulo Escuela</h4>
-                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2">Gestión de alumnos, diplomados, motor de pagos y analíticas de retención.</p>
-                      </div>
-                      <div className="mt-6 flex items-center justify-between">
-                         <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
-                         <button className="text-[#38BDF8] font-black text-[10px] uppercase hover:underline">Configurar</button>
-                      </div>
-                   </div>
-
-                   <div className="bg-[#152035] p-6 rounded-3xl border border-[#1E293B] flex flex-col justify-between group hover:shadow-lg transition-all">
-                      <div>
-                         <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.4)] group-hover:scale-110 transition-transform">
-                            <TrendingUp className="w-6 h-6" />
-                         </div>
-                         <h4 className="text-lg font-black text-white uppercase tracking-tight italic">Módulo CRM</h4>
-                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2">Automatización de ventas, campañas masivas y seguimiento de prospectos (Leads).</p>
-                      </div>
-                      <div className="mt-6 flex items-center justify-between">
-                         <span className="text-[10px] font-black uppercase text-emerald-500 px-3 py-1 bg-emerald-50 rounded-full">Activo</span>
-                         <button className="text-[#38BDF8] font-black text-[10px] uppercase hover:underline">Configurar</button>
-                      </div>
-                   </div>
-
-                   <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 text-white flex flex-col justify-between shadow-xl relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-8 opacity-5">
-                         <Lock className="w-32 h-32" />
-                      </div>
-                      <div className="relative z-10">
-                         <div className="w-12 h-12 bg-[#152035] text-blue-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-slate-700">
-                            <Lock className="w-6 h-6" />
-                         </div>
-                         <h4 className="text-lg font-black uppercase tracking-tight italic">API Integración</h4>
-                         <p className="text-xs text-slate-400 font-medium leading-relaxed mt-2 italic">Servicios externos de courier y pasarelas de pago. Próximamente integración con Redelcom/Transbank.</p>
-                      </div>
-                      <div className="mt-6 flex items-center justify-between relative z-10">
-                         <span className="text-[10px] font-black uppercase text-slate-400 px-3 py-1 bg-[#152035] rounded-full">Beta v5.0</span>
-                         <div className="flex gap-1">
-                            <div className="w-1.5 h-1.5 bg-[#152035]/50 rounded-full animate-pulse" />
-                            <div className="w-1.5 h-1.5 bg-[#152035]/50 rounded-full animate-pulse delay-75" />
-                            <div className="w-1.5 h-1.5 bg-[#152035]/50 rounded-full animate-pulse delay-150" />
-                         </div>
-                      </div>
-                   </div>
-                </div>
-             </div>
-          )}
+          {activeTab === 'manual' && <ManualOperativo />}
        </div>
     </div>
   );
@@ -184,17 +120,18 @@ const SUB_MODULES: Record<string, { id: string; label: string }[]> = {
     { id: 'commercial', label: 'Motor Escuela' }
   ],
   lab: [
-    { id: 'tracking', label: 'Seguimiento de Pedidos' },
-    { id: 'stock', label: 'Stock de Insumo Diario' },
-    { id: 'gotas', label: 'Elaboración Gotas y Diluciones' },
-    { id: 'magistrales', label: 'Formulación Magistral' },
-    { id: 'evaluacion', label: 'Evaluación Gotas Puras' },
-    { id: 'nosodes', label: 'Ingreso Nosodes' },
-    { id: 'tinturas', label: 'Ficha Tinturas Madres' },
-    { id: 'preparacion', label: 'Preparación Gotas Puras' },
-    { id: 'insumos', label: 'Registro de Insumos laboratorio T.M. y otros' },
-    { id: 'vademecum', label: 'Vademécum' },
-    { id: 'mantenimiento', label: 'Mantención' }
+    { id: 'tracking', label: '1. Seguimiento de Pedidos' },
+    { id: 'stock', label: '2. Stock de Insumo Diario' },
+    { id: 'elaboracion', label: '3. Elaboración Gotas y Diluciones' },
+    { id: 'magistrales', label: '4. Formulación Magistral' },
+    { id: 'gotas-puras', label: '5. Evaluación Gotas Puras' },
+    { id: 'nosodes', label: '6. Ingreso Nosodes' },
+    { id: 'tinturas', label: '7. Ficha Tinturas Madres' },
+    { id: 'preparacion', label: '8. Preparación Gotas Puras' },
+    { id: 'insumos', label: '9. Registro de Insumos laboratorio T.M. y otros' },
+    { id: 'vademecum', label: '10. Vademécum' },
+    { id: 'mantenimiento', label: '11. Mantención' },
+    { id: 'conejero', label: '12. Fichas Especializadas / Dr. Conejero' }
   ],
   manager: [
     { id: 'menu', label: 'Dashboard Principal' },
@@ -328,36 +265,37 @@ function UsersManager() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
-        <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-4  font-bold flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-blue-400" /> PANEL DE CONTROL DE ACCESOS (CPANEL)
+      <div className="bg-[#152035] rounded-3xl border border-[#1E293B] shadow-2xl overflow-hidden text-white">
+        <div className="bg-slate-900 text-white p-6 font-bold flex items-center justify-between border-b border-[#1E293B]">
+          <div className="flex items-center gap-3">
+            <Shield className="w-6 h-6 text-sky-400" /> PANEL DE CONTROL DE ACCESOS (CPANEL)
           </div>
           <button 
+            type="button"
             onClick={() => setShowCreate(!showCreate)}
-            className="bg-[#152035] hover:bg-blue-400 text-[10px] font-black tracking-widest px-4 py-2 rounded-2xl transition-all shadow-lg active:scale-95 uppercase"
+            className="bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-black tracking-widest px-4 py-2.5 rounded-xl transition-all shadow-md active:scale-95 uppercase cursor-pointer"
           >
             {showCreate ? 'CANCELAR' : '+ NUEVO USUARIO'}
           </button>
         </div>
         
         {showCreate && (
-          <form className="p-6 bg-[#152035]/50 border-b border-blue-100 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4 duration-300" onSubmit={handleCreate}>
+          <form className="p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4 duration-300" onSubmit={handleCreate}>
             <div className="md:col-span-4">
-              <h4 className="text-xs font-black text-blue-900 mb-2 uppercase tracking-[0.2em]">Registrar Nuevo Acceso</h4>
+              <h4 className="text-xs font-black text-slate-900 mb-2 uppercase tracking-[0.2em]">Registrar Nuevo Acceso</h4>
             </div>
             <FormField label="Correo Electrónico">
               <input 
                 type="email"
                 required
-                className="w-full border border-blue-200 bg-[#152035] rounded-2xl p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                className="w-full border border-slate-300 bg-white rounded-xl p-2 text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={newUser.email} 
                 onChange={e => setNewUser({...newUser, email: e.target.value})} 
               />
             </FormField>
             <FormField label="Nombre Completo">
               <input 
-                className="w-full border border-blue-200 bg-[#152035] rounded-2xl p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                className="w-full border border-slate-300 bg-white rounded-xl p-2 text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={newUser.displayName} 
                 onChange={e => setNewUser({...newUser, displayName: e.target.value})} 
               />
@@ -366,32 +304,32 @@ function UsersManager() {
               <input 
                 type="text"
                 required
-                className="w-full border border-blue-200 bg-[#152035] rounded-2xl p-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                className="w-full border border-slate-300 bg-white rounded-xl p-2 text-sm font-mono text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={newUser.pass} 
                 onChange={e => setNewUser({...newUser, pass: e.target.value})} 
               />
             </FormField>
             <div className="md:col-span-4 mt-2">
-               <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Accesos / Roles</label>
+               <label className="text-xs font-black uppercase text-slate-700 tracking-widest block mb-2">Accesos / Roles</label>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {availableRoles.map(r => (
-                    <div key={r.id} className="bg-[#152035]/50 p-3 rounded-2xl border border-[#1E293B]">
+                    <div key={r.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                       <label className="flex items-center gap-2 cursor-pointer group mb-2">
                         <input 
                           type="checkbox" 
-                          className="w-5 h-5 rounded border-[#1E293B] text-[#38BDF8] focus:ring-blue-500"
+                          className="w-5 h-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                           checked={newUser.roles.includes(r.id)}
                           onChange={() => setNewUser({...newUser, roles: toggleRole(newUser.roles, r.id)})}
                         />
-                        <span className="text-xs font-black text-slate-200 group-hover:text-[#38BDF8] transition-colors uppercase tracking-tight">{r.label}</span>
+                        <span className="text-xs font-black text-slate-900 group-hover:text-sky-600 transition-colors uppercase tracking-tight">{r.label}</span>
                       </label>
                       {newUser.roles.includes(r.id) && r.id !== 'admin' && (
-                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-[#1E293B] mt-2">
+                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-slate-100 mt-2">
                            <div className="flex flex-wrap items-center gap-4">
                              <label className="flex items-center gap-1.5 cursor-pointer" title="Solo puede ver y descargar. No puede ingresar ni borrar.">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-[#1E293B] text-sky-500"
+                                 className="w-4 h-4 rounded border-slate-300 text-sky-500"
                                  checked={newUser.permissions?.[r.id]?.readonly ?? false}
                                  onChange={(e) => {
                                    const perms = { ...newUser.permissions };
@@ -404,12 +342,12 @@ function UsersManager() {
                                    setNewUser({ ...newUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-black text-sky-400 uppercase">SOLO LECTOR</span>
+                               <span className="text-[10px] font-black text-sky-600 uppercase">SOLO LECTOR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-[#1E293B] text-amber-500"
+                                 className="w-4 h-4 rounded border-slate-300 text-amber-500"
                                  checked={newUser.permissions?.[r.id]?.edit ?? true}
                                  disabled={newUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -418,12 +356,12 @@ function UsersManager() {
                                    setNewUser({ ...newUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-400 uppercase">EDITAR</span>
+                               <span className="text-[10px] font-bold text-slate-700 uppercase">EDITAR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-[#1E293B] text-red-500"
+                                 className="w-4 h-4 rounded border-slate-300 text-red-500"
                                  checked={newUser.permissions?.[r.id]?.delete ?? true}
                                  disabled={newUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -432,13 +370,13 @@ function UsersManager() {
                                    setNewUser({ ...newUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-400 uppercase">BORRAR</span>
+                               <span className="text-[10px] font-bold text-slate-700 uppercase">BORRAR</span>
                              </label>
                            </div>
 
                           {SUB_MODULES[r.id] && (
                             <div className="mt-2">
-                              <span className="text-[10px] font-black text-slate-500 uppercase block mb-1 tracking-widest border-b border-[#2A3F5F] pb-1">Sub-módulos</span>
+                              <span className="text-[10px] font-black text-slate-500 uppercase block mb-1 tracking-widest border-b border-slate-200 pb-1">Sub-módulos</span>
                               <div className="flex flex-col gap-1.5 mt-2">
                                 {SUB_MODULES[r.id].map(sub => {
                                   const currentAllowed = newUser.allowedSubmodules?.[r.id];
@@ -447,7 +385,7 @@ function UsersManager() {
                                     <label key={sub.id} className="flex items-center gap-2 cursor-pointer mt-1">
                                       <input 
                                         type="checkbox" 
-                                        className="w-4 h-4 rounded border-[#1E293B] text-[#38BDF8]"
+                                        className="w-4 h-4 rounded border-slate-300 text-sky-600"
                                         checked={isChecked}
                                         onChange={(e) => {
                                           const allowed = { ...(newUser.allowedSubmodules || {}) };
@@ -463,7 +401,7 @@ function UsersManager() {
                                           setNewUser({ ...newUser, allowedSubmodules: allowed });
                                         }}
                                       />
-                                      <span className="text-[11px] font-bold text-slate-300 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
+                                      <span className="text-[11px] font-bold text-slate-700 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
                                     </label>
                                   );
                                 })}
@@ -477,20 +415,20 @@ function UsersManager() {
                </div>
             </div>
             <div className="md:col-span-4 flex justify-end mt-4">
-              <button type="submit" className="bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/50 text-white px-10 py-3 rounded-2xl font-black hover:bg-[#38BDF8]/30 uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95">CREAR ACCESO</button>
+              <button type="submit" className="bg-sky-600 hover:bg-sky-500 text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-md transition-all active:scale-95 cursor-pointer">CREAR ACCESO</button>
             </div>
           </form>
         )}
 
         {editingUser && (
-          <form className="p-6 bg-[#152035] border-b border-[#1E293B] grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-300" onSubmit={handleUpdate}>
+          <form className="p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-300" onSubmit={handleUpdate}>
             <div className="md:col-span-3 flex justify-between items-center mb-2">
-              <h4 className="text-xs font-black text-slate-200 uppercase tracking-widest italic">Editando Acceso: <span className="text-[#38BDF8]">{editingUser.email}</span></h4>
-              <button type="button" onClick={() => setEditingUser(null)} className="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase">Cerrar edición</button>
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest italic">Editando Acceso: <span className="text-sky-600">{editingUser.email}</span></h4>
+              <button type="button" onClick={() => setEditingUser(null)} className="text-[10px] font-black text-slate-500 hover:text-red-600 uppercase cursor-pointer">Cerrar edición</button>
             </div>
             <FormField label="Nombre Completo">
               <input 
-                className="w-full border border-[#1E293B] bg-[#152035] rounded-2xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                className="w-full border border-slate-300 bg-white rounded-xl p-3 text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={editingUser.displayName} 
                 onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} 
               />
@@ -500,31 +438,31 @@ function UsersManager() {
                 <input 
                   type="text"
                   placeholder="Vacío para mantener"
-                  className="w-full border border-[#1E293B] bg-[#152035] rounded-2xl p-3 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                  className="w-full border border-slate-300 bg-white rounded-xl p-3 text-sm font-mono text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                   value={newPass} 
                   onChange={e => setNewPass(e.target.value)} 
                 />
-                <Key className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                <Key className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               </div>
             </FormField>
             <div className="md:col-span-1">
                <div className="flex justify-between items-center mb-3">
-                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Atribuciones</label>
+                 <label className="text-[10px] font-black uppercase text-slate-700 tracking-widest block">Atribuciones</label>
                  <button 
                    type="button" 
                    onClick={() => setEditingUser({...editingUser, roles: availableRoles.map(ar => ar.id)})}
-                   className="text-[9px] font-black text-[#38BDF8] hover:underline uppercase"
+                   className="text-[9px] font-black text-sky-600 hover:underline uppercase cursor-pointer"
                  >
                    Acceso Total
                  </button>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {availableRoles.map(r => (
-                    <div key={r.id} className="space-y-2 p-2 rounded-2xl bg-[#152035] border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+                    <div key={r.id} className="space-y-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm">
                       <label className="flex items-center gap-2 cursor-pointer group">
                         <input 
                           type="checkbox" 
-                          className="w-4 h-4 rounded border-[#1E293B] text-[#38BDF8] focus:ring-blue-500"
+                          className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                           checked={(editingUser.roles || [editingUser.role]).includes(r.id)}
                           onChange={() => {
                             const current = editingUser.roles || [editingUser.role];
@@ -532,15 +470,15 @@ function UsersManager() {
                             setEditingUser({...editingUser, roles: newRoles});
                           }}
                         />
-                        <span className="text-[12px] font-black text-slate-200 group-hover:text-[#38BDF8] transition-colors uppercase tracking-widest">{r.label}</span>
+                        <span className="text-[12px] font-black text-slate-900 group-hover:text-sky-600 transition-colors uppercase tracking-widest">{r.label}</span>
                       </label>
                       {(editingUser.roles || [editingUser.role]).includes(r.id) && r.id !== 'admin' && (
-                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-[#1E293B] mt-2">
+                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-slate-100 mt-2">
                            <div className="flex flex-wrap items-center gap-4">
                              <label className="flex items-center gap-1.5 cursor-pointer" title="Solo puede ver y descargar. No puede ingresar ni borrar.">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-[#1E293B] text-sky-500"
+                                 className="w-4 h-4 rounded border-slate-300 text-sky-500"
                                  checked={editingUser.permissions?.[r.id]?.readonly ?? false}
                                  onChange={(e) => {
                                    const perms = { ...editingUser.permissions };
@@ -553,12 +491,12 @@ function UsersManager() {
                                    setEditingUser({ ...editingUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-black text-sky-400 uppercase">SOLO LECTOR</span>
+                               <span className="text-[10px] font-black text-sky-600 uppercase">SOLO LECTOR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-[#1E293B] text-amber-500"
+                                 className="w-4 h-4 rounded border-slate-300 text-amber-500"
                                  checked={editingUser.permissions?.[r.id]?.edit ?? true}
                                  disabled={editingUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -567,12 +505,12 @@ function UsersManager() {
                                    setEditingUser({ ...editingUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-400 uppercase">EDITAR</span>
+                               <span className="text-[10px] font-bold text-slate-700 uppercase">EDITAR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-[#1E293B] text-red-500"
+                                 className="w-4 h-4 rounded border-slate-300 text-red-500"
                                  checked={editingUser.permissions?.[r.id]?.delete ?? true}
                                  disabled={editingUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -581,25 +519,21 @@ function UsersManager() {
                                    setEditingUser({ ...editingUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-400 uppercase">BORRAR</span>
+                               <span className="text-[10px] font-bold text-slate-700 uppercase">BORRAR</span>
                              </label>
                            </div>
                           
                           {SUB_MODULES[r.id] && (
                             <div className="mt-2">
-                              <span className="text-[11px] font-black text-slate-500 uppercase block mb-2 tracking-widest border-b border-[#2A3F5F] pb-1">Sub-módulos Permitidos</span>
+                              <span className="text-[11px] font-black text-slate-500 uppercase block mb-2 tracking-widest border-b border-slate-200 pb-1">Sub-módulos Permitidos</span>
                               {SUB_MODULES[r.id].map(sub => {
                                 const currentAllowed = editingUser.allowedSubmodules?.[r.id];
-                                // Si no está definido (o es array vacío), asumimos acceso total por defecto, a menos que ya se haya guardado parcialmente. 
-                                // Para simplificar la UX, si currentAllowed es null/undefined, significa acceso total. 
-                                // O si no, requerimos inicializarlo en handleCreate.
-                                // Vamos a asumir que by default se marcan todos.
                                 const isChecked = !currentAllowed || currentAllowed.includes(sub.id);
                                 return (
                                   <label key={sub.id} className="flex items-center gap-2 cursor-pointer mt-1.5">
                                     <input 
                                       type="checkbox" 
-                                      className="w-4 h-4 rounded border-[#1E293B] text-[#38BDF8]"
+                                      className="w-4 h-4 rounded border-slate-300 text-sky-600"
                                       checked={isChecked}
                                       onChange={(e) => {
                                         const allowed = { ...(editingUser.allowedSubmodules || {}) };
@@ -615,7 +549,7 @@ function UsersManager() {
                                         setEditingUser({ ...editingUser, allowedSubmodules: allowed });
                                       }}
                                     />
-                                    <span className="text-[11px] font-bold text-slate-300 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
+                                    <span className="text-[11px] font-bold text-slate-700 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
                                   </label>
                                 );
                               })}
@@ -627,23 +561,23 @@ function UsersManager() {
                   ))}
                </div>
             </div>
-            <div className="md:col-span-3 flex items-center justify-end gap-3 mt-4 pt-6 border-t border-[#1E293B]">
+            <div className="md:col-span-3 flex items-center justify-end gap-3 mt-4 pt-6 border-t border-slate-200">
               <button 
                 type="submit" 
                 disabled={!!savingId}
-                className="px-10 bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B]  py-4 rounded-2xl font-black hover:bg-[#152035] uppercase text-[10px] tracking-[0.2em] shadow-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                className="px-10 bg-slate-900 text-white hover:bg-slate-800 py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
-                {savingId ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-blue-400" />}
+                {savingId ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-sky-400" />}
                 {savingId ? 'PROCESANDO...' : 'ACTUALIZAR SISTEMA'}
               </button>
             </div>
           </form>
         )}
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto bg-white">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#152035] text-left border-b font-black text-slate-400 uppercase tracking-widest">
+              <tr className="bg-slate-100 text-left border-b border-slate-200 font-black text-slate-600 uppercase tracking-widest">
                 <th className="p-5">Usuario / Identificación</th>
                 <th className="p-5">Nombre Profesional</th>
                 <th className="p-5 text-center">Privilegios Concedidos</th>
@@ -653,17 +587,17 @@ function UsersManager() {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {users.map(u => (
-                <tr key={u.email} className="group hover:bg-[#152035]/50 transition-colors">
-                  <td className="p-5 font-black text-white italic opacity-70 group-hover:opacity-100">{u.email}</td>
-                  <td className="p-5 font-bold text-slate-300 tracking-tight">{u.displayName}</td>
+                <tr key={u.email} className="group hover:bg-slate-50 transition-colors">
+                  <td className="p-5 font-black text-slate-900 italic">{u.email}</td>
+                  <td className="p-5 font-bold text-slate-700 tracking-tight">{u.displayName}</td>
                   <td className="p-5 text-center">
                     <div className="flex flex-wrap gap-1.5 justify-center max-w-[300px] mx-auto">
                       {(u.roles || [u.role || 'viewer']).map((roleId: string) => {
                         const roleObj = availableRoles.find(ar => ar.id === roleId);
                         return (
                           <span key={roleId} className={cn(
-                            "px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest border shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-transform hover:scale-105",
-                            roleObj?.color || "bg-[#152035] text-slate-400 border-[#1E293B]"
+                            "px-2.5 py-1 rounded-md text-[8px] font-black uppercase tracking-widest border shadow-sm transition-transform hover:scale-105",
+                            roleId === 'admin' ? "bg-red-50 text-red-700 border-red-200" : "bg-sky-50 text-sky-700 border-sky-200"
                           )}>
                             {roleObj?.label || roleId}
                           </span>
@@ -672,7 +606,7 @@ function UsersManager() {
                     </div>
                   </td>
                   <td className="p-5 text-center">
-                    <span className="font-mono text-slate-300 group-hover:text-amber-600 transition-colors text-[10px] font-bold bg-[#152035] group-hover:bg-amber-50 px-3 py-1 rounded-full border border-[#1E293B] group-hover:border-amber-200">{u.pass}</span>
+                    <span className="font-mono text-slate-700 group-hover:text-amber-700 transition-colors text-[10px] font-bold bg-slate-100 group-hover:bg-amber-50 px-3 py-1 rounded-full border border-slate-200 group-hover:border-amber-200">{u.pass}</span>
                   </td>
                   <td className="p-5 text-center">
                     <RecordActions 
@@ -699,22 +633,22 @@ function UsersManager() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-amber-100/30 border border-amber-200 p-6 rounded-3xl flex gap-4 items-start shadow-[0_4px_20px_rgba(0,0,0,0.4)] shadow-amber-50 group transition-all hover:bg-amber-100/50">
-          <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-lg group-hover:rotate-12 transition-transform">
+        <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl flex gap-4 items-start shadow-sm group transition-all hover:bg-amber-100/50">
+          <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md group-hover:rotate-12 transition-transform">
             <Shield className="w-5 h-5" />
           </div>
-          <div className="text-xs text-amber-900/80 leading-relaxed italic">
-            <p className="font-black mb-1 uppercase tracking-widest text-[10px] text-amber-600 italic">Seguridad Jerárquica Global</p>
+          <div className="text-xs text-amber-900 leading-relaxed italic">
+            <p className="font-black mb-1 uppercase tracking-widest text-[10px] text-amber-700 italic">Seguridad Jerárquica Global</p>
             Solo el perfil <strong>Administrador</strong> puede ver esta sección de alto nivel. Desde aquí puedes crear accesos específicos 
             para cada departamento e inyectar permisos de edición o borrado granular según el módulo asignado.
           </div>
         </div>
-        <div className="bg-[#111A2E]/30 border border-blue-200 p-6 rounded-3xl flex gap-4 items-start shadow-[0_4px_20px_rgba(0,0,0,0.4)] shadow-blue-50 group transition-all hover:bg-[#111A2E]/50">
-          <div className="p-3 bg-[#152035] text-white rounded-2xl shadow-lg group-hover:rotate-12 transition-transform">
+        <div className="bg-sky-50 border border-sky-200 p-6 rounded-3xl flex gap-4 items-start shadow-sm group transition-all hover:bg-sky-100/50">
+          <div className="p-3 bg-sky-600 text-white rounded-2xl shadow-md group-hover:rotate-12 transition-transform">
             <Key className="w-5 h-5" />
           </div>
-          <div className="text-xs text-blue-900/80 leading-relaxed italic">
-            <p className="font-black mb-1 uppercase tracking-widest text-[10px] text-[#38BDF8] italic">Restablecimiento de Credenciales</p>
+          <div className="text-xs text-sky-900 leading-relaxed italic">
+            <p className="font-black mb-1 uppercase tracking-widest text-[10px] text-sky-700 italic">Restablecimiento de Credenciales</p>
             Si un colaborador olvida su clave o requiere un reseteo de seguridad, búscalo en la tabla y usa el botón "EDITAR" para inyectar una nueva 
             contraseña manualmente. La infraestructura actualiza el hash de forma instantánea.
           </div>
@@ -726,17 +660,17 @@ function UsersManager() {
 
 function AuditLogManager({ records }: { records: any[] }) {
   return (
-    <div className="bg-[#152035] rounded-3xl border border-[#1E293B] shadow-xl overflow-hidden animate-in fade-in duration-700">
-      <div className="bg-[#1E3A5F] text-white hover:bg-[#1D3557] border-[#1E293B] p-6  font-black flex items-center justify-between">
+    <div className="bg-[#152035] rounded-3xl border border-[#1E293B] shadow-2xl overflow-hidden animate-in fade-in duration-700 text-white">
+      <div className="bg-slate-900 text-white p-6 font-black flex items-center justify-between border-b border-[#1E293B]">
         <div className="flex items-center gap-3 italic tracking-tighter">
-          <FileText className="w-6 h-6 text-blue-400" /> REGISTRO DE AUDITORÍA GLOBAL (INSIGHTS)
+          <FileText className="w-6 h-6 text-sky-400" /> REGISTRO DE AUDITORÍA GLOBAL (INSIGHTS)
         </div>
-        <div className="text-[9px] font-black text-blue-300 uppercase tracking-widest px-4 py-1.5 bg-[#152035]/20 rounded-full border border-blue-500/30 animate-pulse">Monitor en Tiempo Real Activo</div>
+        <div className="text-[9px] font-black text-sky-300 uppercase tracking-widest px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700 animate-pulse">Monitor en Tiempo Real Activo</div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto bg-[#152035]">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-[#152035] text-left border-b font-black text-slate-400 uppercase tracking-[0.2em]">
+            <tr className="bg-[#111A2E] text-left border-b border-[#1E293B] font-black text-slate-300 uppercase tracking-[0.2em]">
               <th className="p-6">Timestamp (CHILE)</th>
               <th className="p-6">Entidad / Usuario</th>
               <th className="p-6 text-center">Referencia de Acceso</th>
@@ -744,10 +678,10 @@ function AuditLogManager({ records }: { records: any[] }) {
               <th className="p-6">Acción Ejecutada</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-[#1E293B]">
             {records.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 100).map((r, i) => (
-              <tr key={r.id || r.timestamp || i} className="group hover:bg-[#0D1527]/80 transition-all italic border-l-4 border-[#1E293B] hover:border-blue-600">
-                <td className="p-6 text-white font-bold opacity-60 group-hover:opacity-100">{formatDateTimeChile(r.timestamp)}</td>
+              <tr key={r.id || r.timestamp || i} className="group hover:bg-[#111A2E] transition-all italic border-l-4 border-[#1E293B] hover:border-sky-500">
+                <td className="p-6 text-slate-200 font-bold">{formatDateTimeChile(r.timestamp)}</td>
                 <td className="p-6">
                    <div className="flex flex-col">
                       <span className="font-black text-white uppercase tracking-tighter">{r.displayName}</span>
@@ -755,10 +689,10 @@ function AuditLogManager({ records }: { records: any[] }) {
                    </div>
                 </td>
                 <td className="p-6 text-center">
-                   <span className="px-3 py-1 bg-[#111A2E] text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-[#1E293B]">AUTH_TOKEN_VALID</span>
+                   <span className="px-3 py-1 bg-[#111A2E] text-slate-300 rounded-full text-[9px] font-black uppercase tracking-widest border border-[#1E293B]">AUTH_TOKEN_VALID</span>
                 </td>
                 <td className="p-6">
-                   <span className="font-black text-[#38BDF8] uppercase tracking-widest text-[10px] bg-[#152035] px-3 py-1 rounded-2xl border border-blue-100">{r.module}</span>
+                   <span className="font-black text-sky-400 uppercase tracking-widest text-[10px] bg-sky-950/80 px-3 py-1 rounded-2xl border border-sky-800">{r.module}</span>
                 </td>
                 <td className="p-6 text-slate-300 font-medium group-hover:text-white transition-colors italic">
                    {r.action}

@@ -815,7 +815,8 @@ export default function VentasConsignacionView() {
         const q = query(
           collection(db, 'crm_consignacion_lotes'),
           where('clienteId', '==', reponerForm.clienteId),
-          where('productoId', '==', uProduct)
+          where('productoId', '==', uProduct),
+          limit(50)
         );
         const snap = await getDocs(q);
         let existingLoteDoc: any = null;
@@ -1199,7 +1200,7 @@ export default function VentasConsignacionView() {
       }
       
       const realContacts = contacts.filter((c: any) => c.id && !c.id.startsWith('demo_'));
-      realContacts.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      realContacts.sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || '')));
       
       clientesCacheRef.current = realContacts;
       setClientes(realContacts);
@@ -1627,7 +1628,8 @@ export default function VentasConsignacionView() {
         const q = query(
           collection(db, 'crm_consignacion_lotes'),
           where('clienteId', '==', formEntrega.cliente_id),
-          where('productoId', '==', uProduct)
+          where('productoId', '==', uProduct),
+          limit(50)
         );
         const snap = await getDocs(q);
         let existingLoteDoc: any = null;
@@ -1760,7 +1762,8 @@ export default function VentasConsignacionView() {
         const q = query(
           collection(db, 'crm_consignacion_lotes'),
           where('clienteId', '==', declaracionCliente),
-          where('productoId', '==', uProduct)
+          where('productoId', '==', uProduct),
+          limit(50)
         );
         const snap = await getDocs(q);
         let existingLoteDoc: any = null;

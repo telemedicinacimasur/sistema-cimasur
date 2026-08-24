@@ -13,6 +13,7 @@ import { RecordActions } from '../components/RecordActions';
 import { UsersManager } from '../components/settings/UsersManager';
 import { AuditLogManager } from '../components/settings/AuditLogManager';
 import { TrashBinManager } from '../components/settings/TrashBinManager';
+import { Pagination } from '../components/Pagination';
 
 import * as XLSX from 'xlsx';
 import { 
@@ -542,6 +543,15 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
     return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterMonth, filterYear, dateStart, dateEnd, searchTutor]);
+
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const totalVet = filteredRecords.reduce((sum, r) => sum + (Number(r.pagoVeterinario) || 0), 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -818,7 +828,7 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredRecords.map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id} className="hover:bg-[#152035] transition-colors">
                   <td className="p-4 font-mono text-slate-400">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold text-white uppercase">{r.tutor}</td>
@@ -847,6 +857,12 @@ function PetPaymentsManager({ records, setRecords }: { records: any[], setRecord
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecords.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -1096,6 +1112,15 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
     .sort((a, b) => {
       return (Number(b.nroCotiz) || 0) - (Number(a.nroCotiz) || 0);
     });
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchFilter, dateFrom, dateTo, statusFilter, yearFilter, monthFilter, vendedorFilter]);
+
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1433,7 +1458,7 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredRecords.map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id} className="hover:bg-[#152035] transition-colors italic">
                   <td className="p-4 text-center text-slate-400">{r.anio || ''} / {r.mes || ''}</td>
                   <td className="p-4 font-bold text-white">{r.nroCotiz || ''}</td>
@@ -1524,6 +1549,12 @@ function QuoteManager({ records, setRecords }: { records: any[], setRecords: (va
             </tfoot>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecords.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -1742,6 +1773,15 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
   }, 0);
   const totalCotizacion = filteredRecords.reduce((sum, r) => sum + (Number(r.valorCotizacion) || 0), 0);
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterMonth, dateFrom, dateTo, searchTerm]);
+
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
@@ -1958,7 +1998,7 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 italic">
-                {filteredRecords.map(r => (
+                {paginatedRecords.map(r => (
                   <tr key={r.id}>
                     <td className="p-4">{formatDate(r.fecha)}</td>
                     <td className="p-4 font-bold text-white">{r.documento}</td>
@@ -2014,6 +2054,12 @@ function SalesGestionManager({ records, setRecords }: { records: any[], setRecor
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredRecords.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </div>
 
@@ -2290,6 +2336,15 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
     }
     return sum;
   }, 0);
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFrom, dateTo, filterTipoPago, searchTerm]);
+
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2724,7 +2779,7 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                {filteredRecords.map(r => {
+                {paginatedRecords.map(r => {
                   const isCredito = r.tipoPago === 'Crédito';
                   const rMontoTotal = Number(r.montoTotal) || 0;
                   const rMontoAbonado = isCredito ? (Number(r.montoAbonado) || 0) : rMontoTotal;
@@ -2824,6 +2879,12 @@ function SalesManager({ records, setRecords }: { records: any[], setRecords: (da
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredRecords.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </div>
     </div>
@@ -3741,6 +3802,15 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
   const totalIva = filteredRecords.reduce((acc, curr) => acc + (Number(curr.iva) || 0), 0);
   const totalGeneral = filteredRecords.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFrom, dateTo, searchTerm, yearFilter, monthFilter]);
+
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const [form, setForm] = useState({
     anio: new Date().getFullYear().toString(),
     mes: new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date()),
@@ -4126,7 +4196,7 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 italic">
-              {filteredRecords.map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id} className="hover:bg-[#152035] transition-colors">
                   <td className="p-4 text-slate-400">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold text-white">{r.nroDto}</td>
@@ -4175,6 +4245,12 @@ function DTEManager({ records, setRecords }: { records: any[], setRecords: (data
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecords.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

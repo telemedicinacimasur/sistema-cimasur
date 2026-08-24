@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
 import { CommentDialog } from '../components/CommentDialog';
+import { Pagination } from '../components/Pagination';
 
 const exportTableToExcel = (title: string, headers: string[], data: any[][], fileName: string) => {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -1838,10 +1839,19 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
       return matchesSearch && matchesRegion && matchesType && matchesCategoria && matchesIntranet;
     })
     .sort((a, b) => {
-      const dateCmp = (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '');
+      const dateCmp = String(b.fechaIngreso || '').localeCompare(String(a.fechaIngreso || ''));
       if (dateCmp !== 0) return dateCmp;
-      return (a.id || '').localeCompare(b.id || '');
+      return String(a.id || '').localeCompare(String(b.id || ''));
     });
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
+  const paginatedRecords = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -2728,7 +2738,7 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                  </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                 {filtered.map(r => (
+                 {paginatedRecords.map(r => (
                    <tr key={r.id} className="hover:bg-[#1E293B]/50 transition-colors">
                       <td className="p-5">
                         <input 
@@ -2965,6 +2975,12 @@ function CRMTable({ records, setRecords, filters, setFilters, onComment, onViewC
                </tbody>
             </table>
          </div>
+         <Pagination
+           currentPage={currentPage}
+           totalItems={filtered.length}
+           pageSize={pageSize}
+           onPageChange={setCurrentPage}
+         />
        </div>
 
       {/* Modal para seleccionar Ciclo Comercial de Importación */}
@@ -3170,6 +3186,19 @@ function CRMIntranetTable({
 
     return result;
   }, [clients, searchTerm, estadoFilter, crmContacts]);
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, estadoFilter]);
+
+  const sortedClients = React.useMemo(() => {
+    return [...filteredClients].sort((a, b) => String(b.fechaIngreso || '').localeCompare(String(a.fechaIngreso || '')));
+  }, [filteredClients]);
+
+  const paginatedClients = sortedClients.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   
   
@@ -3483,7 +3512,7 @@ function CRMIntranetTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/10">
-            {filteredClients.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '')).map(client => {
+            {paginatedClients.map(client => {
               const matchingContact = crmContacts.find(c => areContactsDuplicate(c, client));
               const isTransferred = !!matchingContact;
               const autoStatus = getAutomaticMotorStatus(client);
@@ -3609,8 +3638,12 @@ function CRMIntranetTable({
           </tbody>
         </table>
       </div>
-
-
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredClients.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 }

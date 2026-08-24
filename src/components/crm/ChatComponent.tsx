@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Bot, User, Trash2 } from 'lucide-react';
+import { safeLocalStorageGet, safeLocalStorageSet, safeLocalStorageRemove } from '../../lib/safeStorage';
 
 export const ChatComponent: React.FC<{ 
   contextData?: any; 
@@ -7,7 +8,7 @@ export const ChatComponent: React.FC<{
 }> = ({ contextData, onNavigateToEditor }) => {
   const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string; actions?: { label: string; type: string; payload: any }[] }[]>(() => {
     try {
-      const saved = localStorage.getItem('cimasur_ai_chat_messages');
+      const saved = safeLocalStorageGet('cimasur_ai_chat_messages');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       console.error('Error loading chat messages:', e);
@@ -19,7 +20,7 @@ export const ChatComponent: React.FC<{
 
   useEffect(() => {
     try {
-      localStorage.setItem('cimasur_ai_chat_messages', JSON.stringify(messages));
+      safeLocalStorageSet('cimasur_ai_chat_messages', JSON.stringify(messages));
     } catch (e) {
       console.error('Error saving chat messages:', e);
     }
@@ -29,7 +30,7 @@ export const ChatComponent: React.FC<{
     if (window.confirm('¿Está seguro de que desea vaciar la conversación?')) {
       setMessages([]);
       try {
-        localStorage.removeItem('cimasur_ai_chat_messages');
+        safeLocalStorageRemove('cimasur_ai_chat_messages');
       } catch (e) {
         console.error(e);
       }

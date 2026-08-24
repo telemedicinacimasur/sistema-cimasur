@@ -29,6 +29,7 @@ import {
   ChevronRight,
   Info
 } from 'lucide-react';
+import { Pagination } from '../../components/Pagination';
 
 // ==========================================
 // Types and Interfaces
@@ -371,6 +372,14 @@ export default function CommercialPortfolio() {
       return matchesSearch && matchesCategory && matchesEstadoCrm && matchesOrigenIntranet;
     });
   }, [clients, searchTerm, selectedCategory, selectedOrigenIntranet, selectedEstadoCrm]);
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  const paginatedClients = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredClients.slice(start, start + pageSize);
+  }, [filteredClients, currentPage, pageSize]);
 
   // ==========================================
   // Handlers for Modals and Forms
@@ -751,7 +760,7 @@ export default function CommercialPortfolio() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredClients.map(c => {
+              {paginatedClients.map(c => {
                 const alertCie = calculateCieAlert(c);
                 const isSelected = selectedClientsToTransfer.includes(c.id);
 
@@ -889,6 +898,12 @@ export default function CommercialPortfolio() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredClients.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* ============================================================== */}

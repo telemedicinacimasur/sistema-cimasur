@@ -2,21 +2,32 @@ const fs = require('fs');
 
 let content = fs.readFileSync('src/views/LabView.tsx', 'utf8');
 
-// 1. Add lucide-react imports
-content = content.replace(/} from 'lucide-react';/, `  ChevronDown,\n  Check\n} from 'lucide-react';`);
+if (!content.includes('import { Pagination }')) {
+  content = content.replace("import { SearchableRefInput } from '../components/SearchableRefInput';", "import { SearchableRefInput } from '../components/SearchableRefInput';\nimport { Pagination } from '../components/Pagination';");
+}
 
-// 2. Fix setPoSelectedArea(selectedArea) -> setPoSelectedAreas([selectedArea === 'TODAS' ? 'TODAS' : selectedArea])
-content = content.replace(/setPoSelectedArea\(selectedArea\);/, `setPoSelectedAreas([selectedArea === 'TODAS' ? 'TODAS' : selectedArea]);`);
+// Remove Conejero module card
+content = content.replace(/\{\(\!user\?\.allowedSubmodules\?\.lab \|\| user\.allowedSubmodules\.lab\.includes\('conejero'\)\) && \([\s\S]*?onClick=\{\(\) => setActiveForm\('conejero'\)\}[\s\S]*?\)\}/, '');
+// Remove Conejero module route
+content = content.replace(/\{activeForm === 'conejero' && <div[\s\S]*?Volver<\/button><\/div>\}/, '');
 
-// 3. Fix error TS2339: Property 'id' does not exist on type '{ fecha: string; ... }'
-// It occurs when doing `newOrder.id = editingPOId;`
-const newOrderDef = /const newOrder = {/g;
-const newOrderDefReplacement = `const newOrder: any = {`;
-content = content.replace(newOrderDef, newOrderDefReplacement);
+const forms = [
+  { name: 'GotasPurasForm', type: 'gotas-puras', deps: '[searchTerm, filterEstado]' },
+  { name: 'ElaboracionForm', type: 'elaboracion', deps: '[searchTerm, filterEstado]' },
+  { name: 'NosodesForm', type: 'nosodes', deps: '[searchTerm, filterEstado]' },
+  { name: 'PreparacionForm', type: 'preparacion', deps: '[searchTerm, filterEstado]' },
+  { name: 'TinturasMadresForm', type: 'tinturas', deps: '[searchTerm, filterEstado]' },
+  { name: 'InsumosForm', type: 'insumos', deps: '[searchTerm, filterEstado]' },
+  { name: 'VademecumForm', type: 'vademecum', deps: '[searchTerm, filterCategoria]' },
+  { name: 'MantenimientoForm', type: 'mantenimiento', deps: '[searchTerm]' }
+];
 
-// 4. Missing area field in itemsToBuy mapping
-const itemsToBuyMapping = /reposicion: ''\n\s*}\)\)\);/;
-const itemsToBuyMappingReplacement = `reposicion: '',\n                      area: r.area || ''\n                    })));`;
-content = content.replace(itemsToBuyMapping, itemsToBuyMappingReplacement);
+for (const form of forms) {
+  // Add pagination state
+  const stateRegex = new RegExp(`(const \\[searchTerm, setSearchTerm\\] = useState\\('');\\s*const \\[filter[^\\]]*\\] = useState[^;]*;)`);
+  if (!content.includes(`const [currentPage, setCurrentPage] = useState<number>(1);`) || !content.match(new RegExp(`function ${form.name}[\\s\\S]*?currentPage`))) {
+    content = content.replace(stateRegex, `$1\n  const [currentPage, setCurrentPage] = useState<number>(1);\n  const pageSize = 20;\n  useEffect(() => { setCurrentPage(1); }, ${form.deps});`);
+  }
+}
 
 fs.writeFileSync('src/views/LabView.tsx', content);

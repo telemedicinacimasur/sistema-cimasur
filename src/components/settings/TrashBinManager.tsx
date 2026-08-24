@@ -15,6 +15,7 @@ import { localDB } from '../../lib/auth';
 import { cn, formatDate } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { migrateLegacyNotifications } from '../../lib/notifications';
+import { Pagination } from '../Pagination';
 
 export function TrashBinManager() {
   const { user } = useAuth();
@@ -166,6 +167,18 @@ export function TrashBinManager() {
     }).sort((a,b) => (b.deletedAt || '').localeCompare(a.deletedAt || ''));
   }, [trashItems, searchQuery, collectionFilter]);
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, collectionFilter]);
+
+  const paginatedTrash = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTrash.slice(start, start + pageSize);
+  }, [filteredTrash, currentPage, pageSize]);
+
   return (
     <div className="space-y-6">
       {/* Header Info Banner */}
@@ -254,8 +267,9 @@ export function TrashBinManager() {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-[#1B2942]/60 border-b border-[#1E293B] text-slate-400">
                   <th className="p-4 font-black uppercase tracking-widest text-[9px]">Módulo Original</th>
@@ -265,7 +279,7 @@ export function TrashBinManager() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1E293B]">
-                {filteredTrash.map((item) => (
+                {paginatedTrash.map((item) => (
                   <tr key={item.id} className="hover:bg-[#111A2E]/30 transition-colors group">
                     <td className="p-4 whitespace-nowrap">
                       <span className="px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black rounded-lg uppercase tracking-wide">
@@ -313,6 +327,13 @@ export function TrashBinManager() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredTrash.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
+        </>
         )}
       </div>
 

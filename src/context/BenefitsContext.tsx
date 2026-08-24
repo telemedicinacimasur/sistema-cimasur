@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { CATEGORY_BENEFITS } from '../lib/crmLogic';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
 
 type BenefitsContextType = {
   benefits: Record<string, string>;
@@ -10,12 +11,12 @@ const BenefitsContext = createContext<BenefitsContextType | undefined>(undefined
 
 export const BenefitsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [benefits, setBenefits] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('category_benefits');
+    const saved = safeLocalStorageGet('category_benefits');
     return saved ? JSON.parse(saved) : CATEGORY_BENEFITS;
   });
 
   useEffect(() => {
-    localStorage.setItem('category_benefits', JSON.stringify(benefits));
+    safeLocalStorageSet('category_benefits', JSON.stringify(benefits));
   }, [benefits]);
 
   const updateBenefit = (category: string, description: string) => {

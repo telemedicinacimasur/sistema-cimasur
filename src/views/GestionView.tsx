@@ -31,6 +31,7 @@ import {
   Zap
 } from 'lucide-react';
 import { RecordActions } from '../components/RecordActions';
+import { Pagination } from '../components/Pagination';
 import { addNotification } from '../lib/notifications';
 import { motion } from 'motion/react';
 
@@ -74,7 +75,7 @@ export default function GestionView() {
     const gestionData = await localDB.getCollection('gestion_records');
     const activityData = await localDB.getCollection('gestion_activities');
     // Sort records by fechaIngreso descending
-    setRecords([...gestionData].sort((a: any, b: any) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || '')));
+    setRecords([...gestionData].sort((a: any, b: any) => String(b.fechaIngreso || '').localeCompare(String(a.fechaIngreso || ''))));
     setActivities(activityData);
   };
 
@@ -287,7 +288,7 @@ function GestionExpedienteModal({ client, onClose }: { client: any, onClose: () 
     ];
 
     // Remove duplicates based on fecha and detalle
-    const uniqueUnified = Array.from(new Map(unified.map(item => [item.fecha.substring(0, 10) + item.detalle, item])).values());
+    const uniqueUnified = Array.from(new Map(unified.map(item => [String(item.fecha || '').substring(0, 10) + String(item.detalle || ''), item])).values());
     
     setActivities(uniqueUnified.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || ""))));
   };
@@ -1072,6 +1073,14 @@ function GestionList({
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
   const filtered = records.filter(r => {
     const searchMatch = (r.nombre || r.cliente || '').toLowerCase().includes(filters.search.toLowerCase()) || 
                       (r.rut || '').toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -1082,6 +1091,8 @@ function GestionList({
     const estMatch = filters.estado === 'Todos' || r.estado === filters.estado;
     return searchMatch && catMatch && estMatch;
   });
+
+  const paginatedRecords = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleDelete = async (id: string, name: string) => {
     if (!id) {
@@ -1192,7 +1203,7 @@ function GestionList({
                  </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                 {filtered.map(r => (
+                 {paginatedRecords.map(r => (
                    <tr key={r.id} className="hover:bg-[#152035] transition-colors">
                       <td className="p-4 align-top">
                          <div className="text-slate-400 font-mono font-bold whitespace-nowrap">{formatDate(r.fechaIngreso)}</div>
@@ -1357,6 +1368,12 @@ function GestionList({
               </tbody>
            </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

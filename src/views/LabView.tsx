@@ -1,3 +1,4 @@
+import { Pagination } from '../components/Pagination';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
 import { getDb, isFirebaseReady } from '../lib/firebase';
@@ -9,6 +10,7 @@ import {
   onSnapshot, 
   startAfter, 
   getDocs, 
+  where,
   QueryDocumentSnapshot, 
   DocumentData 
 } from 'firebase/firestore';
@@ -46,8 +48,15 @@ import {
   Upload,
   FileSpreadsheet,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Check,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Stethoscope
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { RecordActions } from '../components/RecordActions';
@@ -224,6 +233,7 @@ export default function LabView() {
               color="slate"
             />
           )}
+          
         </div>
       </div>
     );
@@ -266,7 +276,7 @@ export default function LabView() {
         {activeForm === 'stock' && <StockManager records={records} setRecords={setRecords} />}
         {activeForm === 'tracking' && <OrderTrackingForm records={records} setRecords={setRecords} />}
         {activeForm === 'magistrales' && <MagistralesForm records={records} setRecords={setRecords} />}
-        {activeForm === 'conejero' && <div className="bg-[#152035] p-10 rounded-3xl border border-[#1E293B] text-center"><h2 className="text-2xl font-black text-white">Módulo EC Dr. Conejero</h2><p className="text-slate-400 mt-2">Próximamente disponible.</p><button onClick={() => setActiveForm('main')} className="mt-6 bg-[#1E3A5F]  hover:bg-[#1D3557] border-[#1E293B]  px-8 py-2 rounded-full font-bold uppercase text-xs">Volver</button></div>}
+        
       </div>
     </div>
   );
@@ -331,6 +341,8 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [filterEstado, setFilterEstado] = useState('Todos');
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -449,6 +461,19 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
   };
 
 
+
+  const filteredRecordsList = records.filter(r => r.type === 'gotas-puras').filter(r => {
+                const searchStr = `${r.producto || ''} ${r.estado || ''} ${r.estadoFinal || ''} ${r.observaciones || ''} ${formatDate(r.fecha)}`.toLowerCase();
+                const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
+                
+                // Normalizing to handle potential accent/case discrepancies, though data seems to use OK/PENDIENTE
+                const estadoActual = (r.estadoFinal || 'PENDIENTE').toUpperCase();
+                const matchesEstado = filterEstado === 'Todos' || estadoActual === filterEstado;
+                
+                return matchesSearch && matchesEstado;
+              })
+              .sort((a,b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const paginatedRecords = filteredRecordsList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
       <div className="bg-[#152035] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] border border-[#1E293B] overflow-hidden">
@@ -628,7 +653,7 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
                 
                 return matchesSearch && matchesEstado;
               })
-              .sort((a,b) => (b.fecha || '').localeCompare(a.fecha || ''))
+              .sort((a,b) => String(b.fecha || '').localeCompare(String(a.fecha || '')))
               .map((record) => (
                 <tr key={record.id} className="hover:bg-[#152035] transition-colors">
                   <td className="px-6 py-4 text-xs font-medium">{formatDate(record.fecha)}</td>
@@ -705,6 +730,12 @@ function GotasPurasForm({ records, setRecords }: { records: any[], setRecords: (
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -723,6 +754,8 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
     tipo: 'Gota Pura',
@@ -846,6 +879,12 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
   };
 
 
+
+  const filteredRecordsList = records.filter(r => r.type === 'elaboracion').filter(r => {
+                const searchStr = `${formatDate(r.fecha)} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).sort((a,b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const paginatedRecords = filteredRecordsList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
@@ -984,10 +1023,7 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {records.filter(r => r.type === 'elaboracion').filter(r => {
-                const searchStr = `${formatDate(r.fecha)} ${r.nroCimasur || ''} ${r.producto || ''} ${r.responsable || ''} ${r.creadoPor || ''} ${r.status || ''} ${r.tipo || ''}`.toLowerCase();
-                return searchStr.includes(searchTerm.toLowerCase());
-              }).sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id} className="hover:bg-[#152035]">
                   <td className="p-4">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-mono text-[#38BDF8]">{r.nroCimasur}</td>
@@ -1055,6 +1091,12 @@ function ElaboracionForm({ records, setRecords }: { records: any[], setRecords: 
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -1101,6 +1143,8 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [form, setForm] = useState<any>(initialFormState);
 
   const downloadExcelTemplate = () => {
@@ -1256,6 +1300,12 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
   };
 
 
+
+  const filteredRecordsList = records.filter(r => r.type === 'nosodes').filter(r => {
+                const searchStr = `${formatDate(r.fechaFicha)} ${r.nroMuestra || ''} ${r.paciente || ''} ${r.producto || ''} ${r.medico || ''} ${r.refrigerador || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).sort((a,b) => String(b.fechaFicha || '').localeCompare(String(a.fechaFicha || '')));
+  const paginatedRecords = filteredRecordsList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
@@ -1409,10 +1459,7 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 italic">
-              {records.filter(r => r.type === 'nosodes').filter(r => {
-                const searchStr = `${formatDate(r.fechaFicha)} ${r.nroMuestra || ''} ${r.paciente || ''} ${r.producto || ''} ${r.medico || ''} ${r.refrigerador || ''}`.toLowerCase();
-                return searchStr.includes(searchTerm.toLowerCase());
-              }).sort((a,b) => (b.fechaFicha || '').localeCompare(a.fechaFicha || '')).map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-medium">{formatDate(r.fechaFicha)}</td>
                   <td className="p-4 font-mono text-[#38BDF8]">{r.nroClasificacion || '---'}</td>
@@ -1494,6 +1541,12 @@ function NosodesForm({ records, setRecords }: { records: any[], setRecords: (dat
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -1512,6 +1565,8 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [frascoSize, setFrascoSize] = useState<30 | 100>(30);
   
   // Logic for Elaboration Registration Modal
@@ -1733,6 +1788,12 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
     });
   };
 
+
+  const filteredRecordsList = records.filter(r => r.type === 'preparacion').filter(r => {
+                const searchStr = `${formatDate(r.fecha)} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).sort((a,b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const paginatedRecords = filteredRecordsList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {elabModal.isOpen && (
@@ -2002,10 +2063,7 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {records.filter(r => r.type === 'preparacion').filter(r => {
-                const searchStr = `${formatDate(r.fecha)} ${r.producto || ''} ${r.preparador || ''} ${r.responsable || ''} ${r.totalLambdas || ''} ${r.observaciones || ''}`.toLowerCase();
-                return searchStr.includes(searchTerm.toLowerCase());
-              }).sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id}>
                   <td className="p-4">{formatDate(r.fecha)}</td>
                   <td className="p-4 font-bold">{r.producto}</td>
@@ -2090,6 +2148,12 @@ function PreparacionForm({ records, setRecords }: { records: any[], setRecords: 
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -2108,6 +2172,8 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [form, setForm] = useState({
     insumo: '',
     fecha: new Date().toISOString().split('T')[0],
@@ -2242,6 +2308,12 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
     setEditingId(record.id);
   };
 
+
+  const filteredRecordsList = records.filter(r => r.type === 'tinturas').filter(r => {
+                const searchStr = `${formatDate(r.fecha)} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).sort((a,b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const paginatedRecords = filteredRecordsList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
@@ -2409,10 +2481,7 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 italic">
-              {records.filter(r => r.type === 'tinturas').filter(r => {
-                const searchStr = `${formatDate(r.fecha)} ${r.insumo || ''} ${r.nroAsignado || ''} ${r.elaborador || ''} ${r.responsable || ''} ${r.estado || ''} ${r.proporcion || ''}`.toLowerCase();
-                return searchStr.includes(searchTerm.toLowerCase());
-              }).sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id}>
                   <td className="px-6 py-4 font-medium">{formatDate(r.fecha)}</td>
                   <td className="px-6 py-4 font-bold">{r.insumo}</td>
@@ -2476,6 +2545,12 @@ function TinturasMadresForm({ records, setRecords }: { records: any[], setRecord
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -2633,6 +2708,9 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
   };
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
 
   const filteredHistory = (records || [])
     .filter(r => r.type === 'insumos')
@@ -2640,7 +2718,8 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
       const searchStr = `${r.nombre || ''} ${r.codigoCimasur || ''} ${r.lote || ''} ${r.proveedor || ''}`.toLowerCase();
       return searchStr.includes(searchTerm.toLowerCase());
     })
-    .sort((a,b) => (b.fechaIngreso || "").localeCompare(a.fechaIngreso || ""));
+    .sort((a,b) => String(b.fechaIngreso || "").localeCompare(String(a.fechaIngreso || "")));
+  const paginatedRecords = filteredHistory.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -2781,7 +2860,7 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 italic">
-              {filteredHistory.map((r, idx) => (
+              {paginatedRecords.map((r, idx) => (
                 <tr key={r.id || idx}>
                   <td className="px-6 py-4 font-medium">{formatDate(r.fechaIngreso)}</td>
                   <td className="px-6 py-4 font-bold">{r.nombre}</td>
@@ -2847,6 +2926,12 @@ function InsumosForm({ records, setRecords }: { records: any[], setRecords: (dat
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredHistory.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -2864,6 +2949,8 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [form, setForm] = useState({
     fechaCotiz: new Date().toISOString().split('T')[0],
     producto: '',
@@ -2961,6 +3048,12 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
     setEditingId(record.id);
   };
 
+
+  const filteredRecordsList = records.filter(r => r.type === 'vademecum').filter(r => {
+                const searchStr = `${formatDate(r.fechaCotiz)} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).sort((a,b) => String(b.fechaCotiz || '').localeCompare(String(a.fechaCotiz || '')));
+  const paginatedRecords = filteredRecordsList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-[#152035] rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] overflow-hidden">
@@ -3153,10 +3246,7 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 italic">
-              {records.filter(r => r.type === 'vademecum').filter(r => {
-                const searchStr = `${formatDate(r.fechaCotiz)} ${r.producto || ''} ${r.proveedor || ''} ${r.estado || ''} ${r.prioridad || ''} ${r.valor || ''}`.toLowerCase();
-                return searchStr.includes(searchTerm.toLowerCase());
-              }).sort((a,b) => (b.fechaCotiz || '').localeCompare(a.fechaCotiz || '')).map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id}>
                   <td className="px-6 py-4 font-medium">{formatDate(r.fechaCotiz)}</td>
                   <td className="px-6 py-4 font-bold">{r.producto}</td>
@@ -3221,6 +3311,12 @@ function VademecumForm({ records, setRecords }: { records: any[], setRecords: (d
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -3238,6 +3334,8 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [form, setForm] = useState({
     codigo: '',
     producto: '',
@@ -3408,6 +3506,12 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
     }
   };
 
+
+  const filteredRecordsList = records.filter(r => r.type === 'mantenimiento').filter(r => {
+                const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''} ${formatDate(r.fechaCompra)}`.toLowerCase();
+                return searchStr.includes(searchTerm.toLowerCase());
+              }).sort((a,b) => String(b.fechaCompra || '').localeCompare(String(a.fechaCompra || '')));
+  const paginatedRecords = filteredRecordsList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {showLogsModal && (
@@ -3475,6 +3579,12 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
                 </tbody>
               </table>
             </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
           </div>
         </div>
       )}
@@ -3648,10 +3758,7 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 italic">
-              {records.filter(r => r.type === 'mantenimiento').filter(r => {
-                const searchStr = `${r.codigo || ''} ${r.producto || ''} ${r.area || ''} ${r.marca || ''} ${r.modelo || ''} ${r.responsable || ''} ${r.estado || ''} ${formatDate(r.fechaCompra)}`.toLowerCase();
-                return searchStr.includes(searchTerm.toLowerCase());
-              }).sort((a,b) => (b.fechaCompra || '').localeCompare(a.fechaCompra || '')).map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id}>
                   <td className="p-4 font-mono text-[#38BDF8] text-center">{r.codigo}</td>
                   <td className="p-4 font-bold">{r.producto}</td>
@@ -3731,6 +3838,12 @@ function MantenimientoForm({ records, setRecords }: { records: any[], setRecords
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredRecordsList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -3764,6 +3877,9 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   const [consumptionQty, setConsumptionQty] = useState<{ [key: string]: number }>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [kardexSearchTerm, setKardexSearchTerm] = useState('');
+  const [kardexCurrentPage, setKardexCurrentPage] = useState<number>(1);
+  const kardexPageSize = 20;
+  useEffect(() => { setKardexCurrentPage(1); }, [kardexSearchTerm, selectedArea]);
   const [showPOModal, setShowPOModal] = useState(false);
   const [poItems, setPoItems] = useState<any[]>([]);
   const [poEncargado, setPoEncargado] = useState('ADMINISTRACION');
@@ -3940,7 +4056,11 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
     if (alertFilter === 'alert') return hasAlert;
     if (alertFilter === 'no_alert') return !hasAlert;
     return true;
-  }).sort((a,b) => (a.item || '').localeCompare(b.item || '', 'es', { sensitivity: 'base', numeric: true }));
+  }).sort((a,b) => String(a.item || '').localeCompare(String(b.item || ''), 'es', { sensitivity: 'base', numeric: true }));
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+  useEffect(() => { setCurrentPage(1); }, [selectedArea, searchTerm, kardexSearchTerm]);
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3991,6 +4111,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
           alertaStock: Number(form.alertaStock) >= 0 ? Number(form.alertaStock) : 5,
           updatedAt: new Date().toISOString()
         };
+
 
         const savedItem = await localDB.saveToCollection('inventory', itemData);
 
@@ -4450,7 +4571,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                   {filteredRecords.map(record => (
+                   {paginatedRecords.map(record => (
                      <tr key={record.id} className="hover:bg-[#152035]/20 transition-colors">
                        <td className="p-4">
                           {editingStockId === record.id ? (
@@ -4614,15 +4735,18 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-200">
-                    {followups.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).filter(f => {
-                       let match = f.area === selectedArea;
-                       if (kardexSearchTerm) {
-                          const s = kardexSearchTerm.toLowerCase();
-                          const text = `${f.item || ''} ${f.motivo || ''} ${formatDate(f.fecha)}`.toLowerCase();
-                          if (!text.includes(s)) match = false;
-                       }
-                       return match;
-                    }).map((f: any, i: number) => (
+                    {(() => {
+                        const filtered = followups.slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || ''))).filter(f => {
+                           let match = f.area === selectedArea;
+                           if (kardexSearchTerm) {
+                              const s = kardexSearchTerm.toLowerCase();
+                              const text = `${f.item || ''} ${f.motivo || ''} ${formatDate(f.fecha)}`.toLowerCase();
+                              if (!text.includes(s)) match = false;
+                           }
+                           return match;
+                        });
+                        const paginated = filtered.slice((kardexCurrentPage - 1) * kardexPageSize, kardexCurrentPage * kardexPageSize);
+                        return paginated.map((f: any, i: number) => (
                       <tr key={i} className="hover:bg-[#152035] italic">
                         <td className="p-3">{formatDate(f.fecha)}</td>
                         <td className="p-3 font-bold text-[#38BDF8] group-hover:text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">{f.item}</td>
@@ -4656,13 +4780,23 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                            <button onClick={() => handleDeleteFollowup(f.id)} className="text-red-400 hover:text-red-600" title="Eliminar Movimiento"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
-                    ))}
-                    {followups.length === 0 && (
+                    ));
+                    })()}
+                    {followups.filter(f => f.area === selectedArea).length === 0 && (
                       <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">No hay movimientos registrados.</td></tr>
                     )}
                  </tbody>
               </table>
            </div>
+           <Pagination currentPage={kardexCurrentPage} totalItems={followups.slice().filter(f => {
+                       let match = f.area === selectedArea;
+                       if (kardexSearchTerm) {
+                          const s = kardexSearchTerm.toLowerCase();
+                          const text = `${f.item || ''} ${f.motivo || ''} ${formatDate(f.fecha)}`.toLowerCase();
+                          if (!text.includes(s)) match = false;
+                       }
+                       return match;
+                    }).length} pageSize={kardexPageSize} onPageChange={setKardexCurrentPage} />
         </div>
       </div>
 
@@ -4940,7 +5074,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1E293B] bg-[#1E3A5F]/10">
-                    {[...purchaseOrders].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((order) => (
+                    {[...purchaseOrders].sort((a, b) => new Date(b?.fecha || 0).getTime() - new Date(a?.fecha || 0).getTime()).map((order) => (
                       <tr key={order.id} className="hover:bg-[#1E3A5F]/30 transition-colors">
                         <td className="p-3 font-medium text-white">{new Date(order.fecha).toLocaleDateString()}</td>
                         <td className="p-3 text-sky-400">{order.mesAnio}</td>
@@ -5076,6 +5210,13 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   const [filterSituacion, setFilterSituacion] = useState<string>('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetail, setShowDetail] = useState<any | null>(null);
+
+  // Optimización y Filtro por Defecto: Ocultar 'OK' / 'ENTREGADO' por defecto
+  const [showCompleted, setShowCompleted] = useState<boolean>(false);
+
+  // Paginación Numerada (20 registros por página)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   
   const downloadExcelTemplate = () => {
     const headers = [
@@ -5101,7 +5242,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         let importedCount = 0;
-        const currentRecords = await localDB.getCollection('order_tracking');
+        const currentRecords = await localDB.getCollection('order_tracking', { limitCount: 5000 });
 
         for (const row of data) {
           const nroCotiz = safe(row["Nro Cotización"]);
@@ -5168,14 +5309,18 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         setIsRefreshing(true);
         localDB.clearCache();
       }
-      const data = await localDB.getCollection('order_tracking', { limitCount: 20, forceRefresh });
+      const data = await localDB.getCollection('order_tracking', { 
+        limitCount: showCompleted ? 500 : 100, 
+        forceRefresh 
+      });
       setTrackingRecords(Array.isArray(data) ? data : []);
+      setCurrentPage(1);
     } catch (err) {
       console.error('Initial Load Error:', err);
       setTrackingRecords([]);
     } finally {
       if (forceRefresh) {
-        setTimeout(() => setIsRefreshing(false), 600);
+        setTimeout(() => setIsRefreshing(false), 500);
       }
     }
   };
@@ -5187,11 +5332,19 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       const db = getDb();
       if (db) {
         try {
-          const q = query(
-            collection(db, 'order_tracking'),
-            orderBy('fecha', 'desc'),
-            limit(20)
-          );
+          const activeStatuses = ['PENDIENTE', 'EN TRÁNSITO', 'EN TRANSITO', 'DEVOLUCIÓN', 'DEVOLUCION', 'SIN RETIRO', 'RECHAZADO', 'NULA'];
+          
+          let q = !showCompleted 
+            ? query(
+                collection(db, 'order_tracking'),
+                where('situacion', 'in', activeStatuses),
+                limit(50)
+              )
+            : query(
+                collection(db, 'order_tracking'),
+                orderBy('fechaCotiz', 'desc'),
+                limit(100)
+              );
 
           unsubscribe = onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({
@@ -5204,27 +5357,10 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             } else {
               setLastTrackingDoc(null);
             }
-            setHasMoreTracking(snapshot.docs.length === 20);
+            setHasMoreTracking(snapshot.docs.length >= 20);
           }, (err) => {
-            console.warn("Firestore order_tracking onSnapshot error (e.g., index or missing field), trying fallback query:", err);
-            try {
-              const fallbackQ = query(
-                collection(db, 'order_tracking'),
-                orderBy('fechaCotiz', 'desc'),
-                limit(20)
-              );
-              const unsubFallback = onSnapshot(fallbackQ, (fbSnap) => {
-                const docs = fbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setTrackingRecords(docs);
-                if (fbSnap.docs.length > 0) setLastTrackingDoc(fbSnap.docs[fbSnap.docs.length - 1]);
-                setHasMoreTracking(fbSnap.docs.length === 20);
-              }, () => {
-                loadTrackingData(true);
-              });
-              unsubscribe = unsubFallback;
-            } catch {
-              loadTrackingData(true);
-            }
+            console.warn("Firestore order_tracking onSnapshot fallback:", err);
+            loadTrackingData(true);
           });
         } catch (err) {
           console.error("Firestore order_tracking query setup error:", err);
@@ -5236,8 +5372,6 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     } else {
       loadTrackingData(true);
     }
-
-    handleSyncFromQuotes(true);
 
     const handleTrackingDbChange = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
@@ -5256,7 +5390,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
       }
       window.removeEventListener('db-change', handleTrackingDbChange);
     };
-  }, []);
+  }, [showCompleted]);
 
   const loadMoreTrackingRecords = async () => {
     if (!hasMoreTracking || loadingMoreTracking || !lastTrackingDoc) return;
@@ -5267,22 +5401,11 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
         if (db) {
           let nextQuery = query(
             collection(db, 'order_tracking'),
-            orderBy('fecha', 'desc'),
+            orderBy('fechaCotiz', 'desc'),
             startAfter(lastTrackingDoc),
             limit(20)
           );
-          let snapshot;
-          try {
-            snapshot = await getDocs(nextQuery);
-          } catch {
-            nextQuery = query(
-              collection(db, 'order_tracking'),
-              orderBy('fechaCotiz', 'desc'),
-              startAfter(lastTrackingDoc),
-              limit(20)
-            );
-            snapshot = await getDocs(nextQuery);
-          }
+          let snapshot = await getDocs(nextQuery);
           if (!snapshot.empty) {
             const newDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setTrackingRecords(prev => {
@@ -5557,22 +5680,41 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     }
   };
 
-  const filteredRecords = (Array.isArray(trackingRecords) ? trackingRecords : []).filter(r => {
-    const situacion = safe(r.situacion);
-    const matchesSituacion = filterSituacion === 'TODOS' || situacion === filterSituacion;
-    const searchString = `${safe(r.nroCotiz)} ${safe(r.cliente)} ${safe(r.ot)} ${formatDate(r.fechaCotiz)} ${formatDate(r.fechaEnvio)}`.toLowerCase();
-    const matchesSearch = searchString.includes(searchTerm.toLowerCase());
-    return matchesSituacion && matchesSearch;
-  }).sort((a,b) => {
-    const valA = String(a.nroCotiz || '').trim();
-    const valB = String(b.nroCotiz || '').trim();
-    const numA = parseFloat(valA.replace(/[^\d.]/g, ''));
-    const numB = parseFloat(valB.replace(/[^\d.]/g, ''));
-    if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
-      return numB - numA;
-    }
-    return valB.localeCompare(valA, 'es', { numeric: true, sensitivity: 'base' });
-  });
+  const filteredRecords = useMemo(() => {
+    return (Array.isArray(trackingRecords) ? trackingRecords : []).filter(r => {
+      const situacion = safe(r.situacion).toUpperCase();
+      
+      // Si showCompleted es falso y no se eligió un filtro explícito distinto a TODOS, ocultamos OK/ENTREGADO
+      if (!showCompleted && filterSituacion === 'TODOS') {
+        if (situacion === 'OK' || situacion === 'ENTREGADO' || situacion === 'FINALIZADO') {
+          return false;
+        }
+      }
+
+      const matchesSituacion = filterSituacion === 'TODOS' || situacion === filterSituacion.toUpperCase();
+      const searchString = `${safe(r.nroCotiz)} ${safe(r.cliente)} ${safe(r.ot)} ${formatDate(r.fechaCotiz)} ${formatDate(r.fechaEnvio)}`.toLowerCase();
+      const matchesSearch = searchString.includes(searchTerm.toLowerCase());
+      return matchesSituacion && matchesSearch;
+    }).sort((a,b) => {
+      const valA = String(a.nroCotiz || '').trim();
+      const valB = String(b.nroCotiz || '').trim();
+      const numA = parseFloat(valA.replace(/[^\d.]/g, ''));
+      const numB = parseFloat(valB.replace(/[^\d.]/g, ''));
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+        return numB - numA;
+      }
+      return valB.localeCompare(valA, 'es', { numeric: true, sensitivity: 'base' });
+    });
+  }, [trackingRecords, showCompleted, filterSituacion, searchTerm]);
+
+  // Cálculo de Paginación Numerada
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  
+  const paginatedRecords = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredRecords.slice(start, start + pageSize);
+  }, [filteredRecords, safeCurrentPage, pageSize]);
 
   const oldTrackingRecordsCount = useMemo(() => {
     const threeMonthsAgo = new Date();
@@ -5808,28 +5950,57 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
           </div>
         </div>
 
-        <div className="p-4 bg-[#111A2E] border-b border-[#1E293B] flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2 bg-[#152035] px-3 py-1.5 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] grow max-w-sm">
-             <Search className="w-4 h-4 text-slate-400" />
-             <input 
-              type="text" 
-              placeholder="Buscar por pedido, cliente u OT..." 
-              className="outline-none text-xs w-full"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-             />
+        <div className="p-4 bg-[#111A2E] border-b border-[#1E293B] flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex flex-wrap items-center gap-4 grow">
+            <div className="flex items-center gap-2 bg-[#152035] px-3 py-1.5 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] grow max-w-sm">
+               <Search className="w-4 h-4 text-slate-400" />
+               <input 
+                type="text" 
+                placeholder="Buscar por pedido, cliente u OT..." 
+                className="outline-none text-xs w-full bg-transparent text-white placeholder-slate-400"
+                value={searchTerm}
+                onChange={e => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+               />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase">Filtrar Situación:</span>
+              <select 
+                className="bg-[#152035] text-white border border-[#1E293B] rounded-xl px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
+                value={filterSituacion}
+                onChange={e => {
+                  setFilterSituacion(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="TODOS">TODOS LOS ESTADOS</option>
+                {situaciones.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
-          
+
+          {/* Toggle para Mostrar/Ocultar 'OK' y 'Entregado' */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-slate-400 uppercase">Filtrar Situación:</span>
-            <select 
-              className="bg-[#152035] border rounded px-2 py-1.5 text-xs font-bold outline-none"
-              value={filterSituacion}
-              onChange={e => setFilterSituacion(e.target.value)}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCompleted(!showCompleted);
+                setCurrentPage(1);
+              }}
+              className={cn(
+                "text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all cursor-pointer shadow-sm",
+                showCompleted 
+                  ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50 hover:bg-emerald-600/30" 
+                  : "bg-[#152035] text-slate-300 border-[#1E293B] hover:bg-[#1E293B] hover:text-white"
+              )}
+              title="Alternar entre ver solo despachos pendientes/en tránsito u observar el archivo histórico completo de entregas"
             >
-              <option value="TODOS">TODOS LOS REGISTROS</option>
-              {situaciones.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+              {showCompleted ? <Eye className="w-3.5 h-3.5 text-emerald-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+              <span>{showCompleted ? "Mostrando Todos (Incluye OK / Entregados)" : "Ocultando Entregados (Solo Pendientes/Tránsito)"}</span>
+            </button>
           </div>
         </div>
         
@@ -5939,7 +6110,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredRecords.map(r => (
+              {paginatedRecords.map(r => (
                 <tr key={r.id || Math.random().toString()} className="hover:bg-[#1E293B]/50 transition-colors">
                    <td className="p-2 font-bold text-[#38BDF8] truncate">{safe(r.nroCotiz)}</td>
                    <td className="p-2 font-mono text-slate-400 truncate flex items-center justify-center gap-1">
@@ -5993,34 +6164,97 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
                    </td>
                 </tr>
               ))}
-              {filteredRecords.length === 0 && (
+              {paginatedRecords.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="p-10 text-center text-slate-400 italic">No se encontraron registros de seguimiento...</td>
+                  <td colSpan={10} className="p-10 text-center text-slate-400 italic">
+                    {filteredRecords.length === 0 
+                      ? "No se encontraron registros de seguimiento..." 
+                      : "Página sin registros."}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        {hasMoreTracking && (
-          <div className="p-4 text-center border-t border-[#1E293B] bg-[#0F172A]/50">
+
+        {/* Paginador Numerado Completo */}
+        <div className="p-4 border-t border-[#1E293B] bg-[#0F172A]/70 flex flex-wrap items-center justify-between gap-4">
+          <div className="text-xs text-slate-400 font-medium">
+            Mostrando <span className="text-white font-bold">{filteredRecords.length > 0 ? (safeCurrentPage - 1) * pageSize + 1 : 0}</span> a <span className="text-white font-bold">{Math.min(safeCurrentPage * pageSize, filteredRecords.length)}</span> de <span className="text-[#38BDF8] font-black">{filteredRecords.length}</span> registros
+            {!showCompleted && filterSituacion === 'TODOS' && (
+              <span className="text-amber-400/80 ml-2">(Entregados/OK ocultos)</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={loadMoreTrackingRecords}
-              disabled={loadingMoreTracking}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow inline-flex items-center gap-2 cursor-pointer"
+              onClick={() => setCurrentPage(1)}
+              disabled={safeCurrentPage === 1}
+              className="p-1.5 rounded-lg bg-[#152035] hover:bg-[#1E293B] disabled:opacity-30 disabled:pointer-events-none text-slate-300 transition-colors border border-[#1E293B]"
+              title="Primera página"
             >
-              {loadingMoreTracking ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Cargando más registros...
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="w-3.5 h-3.5" /> Cargar más registros (+20)
-                </>
-              )}
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={safeCurrentPage === 1}
+              className="p-1.5 rounded-lg bg-[#152035] hover:bg-[#1E293B] disabled:opacity-30 disabled:pointer-events-none text-slate-300 transition-colors border border-[#1E293B]"
+              title="Página anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Páginas numeradas */}
+            <div className="flex items-center gap-1 mx-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
+                let pageNum = idx + 1;
+                if (totalPages > 5) {
+                  if (safeCurrentPage > 3 && safeCurrentPage < totalPages - 2) {
+                    pageNum = safeCurrentPage - 2 + idx;
+                  } else if (safeCurrentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + idx;
+                  }
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={cn(
+                      "w-8 h-8 rounded-lg text-xs font-bold transition-all",
+                      safeCurrentPage === pageNum
+                        ? "bg-[#38BDF8] text-slate-900 shadow-md font-black"
+                        : "bg-[#152035] text-slate-300 hover:bg-[#1E293B] border border-[#1E293B]"
+                    )}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={safeCurrentPage === totalPages}
+              className="p-1.5 rounded-lg bg-[#152035] hover:bg-[#1E293B] disabled:opacity-30 disabled:pointer-events-none text-slate-300 transition-colors border border-[#1E293B]"
+              title="Página siguiente"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={safeCurrentPage === totalPages}
+              className="p-1.5 rounded-lg bg-[#152035] hover:bg-[#1E293B] disabled:opacity-30 disabled:pointer-events-none text-slate-300 transition-colors border border-[#1E293B]"
+              title="Última página"
+            >
+              <ChevronsRight className="w-4 h-4" />
             </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -6038,6 +6272,9 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
   const [compositionRows, setCompositionRows] = useState([
     { composicion: '', codigo: '', dilucion: '', lambdas: '' },
     { composicion: '', codigo: '', dilucion: '', lambdas: '' },
@@ -6402,7 +6639,8 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
                   return <tr><td colSpan={6} className="p-10 text-center text-slate-400">Sin registros para "{searchTerm}"...</td></tr>;
                 }
 
-                return filtered.map(r => (
+                const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+                return paginated.map(r => (
                   <tr key={r.id}>
                     <td className="p-4 font-bold text-[#38BDF8]">{r.nroCotizacion}</td>
                     <td className="p-4 uppercase">{r.mvTratante}</td>
@@ -6523,6 +6761,7 @@ function MagistralesForm({ records, setRecords }: { records: any[], setRecords: 
         </div>
       </div>
 
+      <Pagination currentPage={currentPage} totalItems={records.filter(r => r.type === 'magistrales').filter(r => !searchTerm || String(r.nroCotizacion || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(r.mvTratante || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(r.nroAsignado || '').toLowerCase().includes(searchTerm.toLowerCase()) || formatDate(r.fecha).toLowerCase().includes(searchTerm.toLowerCase()) || String(r.preparador || '').toLowerCase().includes(searchTerm.toLowerCase())).length} pageSize={pageSize} onPageChange={setCurrentPage} />
       {selectedElabRecord && (
         <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#152035] border border-[#1E293B] rounded-3xl p-8 max-w-lg w-full shadow-2xl relative text-slate-200">
