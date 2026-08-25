@@ -2,6 +2,7 @@ import { Pagination } from '../components/Pagination';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
 import { getDb, isFirebaseReady } from '../lib/firebase';
+import { registerListener } from '../lib/listenerRegistry';
 import { 
   collection, 
   query, 
@@ -5362,6 +5363,9 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             console.warn("Firestore order_tracking onSnapshot fallback:", err);
             loadTrackingData(true);
           });
+          if (unsubscribe) {
+            registerListener(unsubscribe);
+          }
         } catch (err) {
           console.error("Firestore order_tracking query setup error:", err);
           loadTrackingData(true);

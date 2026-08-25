@@ -280,22 +280,22 @@ function UsersManager() {
         </div>
         
         {showCreate && (
-          <form className="p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4 duration-300" onSubmit={handleCreate}>
+          <form className="p-6 bg-[#111A2E] border-b border-[#1E293B] grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4 duration-300 text-white" onSubmit={handleCreate}>
             <div className="md:col-span-4">
-              <h4 className="text-xs font-black text-slate-900 mb-2 uppercase tracking-[0.2em]">Registrar Nuevo Acceso</h4>
+              <h4 className="text-xs font-black text-white mb-2 uppercase tracking-[0.2em]">Registrar Nuevo Acceso</h4>
             </div>
             <FormField label="Correo Electrónico">
               <input 
                 type="email"
                 required
-                className="w-full border border-slate-300 bg-white rounded-xl p-2 text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
+                className="w-full border border-[#1E293B] bg-[#152035] rounded-xl p-2 text-sm text-white focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={newUser.email} 
                 onChange={e => setNewUser({...newUser, email: e.target.value})} 
               />
             </FormField>
             <FormField label="Nombre Completo">
               <input 
-                className="w-full border border-slate-300 bg-white rounded-xl p-2 text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
+                className="w-full border border-[#1E293B] bg-[#152035] rounded-xl p-2 text-sm text-white focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={newUser.displayName} 
                 onChange={e => setNewUser({...newUser, displayName: e.target.value})} 
               />
@@ -304,32 +304,32 @@ function UsersManager() {
               <input 
                 type="text"
                 required
-                className="w-full border border-slate-300 bg-white rounded-xl p-2 text-sm font-mono text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
+                className="w-full border border-[#1E293B] bg-[#152035] rounded-xl p-2 text-sm font-mono text-white focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={newUser.pass} 
                 onChange={e => setNewUser({...newUser, pass: e.target.value})} 
               />
             </FormField>
             <div className="md:col-span-4 mt-2">
-               <label className="text-xs font-black uppercase text-slate-700 tracking-widest block mb-2">Accesos / Roles</label>
+               <label className="text-xs font-black uppercase text-slate-300 tracking-widest block mb-2">Accesos / Roles</label>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {availableRoles.map(r => (
-                    <div key={r.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <div key={r.id} className="bg-[#152035] p-3 rounded-xl border border-[#1E293B] shadow-sm">
                       <label className="flex items-center gap-2 cursor-pointer group mb-2">
                         <input 
                           type="checkbox" 
-                          className="w-5 h-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          className="w-5 h-5 rounded border-[#1E293B] bg-[#111A2E] text-sky-600 focus:ring-sky-500"
                           checked={newUser.roles.includes(r.id)}
                           onChange={() => setNewUser({...newUser, roles: toggleRole(newUser.roles, r.id)})}
                         />
-                        <span className="text-xs font-black text-slate-900 group-hover:text-sky-600 transition-colors uppercase tracking-tight">{r.label}</span>
+                        <span className="text-xs font-black text-white group-hover:text-sky-400 transition-colors uppercase tracking-tight">{r.label}</span>
                       </label>
                       {newUser.roles.includes(r.id) && r.id !== 'admin' && (
-                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-slate-100 mt-2">
+                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-[#1E293B] mt-2">
                            <div className="flex flex-wrap items-center gap-4">
                              <label className="flex items-center gap-1.5 cursor-pointer" title="Solo puede ver y descargar. No puede ingresar ni borrar.">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-slate-300 text-sky-500"
+                                 className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-sky-500"
                                  checked={newUser.permissions?.[r.id]?.readonly ?? false}
                                  onChange={(e) => {
                                    const perms = { ...newUser.permissions };
@@ -342,12 +342,12 @@ function UsersManager() {
                                    setNewUser({ ...newUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-black text-sky-600 uppercase">SOLO LECTOR</span>
+                               <span className="text-[10px] font-black text-sky-400 uppercase">SOLO LECTOR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-slate-300 text-amber-500"
+                                 className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-amber-500"
                                  checked={newUser.permissions?.[r.id]?.edit ?? true}
                                  disabled={newUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -356,12 +356,12 @@ function UsersManager() {
                                    setNewUser({ ...newUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-700 uppercase">EDITAR</span>
+                               <span className="text-[10px] font-bold text-slate-300 uppercase">EDITAR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-slate-300 text-red-500"
+                                 className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-red-500"
                                  checked={newUser.permissions?.[r.id]?.delete ?? true}
                                  disabled={newUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -370,13 +370,13 @@ function UsersManager() {
                                    setNewUser({ ...newUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-700 uppercase">BORRAR</span>
+                               <span className="text-[10px] font-bold text-slate-300 uppercase">BORRAR</span>
                              </label>
                            </div>
 
                           {SUB_MODULES[r.id] && (
                             <div className="mt-2">
-                              <span className="text-[10px] font-black text-slate-500 uppercase block mb-1 tracking-widest border-b border-slate-200 pb-1">Sub-módulos</span>
+                              <span className="text-[10px] font-black text-slate-400 uppercase block mb-1 tracking-widest border-b border-[#1E293B] pb-1">Sub-módulos</span>
                               <div className="flex flex-col gap-1.5 mt-2">
                                 {SUB_MODULES[r.id].map(sub => {
                                   const currentAllowed = newUser.allowedSubmodules?.[r.id];
@@ -385,7 +385,7 @@ function UsersManager() {
                                     <label key={sub.id} className="flex items-center gap-2 cursor-pointer mt-1">
                                       <input 
                                         type="checkbox" 
-                                        className="w-4 h-4 rounded border-slate-300 text-sky-600"
+                                        className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-sky-600"
                                         checked={isChecked}
                                         onChange={(e) => {
                                           const allowed = { ...(newUser.allowedSubmodules || {}) };
@@ -401,7 +401,7 @@ function UsersManager() {
                                           setNewUser({ ...newUser, allowedSubmodules: allowed });
                                         }}
                                       />
-                                      <span className="text-[11px] font-bold text-slate-700 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
+                                      <span className="text-[11px] font-bold text-slate-300 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
                                     </label>
                                   );
                                 })}
@@ -421,14 +421,14 @@ function UsersManager() {
         )}
 
         {editingUser && (
-          <form className="p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-300" onSubmit={handleUpdate}>
+          <form className="p-6 bg-[#111A2E] border-b border-[#1E293B] grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-300 text-white" onSubmit={handleUpdate}>
             <div className="md:col-span-3 flex justify-between items-center mb-2">
-              <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest italic">Editando Acceso: <span className="text-sky-600">{editingUser.email}</span></h4>
-              <button type="button" onClick={() => setEditingUser(null)} className="text-[10px] font-black text-slate-500 hover:text-red-600 uppercase cursor-pointer">Cerrar edición</button>
+              <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Editando Acceso: <span className="text-sky-400">{editingUser.email}</span></h4>
+              <button type="button" onClick={() => setEditingUser(null)} className="text-[10px] font-black text-slate-400 hover:text-red-400 uppercase cursor-pointer">Cerrar edición</button>
             </div>
             <FormField label="Nombre Completo">
               <input 
-                className="w-full border border-slate-300 bg-white rounded-xl p-3 text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
+                className="w-full border border-[#1E293B] bg-[#152035] rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                 value={editingUser.displayName} 
                 onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} 
               />
@@ -438,7 +438,7 @@ function UsersManager() {
                 <input 
                   type="text"
                   placeholder="Vacío para mantener"
-                  className="w-full border border-slate-300 bg-white rounded-xl p-3 text-sm font-mono text-slate-900 focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
+                  className="w-full border border-[#1E293B] bg-[#152035] rounded-xl p-3 text-sm font-mono text-white focus:ring-2 focus:ring-sky-500 outline-none transition-all shadow-sm" 
                   value={newPass} 
                   onChange={e => setNewPass(e.target.value)} 
                 />
@@ -447,22 +447,22 @@ function UsersManager() {
             </FormField>
             <div className="md:col-span-1">
                <div className="flex justify-between items-center mb-3">
-                 <label className="text-[10px] font-black uppercase text-slate-700 tracking-widest block">Atribuciones</label>
+                 <label className="text-[10px] font-black uppercase text-slate-300 tracking-widest block">Atribuciones</label>
                  <button 
                    type="button" 
                    onClick={() => setEditingUser({...editingUser, roles: availableRoles.map(ar => ar.id)})}
-                   className="text-[9px] font-black text-sky-600 hover:underline uppercase cursor-pointer"
+                   className="text-[9px] font-black text-sky-400 hover:underline uppercase cursor-pointer"
                  >
                    Acceso Total
                  </button>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {availableRoles.map(r => (
-                    <div key={r.id} className="space-y-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm">
+                    <div key={r.id} className="space-y-2 p-2 rounded-xl bg-[#152035] border border-[#1E293B] shadow-sm">
                       <label className="flex items-center gap-2 cursor-pointer group">
                         <input 
                           type="checkbox" 
-                          className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-sky-600 focus:ring-sky-500"
                           checked={(editingUser.roles || [editingUser.role]).includes(r.id)}
                           onChange={() => {
                             const current = editingUser.roles || [editingUser.role];
@@ -470,15 +470,15 @@ function UsersManager() {
                             setEditingUser({...editingUser, roles: newRoles});
                           }}
                         />
-                        <span className="text-[12px] font-black text-slate-900 group-hover:text-sky-600 transition-colors uppercase tracking-widest">{r.label}</span>
+                        <span className="text-[12px] font-black text-white group-hover:text-sky-400 transition-colors uppercase tracking-widest">{r.label}</span>
                       </label>
                       {(editingUser.roles || [editingUser.role]).includes(r.id) && r.id !== 'admin' && (
-                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-slate-100 mt-2">
+                        <div className="flex flex-col gap-2 pl-6 pt-2 border-t border-[#1E293B] mt-2">
                            <div className="flex flex-wrap items-center gap-4">
                              <label className="flex items-center gap-1.5 cursor-pointer" title="Solo puede ver y descargar. No puede ingresar ni borrar.">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-slate-300 text-sky-500"
+                                 className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-sky-500"
                                  checked={editingUser.permissions?.[r.id]?.readonly ?? false}
                                  onChange={(e) => {
                                    const perms = { ...editingUser.permissions };
@@ -491,12 +491,12 @@ function UsersManager() {
                                    setEditingUser({ ...editingUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-black text-sky-600 uppercase">SOLO LECTOR</span>
+                               <span className="text-[10px] font-black text-sky-400 uppercase">SOLO LECTOR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-slate-300 text-amber-500"
+                                 className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-amber-500"
                                  checked={editingUser.permissions?.[r.id]?.edit ?? true}
                                  disabled={editingUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -505,12 +505,12 @@ function UsersManager() {
                                    setEditingUser({ ...editingUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-700 uppercase">EDITAR</span>
+                               <span className="text-[10px] font-bold text-slate-300 uppercase">EDITAR</span>
                              </label>
                              <label className="flex items-center gap-1.5 cursor-pointer">
                                <input 
                                  type="checkbox" 
-                                 className="w-4 h-4 rounded border-slate-300 text-red-500"
+                                 className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-red-500"
                                  checked={editingUser.permissions?.[r.id]?.delete ?? true}
                                  disabled={editingUser.permissions?.[r.id]?.readonly}
                                  onChange={(e) => {
@@ -519,13 +519,13 @@ function UsersManager() {
                                    setEditingUser({ ...editingUser, permissions: perms });
                                  }}
                                />
-                               <span className="text-[10px] font-bold text-slate-700 uppercase">BORRAR</span>
+                               <span className="text-[10px] font-bold text-slate-300 uppercase">BORRAR</span>
                              </label>
                            </div>
                           
                           {SUB_MODULES[r.id] && (
                             <div className="mt-2">
-                              <span className="text-[11px] font-black text-slate-500 uppercase block mb-2 tracking-widest border-b border-slate-200 pb-1">Sub-módulos Permitidos</span>
+                              <span className="text-[11px] font-black text-slate-400 uppercase block mb-2 tracking-widest border-b border-[#1E293B] pb-1">Sub-módulos Permitidos</span>
                               {SUB_MODULES[r.id].map(sub => {
                                 const currentAllowed = editingUser.allowedSubmodules?.[r.id];
                                 const isChecked = !currentAllowed || currentAllowed.includes(sub.id);
@@ -533,7 +533,7 @@ function UsersManager() {
                                   <label key={sub.id} className="flex items-center gap-2 cursor-pointer mt-1.5">
                                     <input 
                                       type="checkbox" 
-                                      className="w-4 h-4 rounded border-slate-300 text-sky-600"
+                                      className="w-4 h-4 rounded border-[#1E293B] bg-[#111A2E] text-sky-600"
                                       checked={isChecked}
                                       onChange={(e) => {
                                         const allowed = { ...(editingUser.allowedSubmodules || {}) };
@@ -549,7 +549,7 @@ function UsersManager() {
                                         setEditingUser({ ...editingUser, allowedSubmodules: allowed });
                                       }}
                                     />
-                                    <span className="text-[11px] font-bold text-slate-700 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
+                                    <span className="text-[11px] font-bold text-slate-300 uppercase truncate leading-tight" title={sub.label}>{sub.label}</span>
                                   </label>
                                 );
                               })}
@@ -561,11 +561,11 @@ function UsersManager() {
                   ))}
                </div>
             </div>
-            <div className="md:col-span-3 flex items-center justify-end gap-3 mt-4 pt-6 border-t border-slate-200">
+            <div className="md:col-span-3 flex items-center justify-end gap-3 mt-4 pt-6 border-t border-[#1E293B]">
               <button 
                 type="submit" 
                 disabled={!!savingId}
-                className="px-10 bg-slate-900 text-white hover:bg-slate-800 py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                className="px-10 bg-slate-900 text-white hover:bg-slate-800 py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer border border-[#1E293B]"
               >
                 {savingId ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-sky-400" />}
                 {savingId ? 'PROCESANDO...' : 'ACTUALIZAR SISTEMA'}
@@ -574,10 +574,10 @@ function UsersManager() {
           </form>
         )}
 
-        <div className="overflow-x-auto bg-white">
+        <div className="overflow-x-auto bg-[#152035]">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-100 text-left border-b border-slate-200 font-black text-slate-600 uppercase tracking-widest">
+              <tr className="bg-[#111A2E] text-left border-b border-[#1E293B] font-black text-slate-300 uppercase tracking-widest">
                 <th className="p-5">Usuario / Identificación</th>
                 <th className="p-5">Nombre Profesional</th>
                 <th className="p-5 text-center">Privilegios Concedidos</th>
@@ -585,11 +585,11 @@ function UsersManager() {
                 <th className="p-5 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-[#1E293B]">
               {users.map(u => (
-                <tr key={u.email} className="group hover:bg-slate-50 transition-colors">
-                  <td className="p-5 font-black text-slate-900 italic">{u.email}</td>
-                  <td className="p-5 font-bold text-slate-700 tracking-tight">{u.displayName}</td>
+                <tr key={u.email} className="group hover:bg-[#111A2E] transition-colors border-l-4 border-[#1E293B] hover:border-sky-500">
+                  <td className="p-5 font-black text-white italic">{u.email}</td>
+                  <td className="p-5 font-bold text-slate-200 tracking-tight">{u.displayName}</td>
                   <td className="p-5 text-center">
                     <div className="flex flex-wrap gap-1.5 justify-center max-w-[300px] mx-auto">
                       {(u.roles || [u.role || 'viewer']).map((roleId: string) => {
@@ -597,7 +597,7 @@ function UsersManager() {
                         return (
                           <span key={roleId} className={cn(
                             "px-2.5 py-1 rounded-md text-[8px] font-black uppercase tracking-widest border shadow-sm transition-transform hover:scale-105",
-                            roleId === 'admin' ? "bg-red-50 text-red-700 border-red-200" : "bg-sky-50 text-sky-700 border-sky-200"
+                            roleId === 'admin' ? "bg-red-950/80 text-red-300 border-red-800" : "bg-sky-950/80 text-sky-300 border-sky-800"
                           )}>
                             {roleObj?.label || roleId}
                           </span>
@@ -606,7 +606,7 @@ function UsersManager() {
                     </div>
                   </td>
                   <td className="p-5 text-center">
-                    <span className="font-mono text-slate-700 group-hover:text-amber-700 transition-colors text-[10px] font-bold bg-slate-100 group-hover:bg-amber-50 px-3 py-1 rounded-full border border-slate-200 group-hover:border-amber-200">{u.pass}</span>
+                    <span className="font-mono text-slate-300 group-hover:text-amber-300 transition-colors text-[10px] font-bold bg-[#111A2E] group-hover:bg-amber-950/80 px-3 py-1 rounded-full border border-[#1E293B] group-hover:border-amber-800">{u.pass}</span>
                   </td>
                   <td className="p-5 text-center">
                     <RecordActions 
