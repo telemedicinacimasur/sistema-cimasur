@@ -474,7 +474,13 @@ export const Expediente: React.FC<ExpedienteProps> = ({
     .filter(Boolean);
 
   return (
-    <div className="bg-[#0b101d] rounded-2xl shadow-2xl overflow-hidden border border-[#1e293b] flex flex-col font-sans max-w-7xl mx-auto w-full animate-in fade-in duration-300">
+    <div 
+      className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 lg:p-6 overflow-y-auto animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-[#0b101d] rounded-2xl shadow-2xl overflow-hidden border border-[#1e293b] flex flex-col font-sans max-w-7xl mx-auto w-full my-auto animate-in zoom-in-95 duration-200 max-h-[92vh]">
       
       {/* DOSSIER HEADER */}
       <div className="bg-[#0e172a] text-white border-b border-[#1e293b] p-6 lg:p-8 relative">
@@ -505,7 +511,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
           <div className="flex items-center gap-3 w-full lg:w-auto">
             <button 
               onClick={onClose} 
-              className="bg-slate-800 hover:bg-slate-700/80 text-slate-300 pr-5 pl-4 py-2.5 rounded-xl text-xs font-bold uppercase transition flex items-center gap-2 cursor-pointer border border-[#1e293b] w-full lg:w-auto justify-center"
+              className="bg-slate-800 hover:bg-slate-700/80 text-slate-300 pr-5 pl-4 py-2.5 rounded-xl text-xs font-bold uppercase transition flex items-center gap-2 cursor-pointer border border-[#1e293b] w-full lg:w-auto justify-center shadow-md"
             >
               <X className="w-4 h-4" /> Volver a la Lista
             </button>
@@ -514,7 +520,7 @@ export const Expediente: React.FC<ExpedienteProps> = ({
       </div>
 
       {/* DOSSIER CONTENT - FIXED DOUBLE COLUMN WITH HIGH DENSITY & VISUAL QUALITY */}
-      <div className="p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 overflow-y-auto max-h-[85vh] custom-scrollbar">
+      <div className="p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 overflow-y-auto max-h-[calc(92vh-110px)] custom-scrollbar">
         
         {/* COLUMN 1: DATOS MAESTROS Y AVANCES (lg:col-span-7) */}
         <div className="lg:col-span-7 space-y-6">
@@ -1265,5 +1271,6 @@ export const Expediente: React.FC<ExpedienteProps> = ({
       </div>
 
     </div>
+  </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { localDB, addAuditLog } from '../lib/auth';
+import { localDB, localAuth, addAuditLog } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, formatDate, safe, parseExcelDate, formatCurrency } from '../lib/utils';
 import { exportTableToPDF, exportExpedienteToPDF, viewExpedienteInNewTab } from '../lib/pdfUtils';
@@ -39,7 +39,8 @@ import {
   Filter,
   ChevronDown,
   ChevronUp,
-  ChevronRight
+  ChevronRight,
+  MessageSquare
 } from 'lucide-react';
 
 import { RecordActions } from '../components/RecordActions';
@@ -110,13 +111,20 @@ export default function SchoolView() {
 
   
 
-  const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities' | 'commercial'>('register');
+  const [activeView, setActiveView] = useState<'register' | 'students' | 'tracking' | 'activities' | 'commercial' | 'campaigns'>('register');
+  const [trackingFilter, setTrackingFilter] = useState<'all' | 'leads' | 'students'>('all');
   const [data, setData] = useState<any[]>([]);
+
+  const handleNavigateToTracking = (filterTab: 'all' | 'leads' | 'students' = 'leads') => {
+    setTrackingFilter(filterTab);
+    setActiveView('tracking');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     const loadData = async () => {
-      const colName = activeView === 'students' ? 'students' : 'school_leads';
-      if (activeView === 'students') {
+      const colName = (activeView === 'students' || activeView === 'campaigns') ? 'students' : 'school_leads';
+      if (activeView === 'students' || activeView === 'campaigns') {
         await syncStudentsToSchoolPayments();
       }
       const result = await localDB.getCollection(colName);
@@ -151,7 +159,7 @@ export default function SchoolView() {
           <h2 className="text-3xl font-black text-sky-400 tracking-tight">Centro Académico CIMASUR</h2>
           <p className="text-sky-400 text-sm">Ecosistema integrado de captación, formación y seguimiento.</p>
         </div>
-        <div className="flex bg-[#111A2E] p-1 rounded-2xl border border-[#1E293B]">
+        <div className="flex bg-[#111A2E] p-1 rounded-2xl border border-[#1E293B] flex-wrap gap-1">
            {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('register')) && <TabButton active={activeView === 'register'} onClick={() => setActiveView('register')} icon={UserPlus}>Captación</TabButton>}
            {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('students')) && <TabButton active={activeView === 'students'} onClick={() => setActiveView('students')} icon={GraduationCap}>Alumnos</TabButton>}
            {(!user?.allowedSubmodules?.school || user.allowedSubmodules.school.includes('tracking')) && <TabButton active={activeView === 'tracking'} onClick={() => setActiveView('tracking')} icon={LineChart}>Vista 360°</TabButton>}
@@ -161,9 +169,9 @@ export default function SchoolView() {
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {activeView === 'register' && <ContactRegister records={data} />}
+        {activeView === 'register' && <ContactRegister records={data} onNavigateToTracking={handleNavigateToTracking} />}
         {activeView === 'students' && <StudentManager records={data} />}
-        {activeView === 'tracking' && <TrackingView />}
+        {activeView === 'tracking' && <TrackingView initialFilter={trackingFilter} />}
         {activeView === 'commercial' && <CampaignsMotor />}
         {activeView === 'activities' && <SchoolActivities />}
       </div>
@@ -186,7 +194,13 @@ function TabButton({ active, onClick, icon: Icon, children }: any) {
   );
 }
 
-function ContactRegister({ records }: { records: any[] }) {
+function ContactRegister({ 
+  records,
+  onNavigateToTracking 
+}: { 
+  records: any[],
+  onNavigateToTracking?: (filterTab: 'all' | 'leads' | 'students') => void
+}) {
   const { user } = useAuth();
   const userRoles = user?.roles || [user?.role || "viewer"];
   const hasFullAccess = userRoles.includes("admin");
@@ -903,24 +917,22 @@ function ContactRegister({ records }: { records: any[] }) {
                         </button>
                         <button 
                           onClick={async () => {
-                            if (true) {
-                              await localDB.saveToCollection('contacts', {
-                                name: r.name,
-                                rut: r.rut,
-                                email: r.email,
-                                phone: r.phone,
-                                type: 'Lead',
-                                origin: 'Escuela CIMASUR',
-                                date: new Date().toISOString()
-                              });
-                              await localDB.deleteFromCollection('school_leads', r.id);
-                              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
-                              window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
-                              alert('Transferido a Leads (CRM General)');
+                            await localDB.updateInCollection('school_leads', r.id, {
+                              type: 'Lead',
+                              estado: r.estado || 'Lead Activo',
+                              fecha: r.fecha || new Date().toISOString().split('T')[0]
+                            });
+                            const currentUser = localAuth.getCurrentUser() || user;
+                            if (currentUser) {
+                              await addAuditLog(currentUser, `Visualizó/Derivó Lead a Vista 360°: ${r.name}`, 'Escuela');
+                            }
+                            window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
+                            if (onNavigateToTracking) {
+                              onNavigateToTracking('leads');
                             }
                           }}
                           className="text-emerald-400 group-hover:text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-black text-[9px] uppercase tracking-widest hover:underline flex items-center gap-1 bg-[#111A2E] p-1.5 rounded"
-                          title="Pasar a Leads (CRM)"
+                          title="Ver en Leads (Vista 360°)"
                         >
                           <UserPlus className="w-3 h-3" /> Pasar a Leads
                         </button>
@@ -1072,6 +1084,10 @@ function StudentManager({ records }: { records: any[] }) {
   const [filterPago, setFilterPago] = useState('Todos');
   const [filterEstadoAcademico, setFilterEstadoAcademico] = useState('Todos');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isMonthlyModalOpen, setIsMonthlyModalOpen] = useState(false);
+  const [targetStudentForMonthly, setTargetStudentForMonthly] = useState<any>(null);
+  const [monthlyProgVal, setMonthlyProgVal] = useState(0);
+  const [monthlyProgComment, setMonthlyProgComment] = useState('');
   
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({
     'DIPLOMADO': true,
@@ -1547,6 +1563,18 @@ function StudentManager({ records }: { records: any[] }) {
                                           <Download className="w-3 h-3" />
                                         </button>
                                         <button 
+                                          onClick={() => {
+                                            setTargetStudentForMonthly(s);
+                                            setMonthlyProgVal(s.avance || 0);
+                                            setMonthlyProgComment('');
+                                            setIsMonthlyModalOpen(true);
+                                          }}
+                                          className="text-emerald-400 hover:underline font-bold text-[8px] uppercase tracking-widest flex items-center gap-1 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/50"
+                                          title="Registrar Avance Mensual"
+                                        >
+                                           📊 Avance
+                                        </button>
+                                        <button 
                                           onClick={() => setSelectedStudent(s)}
                                           className="text-[#38BDF8] hover:underline font-bold text-[8px] uppercase tracking-widest flex items-center gap-1 bg-[#152035] px-2 py-0.5 rounded border border-[#1E293B]"
                                         >
@@ -1575,13 +1603,19 @@ function StudentManager({ records }: { records: any[] }) {
   );
 }
 
-function TrackingView() {
-  const [filter, setFilter] = useState<'all' | 'leads' | 'students'>('all');
+function TrackingView({ initialFilter = 'all' }: { initialFilter?: 'all' | 'leads' | 'students' }) {
+  const [filter, setFilter] = useState<'all' | 'leads' | 'students'>(initialFilter);
   const [search, setSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<any>(null);
   
   const [leads, setLeads] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (initialFilter) {
+      setFilter(initialFilter);
+    }
+  }, [initialFilter]);
 
   useEffect(() => {
     const loadTrackingData = async () => {
@@ -1624,8 +1658,21 @@ function TrackingView() {
 
   const paginatedCombined = combined.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const lowProgCount = students.filter(s => (s.avance || 0) === 0).length;
+
   return (
     <div className="space-y-6">
+      {lowProgCount > 0 && (
+        <div className="bg-amber-950/30 border border-amber-500/30 p-4 rounded-2xl flex items-center justify-between gap-4 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold shrink-0">⚠️</div>
+            <div>
+              <h4 className="text-xs font-black text-amber-400 uppercase tracking-wider">Alerta de Alumnos sin Avance ({lowProgCount})</h4>
+              <p className="text-[11px] text-slate-300">Se han detectado alumnos con 0% de avance en sus cursos. Registre avance mensual o envíe un recordatorio.</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bg-[#152035] p-6 rounded-2xl border border-[#1E293B] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col md:flex-row justify-between items-center gap-4">
          <div className="flex gap-2 p-1 bg-[#111A2E] rounded-2xl border border-[#1E293B]">
             <button 

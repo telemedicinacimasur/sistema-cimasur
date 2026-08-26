@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn, safe } from '../../lib/utils';
 import * as XLSX from 'xlsx';
 import { exportTableToPDF } from '../../lib/pdfUtils';
+import { Pagination } from '../../components/Pagination';
 
 type MainTab = 'SALINA CS' | 'ETANOL CS' | 'ADE CS' | 'DILUCIONES CIMASUR' | 'GOTAS PURAS' | 'ALTAS DILUCIONES' | 'NOSODES CLIENTES' | 'FÓRMULAS MAGISTRALES' | 'EC DR. CONEJEROS' | 'MATRIZ COMPLETA';
 type SubModule = 'dashboard' | 'codigos' | 'DILUCIONES CIMASUR' | 'GOTAS PURAS' | 'ALTAS DILUCIONES' | 'NOSODES CLIENTES' | 'FÓRMULAS MAGISTRALES' | 'EC DR. CONEJEROS';
@@ -1375,6 +1376,14 @@ export default function CimasurInventoryManager() {
   };
 
   const filtered = getFilteredRecords();
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeModule, activeTab, activeCategory, searchTerm]);
+
+  const paginatedFiltered = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const modules = [
     { id: 'codigos' as SubModule, label: 'Códigos de Barra', desc: 'Módulo Maestro (Salina, Etanol, ADE)', icon: Hash, bg: 'bg-[#1E293B]', text: 'text-[#38BDF8]' },
@@ -1677,8 +1686,8 @@ export default function CimasurInventoryManager() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {filtered.length > 0 ? (
-                    filtered.map((r, i) => {
+                  {paginatedFiltered.length > 0 ? (
+                    paginatedFiltered.map((r, i) => {
                       const rowVals = getRowForTab(r, activeTab);
                       const isDup = !!r.es_duplicado;
                       return (
@@ -1771,9 +1780,15 @@ export default function CimasurInventoryManager() {
             </div>
             <div className="bg-[#111A2E] p-3 border-t text-[10px] uppercase font-black tracking-widest text-white flex justify-between">
               <span>Base: {activeTab.replace(' CS', '')} {isBaseModule && `> ${activeCategory}`}</span>
-              <span>{filtered.length} registros</span>
+              <span>Mostrando {filtered.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} a {Math.min(currentPage * pageSize, filtered.length)} de {filtered.length} registros</span>
             </div>
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
           </div>
         </>
       )}

@@ -86,17 +86,18 @@ export default function LabView() {
 
   const [activeForm, setActiveForm] = useState<LabFormType>('default');
   const [records, setRecords] = useState<any[]>([]);
-
+  
   
 
-  // Generic data fetching for the active form from localDB
+  // Generic data fetching with real-time onSnapshot for Lab modules (Stock, Lab Records, Magistrales)
   useEffect(() => {
-    if (activeForm === 'default') return;
+    if (activeForm === 'default' || activeForm === 'tracking') return;
 
     let collectionName = 'lab_records';
     if (activeForm === 'stock') collectionName = 'inventory';
-    if (activeForm === 'tracking') collectionName = 'order_tracking';
     if (activeForm === 'magistrales') collectionName = 'lab_records';
+
+    let unsubscribe: (() => void) | null = null;
 
     const loadData = async () => {
       try {
@@ -108,15 +109,48 @@ export default function LabView() {
       }
     };
 
-    loadData();
+    if (isFirebaseReady()) {
+      const db = getDb();
+      if (db) {
+        try {
+          const q = query(collection(db, collectionName), limit(500));
+          unsubscribe = onSnapshot(q, (snapshot) => {
+            const docs = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setRecords(docs);
+          }, (err) => {
+            console.warn(`Firestore ${collectionName} onSnapshot fallback:`, err);
+            loadData();
+          });
+          if (unsubscribe) {
+            registerListener(unsubscribe);
+          }
+        } catch (err) {
+          console.error(`Firestore ${collectionName} query setup error:`, err);
+          loadData();
+        }
+      } else {
+        loadData();
+      }
+    } else {
+      loadData();
+    }
+
     const handleDbChange = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (!detail?.collection || detail.collection === collectionName) {
-        loadData();
+        if (!isFirebaseReady()) {
+          loadData();
+        }
       }
     };
     window.addEventListener('db-change', handleDbChange);
-    return () => window.removeEventListener('db-change', handleDbChange);
+    return () => {
+      if (unsubscribe) unsubscribe();
+      window.removeEventListener('db-change', handleDbChange);
+    };
   }, [activeForm]);
 
   const handleBack = () => setActiveForm('default');
@@ -3884,6 +3918,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   const [showPOModal, setShowPOModal] = useState(false);
   const [poItems, setPoItems] = useState<any[]>([]);
   const [poEncargado, setPoEncargado] = useState('ADMINISTRACION');
+  const [poMesAnio, setPoMesAnio] = useState('');
   const [poSelectedAreas, setPoSelectedAreas] = useState<string[]>(['TODAS']);
   const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
   const [showPOHistory, setShowPOHistory] = useState(false);
@@ -3891,11 +3926,42 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   const [editingPOId, setEditingPOId] = useState<string | null>(null);
 
   useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
     const loadPOs = async () => {
       const data = await localDB.getCollection('purchase_orders');
       setPurchaseOrders(data || []);
     };
-    loadPOs();
+    if (isFirebaseReady()) {
+      const db = getDb();
+      if (db) {
+        try {
+          const q = query(collection(db, 'purchase_orders'), limit(200));
+          unsubscribe = onSnapshot(q, (snapshot) => {
+            const docs = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setPurchaseOrders(docs);
+          }, (err) => {
+            console.warn("Firestore purchase_orders onSnapshot fallback:", err);
+            loadPOs();
+          });
+          if (unsubscribe) {
+            registerListener(unsubscribe);
+          }
+        } catch (err) {
+          console.error("Firestore purchase_orders query setup error:", err);
+          loadPOs();
+        }
+      } else {
+        loadPOs();
+      }
+    } else {
+      loadPOs();
+    }
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const areas = useMemo(() => {
@@ -4000,6 +4066,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   };
 
   useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
     const loadFollowups = async () => {
       try {
         const folData = await localDB.getCollection('stock_followups');
@@ -4009,15 +4076,47 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
         setFollowups([]);
       }
     };
-    loadFollowups();
+    if (isFirebaseReady()) {
+      const db = getDb();
+      if (db) {
+        try {
+          const q = query(collection(db, 'stock_followups'), limit(200));
+          unsubscribe = onSnapshot(q, (snapshot) => {
+            const docs = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setFollowups(docs);
+          }, (err) => {
+            console.warn("Firestore stock_followups onSnapshot fallback:", err);
+            loadFollowups();
+          });
+          if (unsubscribe) {
+            registerListener(unsubscribe);
+          }
+        } catch (err) {
+          console.error("Firestore stock_followups query setup error:", err);
+          loadFollowups();
+        }
+      } else {
+        loadFollowups();
+      }
+    } else {
+      loadFollowups();
+    }
     const handleDbChange = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (!detail?.collection || detail.collection === 'stock_followups') {
-        loadFollowups();
+        if (!isFirebaseReady()) {
+          loadFollowups();
+        }
       }
     };
     window.addEventListener('db-change', handleDbChange);
-    return () => window.removeEventListener('db-change', handleDbChange);
+    return () => {
+      if (unsubscribe) unsubscribe();
+      window.removeEventListener('db-change', handleDbChange);
+    };
   }, []);
 
   const handleDeleteItem = async (id: string) => {
@@ -4453,6 +4552,9 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                     }
                     
                     setPoSelectedAreas([selectedArea === 'TODAS' ? 'TODAS' : selectedArea]);
+                    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                    const date = new Date();
+                    setPoMesAnio(`${monthNames[date.getMonth()]} ${date.getFullYear()}`);
                     setPoItems(itemsToBuy.map(r => ({
                       id: r.id,
                       item: r.item || '',
@@ -4815,7 +4917,16 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
             </div>
             
             <div className="p-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 relative z-30">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 relative z-30">
+                <FormField label="Mes / Año">
+                  <input
+                    type="text"
+                    value={poMesAnio}
+                    onChange={e => setPoMesAnio(e.target.value)}
+                    className="w-full bg-[#111A2E] text-white border border-[#1E293B] rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-bold text-sky-400"
+                    placeholder="Ej. Agosto 2026"
+                  />
+                </FormField>
                 <FormField label="Encargado">
                   <input
                     type="text"
@@ -4847,11 +4958,12 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                         <div 
                           className="px-3 py-2 border-b border-[#1E293B] hover:bg-[#15233C] cursor-pointer flex items-center gap-2"
                           onClick={() => {
+                            const existingMap = new Map(poItems.map(i => [i.id, i.reposicion]));
                             const newAreas = ['TODAS'];
                             setPoSelectedAreas(newAreas);
                             const itemsForNewArea = inventoryRecords.filter(r => (Number(r.qty) || 0) <= getRecordAlertaThreshold(r));
                             setPoItems(itemsForNewArea.map(r => ({
-                              id: r.id, item: r.item || '', code: r.code || '', qty: r.qty || '0', alerta: getRecordAlertaThreshold(r), area: r.area || '', reposicion: ''
+                              id: r.id, item: r.item || '', code: r.code || '', qty: r.qty || '0', alerta: getRecordAlertaThreshold(r), area: r.area || '', reposicion: existingMap.get(r.id) || ''
                             })));
                           }}
                         >
@@ -4885,8 +4997,9 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                                   (newAreas.includes('TODAS') || newAreas.includes(r.area)) && 
                                   (Number(r.qty) || 0) <= getRecordAlertaThreshold(r)
                                 );
+                                const existingMap = new Map(poItems.map(i => [i.id, i.reposicion]));
                                 setPoItems(itemsForNewArea.map(r => ({
-                                  id: r.id, item: r.item || '', code: r.code || '', qty: r.qty || '0', alerta: getRecordAlertaThreshold(r), area: r.area || '', reposicion: ''
+                                  id: r.id, item: r.item || '', code: r.code || '', qty: r.qty || '0', alerta: getRecordAlertaThreshold(r), area: r.area || '', reposicion: existingMap.get(r.id) || ''
                                 })));
                               }}
                             >
@@ -4971,7 +5084,8 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                 onClick={async () => {
                   const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
                   const date = new Date();
-                  const mesAnio = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+                  const defaultMesAnio = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+                  const mesAnio = poMesAnio || defaultMesAnio;
                   
                   const filteredItemsToExport = poItems.filter(i => i.reposicion && i.reposicion !== '0');
                   const finalItemsToExport = filteredItemsToExport.length > 0 ? filteredItemsToExport : poItems;
@@ -5114,6 +5228,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
                                 setEditingPOId(order.id);
                                 setPoSelectedAreas(order.area === 'TODAS' ? ['TODAS'] : (order.area || '').split(', '));
                                 setPoEncargado(order.encargado || 'ADMINISTRACION');
+                                setPoMesAnio(order.mesAnio || '');
                                 setPoItems(order.items || []);
                                 setShowPOHistory(false);
                                 setShowPOModal(true);
@@ -5214,6 +5329,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
 
   // Optimización y Filtro por Defecto: Ocultar 'OK' / 'ENTREGADO' por defecto
   const [showCompleted, setShowCompleted] = useState<boolean>(false);
+  const [showOptimizationModal, setShowOptimizationModal] = useState<boolean>(false);
 
   // Paginación Numerada (20 registros por página)
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -5986,8 +6102,28 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
             </div>
           </div>
 
-          {/* Toggle para Mostrar/Ocultar 'OK' y 'Entregado' */}
-          <div className="flex items-center gap-2">
+          {/* Toggle para Mostrar/Ocultar 'OK' y 'Entregado' y Botón de Engranaje de Optimización */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowOptimizationModal(true)}
+              className={cn(
+                "relative text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all cursor-pointer shadow-sm",
+                oldTrackingRecordsCount > 0 
+                  ? "bg-amber-950/40 text-amber-400 border-amber-600/50 hover:bg-amber-900/40 animate-pulse" 
+                  : "bg-[#152035] text-slate-300 border-[#1E293B] hover:bg-[#1E293B] hover:text-white"
+              )}
+              title="Asistente de Optimización y Limpieza de Registros Antiguos (> 3 meses)"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Optimización BD</span>
+              {oldTrackingRecordsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-red-400 animate-bounce">
+                  {oldTrackingRecordsCount}
+                </span>
+              )}
+            </button>
+            
             <button
               type="button"
               onClick={() => {
@@ -6008,45 +6144,76 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
           </div>
         </div>
         
-        {/* Panel de Control y Asistente de Optimización de Lectura */}
-        <div className="p-6 bg-gradient-to-r from-blue-950/40 via-slate-900/40 to-slate-950/40 border-b border-[#1E293B] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in slide-in-from-top-3 duration-300">
-          <div className="space-y-1.5 max-w-2xl">
-            <h4 className="text-xs font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              Asistente de Optimización de Tiempos de Carga
-            </h4>
-            <p className="text-xs text-white leading-relaxed">
-              El historial de <strong>Seguimiento de Pedidos, Trazabilidad, Courier y Estados de Envío</strong> se puede alivianar de forma segura. Se recomienda borrar registros viejos (superior a 3 meses) para acelerar las lecturas en la plataforma.
-            </p>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
-              <span className="text-emerald-400 font-bold">🔒 Administración Protegida:</span>
-              <span>Las cotizaciones, facturas, clientes y presupuestos históricos antiguos <strong>no se alteran ni eliminan</strong>.</span>
+        {/* Modal de Asistente de Optimización de Tiempos de Carga (Oculto en Engranaje) */}
+        {showOptimizationModal && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-[#152035] border border-[#1E293B] rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-6 relative">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500">
+                    <Settings className="w-5 h-5 animate-spin-slow" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">Asistente de Optimización de Tiempos de Carga</h3>
+                    <p className="text-[10px] text-slate-400">Limpieza segura de registros históricos de logística</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowOptimizationModal(false)}
+                  className="w-8 h-8 rounded-full bg-[#111A2E] border border-[#1E293B] flex items-center justify-center text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  El historial de <strong>Seguimiento de Pedidos, Trazabilidad, Courier y Estados de Envío</strong> se puede alivianar de forma segura. Se recomienda borrar registros viejos (superior a 3 meses) para acelerar las lecturas en la plataforma y evitar sobrepasar límites.
+                </p>
+
+                <div className="bg-[#111A2E] p-4 rounded-2xl border border-[#1E293B] flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Registros con Antigüedad &gt; 3 meses:</span>
+                    <span className="text-xs text-amber-400 font-bold">Listos para depuración segura</span>
+                  </div>
+                  <span className={cn(
+                    "px-3 py-1 text-xs font-black rounded-lg border",
+                    oldTrackingRecordsCount > 0 ? "bg-amber-950 text-amber-400 border-amber-800 animate-pulse" : "bg-emerald-950 text-emerald-400 border-emerald-800"
+                  )}>
+                    {oldTrackingRecordsCount} {oldTrackingRecordsCount === 1 ? 'registro' : 'registros'}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 bg-emerald-950/20 p-3 rounded-xl border border-emerald-500/20">
+                  <span className="text-emerald-400 font-bold">🔒 Administración Protegida:</span>
+                  <span>Las cotizaciones, facturas, clientes y presupuestos históricos antiguos <strong>no se alteran ni eliminan</strong>.</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => setShowOptimizationModal(false)}
+                  className="px-4 py-2 bg-[#111A2E] text-slate-300 border border-[#1E293B] rounded-xl text-xs font-bold hover:bg-[#1E293B] hover:text-white transition-all"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  disabled={oldTrackingRecordsCount === 0 || !canEdit}
+                  onClick={() => {
+                    handleCleanupOldTracking();
+                    setShowOptimizationModal(false);
+                  }}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 font-black text-xs text-white uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-2 active:scale-95 disabled:pointer-events-none cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Optimizar Base de Datos (Limpiar &gt; 3 Meses)</span>
+                </button>
+              </div>
             </div>
           </div>
-          
-          <div className="flex flex-col items-stretch md:items-end gap-2 w-full md:w-auto shrink-0 bg-[#0F172A] p-4 rounded-2xl border border-[#1E293B] shadow-inner">
-            <div className="flex justify-between md:justify-end items-center gap-4">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Antigüedad &gt; 3 meses:</span>
-              <span className={cn(
-                "px-2.5 py-1 text-xs font-black rounded-lg border",
-                oldTrackingRecordsCount > 0 ? "bg-amber-950 text-amber-400 border-amber-800 animate-pulse" : "bg-emerald-950 text-emerald-400 border-emerald-800"
-              )}>
-                {oldTrackingRecordsCount} {oldTrackingRecordsCount === 1 ? 'registro' : 'registros'}
-              </span>
-            </div>
-            
-            <button
-              type="button"
-              disabled={oldTrackingRecordsCount === 0 || !canEdit}
-              onClick={handleCleanupOldTracking}
-              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:from-slate-800 disabled:to-slate-805 disabled:text-slate-500 font-black text-[10px] text-white uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 disabled:pointer-events-none cursor-pointer"
-              title="Limpiar registros de Seguimiento de Pedidos antiguos para alivianar lecturas"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Optimizar Base de Datos (Limpiar &gt; 3 Meses)</span>
-            </button>
-          </div>
-        </div>
+        )}
 
         <form className="p-8 bg-[#152035] border-b border-[#1E293B]" onSubmit={handleSubmit}>
           <div className="max-w-none mx-auto space-y-6">

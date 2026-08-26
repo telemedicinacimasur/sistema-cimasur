@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { localDB, addAuditLog } from '../../lib/auth';
 import { cn } from '../../lib/utils';
+import { SchoolCampaignsHub } from './SchoolCampaignsHub';
 
 // Default realistic WhatsApp chat scenarios for testing
 const MOCK_SCENARIOS = [
@@ -59,6 +60,7 @@ export function CampaignsMotor() {
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [filterType, setFilterType] = useState<'mv_only' | 'all'>('mv_only');
   const [searchTerm, setSearchTerm] = useState('');
+  const [motorTab, setMotorTab] = useState<'chat_motor' | 'campaigns_hub'>('chat_motor');
   
   // Workspace chat state
   const [chatLog, setChatLog] = useState('');
@@ -548,22 +550,6 @@ export function CampaignsMotor() {
               Analiza interacciones en conversaciones de WhatsApp de médicos veterinarios postulantes. Identifica objeciones de valor, calcula la temperatura del lead y genera tácticas persuasivas automáticas con IA.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setIsImportModalOpen(true)}
-              className="text-xs bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white px-4 py-2.5 rounded-xl font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-md cursor-pointer"
-            >
-              <UploadCloud className="w-4 h-4" /> 📥 Importador Inteligente WhatsApp
-            </button>
-            <button
-              type="button"
-              onClick={loadLeads}
-              className="text-xs bg-[#1E3A5F] hover:bg-[#1C2C4E] text-white px-4 py-2.5 rounded-xl border border-[#1E293B] font-bold flex items-center gap-2 transition-all cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Sincronizar
-            </button>
-          </div>
         </div>
 
         {/* Mini Stats */}
@@ -589,10 +575,54 @@ export function CampaignsMotor() {
             </span>
           </div>
         </div>
+
+        {/* Sub-Tab Switcher inside Motor Escuela */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-6 border-t border-[#1E293B]">
+          <div className="flex items-center gap-2 bg-[#111A2E] p-1.5 rounded-xl border border-[#1E293B]">
+            <button
+              type="button"
+              onClick={() => setMotorTab('chat_motor')}
+              className={cn("px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 cursor-pointer", motorTab === 'chat_motor' ? "bg-sky-600 text-white shadow" : "text-slate-400 hover:text-white")}
+            >
+              <Brain className="w-4 h-4" />
+              <span>💬 Analizador IA &amp; Chats WhatsApp</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMotorTab('campaigns_hub')}
+              className={cn("px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 cursor-pointer", motorTab === 'campaigns_hub' ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white")}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>📧 Campañas WhatsApp &amp; Email (Leads &amp; Alumnos)</span>
+            </button>
+          </div>
+
+          {motorTab === 'chat_motor' && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="text-xs bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white px-4 py-2.5 rounded-xl font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-md cursor-pointer"
+              >
+                <UploadCloud className="w-4 h-4" /> 📥 Importador Inteligente WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={loadLeads}
+                className="text-xs bg-[#1E3A5F] hover:bg-[#1C2C4E] text-white px-4 py-2.5 rounded-xl border border-[#1E293B] font-bold flex items-center gap-2 transition-all cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Sincronizar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {motorTab === 'campaigns_hub' ? (
+        <SchoolCampaignsHub />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left column: Leads List (1/3 of space) */}
         <div className="lg:col-span-4 bg-[#152035] rounded-2xl border border-[#1E293B] flex flex-col h-[650px] overflow-hidden shadow-md">
           {/* List Header / Filters */}
@@ -704,11 +734,19 @@ export function CampaignsMotor() {
               }
 
               return (
-                <button
+                <div
                   key={lead.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedLead(lead)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedLead(lead);
+                    }
+                  }}
                   className={cn(
-                    "w-full text-left p-4 hover:bg-[#1E293B]/20 transition-all flex items-start gap-3 border-l-2",
+                    "w-full text-left p-4 hover:bg-[#1E293B]/20 transition-all flex items-start gap-3 border-l-2 cursor-pointer outline-none focus:bg-[#1E3A5F]/30",
                     isSelected ? "bg-[#1E3A5F]/20 border-[#38BDF8]" : "border-transparent"
                   )}
                 >
@@ -762,7 +800,7 @@ export function CampaignsMotor() {
                       )}
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
 
@@ -853,25 +891,71 @@ export function CampaignsMotor() {
                   </div>
                 </div>
 
-                {/* Scenarios Preset selector - only when not editing or when chat is clean */}
+                {/* Scenarios Preset selector & CIMASUR Campaign Templates */}
                 {!isEditingChat && (
-                  <div className="p-3 bg-[#111A2E]/30 border-b border-[#1E293B] overflow-x-auto flex gap-2 scrollbar-none">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest self-center mr-1">Cargar Escenarios de Prueba:</span>
-                    {MOCK_SCENARIOS.map(scen => (
+                  <div className="p-3 bg-[#111A2E]/30 border-b border-[#1E293B] space-y-2">
+                    <div className="overflow-x-auto flex gap-2 scrollbar-none">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest self-center mr-1">Cargar Escenarios:</span>
+                      {MOCK_SCENARIOS.map(scen => (
+                        <button
+                          key={scen.id}
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm('¿Desea cargar la conversación de este escenario para analizarla?')) {
+                              setChatLog(scen.chat);
+                            }
+                          }}
+                          className="text-[10px] bg-[#111A2E] hover:bg-[#1C2C4E] text-slate-300 border border-[#1E293B] px-2.5 py-1 rounded-full whitespace-nowrap transition-colors"
+                          title={scen.description}
+                        >
+                          {scen.title}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="overflow-x-auto flex gap-2 scrollbar-none pt-1 border-t border-[#1E293B]">
+                      <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest self-center mr-1">⚡ Plantillas Escuela CIMASUR:</span>
                       <button
-                        key={scen.id}
                         type="button"
                         onClick={() => {
-                          if (window.confirm('¿Desea cargar la conversación de este escenario para analizarla? Reemplazará la transcripción actual en pantalla.')) {
-                            setChatLog(scen.chat);
-                          }
+                          const name = selectedLead?.name || 'Dr(a). Alumno';
+                          setChatLog(`[${new Date().toLocaleDateString()}] CIMASUR Escuela: Hola ${name}, te quedan 25 días para terminar tu suscripción de clases en la Escuela CIMASUR. ¡Aprovecha de repasar tus módulos y acceder a la Intranet!`);
                         }}
-                        className="text-[10px] bg-[#111A2E] hover:bg-[#1C2C4E] text-slate-300 border border-[#1E293B] px-2.5 py-1 rounded-full whitespace-nowrap transition-colors"
-                        title={scen.description}
+                        className="text-[10px] bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/50 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors font-bold"
                       >
-                        {scen.title}
+                        ⏰ Suscripción (25 días)
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const name = selectedLead?.name || 'Dr(a). Alumno';
+                          setChatLog(`[${new Date().toLocaleDateString()}] CIMASUR Escuela: ¡Hola ${name}! Tenemos una promoción exclusiva de cierre de venta por tiempo limitado para completar tu formación en Homeopatía Veterinaria.`);
+                        }}
+                        className="text-[10px] bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-800/50 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors font-bold"
+                      >
+                        🔥 Cierre de Venta y Promoción
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const name = selectedLead?.name || 'Dr(a). Alumno';
+                          setChatLog(`[${new Date().toLocaleDateString()}] CIMASUR Escuela: ¡Hola ${name}! Por ser participante de la Escuela CIMASUR, te ofrecemos un 10% de descuento en todos los productos base y avanzado de CIMASUR. Consulta por tu listado de productos y obtén acceso a Intranet.`);
+                        }}
+                        className="text-[10px] bg-sky-950/60 hover:bg-sky-900/60 text-sky-300 border border-sky-800/50 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors font-bold"
+                      >
+                        💎 10% Dto. Participante CIMASUR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const name = selectedLead?.name || 'Dr(a). Alumno';
+                          setChatLog(`[${new Date().toLocaleDateString()}] CIMASUR Escuela: Hola ${name}, notamos que tu avance mensual está pendiente. Recuerda que cuentas con apoyo continuo del equipo docente.`);
+                        }}
+                        className="text-[10px] bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors font-bold"
+                      >
+                        ⚠️ Alerta Alumno sin Avance
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1534,6 +1618,8 @@ export function CampaignsMotor() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

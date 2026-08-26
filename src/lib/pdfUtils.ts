@@ -114,7 +114,17 @@ export const exportTableToPDF = (title: string, headers: string[], data: any[][]
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(30, 41, 59);
-    doc.text(`Total de registros: ${data.length}`, pageWidth - 14, finalY, { align: 'right' });
+    const reposicionIdx = headers.findIndex(h => h.toUpperCase() === 'REPOSICIÓN');
+    if (reposicionIdx !== -1) {
+      let totalReposicion = 0;
+      data.forEach(row => {
+        const val = Number(row[reposicionIdx]) || 0;
+        totalReposicion += val;
+      });
+      doc.text(`Total Reposición: ${totalReposicion}`, pageWidth - 14, finalY, { align: 'right' });
+    } else {
+      doc.text(`Total de registros: ${data.length}`, pageWidth - 14, finalY, { align: 'right' });
+    }
   }
   
   doc.save(`${fileName}.pdf`);
