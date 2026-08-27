@@ -455,16 +455,37 @@ const crmTools: FunctionDeclaration[] = [
     const { email, pass } = req.body;
     let users = await readRecords('users');
     if (!users || users.length === 0) {
-      const defaultAdmin = {
-        uid: 'admin-001',
-        email: 'admin@cimasur.cl',
-        displayName: 'Administrador Cimasur',
-        photoURL: '',
-        role: 'admin',
-        pass: 'admin123'
-      };
-      await writeRecords('users', [defaultAdmin]);
-      users = [defaultAdmin];
+      const defaultUsers = [
+        {
+          uid: 'admin-001',
+          email: 'admin@cimasur.cl',
+          displayName: 'Administrador Cimasur',
+          photoURL: '',
+          role: 'admin',
+          roles: ['admin', 'commercial', 'lab', 'school'],
+          pass: 'admin123'
+        },
+        {
+          uid: 'user-fernanda',
+          email: 'fernanda@comercial.cl',
+          displayName: 'Fernanda Comercial',
+          photoURL: '',
+          role: 'commercial',
+          roles: ['commercial', 'school'],
+          pass: 'admin123'
+        },
+        {
+          uid: 'user-telemedicina',
+          email: 'telemedicina.cimasur@gmail.com',
+          displayName: 'Dirección Cimasur',
+          photoURL: '',
+          role: 'admin',
+          roles: ['admin', 'commercial', 'lab', 'school'],
+          pass: 'admin123'
+        }
+      ];
+      await writeRecords('users', defaultUsers);
+      users = defaultUsers;
     }
     const user = users.find((u: any) => u.email === email && u.pass === pass);
     if (user) {
@@ -1476,6 +1497,107 @@ ATENCIÓN IMPORTANTE PARA EL MENSAJE Y LA ACCIÓN: Ten muy en cuenta el tiempo t
     } catch (e: any) {
       console.error("Error in analyze-whatsapp-chat:", e);
       res.status(500).json({ error: e.message || 'Error en el análisis de conversación con IA' });
+    }
+  });
+
+  // Batch analyze multiple WhatsApp leads in parallel
+  app.post('/api/ai/batch-analyze-whatsapp-leads', async (req, res) => {
+    console.log('API call: POST /api/ai/batch-analyze-whatsapp-leads');
+    try {
+      const { leadsList } = req.body;
+      if (!Array.isArray(leadsList) || leadsList.length === 0) {
+        return res.status(400).json({ error: "La lista de leads para analizar está vacía." });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
+      }
+
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      // Prepare a compact list for Gemini to analyze in a single or chunked prompt
+      // We can chunk in sets of up to 15 leads per prompt for optimal speed and reliability
+      const chunkSize = 15;
+      const allResults: any[] = [];
+
+      for (let i = 0; i < leadsList.length; i += chunkSize) {
+        const chunk = leadsList.slice(i, i + chunkSize);
+        
+        const chunkPrompt = `Eres un Analista Experto en Ventas y Admisiones de la Escuela Médica CIMASUR.
+Debes analizar simultáneamente los siguientes ${chunk.length} prospectos/alumnos potenciales (Leads) de WhatsApp.
+
+Lista de Leads y sus conversaciones/datos:
+${chunk.map((item: any, idx: number) => `
+--- LEAD #${idx + 1} ---
+ID: ${item.id}
+Nombre: ${item.name || 'Sin información'}
+Clasificación: ${item.clasificacion || 'Médico Veterinario'}
+Fecha Registro: ${item.fecha || 'Desconocida'}
+Interés/Diplomado: ${item.interes || 'Diplomado Homeopatía Clínica'}
+Conversación de WhatsApp:
+"""
+${item.chatLog || 'Sin historial de conversación registrado. El lead mostró interés pero no hay mensajes transcritos.'}
+"""
+`).join('\n')}
+
+Para CADA lead analizado en la lista, determina con precisión:
+1. "id": El mismo ID del lead recibido.
+2. "interestLevel": Nivel de interés estricto ("Caliente" si está listo para matricular/pagar o pide cuentas, "Tibio" si pregunta precios/temario/horarios con dudas u objeciones, "Frío" si está desinteresado o no responde).
+3. "summary": Resumen de máximo 2 líneas del estado del lead y su interacción.
+4. "objections": Lista de objeciones identificadas (ej. "Precio", "Horarios", "Certificación", "Ninguna").
+5. "nextAction": Acción comercial inmediata recomendada para el asesor.
+6. "suggestedMessage": Mensaje persuasivo, empático y profesional con emojis para enviar por WhatsApp para cerrar o reenganchar al prospecto.`;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: chunkPrompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  interestLevel: { type: Type.STRING },
+                  summary: { type: Type.STRING },
+                  objections: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  nextAction: { type: Type.STRING },
+                  suggestedMessage: { type: Type.STRING }
+                },
+                required: ["id", "interestLevel", "summary", "objections", "nextAction", "suggestedMessage"]
+              }
+            }
+          }
+        });
+
+        const text = response.text;
+        const resolved = typeof text === 'string' ? text : await text;
+        if (resolved) {
+          try {
+            const parsedChunk = JSON.parse(resolved);
+            if (Array.isArray(parsedChunk)) {
+              allResults.push(...parsedChunk);
+            }
+          } catch (err) {
+            console.error('Error parsing chunk JSON:', err);
+          }
+        }
+      }
+
+      res.json({ results: allResults });
+    } catch (e: any) {
+      console.error("Error in batch-analyze-whatsapp-leads:", e);
+      res.status(500).json({ error: e.message || 'Error al analizar los leads en lote con IA' });
     }
   });
 

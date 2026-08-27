@@ -3,7 +3,7 @@ import {
   MessageSquare, Sparkles, Copy, Save, Filter, User, Calendar, 
   AlertTriangle, TrendingUp, Send, Check, RotateCcw, FileText, 
   Phone, Mail, BookOpen, Heart, ChevronRight, Play, Award, HelpCircle,
-  Brain, UploadCloud, X, Plus
+  Brain, UploadCloud, X, Plus, Zap, CheckCircle2, Loader2
 } from 'lucide-react';
 import { localDB, addAuditLog } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -79,6 +79,11 @@ export function CampaignsMotor() {
   const [copied, setCopied] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Bulk / Automatic AI Analysis for all leads
+  const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [batchSuccessMsg, setBatchSuccessMsg] = useState('');
 
   // WhatsApp Bulk Import / Upload State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -411,6 +416,109 @@ export function CampaignsMotor() {
     }
   };
 
+  // Bulk Automatic AI Analysis for all leads in the current view/list
+  const handleBatchAnalyzeAll = async () => {
+    const leadsToAnalyze = filteredLeads.length > 0 ? filteredLeads : leads;
+    if (!leadsToAnalyze || leadsToAnalyze.length === 0) {
+      alert('No hay alumnos potenciales en la lista para analizar.');
+      return;
+    }
+
+    const confirmMsg = `¿Deseas iniciar el ANÁLISIS AUTOMÁTICO de ${leadsToAnalyze.length} prospectos con Inteligencia Artificial?\n\nGemini evaluará cada conversación y clasificará automáticamente la temperatura (🔥 Caliente / ⚡ Tibio / ❄️ Frío), objeciones y sugerencia de cierre.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBatchAnalyzing(true);
+    setBatchProgress({ current: 0, total: leadsToAnalyze.length });
+    setBatchSuccessMsg('');
+    setErrorMsg('');
+
+    try {
+      // Prepare leads payload with chat log or default scenario
+      const payloadLeads = leadsToAnalyze.map(lead => {
+        let chat = lead.whatsappChatLog || '';
+        if (!chat) {
+          // Dynamic replace of default scenario
+          chat = MOCK_SCENARIOS[0].chat
+            .replaceAll('Dr. Francisco', lead.name || 'Doctor')
+            .replaceAll('Francisco', (lead.name || 'Doctor').split(' ')[0]);
+        }
+        return {
+          id: lead.id,
+          name: lead.name,
+          clasificacion: lead.clasificacion || 'Médico Veterinario',
+          fecha: lead.fecha || 'Reciente',
+          interes: lead.interes || 'Diplomado Homeopatía Clínica',
+          chatLog: chat
+        };
+      });
+
+      const response = await fetch('/api/ai/batch-analyze-whatsapp-leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadsList: payloadLeads })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Error al procesar el análisis en lote.');
+      }
+
+      const data = await response.json();
+      const results: any[] = data.results || [];
+
+      // Save each result into localDB
+      const currentDate = new Date().toLocaleString('es-CL');
+      for (const resItem of results) {
+        const targetLead = leadsToAnalyze.find(l => l.id === resItem.id);
+        if (targetLead) {
+          const analysisSummaryText = `\n[${currentDate}] 🤖 ANÁLISIS AUTOMÁTICO (Motor IA):\n` +
+            `• Nivel de Interés: ${resItem.interestLevel}\n` +
+            `• Resumen: ${resItem.summary}\n` +
+            `• Objeciones: ${Array.isArray(resItem.objections) ? resItem.objections.join(', ') : resItem.objections || 'Ninguna'}\n` +
+            `• Acción Recomendada: ${resItem.nextAction}`;
+          
+          const updatedNotes = (targetLead.observaciones || '') + analysisSummaryText;
+          
+          await localDB.updateInCollection('school_leads', targetLead.id, {
+            observaciones: updatedNotes,
+            interestLevel: resItem.interestLevel,
+            aiAnalysis: JSON.stringify(resItem)
+          });
+        }
+      }
+
+      // Add audit log
+      const user = JSON.parse(localStorage.getItem('cimasur_user') || '{}');
+      await addAuditLog(user, `Ejecutó Análisis Automático Masivo con IA para ${results.length} Leads`, 'SCHOOL');
+
+      // Refresh list
+      await loadLeads();
+      window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'school_leads' } }));
+
+      // If selected lead was in the analyzed batch, update its state
+      if (selectedLead) {
+        const updatedSelected = results.find(r => r.id === selectedLead.id);
+        if (updatedSelected) {
+          setAnalysisResult(updatedSelected);
+          setSelectedLead((prev: any) => ({
+            ...prev,
+            interestLevel: updatedSelected.interestLevel,
+            aiAnalysis: JSON.stringify(updatedSelected)
+          }));
+        }
+      }
+
+      setBatchSuccessMsg(`¡Éxito! Se analizaron y clasificaron automáticamente ${results.length} alumnos potenciales con Inteligencia Artificial.`);
+      setTimeout(() => setBatchSuccessMsg(''), 8000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Error durante el análisis automático con IA.');
+    } finally {
+      setIsBatchAnalyzing(false);
+      setBatchProgress(null);
+    }
+  };
+
   // Save AI analysis and updated chat log back to lead's record in localDB
   const handleSaveToLeadProfile = async () => {
     if (!selectedLead || !analysisResult) return;
@@ -598,13 +706,37 @@ export function CampaignsMotor() {
           </div>
 
           {motorTab === 'chat_motor' && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleBatchAnalyzeAll}
+                disabled={isBatchAnalyzing || filteredLeads.length === 0}
+                className={cn(
+                  "text-xs px-4 py-2.5 rounded-xl font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-md cursor-pointer",
+                  isBatchAnalyzing
+                    ? "bg-amber-600/50 text-amber-200 cursor-not-allowed"
+                    : "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-600 hover:to-rose-700 text-white animate-pulse"
+                )}
+                title="Leer y procesar todos los prospectos con IA automáticamente"
+              >
+                {isBatchAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Leyendo Todo con IA... ({batchProgress?.current || 0}/{batchProgress?.total || filteredLeads.length})</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-yellow-300" />
+                    <span>⚡ Leer y Analizar Todo Automático ({filteredLeads.length})</span>
+                  </>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => setIsImportModalOpen(true)}
                 className="text-xs bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white px-4 py-2.5 rounded-xl font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-md cursor-pointer"
               >
-                <UploadCloud className="w-4 h-4" /> 📥 Importador Inteligente WhatsApp
+                <UploadCloud className="w-4 h-4" /> 📥 Importador WhatsApp
               </button>
               <button
                 type="button"
@@ -617,6 +749,13 @@ export function CampaignsMotor() {
           )}
         </div>
       </div>
+
+      {batchSuccessMsg && (
+        <div className="bg-emerald-950/50 border border-emerald-500/40 p-3.5 rounded-2xl flex items-center gap-3 text-emerald-200 text-xs shadow-lg animate-in fade-in duration-300">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="font-bold">{batchSuccessMsg}</span>
+        </div>
+      )}
 
       {motorTab === 'campaigns_hub' ? (
         <SchoolCampaignsHub />
