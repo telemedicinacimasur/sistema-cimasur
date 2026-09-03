@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { localDB, localAuth } from "../lib/auth";
 import { addNotification } from "../lib/notifications";
+import { useSharedRealtimeCollection } from "../contexts/RealtimeContext";
 import {
   Calendar,
   Clock,
@@ -99,6 +100,29 @@ export default function PizarraView() {
     );
   };
 
+  // Real-time bounded notes & agreements subscription with multi-user sharing and offline cache
+  const { data: realtimeNotes } = useSharedRealtimeCollection<NoteRecord>({
+    collectionName: "pizarra_notes",
+    limitCount: 50,
+  });
+
+  const { data: realtimeAgreements } = useSharedRealtimeCollection<AgreementRecord>({
+    collectionName: "pizarra_agreements",
+    limitCount: 50,
+  });
+
+  useEffect(() => {
+    if (realtimeNotes && realtimeNotes.length > 0) {
+      setNotes(realtimeNotes);
+    }
+  }, [realtimeNotes]);
+
+  useEffect(() => {
+    if (realtimeAgreements && realtimeAgreements.length > 0) {
+      setAgreements(realtimeAgreements);
+    }
+  }, [realtimeAgreements]);
+
   useEffect(() => {
     loadData();
   }, [user?.uid, user?.email]);
@@ -107,11 +131,13 @@ export default function PizarraView() {
     setLoading(true);
     try {
       const [allNotes, allUsers, allAgreements] = await Promise.all([
-        localDB.getCollection("pizarra_notes"),
+        localDB.getCollection("pizarra_notes", { limitCount: 50 }),
         localAuth.getAllUsers(),
-        localDB.getCollection("pizarra_agreements"),
+        localDB.getCollection("pizarra_agreements", { limitCount: 50 }),
       ]);
-      setNotes(allNotes);
+      if (allNotes && allNotes.length > 0) {
+        setNotes(allNotes);
+      }
       setWorkers(allUsers.filter((u) => u.email !== user?.email));
       setAgreements(allAgreements);
 

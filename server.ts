@@ -1437,13 +1437,107 @@ Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de
     }
   });
 
+  // Helper function to call Gemini with resilient failover and fallback for high demand (503)
+  async function callGeminiWithResilience(ai: any, params: {
+    contents: string;
+    config?: any;
+    fallbackFn?: () => any;
+  }) {
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+    let lastError: any = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: params.contents,
+          config: params.config
+        });
+        const text = response.text;
+        const resolved = typeof text === 'string' ? text : await text;
+        if (resolved) {
+          return resolved;
+        }
+      } catch (err: any) {
+        console.warn(`Gemini model ${modelName} warning/error:`, err?.message || err);
+        lastError = err;
+        // Wait 400ms before trying the next model
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+
+    // If both models had temporary spikes / 503, execute fallback if available
+    if (params.fallbackFn) {
+      console.log("Using smart local fallback due to Gemini high demand spike.");
+      return params.fallbackFn();
+    }
+
+    throw lastError || new Error("El servicio de Gemini está experimentando alta demanda temporal. Por favor intente nuevamente en unos instantes.");
+  }
+
+  // Heuristic rule-based fallback analyzer for WhatsApp lead chat
+  function fallbackAnalyzeLeadChat(leadName: string, leadClasificacion: string, leadFecha: string, chatLog: string) {
+    const text = (chatLog || '').toLowerCase();
+    const name = leadName && leadName !== 'Sin información' ? leadName : 'Estimad@ colega';
+    
+    // Objections detection
+    const objections: string[] = [];
+    if (text.includes('precio') || text.includes('descuento') || text.includes('cuota') || text.includes('caro') || text.includes('costo') || text.includes('valor')) {
+      objections.push('Precio / Facilidades de Pago');
+    }
+    if (text.includes('tiempo') || text.includes('horario') || text.includes('turno') || text.includes('grabada') || text.includes('noche') || text.includes('disponibilidad')) {
+      objections.push('Horarios / Turnos Rotativos');
+    }
+    if (text.includes('aval') || text.includes('certifica') || text.includes('reconoc') || text.includes('validez') || text.includes('médic')) {
+      objections.push('Certificación y Aval Académico');
+    }
+
+    // Interest level
+    let interestLevel = 'Tibio';
+    if (text.includes('transferencia') || text.includes('pagar') || text.includes('datos de pago') || text.includes('cuenta') || text.includes('inscribir') || text.includes('matricular') || text.includes('reserva')) {
+      interestLevel = 'Caliente';
+    } else if (text.length < 50 || text.includes('no gracias') || text.includes('después') || text.includes('no puedo')) {
+      interestLevel = 'Frío';
+    }
+
+    let summary = `El postulante ${leadName || 'Médico Veterinario'} interactuó solicitando detalles del diplomado. `;
+    if (objections.length > 0) {
+      summary += `Consultó principalmente sobre ${objections.join(' y ')}.`;
+    } else {
+      summary += `Mostró interés positivo en la modalidad y contenidos clínicos.`;
+    }
+
+    let nextAction = '';
+    let suggestedMessage = '';
+
+    if (interestLevel === 'Caliente') {
+      nextAction = 'Enviar datos de transferencia / Link de pago Webpay y confirmar cupo reservado.';
+      suggestedMessage = `¡Hola ${name}! 🎓 Qué gran noticia tu decisión de sumarte al Diplomado en Medicina Homeopática CIMASUR.\n\nTe confirmo que tu cupo está reservado. Aquí tienes las facilidades de pago en cuotas y los datos para tu matrícula oficial:\n💳 Webpay / Transferencia bancaria disponible.\n\n¿Deseas que te envíe los datos de cuenta ahora mismo?`;
+    } else if (interestLevel === 'Tibio') {
+      nextAction = 'Enviar temario detallado, flexibilidad de clases 24/7 grabadas y oferta de beca pronto pago.';
+      suggestedMessage = `¡Hola ${name}! 🌿 Te saluda la Escuela de Educación Médica CIMASUR.\n\nQueríamos confirmarte que todas nuestras clases quedan grabadas en alta definición en tu intranet para que avances 100% a tu propio ritmo según tus turnos.\n\n¿Te gustaría que te envíe el temario clínico completo con el beneficio de beca especial para este ciclo?`;
+    } else {
+      nextAction = 'Realizar seguimiento suave y compartir caso clínico o clase abierta gratuita.';
+      suggestedMessage = `¡Hola ${name}! 🐾 Esperamos que estés muy bien. En Escuela CIMASUR sabemos lo exigente que es la labor clínica, por lo que dejamos tu postulación abierta para cuando dispongas de tiempo.\n\n¿Te gustaría recibir una masterclass grabada sin costo para conocer nuestra metodología?`;
+    }
+
+    return {
+      interestLevel,
+      summary,
+      objections: objections.length > 0 ? objections : ['Ninguna identificada'],
+      nextAction,
+      suggestedMessage
+    };
+  }
+
   app.post('/api/ai/analyze-whatsapp-chat', async (req, res) => {
     console.log('API call: POST /api/ai/analyze-whatsapp-chat');
     try {
       const { leadName, leadClasificacion, leadFecha, chatLog } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor." });
+        // Return heuristic fallback immediately if no key
+        return res.json(fallbackAnalyzeLeadChat(leadName, leadClasificacion, leadFecha, chatLog));
       }
       const { GoogleGenAI, Type } = await import('@google/genai');
       const ai = new GoogleGenAI({
@@ -1455,9 +1549,7 @@ Retorna un objeto JSON con el nuevo mensaje mejorado/diseñado y un análisis de
         }
       });
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Eres un Analista Experto en Ventas y Psicología de Clientes para la Escuela de Educación Médica CIMASUR.
+      const promptText = `Eres un Analista Experto en Ventas y Psicología de Clientes para la Escuela de Educación Médica CIMASUR.
 Tu tarea es analizar la siguiente conversación de WhatsApp entre un potencial alumno (Lead) de clasificación "${leadClasificacion || 'Médico Veterinario'}" llamado "${leadName}" y el asesor de Escuela CIMASUR.
 Fecha en que el lead ingresó o mostró interés: ${leadFecha || 'Desconocida'} (La fecha actual del sistema es ${new Date().toISOString().split('T')[0]}).
 
@@ -1471,8 +1563,10 @@ Analiza rigurosamente la conversación y genera un objeto JSON con los siguiente
 2. "summary": Un resumen conciso (máximo 3 líneas) de la interacción, destacando de qué hablaron y el tono del lead.
 3. "objections": Un array de strings con las objeciones o dudas principales identificadas (ej. "Precio alto", "Falta de tiempo", "Dudas sobre certificación", "Horarios", etc.). Si no hay, dejar vacío.
 4. "nextAction": Una recomendación de la siguiente mejor acción de seguimiento comercial.
-5. "suggestedMessage": Un mensaje personalizado listo para enviar por WhatsApp que aborde sus dudas o continúe la interacción con calidez y profesionalismo, utilizando emojis atractivos y un tono de aliado clínico de CIMASUR.
-ATENCIÓN IMPORTANTE PARA EL MENSAJE Y LA ACCIÓN: Ten muy en cuenta el tiempo transcurrido desde la fecha en que el lead se registró (${leadFecha || 'Desconocida'}) hasta hoy (${new Date().toISOString().split('T')[0]}). Si ha pasado mucho tiempo (ej. semanas o meses), el mensaje NO debe asumir que hablaron ayer ni ser insistente; debe ser un mensaje de "retoma de contacto" o reconexión suave (ej. "Hola! Hace un tiempo nos contactaste interesad@ en... ¿pudiste revisar la información?"). Si es reciente, usa un tono más inmediato. Puede usar marcadores como "{{NOMBRE}}".`,
+5. "suggestedMessage": Un mensaje personalizado listo para enviar por WhatsApp que aborde sus dudas o continúe la interacción con calidez y profesionalismo, utilizando emojis atractivos y un tono de aliado clínico de CIMASUR.`;
+
+      const result = await callGeminiWithResilience(ai, {
+        contents: promptText,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -1486,17 +1580,16 @@ ATENCIÓN IMPORTANTE PARA EL MENSAJE Y LA ACCIÓN: Ten muy en cuenta el tiempo t
             },
             required: ["interestLevel", "summary", "objections", "nextAction", "suggestedMessage"]
           }
-        }
+        },
+        fallbackFn: () => JSON.stringify(fallbackAnalyzeLeadChat(leadName, leadClasificacion, leadFecha, chatLog))
       });
 
-      const text = response.text;
-      const resolved = typeof text === 'string' ? text : await text;
-      if (!resolved) throw new Error("No se pudo obtener la respuesta de análisis de la conversación.");
-      const data = JSON.parse(resolved);
-      res.json(data);
+      const parsed = typeof result === 'string' ? JSON.parse(result) : result;
+      res.json(parsed);
     } catch (e: any) {
-      console.error("Error in analyze-whatsapp-chat:", e);
-      res.status(500).json({ error: e.message || 'Error en el análisis de conversación con IA' });
+      console.error("Error in analyze-whatsapp-chat, using fallback:", e?.message);
+      const { leadName, leadClasificacion, leadFecha, chatLog } = req.body || {};
+      res.json(fallbackAnalyzeLeadChat(leadName || '', leadClasificacion || '', leadFecha || '', chatLog || ''));
     }
   });
 
@@ -1511,7 +1604,11 @@ ATENCIÓN IMPORTANTE PARA EL MENSAJE Y LA ACCIÓN: Ten muy en cuenta el tiempo t
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en el servidor de CIMASUR." });
+        const fallbackResults = leadsList.map(lead => ({
+          id: lead.id,
+          ...fallbackAnalyzeLeadChat(lead.name, lead.clasificacion, lead.fecha, lead.chatLog)
+        }));
+        return res.json({ results: fallbackResults });
       }
 
       const { GoogleGenAI, Type } = await import('@google/genai');
@@ -1524,8 +1621,6 @@ ATENCIÓN IMPORTANTE PARA EL MENSAJE Y LA ACCIÓN: Ten muy en cuenta el tiempo t
         }
       });
 
-      // Prepare a compact list for Gemini to analyze in a single or chunked prompt
-      // We can chunk in sets of up to 15 leads per prompt for optimal speed and reliability
       const chunkSize = 15;
       const allResults: any[] = [];
 
@@ -1557,47 +1652,59 @@ Para CADA lead analizado en la lista, determina con precisión:
 5. "nextAction": Acción comercial inmediata recomendada para el asesor.
 6. "suggestedMessage": Mensaje persuasivo, empático y profesional con emojis para enviar por WhatsApp para cerrar o reenganchar al prospecto.`;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: chunkPrompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING },
-                  interestLevel: { type: Type.STRING },
-                  summary: { type: Type.STRING },
-                  objections: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  nextAction: { type: Type.STRING },
-                  suggestedMessage: { type: Type.STRING }
-                },
-                required: ["id", "interestLevel", "summary", "objections", "nextAction", "suggestedMessage"]
+        try {
+          const chunkResult = await callGeminiWithResilience(ai, {
+            contents: chunkPrompt,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    interestLevel: { type: Type.STRING },
+                    summary: { type: Type.STRING },
+                    objections: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    nextAction: { type: Type.STRING },
+                    suggestedMessage: { type: Type.STRING }
+                  },
+                  required: ["id", "interestLevel", "summary", "objections", "nextAction", "suggestedMessage"]
+                }
               }
-            }
-          }
-        });
+            },
+            fallbackFn: () => JSON.stringify(chunk.map((item: any) => ({
+              id: item.id,
+              ...fallbackAnalyzeLeadChat(item.name, item.clasificacion, item.fecha, item.chatLog)
+            })))
+          });
 
-        const text = response.text;
-        const resolved = typeof text === 'string' ? text : await text;
-        if (resolved) {
-          try {
-            const parsedChunk = JSON.parse(resolved);
-            if (Array.isArray(parsedChunk)) {
-              allResults.push(...parsedChunk);
-            }
-          } catch (err) {
-            console.error('Error parsing chunk JSON:', err);
+          const parsedChunk = typeof chunkResult === 'string' ? JSON.parse(chunkResult) : chunkResult;
+          if (Array.isArray(parsedChunk)) {
+            allResults.push(...parsedChunk);
           }
+        } catch (err: any) {
+          console.warn("Chunk error, applying heuristic fallback for chunk:", err);
+          const fallbackChunk = chunk.map((item: any) => ({
+            id: item.id,
+            ...fallbackAnalyzeLeadChat(item.name, item.clasificacion, item.fecha, item.chatLog)
+          }));
+          allResults.push(...fallbackChunk);
         }
       }
 
       res.json({ results: allResults });
     } catch (e: any) {
       console.error("Error in batch-analyze-whatsapp-leads:", e);
-      res.status(500).json({ error: e.message || 'Error al analizar los leads en lote con IA' });
+      const { leadsList } = req.body || {};
+      if (Array.isArray(leadsList)) {
+        const fallbackAll = leadsList.map((item: any) => ({
+          id: item.id,
+          ...fallbackAnalyzeLeadChat(item.name, item.clasificacion, item.fecha, item.chatLog)
+        }));
+        return res.json({ results: fallbackAll });
+      }
+      res.status(500).json({ error: e.message || 'Error al analizar los leads en lote' });
     }
   });
 

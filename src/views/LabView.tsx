@@ -3,12 +3,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDB, localAuth, addAuditLog } from '../lib/auth';
 import { getDb, isFirebaseReady } from '../lib/firebase';
 import { registerListener } from '../lib/listenerRegistry';
+import { isTabActive } from '../lib/idleTracker';
 import { 
   collection, 
   query, 
   orderBy, 
   limit, 
-  onSnapshot, 
+  onSnapshot,
   startAfter, 
   getDocs, 
   where,
@@ -89,7 +90,7 @@ export default function LabView() {
   
   
 
-  // Generic data fetching with real-time onSnapshot for Lab modules (Stock, Lab Records, Magistrales)
+  // Real-time synchronization with bounded query and strict unmount cleanup
   useEffect(() => {
     if (activeForm === 'default' || activeForm === 'tracking') return;
 
@@ -97,15 +98,18 @@ export default function LabView() {
     if (activeForm === 'stock') collectionName = 'inventory';
     if (activeForm === 'magistrales') collectionName = 'lab_records';
 
+    let isMounted = true;
     let unsubscribe: (() => void) | null = null;
 
     const loadData = async () => {
       try {
-        const data = await localDB.getCollection(collectionName);
-        setRecords(Array.isArray(data) ? data : []);
+        const data = await localDB.getCollection(collectionName, { limitCount: 100 });
+        if (isMounted) {
+          setRecords(Array.isArray(data) ? data : []);
+        }
       } catch (err) {
         console.error('LabView Load Error:', err);
-        setRecords([]);
+        if (isMounted) setRecords([]);
       }
     };
 
@@ -113,13 +117,15 @@ export default function LabView() {
       const db = getDb();
       if (db) {
         try {
-          const q = query(collection(db, collectionName), limit(500));
+          const q = query(collection(db, collectionName), limit(100));
           unsubscribe = onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             }));
-            setRecords(docs);
+            if (isMounted) {
+              setRecords(docs);
+            }
           }, (err) => {
             console.warn(`Firestore ${collectionName} onSnapshot fallback:`, err);
             loadData();
@@ -147,8 +153,12 @@ export default function LabView() {
       }
     };
     window.addEventListener('db-change', handleDbChange);
+
     return () => {
-      if (unsubscribe) unsubscribe();
+      isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
       window.removeEventListener('db-change', handleDbChange);
     };
   }, [activeForm]);
@@ -3926,22 +3936,32 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   const [editingPOId, setEditingPOId] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     let unsubscribe: (() => void) | null = null;
     const loadPOs = async () => {
-      const data = await localDB.getCollection('purchase_orders');
-      setPurchaseOrders(data || []);
+      try {
+        const data = await localDB.getCollection('purchase_orders', { limitCount: 100 });
+        if (isMounted) {
+          setPurchaseOrders(data || []);
+        }
+      } catch (err) {
+        console.error("Error loading purchase_orders:", err);
+      }
     };
+
     if (isFirebaseReady()) {
       const db = getDb();
       if (db) {
         try {
-          const q = query(collection(db, 'purchase_orders'), limit(200));
+          const q = query(collection(db, 'purchase_orders'), limit(100));
           unsubscribe = onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             }));
-            setPurchaseOrders(docs);
+            if (isMounted) {
+              setPurchaseOrders(docs);
+            }
           }, (err) => {
             console.warn("Firestore purchase_orders onSnapshot fallback:", err);
             loadPOs();
@@ -3959,8 +3979,23 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
     } else {
       loadPOs();
     }
+
+    const handleDbChange = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.collection || detail.collection === 'purchase_orders') {
+        if (!isFirebaseReady()) {
+          loadPOs();
+        }
+      }
+    };
+    window.addEventListener('db-change', handleDbChange);
+
     return () => {
-      if (unsubscribe) unsubscribe();
+      isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+      window.removeEventListener('db-change', handleDbChange);
     };
   }, []);
 
@@ -4066,27 +4101,35 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
   };
 
   useEffect(() => {
+    let isMounted = true;
     let unsubscribe: (() => void) | null = null;
     const loadFollowups = async () => {
       try {
-        const folData = await localDB.getCollection('stock_followups');
-        setFollowups(Array.isArray(folData) ? folData : []);
+        const folData = await localDB.getCollection('stock_followups', { limitCount: 100 });
+        if (isMounted) {
+          setFollowups(Array.isArray(folData) ? folData : []);
+        }
       } catch (err) {
         console.error('StockManager Load Error:', err);
-        setFollowups([]);
+        if (isMounted) {
+          setFollowups([]);
+        }
       }
     };
+
     if (isFirebaseReady()) {
       const db = getDb();
       if (db) {
         try {
-          const q = query(collection(db, 'stock_followups'), limit(200));
+          const q = query(collection(db, 'stock_followups'), limit(100));
           unsubscribe = onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             }));
-            setFollowups(docs);
+            if (isMounted) {
+              setFollowups(docs);
+            }
           }, (err) => {
             console.warn("Firestore stock_followups onSnapshot fallback:", err);
             loadFollowups();
@@ -4104,6 +4147,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
     } else {
       loadFollowups();
     }
+
     const handleDbChange = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (!detail?.collection || detail.collection === 'stock_followups') {
@@ -4113,8 +4157,12 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
       }
     };
     window.addEventListener('db-change', handleDbChange);
+
     return () => {
-      if (unsubscribe) unsubscribe();
+      isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
       window.removeEventListener('db-change', handleDbChange);
     };
   }, []);
@@ -5443,6 +5491,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
   };
 
   useEffect(() => {
+    let isMounted = true;
     let unsubscribe: (() => void) | null = null;
 
     if (isFirebaseReady()) {
@@ -5468,13 +5517,15 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
               id: doc.id,
               ...doc.data()
             }));
-            setTrackingRecords(docs);
-            if (snapshot.docs.length > 0) {
-              setLastTrackingDoc(snapshot.docs[snapshot.docs.length - 1]);
-            } else {
-              setLastTrackingDoc(null);
+            if (isMounted) {
+              setTrackingRecords(docs);
+              if (snapshot.docs.length > 0) {
+                setLastTrackingDoc(snapshot.docs[snapshot.docs.length - 1]);
+              } else {
+                setLastTrackingDoc(null);
+              }
+              setHasMoreTracking(snapshot.docs.length >= 20);
             }
-            setHasMoreTracking(snapshot.docs.length >= 20);
           }, (err) => {
             console.warn("Firestore order_tracking onSnapshot fallback:", err);
             loadTrackingData(true);
@@ -5505,6 +5556,7 @@ function OrderTrackingForm({ records: _, setRecords: __ }: { records: any[], set
     window.addEventListener('db-change', handleTrackingDbChange);
 
     return () => {
+      isMounted = false;
       if (unsubscribe) {
         unsubscribe();
       }

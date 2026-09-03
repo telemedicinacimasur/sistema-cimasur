@@ -3,6 +3,7 @@ import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, limit, writeBatch } from 'firebase/firestore';
 import { isTabActive } from './idleTracker';
 import { safeLocalStorageGet, safeLocalStorageSet, safeLocalStorageRemove, cleanupLocalStorageQuota } from './safeStorage';
+import { updateQueryCacheItem, removeQueryCacheItem, invalidateCollectionQuery, queryClient } from './queryClient';
 
 export interface UserProfile {
   uid: string;
@@ -276,6 +277,9 @@ const invalidateCollectionCache = (name: string) => {
       delete collectionCache[key];
     }
   });
+  try {
+    invalidateCollectionQuery(name);
+  } catch (e) {}
 };
 
 const updateCachedCollectionItem = (name: string, savedItem: { id: string, [key: string]: any }) => {
@@ -326,6 +330,11 @@ const updateCachedCollectionItem = (name: string, savedItem: { id: string, [key:
       }
     }
   }
+
+  // Update TanStack Query cache in-memory
+  try {
+    updateQueryCacheItem(name, savedItem);
+  } catch (e) {}
 };
 
 const removeCachedCollectionItem = (name: string, id: string) => {
@@ -356,14 +365,41 @@ const removeCachedCollectionItem = (name: string, id: string) => {
       }
     }
   }
+
+  // Remove from TanStack Query cache in-memory
+  try {
+    removeQueryCacheItem(name, id);
+  } catch (e) {}
 };
 
 export const localDB = {
   clearCache: () => {
     Object.keys(collectionCache).forEach(key => delete collectionCache[key]);
+    try {
+      queryClient.clear();
+    } catch (e) {}
+  },
+  getCollectionPaginated: async (name: string, options?: { pageSize?: number; page?: number; dateField?: string; startDate?: string; endDate?: string; forceRefresh?: boolean }) => {
+    const pageSize = options?.pageSize || 20;
+    const page = options?.page || 1;
+    const allData = await localDB.getCollection(name, {
+      dateField: options?.dateField,
+      startDate: options?.startDate,
+      endDate: options?.endDate,
+      forceRefresh: options?.forceRefresh
+    });
+    const startIndex = (page - 1) * pageSize;
+    const pagedItems = allData.slice(startIndex, startIndex + pageSize);
+    return {
+      items: pagedItems,
+      total: allData.length,
+      page,
+      pageSize,
+      hasMore: startIndex + pageSize < allData.length
+    };
   },
   getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number; forceRefresh?: boolean }): Promise<any[]> => {
-    const rawLimit = options?.limitCount !== undefined ? options.limitCount : 5000;
+    const rawLimit = options?.limitCount !== undefined ? options.limitCount : 1000;
     const shouldLimit = rawLimit > 0;
     const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
     const hasDateFilter = Boolean(options && options.dateField && options.startDate && options.endDate);

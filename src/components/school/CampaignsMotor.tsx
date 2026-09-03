@@ -381,6 +381,26 @@ export function CampaignsMotor() {
     }
   }, [selectedLead]);
 
+  // Clean error message helper
+  const getReadableError = (rawError: any): string => {
+    if (!rawError) return 'Error inesperado.';
+    let str = typeof rawError === 'string' ? rawError : (rawError.message || JSON.stringify(rawError));
+    try {
+      if (str.startsWith('{') && str.endsWith('}')) {
+        const parsed = JSON.parse(str);
+        if (parsed.error?.message) return parsed.error.message;
+        if (parsed.error && typeof parsed.error === 'string') return parsed.error;
+        if (parsed.message) return parsed.message;
+      }
+    } catch {
+      // keep str as is
+    }
+    if (str.includes('503') || str.includes('high demand') || str.includes('UNAVAILABLE')) {
+      return 'Los servidores de IA de Google tuvieron un pico de alta demanda momentáneo. Se activó el análisis de contingencia; puedes reintentar el análisis en cualquier momento.';
+    }
+    return str;
+  };
+
   // Call the backend AI analysis route
   const handleAnalyzeChat = async () => {
     if (!selectedLead || !chatLog.trim()) return;
@@ -402,7 +422,7 @@ export function CampaignsMotor() {
       });
       
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({ error: 'Error al analizar la conversación.' }));
         throw new Error(errData.error || 'Error al analizar la conversación.');
       }
       
@@ -410,7 +430,7 @@ export function CampaignsMotor() {
       setAnalysisResult(data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Error en el servidor al invocar a Gemini. Por favor asegúrese de tener configurada la API Key.');
+      setErrorMsg(getReadableError(err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -512,7 +532,7 @@ export function CampaignsMotor() {
       setTimeout(() => setBatchSuccessMsg(''), 8000);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Error durante el análisis automático con IA.');
+      setErrorMsg(getReadableError(err));
     } finally {
       setIsBatchAnalyzing(false);
       setBatchProgress(null);
@@ -1169,11 +1189,29 @@ export function CampaignsMotor() {
 
               {/* Error Box */}
               {errorMsg && (
-                <div className="bg-red-950/40 border border-red-900/50 p-4 rounded-xl flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <span className="font-bold text-red-200 block">Error del Motor de Campañas</span>
-                    <span className="text-red-300 mt-0.5 block">{errorMsg}</span>
+                <div className="bg-red-950/50 border border-red-800/60 p-4 rounded-xl flex items-start justify-between gap-3 shadow-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="font-bold text-red-200 block">Aviso del Asistente de IA</span>
+                      <span className="text-red-300 mt-1 block leading-relaxed">{errorMsg}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleAnalyzeChat()}
+                      className="px-3 py-1.5 bg-red-800 hover:bg-red-700 text-white rounded-lg font-bold text-xs transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reintentar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setErrorMsg('')}
+                      className="p-1 text-slate-400 hover:text-white transition-all cursor-pointer bg-transparent border-none"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}

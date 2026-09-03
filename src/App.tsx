@@ -1,7 +1,10 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ModalProvider } from './contexts/ModalContext';
+import { RealtimeProvider } from './contexts/RealtimeContext';
 import { IdleTimeoutManager } from './components/IdleTimeoutManager';
 import MainLayout from './views/components/MainLayout';
 import LoginView from './views/LoginView';
@@ -40,58 +43,62 @@ function RoleRoute({ children, roles }: { children: React.ReactNode, roles: stri
 
 export default function App() {
   return (
-    <ModalProvider>
-      <AuthProvider>
-        <Router>
-          <IdleTimeoutManager>
-            <Routes>
-              <Route path="/login" element={<LoginView />} />
-              <Route
-                path="/*"
-                element={
-                  <PrivateRoute>
-                    <MainLayout>
-                      <Suspense fallback={<div className="h-full flex items-center justify-center font-sans text-primary">Cargando módulo...</div>}>
-                        <Routes>
-                          <Route path="/" element={<DashboardView />} />
-                          <Route 
-                            path="/pizarra" 
-                            element={<PizarraView />} 
-                          />
-                          <Route 
-                            path="/laboratorio" 
-                            element={<RoleRoute roles={['admin', 'lab']}><LabView /></RoleRoute>} 
-                          />
-                          <Route 
-                            path="/administracion" 
-                            element={<RoleRoute roles={['admin', 'manager', 'crm']}><AdminView /></RoleRoute>} 
-                          />
-                          <Route 
-                            path="/crm" 
-                            element={<RoleRoute roles={['admin', 'crm']}><CRMView /></RoleRoute>} 
-                          />
-                          <Route 
-                            path="/escuela" 
-                            element={<RoleRoute roles={['admin', 'school']}><SchoolView /></RoleRoute>} 
-                          />
-                          <Route 
-                            path="/gestion" 
-                            element={<RoleRoute roles={['admin', 'gestion']}><GestionView /></RoleRoute>} 
-                          />
-                          <Route 
-                            path="/cpanel" 
-                            element={<RoleRoute roles={['admin']}><CPanelView /></RoleRoute>} 
-                          />
-                        </Routes>
-                      </Suspense>
-                    </MainLayout>
-                  </PrivateRoute>
-                }
-              />
-            </Routes>
-          </IdleTimeoutManager>
-        </Router>
-      </AuthProvider>
-    </ModalProvider>
+    <QueryClientProvider client={queryClient}>
+      <ModalProvider>
+        <AuthProvider>
+          <RealtimeProvider>
+            <Router>
+              <IdleTimeoutManager>
+                <Routes>
+                  <Route path="/login" element={<LoginView />} />
+                  <Route
+                    path="/*"
+                    element={
+                      <PrivateRoute>
+                        <MainLayout>
+                          <Suspense fallback={<div className="h-full flex items-center justify-center font-sans text-primary">Cargando módulo...</div>}>
+                            <Routes>
+                              <Route path="/" element={<DashboardView />} />
+                              <Route 
+                                path="/pizarra" 
+                                element={<PizarraView />} 
+                              />
+                              <Route 
+                                path="/laboratorio" 
+                                element={<RoleRoute roles={['admin', 'lab']}><LabView /></RoleRoute>} 
+                              />
+                              <Route 
+                                path="/administracion" 
+                                element={<RoleRoute roles={['admin', 'manager', 'crm']}><AdminView /></RoleRoute>} 
+                              />
+                              <Route 
+                                path="/crm" 
+                                element={<RoleRoute roles={['admin', 'crm']}><CRMView /></RoleRoute>} 
+                              />
+                              <Route 
+                                path="/escuela" 
+                                element={<RoleRoute roles={['admin', 'school']}><SchoolView /></RoleRoute>} 
+                              />
+                              <Route 
+                                path="/gestion" 
+                                element={<RoleRoute roles={['admin', 'gestion']}><GestionView /></RoleRoute>} 
+                              />
+                              <Route 
+                                path="/cpanel" 
+                                element={<RoleRoute roles={['admin']}><CPanelView /></RoleRoute>} 
+                              />
+                            </Routes>
+                          </Suspense>
+                        </MainLayout>
+                      </PrivateRoute>
+                    }
+                  />
+                </Routes>
+              </IdleTimeoutManager>
+            </Router>
+          </RealtimeProvider>
+        </AuthProvider>
+      </ModalProvider>
+    </QueryClientProvider>
   );
 }

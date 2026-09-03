@@ -119,6 +119,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
   const [newCategory, setNewCategory] = useState<string>('Sin categoría');
   const [newCompraAnual, setNewCompraAnual] = useState<string>('0');
   const [activityType, setActivityType] = useState<string>('Nota de Seguimiento');
+  const [customActivityType, setCustomActivityType] = useState<string>('');
   const [gestionStatus, setGestionStatus] = useState<string>('En proceso');
 
   // Fetch benefits dynamically from configuration or fallback to DEFAULT_BENEFITS
@@ -403,59 +404,67 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
       quickUpdates.categoria = catToSave;
     }
 
+    // Also update gestion_records if client is in gestión
+    if (gestionStatus) {
+      try {
+        const existingGestionRecords = await localDB.getCollection('gestion_records');
+        const gRecord = existingGestionRecords.find((r: any) => r.rut === client.rut || r.email === client.email);
+        if (gRecord) {
+          await localDB.updateInCollection('gestion_records', gRecord.id, {
+            estado: gestionStatus,
+            categoria: catToSave
+          });
+        }
+      } catch (err) {
+        console.error("Error updating gestion_records status:", err);
+      }
+    }
+
     await clientService.updateClient(client.id, quickUpdates);
 
     await localDB.saveToCollection('crm_activities', {
       fecha: new Date().toISOString(),
-      campania: 'Actualización Comercial',
+      campania: 'Actualización Comercial Club',
       tipo: 'Actualización Compra/Categoría',
-      observaciones: `Se actualizó la Compra Anual Acumulada a $${amount.toLocaleString('es-CL')} y Categoría a "${catToSave}".`,
-      responsable: 'Usuario CRM',
+      observaciones: `Se actualizó la Compra Anual Acumulada (${selectedClubYear}) a $${amount.toLocaleString('es-CL')}, Estado: ${gestionStatus} y Categoría a "${catToSave}".`,
+      responsable: user?.name || user?.email || 'Usuario CRM',
       clientId: client.id
     });
 
-    alert(`¡Datos Comerciales Guardados Con Éxito!\n\n- Compra Anual Acumulada: $${amount.toLocaleString('es-CL')}\n- Categoría Club: ${catToSave}`);
+    alert(`¡Datos Comerciales Guardados Con Éxito!\n\n• Año Club: ${selectedClubYear}\n• Compra Anual Acumulada: $${amount.toLocaleString('es-CL')}\n• Categoría: ${catToSave}\n• Estado Actual: ${gestionStatus}`);
     await loadData();
     if (onSave) onSave();
     window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'gestion_records' } }));
   };
 
   const handleAddBitacora = async () => {
     if (!client) return;
-    const amount = Number(newCompraAnual) || 0;
-    const catToSave = newCategory || getTierForSales(amount);
-    const commentText = newBitacoraEntry.trim() || `Gestión ${activityType}: Categoría ${catToSave}, Compra Anual $${amount.toLocaleString('es-CL')}`;
+    const commentText = newBitacoraEntry.trim();
+    if (!commentText) {
+      alert('Por favor ingrese el detalle de la actividad o gestión a registrar.');
+      return;
+    }
+
+    const finalActivityType = activityType === 'Otros' 
+      ? (customActivityType.trim() || 'Otra Actividad / Solicitud') 
+      : activityType;
 
     const newEntry = {
       id: Date.now().toString(),
       fecha: new Date().toISOString(),
       comentario: commentText,
-      creador: 'Usuario CRM',
-      title: activityType,
+      creador: user?.name || user?.email || 'Usuario CRM',
+      title: finalActivityType,
       source: 'Manual'
     };
     const updated = [newEntry, ...bitacora];
 
-    let existingClubDetails: any = {};
-    if (client.clubVentasDetail) {
-      try {
-        existingClubDetails = typeof client.clubVentasDetail === 'string' ? JSON.parse(client.clubVentasDetail) : client.clubVentasDetail;
-      } catch (e) {
-        existingClubDetails = {};
-      }
-    }
-    existingClubDetails[`v${selectedClubYear}`] = amount;
-    existingClubDetails[`cat${selectedClubYear}`] = catToSave;
-
+    // NOTE: This button ONLY registers manual activity/bitacora in history.
+    // It intentionally DOES NOT touch or overwrite compraAnual, categoria, or clubVentasDetail.
     const updates: any = { 
-      bitacora: updated,
-      clubVentasDetail: JSON.stringify(existingClubDetails)
+      bitacora: updated
     };
-
-    if (selectedClubYear === activeCrmYear) {
-      updates.compraAnual = amount;
-      updates.categoria = catToSave;
-    }
 
     if (newPhone && newPhone !== (client.telefono || client.phone || client.celular)) updates.telefono = newPhone;
     if (newEmail && newEmail !== client.email) updates.email = newEmail;
@@ -468,9 +477,9 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
       await localDB.saveToCollection('crm_activities', {
         fecha: newEntry.fecha,
         campania: 'Gestión Directa',
-        tipo: activityType,
+        tipo: finalActivityType,
         observaciones: commentText,
-        responsable: 'Usuario CRM',
+        responsable: user?.name || user?.email || 'Usuario CRM',
         clientId: client.id
       });
     } catch (err) {
@@ -478,6 +487,9 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
     }
 
     setNewBitacoraEntry('');
+    setCustomActivityType('');
+    if (activityType === 'Otros') setActivityType('Nota de Seguimiento');
+    alert(`¡Gestión registrada con éxito en el historial!\n\n• Tipo: ${finalActivityType}\n• Detalle: ${commentText}`);
     await loadData();
     if (onSave) onSave();
     window.dispatchEvent(new CustomEvent('db-change', { detail: { collection: 'contacts' } }));
@@ -835,44 +847,96 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
 
             {/* RIGHT COLUMN: GESTIÓN */}
             <div className="lg:col-span-4 space-y-6">
-              <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-3xl space-y-6 shadow-2xl">
-                <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-                  <ClipboardList size={14} className="text-sky-500" />
-                  Nueva Gestión / Seguimiento
-                </h3>
+              {/* CARD 1: NUEVA GESTIÓN / ACTIVIDAD MANUAL */}
+              <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-3xl space-y-5 shadow-2xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <ClipboardList size={15} className="text-sky-400" />
+                    Nueva Gestión / Seguimiento
+                  </h3>
+                  <span className="text-[9px] px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20 uppercase">
+                    Registro Manual
+                  </span>
+                </div>
 
-                <div className="space-y-5">
+                <div className="space-y-4">
                   <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Tipo de Actividad</label>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5 block">Tipo de Actividad</label>
                     <select 
                       value={activityType}
                       onChange={e => setActivityType(e.target.value)}
                       className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-sky-500 transition-all cursor-pointer"
                     >
-                      <option>Nota de Seguimiento</option>
-                      <option>Llamada Telefónica</option>
-                      <option>Email masivo</option>
-                      <option>WhatsApp</option>
+                      <option value="Nota de Seguimiento">Nota de Seguimiento</option>
+                      <option value="Llamada Telefónica">Llamada Telefónica</option>
+                      <option value="Email masivo">Email masivo</option>
+                      <option value="WhatsApp">WhatsApp</option>
+                      <option value="Campaña Comercial">Campaña Comercial</option>
+                      <option value="Solicitud de Cliente">Solicitud de Cliente / Pedido</option>
+                      <option value="Otros">Otros (Especificar)</option>
                     </select>
                   </div>
 
+                  {activityType === 'Otros' && (
+                    <div className="animate-in fade-in duration-200">
+                      <label className="text-[9px] font-black text-sky-400 uppercase tracking-wider mb-1.5 block">
+                        Especifique el Tipo de Actividad u Origen
+                      </label>
+                      <input 
+                        type="text"
+                        placeholder="Ej: Me llamó la clienta pidiendo algo, Reunión presencial, Reclamo..."
+                        value={customActivityType}
+                        onChange={e => setCustomActivityType(e.target.value)}
+                        className="w-full bg-[#050914] border border-sky-500/60 p-3 rounded-xl text-xs text-white font-semibold outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-all"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+
                   <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Detalle de la Actividad</label>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5 block">Detalle de la Actividad</label>
                     <textarea 
-                      placeholder="Escriba los pormenores de la gestión realizada..."
+                      placeholder="Escriba los pormenores de la gestión realizada (ej: la clienta solicitó cotización de nuevos productos, se envió información de campaña, etc.)..."
                       value={newBitacoraEntry}
                       onChange={e => setNewBitacoraEntry(e.target.value)}
-                      className="w-full bg-[#050914] border border-slate-800 p-4 rounded-xl text-xs text-white outline-none focus:border-sky-500 transition-all min-h-[120px] resize-none leading-relaxed"
+                      className="w-full bg-[#050914] border border-slate-800 p-4 rounded-xl text-xs text-white outline-none focus:border-sky-500 transition-all min-h-[110px] resize-none leading-relaxed"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    type="button"
+                    onClick={handleAddBitacora}
+                    className="w-full bg-[#0284C7] hover:bg-[#0369a1] text-white font-black text-xs py-3.5 rounded-2xl transition-all shadow-lg hover:shadow-sky-950/30 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                  >
+                    <Save size={16} />
+                    GUARDAR CAMBIOS Y REGISTRAR EN HISTORIAL
+                  </button>
+                  <p className="text-[9px] text-slate-400 text-center italic">
+                    Registra la actividad en el historial de la bitácora sin modificar montos de compra ni categorías.
+                  </p>
+                </div>
+              </div>
+
+              {/* CARD 2: ACTUALIZACIÓN COMERCIAL Y CLUB CIMASUR */}
+              <div className="bg-[#0D1527] border border-slate-850 p-6 rounded-3xl space-y-5 shadow-2xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <Award size={15} className="text-amber-400" />
+                    Categoría y Compras Club ({selectedClubYear})
+                  </h3>
+                  <span className="text-[9px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 uppercase">
+                    Comercial
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Categoría</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5 block">Categoría</label>
                       <select 
                         value={newCategory}
                         onChange={e => setNewCategory(e.target.value)}
-                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer outline-none focus:border-sky-500"
+                        className="w-full bg-[#050914] border border-slate-800 p-2.5 rounded-xl text-[11px] text-white font-bold cursor-pointer outline-none focus:border-amber-500"
                       >
                         <option value="Sin categoría">Sin categoría</option>
                         <option value="Bronce">Bronce</option>
@@ -882,11 +946,11 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                       </select>
                     </div>
                     <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Estado Actual</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5 block">Estado Actual</label>
                       <select 
                         value={gestionStatus}
                         onChange={e => setGestionStatus(e.target.value)}
-                        className="w-full bg-[#050914] border border-slate-800 p-3 rounded-xl text-[11px] text-white font-bold cursor-pointer outline-none focus:border-sky-500"
+                        className="w-full bg-[#050914] border border-slate-800 p-2.5 rounded-xl text-[11px] text-white font-bold cursor-pointer outline-none focus:border-amber-500"
                       >
                         <option>En proceso</option>
                         <option>Completado</option>
@@ -896,9 +960,9 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Compra Anual Acumulada ($)</label>
-                      <span className="text-[9px] text-sky-400 font-bold">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Compra Anual Acumulada ($)</label>
+                      <span className="text-[9px] text-amber-400 font-bold">
                         Sugerido: {getTierForSales(Number(newCompraAnual) || 0)}
                       </span>
                     </div>
@@ -911,7 +975,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                         const autoCat = getTierForSales(Number(val) || 0);
                         setNewCategory(autoCat);
                       }}
-                      className="w-full bg-[#050914] border border-sky-500/50 p-3 rounded-xl text-xs text-white font-black outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-all" 
+                      className="w-full bg-[#050914] border border-amber-500/40 p-3 rounded-xl text-xs text-white font-black outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all" 
                       placeholder="0"
                     />
                   </div>
@@ -919,7 +983,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                   <button 
                     type="button"
                     onClick={handleQuickSaveCategoryAndSales}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-black text-[10px] py-2.5 rounded-xl transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-black text-[11px] py-3 rounded-xl transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-[0.99]"
                   >
                     <Save size={14} />
                     GUARDAR COMPRA Y CATEGORÍA
@@ -964,7 +1028,7 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                           campania: 'Actualización',
                           tipo: newVal ? 'Activación Gestión' : 'Desactivación Gestión',
                           observaciones: `El cliente fue ${newVal ? 'marcado' : 'desmarcado'} como Cliente de Gestión.`,
-                          responsable: 'Usuario CRM',
+                          responsable: user?.name || user?.email || 'Usuario CRM',
                           clientId: client.id
                         });
                         
@@ -980,20 +1044,6 @@ export const Client360View: React.FC<Client360Props> = ({ clientId, onClose, onS
                     </div>
                     <span className="text-[11px] font-black text-slate-400 group-hover:text-slate-200 transition-all uppercase tracking-wide">Es Cliente de Gestión</span>
                   </label>
-
-                  <div className="pt-2 space-y-5">
-                    <button 
-                      onClick={handleAddBitacora}
-                      className="w-full bg-[#0284C7] hover:bg-[#0369a1] text-white font-black text-xs py-4 rounded-2xl transition-all shadow-lg hover:shadow-sky-950/20 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Save size={16} />
-                      GUARDAR CAMBIOS Y REGISTRAR EN HISTORIAL
-                    </button>
-                  </div>
-
-                  <p className="text-[10px] text-sky-400 italic text-center pt-2 uppercase font-black tracking-tight">
-                    ¡Use el botón azul superior para guardar su gestión, categoría, compras y demás datos modificados!
-                  </p>
                 </div>
               </div>
             </div>

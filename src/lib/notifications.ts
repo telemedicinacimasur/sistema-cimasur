@@ -1,6 +1,6 @@
 import { localDB } from './auth';
 import { dbInstance as db, isFirebaseReady } from './firebase';
-import { collection, getDocs, query, where, orderBy, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 
 export interface Notification {
   id?: string;
@@ -199,7 +199,9 @@ export const subscribeToNotifications = (
     return isRoleRecipient;
   };
 
-  const fetchOnDemand = async () => {
+  let unsubscribeFirestore: (() => void) | null = null;
+
+  const setupRealtimeNotifications = () => {
     if (isFirebaseReady && db) {
       try {
         const usuarioActualId = usuarioActualIdParam || currentUserEmail || currentUserName;
@@ -207,43 +209,45 @@ export const subscribeToNotifications = (
           collection(db, 'notifications'),
           where('usuarioId', '==', usuarioActualId),
           where('leida', '==', false),
-          limit(20)
+          limit(25)
         );
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => {
-          const d = doc.data();
-          return {
-            id: doc.id,
-            ...d,
-            read: d.read ?? d.leida ?? false,
-            leida: d.leida ?? d.read ?? false,
-          } as unknown as Notification;
-        });
-        const filtered = data.filter(isRecipient);
-        callback(filtered);
-      } catch (err) {
-        console.warn("Firestore getDocs notifications error, falling back to local cache:", err);
-        try {
-          const data = await localDB.getCollection('notifications', { limitCount: 20 });
-          const filtered = (data || []).filter(isRecipient);
+        unsubscribeFirestore = onSnapshot(q, (snapshot) => {
+          const data = snapshot.docs.map(doc => {
+            const d = doc.data();
+            return {
+              id: doc.id,
+              ...d,
+              read: d.read ?? d.leida ?? false,
+              leida: d.leida ?? d.read ?? false,
+            } as unknown as Notification;
+          });
+          const filtered = data.filter(isRecipient);
           callback(filtered);
-        } catch (e) {
-          console.warn("Failed to fetch fallback notifications", e);
-        }
+        }, (err) => {
+          console.warn("Firestore notifications onSnapshot error, falling back to on-demand:", err);
+          fetchOnDemand();
+        });
+      } catch (err) {
+        console.warn("Error setting up notifications listener:", err);
+        fetchOnDemand();
       }
     } else {
-      try {
-        const data = await localDB.getCollection('notifications', { limitCount: 20 });
-        const sorted = [...data].sort((a, b) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return timeB - timeA;
-        });
-        const filtered = sorted.filter(isRecipient);
-        callback(filtered);
-      } catch (e) {
-        console.warn("Local notifications fetch error:", e);
-      }
+      fetchOnDemand();
+    }
+  };
+
+  const fetchOnDemand = async () => {
+    try {
+      const data = await localDB.getCollection('notifications', { limitCount: 25 });
+      const sorted = [...(data || [])].sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      const filtered = sorted.filter(isRecipient);
+      callback(filtered);
+    } catch (e) {
+      console.warn("Local notifications fetch error:", e);
     }
   };
 
@@ -254,10 +258,15 @@ export const subscribeToNotifications = (
     }
   };
 
-  fetchOnDemand();
+  setupRealtimeNotifications();
   window.addEventListener('db-change', onDbChange);
 
   return () => {
+    if (unsubscribeFirestore) {
+      try {
+        unsubscribeFirestore();
+      } catch (e) {}
+    }
     window.removeEventListener('db-change', onDbChange);
   };
 };
