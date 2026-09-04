@@ -399,7 +399,7 @@ export const localDB = {
     };
   },
   getCollection: async (name: string, options?: { dateField?: string; startDate?: string; endDate?: string; limitCount?: number; forceRefresh?: boolean }): Promise<any[]> => {
-    const rawLimit = options?.limitCount !== undefined ? options.limitCount : 1000;
+    const rawLimit = options?.limitCount !== undefined ? options.limitCount : 5000;
     const shouldLimit = rawLimit > 0;
     const limitStr = shouldLimit ? `limit_${rawLimit}` : 'nolimit';
     const hasDateFilter = Boolean(options && options.dateField && options.startDate && options.endDate);

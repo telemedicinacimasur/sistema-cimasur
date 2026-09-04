@@ -103,7 +103,7 @@ export default function LabView() {
 
     const loadData = async () => {
       try {
-        const data = await localDB.getCollection(collectionName, { limitCount: 100 });
+        const data = await localDB.getCollection(collectionName, { limitCount: 5000 });
         if (isMounted) {
           setRecords(Array.isArray(data) ? data : []);
         }
@@ -117,7 +117,7 @@ export default function LabView() {
       const db = getDb();
       if (db) {
         try {
-          const q = query(collection(db, collectionName), limit(100));
+          const q = query(collection(db, collectionName), limit(5000));
           unsubscribe = onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({
               id: doc.id,
@@ -3940,7 +3940,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
     let unsubscribe: (() => void) | null = null;
     const loadPOs = async () => {
       try {
-        const data = await localDB.getCollection('purchase_orders', { limitCount: 100 });
+        const data = await localDB.getCollection('purchase_orders', { limitCount: 2000 });
         if (isMounted) {
           setPurchaseOrders(data || []);
         }
@@ -3953,7 +3953,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
       const db = getDb();
       if (db) {
         try {
-          const q = query(collection(db, 'purchase_orders'), limit(100));
+          const q = query(collection(db, 'purchase_orders'), limit(2000));
           unsubscribe = onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({
               id: doc.id,
@@ -4105,7 +4105,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
     let unsubscribe: (() => void) | null = null;
     const loadFollowups = async () => {
       try {
-        const folData = await localDB.getCollection('stock_followups', { limitCount: 100 });
+        const folData = await localDB.getCollection('stock_followups', { limitCount: 2000 });
         if (isMounted) {
           setFollowups(Array.isArray(folData) ? folData : []);
         }
@@ -4121,7 +4121,7 @@ function StockManager({ records: inventoryRecords, setRecords }: { records: any[
       const db = getDb();
       if (db) {
         try {
-          const q = query(collection(db, 'stock_followups'), limit(100));
+          const q = query(collection(db, 'stock_followups'), limit(2000));
           unsubscribe = onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({
               id: doc.id,

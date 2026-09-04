@@ -99,8 +99,8 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               constraints.push(orderBy(config.orderByClause[0], config.orderByClause[1]));
             }
             
-            // STRICT BOUNDED QUERIES (max 50 to prevent read explosion across 5+ concurrent users)
-            const safeLimit = Math.min(config.limitCount || 30, 100);
+            // Bounded queries with generous default to avoid truncating products/inventories
+            const safeLimit = config.limitCount ? Math.min(config.limitCount, 5000) : 2000;
             constraints.push(limit(safeLimit));
 
             const q = query(collection(db, config.collectionName), ...constraints);
@@ -257,7 +257,7 @@ export function useSharedRealtimeCollection<T = any>(config: SubscriptionConfig)
             if (config.orderByClause) {
               constraints.push(orderBy(config.orderByClause[0], config.orderByClause[1]));
             }
-            const safeLimit = Math.min(config.limitCount || 30, 100);
+            const safeLimit = config.limitCount ? Math.min(config.limitCount, 5000) : 2000;
             constraints.push(limit(safeLimit));
 
             const q = query(collection(db, config.collectionName), ...constraints);
